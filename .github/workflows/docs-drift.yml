@@ -1,0 +1,116 @@
+name: Docs Drift
+
+on:
+  repository_dispatch:
+    types: [docs-drift]
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: AutoVault commit SHA or ref to audit
+        required: false
+      reason:
+        description: Why the docs audit is running
+        required: true
+        default: Manual docs drift audit
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve source payload
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.DOCS_DRIFT_TOKEN || github.token }}
+        run: |
+          SOURCE_REPO="${{ github.event.client_payload.source_repo || 'autoworks-ai/autovault' }}"
+          SOURCE_REF="${{ github.event.client_payload.source_sha || inputs.source_sha || 'main' }}"
+          SOURCE_BRANCH="${{ github.event.client_payload.source_branch || 'main' }}"
+          REASON="${{ github.event.client_payload.reason || inputs.reason || 'Manual docs drift audit' }}"
+
+          if [ "$SOURCE_REPO" != "autoworks-ai/autovault" ]; then
+            echo "::error::Unsupported source repo: $SOURCE_REPO"
+            exit 1
+          fi
+
+          FULL_SHA=$(gh api "repos/$SOURCE_REPO/commits/$SOURCE_REF" -q '.sha') || {
+            echo "::error::Could not resolve ref '$SOURCE_REF' in $SOURCE_REPO"
+            exit 1
+          }
+
+          echo "source_repo=$SOURCE_REPO" >> "$GITHUB_OUTPUT"
+          echo "source_sha=$FULL_SHA" >> "$GITHUB_OUTPUT"
+          echo "source_branch=$SOURCE_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "reason=$REASON" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.resolve.outputs.source_repo }}
+          ref: ${{ steps.resolve.outputs.source_sha }}
+          path: .source-repo
+          token: ${{ secrets.DOCS_DRIFT_TOKEN || github.token }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run Claude Code docs audit
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Read .github/prompts/update-docs.md for full instructions.
+
+            Source repo: ${{ steps.resolve.outputs.source_repo }}
+            Source branch: ${{ steps.resolve.outputs.source_branch }}
+            Commit: ${{ steps.resolve.outputs.source_sha }}
+            Changed files: ${{ toJSON(github.event.client_payload.changed_files) || 'See reason below' }}
+            Affected website pages: ${{ toJSON(github.event.client_payload.affected_docs) || 'Determine from scripts/file-doc-map.json and reason' }}
+            Compare URL: ${{ github.event.client_payload.compare_url || 'N/A' }}
+            Reason: ${{ steps.resolve.outputs.reason }}
+
+            The source repo is checked out at .source-repo/.
+          claude_args: >-
+            --model claude-sonnet-4-6
+            --max-turns 50
+            --allowedTools 'Read'
+            --allowedTools 'MultiEdit'
+            --allowedTools 'Edit'
+            --allowedTools 'Write'
+            --allowedTools 'Glob'
+            --allowedTools 'Grep'
+            --allowedTools 'Bash(npm run typecheck)'
+            --allowedTools 'Bash(npm test)'
+            --allowedTools 'Bash(npm run docs:build)'
+
+      - name: Enable auto-merge on docs PRs created by this run
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.DOCS_DRIFT_TOKEN || github.token }}
+          RUN_STARTED_AT: ${{ github.run_started_at }}
+        run: |
+          PRS=$(gh pr list \
+            --state open \
+            --limit 200 \
+            --json number,headRefName,createdAt,isCrossRepository \
+            --jq "[.[] | select(.isCrossRepository == false) | select(.headRefName | startswith(\"docs/audit-\")) | select(.createdAt >= \"$RUN_STARTED_AT\")] | .[].number")
+
+          if [ -z "$PRS" ]; then
+            echo "No docs/audit-* PRs created during this run."
+            exit 0
+          fi
+
+          for pr in $PRS; do
+            gh pr merge "$pr" --auto --squash \
+              || echo "Skipped PR #$pr; it may have conflicts, missing checks, or already be merged."
+          done

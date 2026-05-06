@@ -1,0 +1,39 @@
+{
+  "_meta": {
+    "description": "Maps AutoVault source file patterns to website page slugs. Use exact paths or '/**' suffix for subtrees.",
+    "last_updated": "2026-05-06",
+    "source_repo": "autoworks-ai/autovault",
+    "website_repo": "autoworks-ai/autovault-website"
+  },
+  "autovault": {
+    "README.md": ["AutoVault", "quick-start", "security"],
+    "INSTALL.md": ["quick-start"],
+    "CHANGELOG.md": ["changelog"],
+    "package.json": ["quick-start", "changelog"],
+    "package-lock.json": ["quick-start"],
+    ".env.example": ["quick-start"],
+
+    "src/cli.ts": ["quick-start"],
+    "src/library.ts": ["AutoVault", "quick-start"],
+    "src/index.ts": ["AutoVault", "quick-start"],
+    "src/mcp/**": ["AutoVault", "quick-start"],
+    "src/tools/**": ["AutoVault", "quick-start", "skills-directory"],
+    "src/capabilities/**": ["AutoVault", "skills-directory"],
+    "src/profiles/**": ["AutoVault", "quick-start"],
+    "src/transforms/**": ["AutoVault", "authoring"],
+    "src/validation/**": ["authoring", "security"],
+    "src/storage/**": ["AutoVault", "security"],
+    "src/sources/**": ["quick-start", "security"],
+    "src/util/**": ["security"],
+
+    "scripts/install.sh": ["quick-start"],
+    "scripts/bootstrap-skills.mjs": ["quick-start", "skills-directory"],
+    "scripts/security/**": ["security", "authoring"],
+    "skills/**": ["skills-directory", "authoring"],
+
+    "docs/THREAT-MODEL.md": ["security"],
+    "docs/RELEASE.md": ["changelog"],
+    "docs/adr/**": ["AutoVault"],
+    ".github/workflows/**": ["changelog"]
+  }
+}

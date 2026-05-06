@@ -1,7 +1,7 @@
 ---
 title: Skills Directory
 description: Browse and filter signed AutoVault skills.
-aside: false
+layout: false
 ---
 
-<SkillsDirectoryPage />
+<DocsShell page="skills"><SkillsDirectoryPage /></DocsShell>

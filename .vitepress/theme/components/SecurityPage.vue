@@ -4,7 +4,7 @@
       <div>
         <div class="eyebrow"><span class="dash" /> Security & provenance</div>
         <h1>Signing isn't the same as <span class="ital">safe.</span></h1>
-        <p class="lede">A signature proves who said what, when. It does not prove the thing they said is correct or harmless. AutoVault's security model rests on three pillars: what we sign, what we do not sign, and where the trust boundary actually lives.</p>
+        <p class="lede">A signature proves <em>who said what, when</em>. It does <strong>not</strong> prove the thing they said is correct or harmless. AutoVault's security model rests on three pillars — what we sign, what we don't sign, and where the trust boundary actually lives. This page is for staff engineers and security teams who want to inspect that model before they deploy.</p>
       </div>
       <VerifierDemo />
     </section>
@@ -12,7 +12,7 @@
     <section class="sec-section">
       <div class="eyebrow"><span class="dash" /> Trust model</div>
       <h2>Three actors. Three responsibilities. <span class="ital">No overlap.</span></h2>
-      <p class="sub">AutoVault explicitly does not claim to make untrusted code safe. It splits the job into narrow roles and keeps the runtime boundary with the local agent.</p>
+      <p class="sub">AutoVault explicitly does <strong>not</strong> claim to make untrusted code safe. Instead, the system splits the job into three roles. Each role has a narrow, well-defined responsibility, and we never blur the lines between them.</p>
 
       <div class="trust-diagram">
         <article v-for="(role, index) in roles" :key="role.title" class="trust-col">

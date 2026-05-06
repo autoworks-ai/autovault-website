@@ -14,7 +14,7 @@
               <div class="install-head"><span class="dot live" /><span class="dot" /><span class="dot" /><span class="label">~ &nbsp;bash</span></div>
               <div class="install-body">
                 <span class="prompt">$</span>
-                <code class="cmd">curl <span class="arg">-fsSL</span> autovault.sh <span class="pipe">|</span> sh</code>
+                <code class="cmd">curl <span class="arg">-fsSL</span> https://autovault.sh <span class="pipe">|</span> sh</code>
                 <button class="copy-btn" :class="{ copied }" type="button" @click="copyInstall">{{ copied ? "Copied" : "Copy" }}</button>
               </div>
             </div>
@@ -341,7 +341,7 @@ onUnmounted(() => {
 });
 
 async function copyInstall() {
-  await navigator.clipboard?.writeText("curl -fsSL autovault.sh | sh");
+  await navigator.clipboard?.writeText("curl -fsSL https://autovault.sh | sh");
   copied.value = true;
   window.setTimeout(() => (copied.value = false), 1400);
 }
@@ -393,7 +393,7 @@ const compareRows = [
 ];
 
 const quickSteps = [
-  { title: "Install the local vault", body: '<div><span class="pmt">$</span> curl -fsSL autovault.sh | sh</div><div class="muted">↳ installed → ~/.autovault</div><div class="arg">● vault healthy · 0 skills · ed25519 keypair generated</div>' },
+  { title: "Install the local vault", body: '<div><span class="pmt">$</span> curl -fsSL https://autovault.sh | sh</div><div class="muted">↳ installed → ~/.autovault/app</div><div class="arg">● vault healthy · 0 skills · ed25519 keypair generated</div>' },
   { title: "Add a validated skill", body: '<div><span class="pmt">$</span> autovault add github:autoworks-ai/skills/extract-pdf</div><div class="muted">↳ [1/5] yaml-repair: ok</div><div class="muted">↳ [5/5] sign: 0x9af4…2c81</div><div class="arg">✓ admitted to vault</div>' },
   { title: "Scope to a project", body: '<div><span class="pmt">$</span> autovault scope extract-pdf --project autovault-website --agent claude-code,codex</div><div class="muted">↳ scoped: 2 agents × 1 project</div><div class="arg">✓ ready · cached</div>' },
   { title: "Run from either agent", body: '<div class="muted"># in claude-code</div><div>&gt; use extract-pdf to summarize report.pdf</div><div class="arg">✓ tool resolved: chrome-devtools, read</div><div class="muted" style="margin-top:12px"># in codex</div><div>&gt; use extract-pdf to summarize report.pdf</div><div class="arg">✓ tool resolved: browser_form, file_read</div>' }

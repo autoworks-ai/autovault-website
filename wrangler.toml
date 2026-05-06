@@ -1,0 +1,6 @@
+name = "autovault-website"
+pages_build_output_dir = ".vitepress/dist"
+compatibility_date = "2026-05-06"
+
+[vars]
+AUTOVAULT_INSTALLER_URL = "https://raw.githubusercontent.com/autoworks-ai/autovault/main/scripts/install.sh"

@@ -15,11 +15,11 @@
     </section>
 
     <h2 id="step-1-install-the-local-vault">Step 1 — Install the local vault</h2>
-    <p>The installer drops a single binary at <code>~/.autovault/bin/autovault</code>, generates an Ed25519 keypair, and symlinks each agent's skill profile directory into the rendered output of the vault.</p>
-    <CodeBlock lang="bash"><span class="pmt">$</span> curl <span class="arg">-fsSL</span> autovault.sh <span class="muted">|</span> sh
+    <p>The installer builds the Node app under <code>~/.autovault/app</code>, preserves vault storage in <code>~/.autovault</code>, and writes the CLI shim to <code>~/.autovault/bin/autovault</code>.</p>
+    <CodeBlock lang="bash"><span class="pmt">$</span> curl <span class="arg">-fsSL</span> https://autovault.sh <span class="muted">|</span> sh
 <span class="yaml-comment"># macOS: also available via brew</span>
 <span class="pmt">$</span> brew install autoworks-ai/tap/autovault</CodeBlock>
-    <div class="callout tip"><UiIcon name="tip" class="arg" /><div><strong>Privacy.</strong> The installer does not phone home. <code>autovault.sh</code> redirects to the GitHub release artifact; you can audit the script before piping it.</div></div>
+    <div class="callout tip"><UiIcon name="tip" class="arg" /><div><strong>Privacy.</strong> The installer does not phone home. <code>autovault.sh</code> serves the audited script from the AutoVault source repository; you can read it before piping it.</div></div>
 
     <h2 id="step-2-add-your-first-skill">Step 2 — Add your first skill</h2>
     <p>Skills enter the vault through a <strong>source adapter</strong>. Whatever the source, the gate runs the same five checks before admission.</p>
@@ -71,11 +71,12 @@ const activeAgent = computed(() => agentOptions.find((item) => item.id === agent
 const TerminalDemo = defineComponent({
   setup() {
     const lines = [
-      { type: "cmd", text: "curl -fsSL autovault.sh | sh" },
-      { type: "out", text: "↳ downloading autovault-installer (1.2 MB)…" },
-      { type: "out", text: "↳ verifying ed25519 signature…" },
-      { type: "ok", text: "✓ signature ok · key:0xC4F9…E10A" },
-      { type: "out", text: "↳ installed to ~/.autovault" },
+      { type: "cmd", text: "curl -fsSL https://autovault.sh | sh" },
+      { type: "out", text: "↳ downloading autoworks-ai/autovault source…" },
+      { type: "out", text: "↳ installing dependencies…" },
+      { type: "out", text: "↳ building TypeScript…" },
+      { type: "out", text: "↳ installed app to ~/.autovault/app" },
+      { type: "out", text: "↳ wrote shim to ~/.autovault/bin/autovault" },
       { type: "out", text: "↳ symlinking profile dirs:" },
       { type: "out", text: "    ~/.claude/skills → ~/.autovault/render/claude-code" },
       { type: "out", text: "    ~/.codex/skills  → ~/.autovault/render/codex" },

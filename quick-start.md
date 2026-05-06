@@ -1,6 +1,7 @@
 ---
 title: Quick start
 description: Install AutoVault, add a skill, scope it to agents, and run the gate.
+layout: false
 ---
 
-<QuickStartPage />
+<DocsShell page="quick-start"><QuickStartPage /></DocsShell>

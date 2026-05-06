@@ -1,6 +1,7 @@
 ---
 title: Authoring
 description: Write AutoVault skills with metadata, transformations, permissions, and gate checks.
+layout: false
 ---
 
-<AuthoringPage />
+<DocsShell page="authoring"><AuthoringPage /></DocsShell>
