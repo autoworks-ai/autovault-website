@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Quick start — AutoVault</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="docs-shell.css">
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<style>
+/* Quick start — page-specific extras */
+.qs-hero {
+  display: grid; grid-template-columns: 1.15fr 1fr; gap: 56px; align-items: center;
+  margin-bottom: 48px; padding-bottom: 48px; border-bottom: 1px solid var(--line);
+}
+.qs-hero h1 { font-size: 52px; line-height: 1.02; }
+.qs-hero .lede { margin-top: 18px; }
+.qs-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 28px; }
+.qs-stats .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.qs-stats .lbl { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); letter-spacing: 0.06em; text-transform: uppercase; }
+.qs-stats .val { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; margin-top: 4px; }
+.qs-stats .val .unit { font-family: var(--mono); font-size: 12px; color: var(--ink-3); margin-left: 4px; font-weight: 400; }
+
+.terminal {
+  background: #0a0d11;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-family: var(--mono); font-size: 12.5px;
+  overflow: hidden;
+}
+.terminal-head {
+  display: flex; align-items: center; gap: 6px;
+  padding: 10px 14px; background: var(--bg-2); border-bottom: 1px solid var(--line);
+}
+.terminal-head .lights { display: flex; gap: 5px; }
+.terminal-head .lights span { width: 9px; height: 9px; border-radius: 50%; background: #2a3038; }
+.terminal-head .lights span:first-child { background: #d97171; opacity: 0.85; }
+.terminal-head .lights span:nth-child(2) { background: #e8a866; opacity: 0.85; }
+.terminal-head .lights span:nth-child(3) { background: var(--accent); opacity: 0.85; }
+.terminal-head .ttl { margin-left: auto; color: var(--ink-3); font-size: 11px; }
+.terminal-body { padding: 18px 22px; line-height: 1.75; color: var(--ink); min-height: 400px; }
+.terminal-body .line { display: flex; gap: 10px; }
+.terminal-body .pmt { color: var(--accent); user-select: none; }
+.terminal-body .out { color: var(--ink-3); padding-left: 22px; }
+.terminal-body .ok { color: var(--accent); padding-left: 22px; }
+.terminal-body .err { color: var(--bad); padding-left: 22px; }
+.terminal-body .ind { color: var(--ink-4); }
+.terminal-body .arg { color: var(--accent); }
+.terminal-body .cur { display: inline-block; width: 7px; height: 14px; background: var(--accent); animation: blink 1s steps(1) infinite; vertical-align: middle; margin-left: 2px; }
+@keyframes blink { 50% { opacity: 0; } }
+
+.steplist {
+  display: grid; gap: 0;
+  border-left: 2px solid var(--line);
+  padding-left: 28px;
+  margin: 32px 0 32px 8px;
+}
+.steplist .step { padding-bottom: 36px; position: relative; }
+.steplist .step::before {
+  content: ""; position: absolute; left: -36px; top: 4px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--bg); border: 2px solid var(--line);
+}
+.steplist .step.done::before { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 4px var(--bg), 0 0 0 5px var(--accent-soft); }
+.steplist .step h3 { margin-top: 0; }
+.steplist .step .meta { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; }
+
+.agent-tabs { display: flex; gap: 4px; padding: 4px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; margin-bottom: 0; width: fit-content; }
+.agent-tabs button { background: none; border: 0; color: var(--ink-3); font: inherit; font-size: 12px; font-weight: 500; padding: 6px 12px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.agent-tabs button.active { background: var(--panel); color: var(--ink); }
+.agent-tabs button .dot { width: 7px; height: 7px; border-radius: 50%; }
+
+.cmd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0 24px; }
+.cmd-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+.cmd-card .cmd-name { font-family: var(--mono); font-size: 13px; color: var(--accent); margin-bottom: 6px; }
+.cmd-card .cmd-desc { font-size: 12.5px; color: var(--ink-3); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="docs-shell.jsx"></script>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+const { Topbar, Sidebar, TOC, Code, Callout, Breadcrumbs, Pager, Icon } = window;
+
+const TERMINAL_LINES = [
+  { type: "cmd", text: "curl -fsSL autovault.sh | sh" },
+  { type: "out", text: "↳ downloading autovault-installer (1.2 MB)…" },
+  { type: "out", text: "↳ verifying ed25519 signature…" },
+  { type: "ok",  text: "✓ signature ok · key:0xC4F9…E10A" },
+  { type: "out", text: "↳ installed to ~/.autovault" },
+  { type: "out", text: "↳ symlinking profile dirs:" },
+  { type: "out", text: "    ~/.claude/skills → ~/.autovault/render/claude-code" },
+  { type: "out", text: "    ~/.codex/skills  → ~/.autovault/render/codex" },
+  { type: "out", text: "    ~/.cursor/skills → ~/.autovault/render/cursor" },
+  { type: "ok",  text: "✓ vault ready · 0 skills · ed25519 keypair generated" },
+  { type: "blank" },
+  { type: "cmd", text: "autovault add github:autoworks-ai/skills/extract-pdf" },
+  { type: "out", text: "↳ fetching extract-pdf@1.4.0… 1.4kb" },
+  { type: "out", text: "↳ [1/5] yaml-repair    : ok (frontmatter clean)" },
+  { type: "out", text: "↳ [2/5] denylist       : ok (no known bad patterns)" },
+  { type: "out", text: "↳ [3/5] cap/behavior   : ok (declared = observed)" },
+  { type: "out", text: "↳ [4/5] dedup          : ok (no near matches in vault)" },
+  { type: "out", text: "↳ [5/5] sign           : 0x9af4…2c81" },
+  { type: "ok",  text: "✓ admitted to vault · scoped to: claude-code, codex" },
+];
+
+const Terminal = () => {
+  const [shown, setShown] = useState(0);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (shown >= TERMINAL_LINES.length) return;
+    const cur = TERMINAL_LINES[shown];
+    const delay = cur.type === "cmd" ? 700 : cur.type === "ok" ? 250 : 130;
+    const id = setTimeout(() => setShown(s => s + 1), delay);
+    return () => clearTimeout(id);
+  }, [shown]);
+  useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [shown]);
+
+  return (
+    <div className="terminal">
+      <div className="terminal-head">
+        <span className="lights"><span/><span/><span/></span>
+        <span className="ttl">~ — autovault — bash</span>
+      </div>
+      <div className="terminal-body" ref={ref}>
+        {TERMINAL_LINES.slice(0, shown).map((l, i) => {
+          if (l.type === "blank") return <div key={i} style={{ height: 12 }}/>;
+          if (l.type === "cmd") return <div className="line" key={i}><span className="pmt">$</span><span>{l.text}</span></div>;
+          return <div className={l.type} key={i}>{l.text}</div>;
+        })}
+        {shown < TERMINAL_LINES.length && <span className="cur"/>}
+        {shown >= TERMINAL_LINES.length && (
+          <div style={{ marginTop: 16, display: "flex", gap: 12 }}>
+            <button className="pill-btn" onClick={() => setShown(0)} style={{ fontSize: 11 }}>↻ Replay</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const App = () => {
+  const [agent, setAgent] = useState("claude-code");
+  const agents = [
+    { id: "claude-code", label: "Claude Code", color: "#d6a85a", cmd: "use extract-pdf to summarize report.pdf", out: "✓ tool resolved: chrome-devtools, read" },
+    { id: "codex", label: "Codex", color: "#5a9dd6", cmd: "use extract-pdf to summarize report.pdf", out: "✓ tool resolved: browser_form, file_read" },
+    { id: "cursor", label: "Cursor", color: "#b48ad6", cmd: "@extract-pdf summarize report.pdf", out: "✓ tool resolved: playwright_fill_form, fs_read" },
+  ];
+  const a = agents.find(x => x.id === agent);
+
+  return (
+    <>
+      <Topbar active="Quick start" />
+      <div className="docs-shell">
+        <Sidebar active="Quick start" />
+        <main className="docs-content">
+          <Breadcrumbs trail={[
+            { label: "Docs", href: "AutoVault.html" },
+            { label: "Get started" },
+            { label: "Quick start" },
+          ]} />
+
+          <div className="qs-hero">
+            <div>
+              <div className="eyebrow"><span className="dash"/> Get started · 5 minutes</div>
+              <h1>Run one skill across <span className="ital">two agents.</span></h1>
+              <p className="lede">By the end of this page you'll have a local vault, a validated skill, and the same skill running from both Claude Code and Codex with zero forks.</p>
+              <div className="qs-stats">
+                <div className="stat"><div className="lbl">Time</div><div className="val">5<span className="unit">min</span></div></div>
+                <div className="stat"><div className="lbl">Disk</div><div className="val">12<span className="unit">MB</span></div></div>
+                <div className="stat"><div className="lbl">Required</div><div className="val">node <span className="unit">≥ 20</span></div></div>
+              </div>
+            </div>
+            <Terminal />
+          </div>
+
+          <h2 id="install">Step 1 — Install the local vault</h2>
+          <p>The installer drops a single binary at <code>~/.autovault/bin/autovault</code>, generates an ed25519 keypair, and symlinks each agent's skill profile directory into the rendered output of the vault. Nothing runs as a daemon — the CLI does sync on demand and a drift check on shell startup.</p>
+
+          <Code lang="bash">
+            <span className="p">$</span> <span className="v">curl</span> <span className="k">-fsSL</span> <span className="s">autovault.sh</span> <span className="p">|</span> <span className="v">sh</span>{"\n"}
+            <span className="c"># macOS: also available via brew</span>{"\n"}
+            <span className="p">$</span> <span className="v">brew install</span> <span className="s">autoworks-ai/tap/autovault</span>
+          </Code>
+
+          <Callout kind="tip" title="Privacy">
+            The installer does not phone home. <code>autovault.sh</code> redirects to the GitHub release artifact; you can audit the script before piping it. The signing key is fetched from <code>autovault.dev/.well-known/keys.json</code> with TOFU-pinning.
+          </Callout>
+
+          <h2 id="first">Step 2 — Add your first skill</h2>
+          <p>Skills enter the vault through a <strong>source adapter</strong>. Each adapter knows how to fetch from one origin (GitHub repo, local path, HTTPS bundle, ClawdHub mirror with reduced trust) and hand the raw skill to the validation gate. Whatever the source, the gate runs the same five checks before admission.</p>
+
+          <Code lang="bash">
+            <span className="p">$</span> <span className="v">autovault</span> <span className="k">add</span> <span className="s">github:autoworks-ai/skills/extract-pdf</span>
+          </Code>
+
+          <p>You'll see the gate run live in your terminal — yaml-repair, denylist, capability/behavior, dedup, sign. If any step fails, the skill is rejected and never touches your vault.</p>
+
+          <Callout kind="warn" title="What gets rejected">
+            About 11% of submissions in private beta were rejected. Most common reasons: declared tools the skill never actually uses (capability/behavior mismatch), or near-duplicates of a skill already in the vault. Both surface clear error messages with diff output.
+          </Callout>
+
+          <h2 id="scope">Step 3 — Scope it to your context</h2>
+          <p>By default a freshly-added skill is unscoped — admitted to the vault, but not visible to any caller. Scope it explicitly to the agents and projects that should see it. The four-axis permission system means dev-machine skills don't leak into prod, and client work doesn't bleed across project boundaries.</p>
+
+          <Code lang="bash">
+            <span className="p">$</span> <span className="v">autovault</span> <span className="k">scope</span> <span className="s">extract-pdf</span> \{"\n"}
+            <span className="ind">    </span><span className="k">--agent</span> <span className="s">claude-code,codex</span> \{"\n"}
+            <span className="ind">    </span><span className="k">--project</span> <span className="s">autovault-website</span> \{"\n"}
+            <span className="ind">    </span><span className="k">--device</span> <span className="s">$(hostname)</span>
+          </Code>
+
+          <p>Each scope rule is additive. A caller sees a skill only if it matches at least one rule on every axis it requests. Unspecified axes default to "any."</p>
+
+          <h2 id="run">Step 4 — Run it from your agent</h2>
+          <p>The skill is now installed, validated, scoped, and rendered for each target agent. Open whichever agent you use most — the same skill name works in all of them, but the underlying tool calls have been transformed to match each agent's vocabulary.</p>
+
+          <div className="agent-tabs" style={{ marginTop: 8 }}>
+            {agents.map(x => (
+              <button key={x.id} className={agent === x.id ? "active" : ""} onClick={() => setAgent(x.id)}>
+                <span className="dot" style={{ background: x.color }}/> {x.label}
+              </button>
+            ))}
+          </div>
+          <Code lang={a.label.toLowerCase()} file={`# in ${a.label}`}>
+            <span className="p">&gt;</span> <span className="v">{a.cmd}</span>{"\n"}
+            <span className="c">{a.out}</span>{"\n"}
+            <span className="c">{"# extracting…"}</span>{"\n"}
+            <span className="v">"This 24-page report covers Q1 platform metrics, with three…"</span>
+          </Code>
+
+          <h2 id="next">Where to next</h2>
+          <p>You've completed the install + add + scope + run loop. From here, most people branch into one of three places:</p>
+
+          <div className="cmd-grid">
+            <a className="cmd-card" href="authoring.html">
+              <div className="cmd-name">→ Author your own</div>
+              <div className="cmd-desc">Write a SKILL.md, attach a transformation manifest, propose it through the gate.</div>
+            </a>
+            <a className="cmd-card" href="skills-directory.html">
+              <div className="cmd-name">→ Browse skills</div>
+              <div className="cmd-desc">241 community skills, all signed and gated. Filter by agent, capability, or org.</div>
+            </a>
+            <a className="cmd-card" href="security.html">
+              <div className="cmd-name">→ Security model</div>
+              <div className="cmd-desc">Provenance chain, denylist sources, what we sign and why.</div>
+            </a>
+            <a className="cmd-card" href="AutoVault.html#concepts">
+              <div className="cmd-name">→ Concepts</div>
+              <div className="cmd-desc">The five-step gate, four-axis scoping, transformation manifest in depth.</div>
+            </a>
+          </div>
+
+          <Pager
+            prev={{ label: "Overview", href: "AutoVault.html" }}
+            next={{ label: "Authoring skills", href: "authoring.html" }}
+          />
+        </main>
+        <TOC items={[
+          ["Step 1 — Install", "install"],
+          ["Step 2 — First skill", "first"],
+          ["Step 3 — Scope", "scope"],
+          ["Step 4 — Run it", "run"],
+          ["Where to next", "next"],
+        ]}/>
+      </div>
+    </>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
