@@ -5,7 +5,7 @@
         <div>
           <div class="eyebrow"><span class="dash" /> Changelog</div>
           <h1>Every skill leaves <span class="ital">a trail.</span></h1>
-          <p class="lede">A permanent, signed record of what changed in AutoVault and a model for how the wider skill ecosystem should look.</p>
+          <p class="lede">A permanent, signed record of what changed in AutoVault — and a model for how we'd like the rest of the skill ecosystem to look. Every release is signed; every signature is verifiable.</p>
         </div>
         <div class="cl-feeds">
           <button v-for="feed in feeds" :key="feed" class="cl-feed-btn" type="button">{{ feed }}</button>

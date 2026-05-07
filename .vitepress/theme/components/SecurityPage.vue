@@ -4,7 +4,7 @@
       <div>
         <div class="eyebrow"><span class="dash" /> Security & provenance</div>
         <h1>Signing isn't the same as <span class="ital">safe.</span></h1>
-        <p class="lede">A signature proves <em>who said what, when</em>. It does <strong>not</strong> prove the thing they said is correct or harmless. AutoVault's security model rests on three pillars — what we sign, what we don't sign, and where the trust boundary actually lives. This page is for staff engineers and security teams who want to inspect that model before they deploy.</p>
+        <p class="lede">A signature proves <em>who said what, when</em>. It does not prove the thing they said is correct or harmless. AutoVault's security model rests on three pillars — what we sign, what we don't sign, and where the trust boundary actually lives. This page is for staff engineers and security teams who want to inspect that model before they deploy.</p>
       </div>
       <VerifierDemo />
     </section>
@@ -44,7 +44,7 @@
     <section class="sec-section">
       <div class="eyebrow"><span class="dash" /> The gate, in detail</div>
       <h2>What each of the five stages actually checks.</h2>
-      <p class="sub">Every skill, installed, mirrored, or proposed by an agent at runtime, runs through these stages in order. Counts shown are from the public vault as of v0.4.1.</p>
+      <p class="sub">Every skill — installed, mirrored, or proposed by an agent at runtime — runs through these five stages in this order. Counts shown are from the public vault as of v0.4.1.</p>
 
       <div class="gate-stages-board panel">
         <div class="gsb-head">
@@ -69,7 +69,7 @@
     <section class="sec-section">
       <div class="eyebrow"><span class="dash" /> Denylist inspector</div>
       <h2>Public, auditable, signed.</h2>
-      <p class="sub">The denylist is itself a signed, versioned artifact. You can mirror it, audit it, and propose additions through public review.</p>
+      <p class="sub">The denylist is itself an artifact under the same trust model — a signed, versioned bundle published at <code>autovault.dev/denylist/v1.json</code>. You can mirror it, audit it, propose additions through public review.</p>
 
       <div class="deny-grid">
         <div class="deny-list">
@@ -113,7 +113,7 @@
     <section class="sec-section">
       <div class="eyebrow"><span class="dash" /> Provenance chain</div>
       <h2>Every skill carries its <span class="ital">isnad.</span></h2>
-      <p class="sub">An isnad is a chain of transmission: who said what, who heard it, who passed it on. Each link is its own Ed25519 signature; tampering with any link breaks the chain.</p>
+      <p class="sub">An "isnad" is a chain of transmission — who said what, who heard it, who passed it on. Every signed skill in AutoVault carries one. Each link is its own ed25519 signature; tampering with any link breaks the chain.</p>
 
       <div class="prov-chain">
         <div class="prov-grid">
@@ -130,12 +130,12 @@
     <section class="sec-section">
       <div class="eyebrow"><span class="dash" /> Disclosure</div>
       <h2>Found something? Tell us.</h2>
-      <p class="sub">We treat skill ecosystem vulnerabilities the way mature infrastructure projects do: coordinated disclosure, public advisory, and patch-first response.</p>
+      <p class="sub">We treat skill-ecosystem vulnerabilities the way mature infrastructure projects do. Coordinated disclosure, public CVE assignment, advisory published with the patch.</p>
 
       <div class="disc-grid">
         <article class="disc-card">
           <h3>Report a vulnerability</h3>
-          <p>If you found a vulnerability in the gate, CLI, renderer, or a denylist bypass, report it before public disclosure.</p>
+          <p>If you've found a vulnerability in the gate, the CLI, the renderer, or a denylist bypass — please report it before public disclosure. We respond within 48 hours and ship critical fixes within 7 days.</p>
           <div class="kv">
             <span class="k">Email</span><span class="v accent">security@autoworks-ai</span>
             <span class="k">PGP</span><span class="v">0xC4F9 7E10 A2C8 1B3D</span>
@@ -145,7 +145,7 @@
         </article>
         <article class="disc-card">
           <h3>Audit & transparency</h3>
-          <p>The CLI is Apache-2.0 and self-buildable from a tagged commit. The denylist is public and signed. The gate is reproducible from the same skill bytes.</p>
+          <p>The CLI is Apache-2.0 and self-buildable from a tagged commit. The denylist is a public, signed JSON artifact. The gate is reproducible — given the same skill bytes you should always get the same verdict.</p>
           <div class="kv">
             <span class="k">License</span><span class="v">Apache-2.0</span>
             <span class="k">Reproducible</span><span class="v accent">yes · gate v0.4+</span>
@@ -169,7 +169,7 @@ type RowKind = "ok" | "warn" | "bad";
 const roles = [
   {
     title: "The author",
-    desc: "Writes the SKILL.md, declares capabilities and permissions, and signs with a personal key.",
+    desc: "Writes the SKILL.md, declares its capabilities and permissions, signs it with a personal key. Owns what the skill claims to do.",
     object: "SKILL.md",
     detail: "+ frontmatter, transformations",
     seal: "signed",
@@ -178,7 +178,7 @@ const roles = [
   },
   {
     title: "The vault",
-    desc: "Validates, signs, indexes, and delivers the caller-specific view.",
+    desc: "Validates, signs, indexes, and delivers per caller. Owns what the skill looks like when it leaves the vault.",
     object: "vault sig",
     detail: "+ gate run record",
     seal: "scoped",
@@ -187,7 +187,7 @@ const roles = [
   },
   {
     title: "The agent",
-    desc: "Loads, interprets, and executes the skill within its own sandbox and tool-call boundary.",
+    desc: "Loads, interprets, and executes the skill within its own sandbox and tool-call boundary. Owns what the skill actually does at runtime.",
     object: "runtime",
     detail: "+ caller sandbox",
     seal: "executed",
@@ -197,11 +197,11 @@ const roles = [
 ];
 
 const gateDetails = [
-  { title: "YAML auto-repair", desc: "Trailing commas, mixed indentation, and unquoted special chars are fixed before the strict schema check.", rows: [{ label: "passed clean", count: "2,640", kind: "ok" }, { label: "repaired", count: "478", kind: "warn" }, { label: "rejected", count: "0", kind: "bad" }] },
-  { title: "Security denylist", desc: "Known-bad patterns: credential stealers, fork bombs, and exfiltration paths.", rows: [{ label: "clean", count: "3,066", kind: "ok" }, { label: "flagged", count: "52", kind: "bad" }] },
-  { title: "Capability vs. behavior", desc: "Mismatch between declared tools and observed behavior is rejected.", rows: [{ label: "aligned", count: "2,718", kind: "ok" }, { label: "over-declared", count: "220", kind: "warn" }, { label: "under-declared", count: "128", kind: "bad" }] },
-  { title: "Dedup", desc: "Text similarity in V1 and embedding-space matching in V2 preview stop duplicate explosions at the door.", rows: [{ label: "unique", count: "2,762", kind: "ok" }, { label: "near-duplicate", count: "176", kind: "bad" }] },
-  { title: "Ed25519 sign", desc: "If AutoVault admits it, AutoVault signs it and records the chain back to the author key.", rows: [{ label: "signed", count: "2,762", kind: "ok" }, { label: "key error", count: "0", kind: "bad" }] }
+  { title: "YAML auto-repair", desc: "Frontmatter is the #1 source of breakage. Trailing commas, mixed indentation, unquoted special chars are fixed before the strict schema check.", rows: [{ label: "passed clean", count: "2,640", kind: "ok" }, { label: "repaired", count: "478", kind: "warn" }, { label: "rejected", count: "0", kind: "bad" }] },
+  { title: "Security denylist", desc: "~340 known-bad patterns: credential stealers, fork bombs, exfil paths. Sourced from public CVEs, internal research, and community submissions.", rows: [{ label: "clean", count: "3,066", kind: "ok" }, { label: "flagged", count: "52", kind: "bad" }] },
+  { title: "Capability vs. behavior", desc: "Does the skill actually do what its frontmatter claims? Mismatch between declared tools_required and observed behavior in the body = reject.", rows: [{ label: "aligned", count: "2,718", kind: "ok" }, { label: "over-declared", count: "220", kind: "warn" }, { label: "under-declared", count: "128", kind: "bad" }] },
+  { title: "Dedup", desc: "Text similarity in V1, embedding-space matching in V2 preview. Stops the duplicate explosion at the door — too aggressive and authors complain, too lenient and the vault becomes ClawdHub.", rows: [{ label: "unique", count: "2,762", kind: "ok" }, { label: "near-duplicate", count: "176", kind: "bad" }] },
+  { title: "Ed25519 sign", desc: "If we admit it, we sign it. Provenance becomes a first-class artifact with a verifiable chain back to the original author key.", rows: [{ label: "signed", count: "2,762", kind: "ok" }, { label: "key error", count: "0", kind: "bad" }] }
 ] satisfies Array<{ title: string; desc: string; rows: Array<{ label: string; count: string; kind: RowKind }> }>;
 
 const selectedDeny = ref(denyRows[0].id);

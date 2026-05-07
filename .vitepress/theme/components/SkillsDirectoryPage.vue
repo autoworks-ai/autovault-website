@@ -4,7 +4,7 @@
       <div>
         <div class="eyebrow"><span class="dash" /> Skills directory</div>
         <h1>Browse signed skills.</h1>
-        <p class="lede">A filterable directory of community and first-party skills. Every listing here has passed the gate and is rendered per caller.</p>
+        <p class="lede">Browse 241 community skills, all signed, all dedup'd, all transformation-mapped to the major agents. Filter by what you run, what you need, who you trust.</p>
       </div>
       <div class="dir-stats">
         <div class="stat"><div class="mono-label">Skills</div><div class="val">241</div><div class="arg" style="font-size: 10.5px">+18 this week</div></div>

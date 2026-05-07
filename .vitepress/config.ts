@@ -44,17 +44,17 @@ export default defineConfig({
         items: [
           { text: "Overview", link: "/" },
           { text: "Quick start", link: "/quick-start.html" },
-          { text: "Installation", link: "/quick-start.html#step-1-install-the-local-vault" },
-          { text: "Your first skill", link: "/quick-start.html#step-2-add-your-first-skill" }
+          { text: "Installation", link: "/quick-start.html#install" },
+          { text: "Your first skill", link: "/quick-start.html#first" }
         ]
       },
       {
         text: "Authoring",
         items: [
           { text: "Anatomy of a SKILL.md", link: "/authoring.html" },
-          { text: "Transformation manifest", link: "/authoring.html#transformation-manifest" },
-          { text: "Permissions", link: "/authoring.html#permissions" },
-          { text: "Publishing", link: "/authoring.html#publish-through-the-gate" }
+          { text: "Transformation manifest", link: "/authoring.html#manifest" },
+          { text: "Permissions", link: "/authoring.html#perms" },
+          { text: "Publishing", link: "/authoring.html#publish" }
         ]
       },
       {

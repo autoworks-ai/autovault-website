@@ -15,6 +15,9 @@
     <circle cx="7" cy="7" r="4.5" />
     <path d="m13 13-2.5-2.5" stroke-linecap="round" />
   </svg>
+  <svg v-else-if="name === 'menu'" viewBox="0 0 16 16" :width="size" :height="size" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+    <path d="M3 4.5h10M3 8h10M3 11.5h10" />
+  </svg>
   <svg v-else viewBox="0 0 16 16" :width="size" :height="size" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
     <circle cx="8" cy="8" r="6" />
     <path d="M8 5v3.5M8 11v.01" stroke-linecap="round" />
@@ -22,5 +25,5 @@
 </template>
 
 <script setup lang="ts">
-withDefaults(defineProps<{ name: "check" | "x" | "arrow" | "github" | "search" | "tip"; size?: number }>(), { size: 14 });
+withDefaults(defineProps<{ name: "check" | "x" | "arrow" | "github" | "search" | "menu" | "tip"; size?: number }>(), { size: 14 });
 </script>

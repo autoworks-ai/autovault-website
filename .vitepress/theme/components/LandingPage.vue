@@ -157,6 +157,11 @@
               </div>
             </div>
             <div class="gate-output" :class="{ verified: tick > gateStages.length }" :style="{ opacity: tick > gateStages.length ? 1 : 0.4 }"><span class="tag">VERIFIED</span><span style="flex: 1">weather-skill@1.2.0 — admitted</span><span class="arg">sig:0x9af4…2c81</span></div>
+            <a v-if="verifiedSeen" class="gate-verify-flag" href="/authoring.html#playground">
+              <span class="mono-label">Your turn</span>
+              <strong>Verify your own skill URL</strong>
+              <UiIcon name="arrow" :size="14" />
+            </a>
           </div>
         </div>
       </section>
@@ -224,7 +229,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, h, onMounted, onUnmounted, ref } from "vue";
+import { computed, defineComponent, h, onMounted, onUnmounted, ref, watch } from "vue";
 import BrandMark from "./BrandMark.vue";
 import UiIcon from "./UiIcon.vue";
 import { gateStages } from "../data/security";
@@ -328,6 +333,7 @@ const transformKeys = Object.keys(transforms) as TransformTarget[];
 const activeTransform = computed(() => transforms[target.value]);
 const tick = ref(0);
 const running = ref(true);
+const verifiedSeen = ref(false);
 let gateTimer: number | undefined;
 
 onMounted(() => {
@@ -349,6 +355,7 @@ async function copyInstall() {
 function replayGate() {
   tick.value = 0;
   running.value = true;
+  verifiedSeen.value = false;
 }
 
 function stepClass(i: number) {
@@ -363,6 +370,10 @@ function stepStatus(i: number) {
   const state = stepClass(i);
   return state === "active" ? "RUNNING…" : state === "done" ? "PASSED" : "QUEUED";
 }
+
+watch(tick, (value) => {
+  if (value > gateStages.length) verifiedSeen.value = true;
+});
 
 const problems = [
   { num: "01", title: "Skill drift", body: "The same SKILL.md gets copy-pasted across repos and adapted locally. No upstream tracking, no merge story.", badge: "no provenance" },
