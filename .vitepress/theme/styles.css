@@ -1465,14 +1465,9 @@ body {
   max-height: 400px;
   overflow-y: auto;
   scroll-behavior: smooth;
-  scrollbar-width: none;
   padding: 18px 22px;
   color: var(--ink);
   line-height: 1.75;
-}
-
-.terminal-body::-webkit-scrollbar {
-  display: none;
 }
 
 .terminal-line {

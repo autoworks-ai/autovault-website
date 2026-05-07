@@ -153,7 +153,7 @@ async function getClerkSessionUser(request, env) {
 }
 
 function clerkModeEnabled(env) {
-  return Boolean(env.CLERK_SECRET_KEY || env.VITE_CLERK_PUBLISHABLE_KEY || env.CLERK_PUBLISHABLE_KEY);
+  return Boolean(env.CLERK_SECRET_KEY && clerkPublishableKey(env));
 }
 
 function clerkPublishableKey(env) {

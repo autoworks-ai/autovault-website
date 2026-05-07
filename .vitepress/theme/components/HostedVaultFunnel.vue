@@ -144,14 +144,15 @@ const headline = computed(() => props.entry === "playground" ? "Reserve a namesp
 const primaryLabel = computed(() => props.entry === "playground" ? "Reserve namespace" : "Start paid onboarding");
 const showSetupDetails = computed(() => signedIn.value || paid.value || Boolean(vault.value) || props.entry === "playground");
 const showLocalHandoff = computed(() => signedIn.value || Boolean(vault.value));
+const namespaceStatusLabel = computed(() => vault.value ? "Hosted namespace reserved:" : "Planned namespace:");
 const commandBlock = computed(() => [
   "curl -fsSL https://autovault.sh | sh",
   ". \"$HOME/.autovault/env\"",
   "autovault skill list",
   "",
-  "# Hosted namespace reserved:",
+  `# ${namespaceStatusLabel.value}`,
   `# ${hostedEndpoint.value}`,
-  "# Cloud sync is not enabled yet."
+  vault.value ? "# Cloud sync is not enabled yet." : "# Checkout must complete before this namespace is reserved."
 ].join("\n"));
 
 const stageFocus = computed(() => {
@@ -210,7 +211,7 @@ const flowItems = computed(() => [
   {
     label: "Sync",
     detail: pendingSaved.value ? "Pending import saved for later cloud sync" : "Cloud CLI sync is coming soon",
-    state: vault.value ? "ready" : "pending"
+    state: pendingSaved.value ? "done" : vault.value ? "ready" : "pending"
   }
 ]);
 
