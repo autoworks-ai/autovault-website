@@ -39,7 +39,7 @@
     </div>
 
     <h2 id="manifest">The transformation manifest</h2>
-    <p>This is the part that distinguishes AutoVault from every other registry. The manifest is a flat dictionary keyed by agent identifier, mapping canonical capability names to whatever each agent calls them. For workspace-specific edits, use <code>propose_skill_transform</code> instead of forking the upstream skill.</p>
+    <p>This is the part that distinguishes AutoVault from every other registry. The manifest is a flat dictionary keyed by agent identifier, mapping canonical capability names to whatever each agent calls them. Workspace-specific transforms let a vault adapt an upstream skill without forking it.</p>
     <div class="man-grid">
       <div v-for="agent in manifestAgents" :key="agent.name" class="man-card">
         <div class="mono-label"><span class="swatch" :style="{ background: agent.color, display: 'inline-block', marginRight: '8px' }" />{{ agent.name }}</div>
@@ -136,7 +136,7 @@
     <div class="process-ribbon">
       <div v-for="(step, idx) in process" :key="step.title" class="step"><div class="num mono-label">{{ String(idx + 1).padStart(2, "0") }}</div><div style="font-weight:500">{{ step.title }}</div><div class="muted" style="font-size:12px">{{ step.sub }}</div></div>
     </div>
-    <p>The other path uses <code>install_skill</code> or <code>add-local</code> depending on whether the bytes come from a remote source or a local bundle. Either way, the skill is signed against your vault's keypair before it is rendered into an agent profile, and packaged resources stay available through <code>read_skill_resource</code>.</p>
+    <p>The other path uses <code>add_skill</code> for trusted remote sources or local bundles. Either way, the skill is signed against your vault's keypair before it is rendered into an agent profile, and packaged resources stay available through <code>get_skill</code> with <code>include_resources</code>.</p>
   </div>
 </template>
 
@@ -192,7 +192,7 @@ const explanations = {
   tools: { lines: "L8–L12", title: "Canonical tool requirements", body: "<p>The skill declares what it needs in <strong>canonical capability names</strong> — a stable namespace AutoVault maintains, independent of any specific agent's vocabulary.</p><p>This is the part the gate's capability/behavior check audits. If the skill body uses <code>fs.read</code> but never declares it here, or declares it but never uses it, the skill is rejected.</p>" },
   trans: { lines: "L14–L20", title: "Per-caller transformation", body: "<p>The transformation manifest maps each canonical capability to the actual tool name the calling agent expects. Same skill, three rendered views — written once.</p><p>If a tool isn't mapped for a given agent, the skill renders without that capability and the gate emits a warning at scope-time. Agents you haven't mapped fall through to the canonical name (which usually fails — that's the point).</p>" },
   perm: { lines: "L22–L25", title: "Permission boundaries", body: "<p>The skill declares its own runtime boundaries. <code>network: false</code> tells the host agent to refuse outbound HTTP from this skill's tool calls. <code>fs_scope</code> restricts filesystem access to specific path prefixes.</p><p>These are enforced by <em>the agent</em> at execution time, not by AutoVault. AutoVault is content provider, not executor — but it surfaces the declared boundary so callers know what they're admitting.</p>" },
-  body: { lines: "L29–L33", title: "Skill body", body: "<p>Plain markdown. This is what the agent reads and follows when the skill is loaded into context. Keep it tight: under 200 tokens for a skill of this size, under 500 for anything bigger.</p><p><strong>Progressive disclosure:</strong> AutoVault returns summaries from <code>list_skills</code> and <code>search_skills</code>. The full body is loaded on demand via <code>get_skill</code>, while packaged files are loaded through <code>read_skill_resource</code>.</p>" }
+  body: { lines: "L29–L33", title: "Skill body", body: "<p>Plain markdown. This is what the agent reads and follows when the skill is loaded into context. Keep it tight: under 200 tokens for a skill of this size, under 500 for anything bigger.</p><p><strong>Progressive disclosure:</strong> Agents can call <code>get_skill</code> with a query for discovery, load full content only when needed, and set <code>include_resources</code> when packaged files are required.</p>" }
 } as const;
 
 const hovered = ref<AnnotationGroup>("trans");
