@@ -33,7 +33,7 @@
           <div class="cmd">
             <span class="pmt">$</span>
             <span>autovault add extract-pdf</span>
-            <button class="copy" type="button" @click="copyInstall">{{ copied ? "Copied" : "Copy" }}</button>
+            <button class="copy" type="button" @click="copyInstall">{{ copied ? "Copied" : copyFailed ? "Copy failed" : "Copy" }}</button>
           </div>
         </div>
         <div class="sd-secondary-actions">
@@ -70,27 +70,27 @@
               <div class="sd-frontmatter">
                 <div v-for="line in frontmatterLines" :key="line" v-html="line" />
               </div>
-              <h1># Extract PDF</h1>
+              <h1>Extract PDF</h1>
               <p>Extract structured text from PDF files while preserving heading hierarchy, list structure, and table layout where possible. Wraps a local pdf-parsing library — never sends bytes off-device.</p>
-              <h2>## When to use this skill</h2>
+              <h2>When to use this skill</h2>
               <p>Reach for <code>extract-pdf</code> when the user asks you to read, summarize, or extract content from a PDF file. Don't use this skill for structured data extraction — pair with <code>extract-table</code> downstream for that.</p>
-              <h2>## Inputs</h2>
+              <h2>Inputs</h2>
               <ul>
                 <li>A path to a .pdf file under the user's working directory</li>
                 <li>Optional: <code>--format=json</code> to emit structured output</li>
                 <li>Optional: <code>--pages=1-5</code> to scope extraction to a page range</li>
               </ul>
-              <h2>## Outputs</h2>
+              <h2>Outputs</h2>
               <ul>
                 <li>Plain text by default. Headings preserved as <code>#</code> markers, lists as <code>-</code> bullets</li>
                 <li>JSON when <code>--format=json</code> — includes pages, headings, paragraphs, and tables</li>
               </ul>
-              <h2>## Examples</h2>
+              <h2>Examples</h2>
               <h3>Basic extraction</h3>
               <p>User: <em>"What's in spec-v2.pdf?"</em> → run <code>extract-pdf ./spec-v2.pdf</code>, then summarize the result.</p>
               <h3>Page range</h3>
               <p>User: <em>"Read the first chapter of book.pdf"</em> → estimate page range from the table of contents, run <code>extract-pdf ./book.pdf --pages=1-22</code>.</p>
-              <h2>## Caveats</h2>
+              <h2>Caveats</h2>
               <ul>
                 <li>Scanned PDFs without an embedded text layer return empty. Pair with <code>ocr-image</code> for image-based PDFs.</li>
                 <li>Tables in irregular layouts may extract as flat text.</li>
@@ -236,6 +236,7 @@ type TargetId = "cc" | "cx" | "cu";
 const tab = ref<TabId>("overview");
 const target = ref<TargetId>("cc");
 const copied = ref(false);
+const copyFailed = ref(false);
 
 const tabs = [
   { id: "overview" as const, label: "Overview" },
@@ -418,14 +419,20 @@ const maintainers = [
 ];
 
 async function copyInstall() {
-  copied.value = true;
+  copied.value = false;
+  copyFailed.value = false;
   try {
-    await navigator.clipboard?.writeText("autovault add extract-pdf");
+    if (!navigator.clipboard) throw new Error("Clipboard unavailable");
+    await navigator.clipboard.writeText("autovault add extract-pdf");
+    copied.value = true;
+    window.setTimeout(() => {
+      copied.value = false;
+    }, 1200);
   } catch {
-    // Clipboard is progressive enhancement.
+    copyFailed.value = true;
+    window.setTimeout(() => {
+      copyFailed.value = false;
+    }, 1600);
   }
-  window.setTimeout(() => {
-    copied.value = false;
-  }, 1200);
 }
 </script>

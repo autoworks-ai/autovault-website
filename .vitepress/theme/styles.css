@@ -1314,7 +1314,8 @@ body {
   text-transform: uppercase;
 }
 
-.footer a {
+.footer a,
+.footer .footer-text {
   display: block;
   color: var(--ink-2);
   padding: 4px 0;

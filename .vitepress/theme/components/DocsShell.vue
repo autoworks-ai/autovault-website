@@ -142,7 +142,7 @@ const configs: Record<PageKey, { active: string; sidebarActive: string; variant:
   skills: { active: "Skills", sidebarActive: "Skills", variant: "full", toc: [] },
   api: { active: "API", sidebarActive: "API", variant: "full", toc: [] },
   deploy: { active: "Deploy", sidebarActive: "Deploy", variant: "full", toc: [] },
-  compare: { active: "Overview", sidebarActive: "Compare", variant: "full", toc: [] },
+  compare: { active: "Compare", sidebarActive: "Compare", variant: "full", toc: [] },
   "skill-detail": { active: "Skills", sidebarActive: "Skills", variant: "full", toc: [] },
   "author-profile": { active: "Skills", sidebarActive: "Skills", variant: "full", toc: [] },
   security: { active: "Security", sidebarActive: "Security", variant: "full", toc: [] },
