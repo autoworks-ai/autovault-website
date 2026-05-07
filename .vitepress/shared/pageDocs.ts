@@ -80,7 +80,7 @@ npm run build
 node scripts/bootstrap-skills.mjs
 \`\`\`
 
-Bootstrap installs every bundled skills/*/SKILL.md through the same validation path as any other skill and refreshes discovered host profiles.
+Bootstrap installs every bundled skill (skills/*/SKILL.md) through the same validation path as any other skill and refreshes discovered host profiles.
 
 ## 3. Add a remote skill
 
@@ -307,7 +307,7 @@ AutoVault is currently pre-1.0. The public source package is MIT licensed and th
 - OAuth and role-aware access checks for remote mode.
 - add-local for third-party installers that already have a local skill bundle.
 - AUTOVAULT_SKILL_INSTALL vendor routing modes.
-- Bundled skills installed from every skills/*/SKILL.md bundle.
+- Bundled skills are installed from each skills/*/SKILL.md bundle.
 - scripts/bootstrap-skills.mjs to seed bundled skills through the real validation path and refresh discovered host profiles.
 - get_skill agent rendering and include_resources for transformed variants and packaged resources.
 - check_updates for upstream drift and transform review state.

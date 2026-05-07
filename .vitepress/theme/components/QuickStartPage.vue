@@ -20,7 +20,7 @@
 <span class="yaml-comment"># macOS: also available via brew</span><br />
 <span class="pmt">$</span> brew install autoworks-ai/tap/autovault<br />
 <span class="pmt">$</span> autovault skill list</CodeBlock>
-    <div class="callout tip"><UiIcon name="tip" class="arg" /><div><strong>Bundled skills.</strong> The installer seeds every bundled <code>skills/*/SKILL.md</code> through the same validation path used by remote installs and proposals, then refreshes discovered host profiles.</div></div>
+    <div class="callout tip"><UiIcon name="tip" class="arg" /><div><strong>Bundled skills.</strong> The installer seeds every bundled skill (<code>skills/*/SKILL.md</code>) through the same validation path used by remote installs and proposals, then refreshes discovered host profiles.</div></div>
 
     <h2 id="first">Step 2 — Add your first skill</h2>
     <p>Skills enter the vault through a <strong>source adapter</strong>. Each adapter knows how to fetch from one origin (GitHub repo, agentskills slug, HTTPS bundle, or local directory) and hand the raw skill to the validation gate. Whatever the source, the gate runs the same checks before admission.</p>
