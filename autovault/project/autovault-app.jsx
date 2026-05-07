@@ -40,18 +40,35 @@ const Icon = {
 };
 
 /* ============================================================ */
-/* BRAND MARK — abstract gate (not a vault)                      */
+/* BRAND MARK — minimalist vault                                 */
 /* ============================================================ */
-const BrandMark = ({ size = 22 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    {/* outer frame */}
-    <rect x="2.5" y="2.5" width="19" height="19" rx="2" stroke="var(--accent)" strokeWidth="1.4" />
-    {/* gate slit */}
-    <path d="M12 4v16" stroke="var(--accent)" strokeWidth="1.4" />
-    {/* check inside */}
-    <path d="M7 12.5l2.2 2.2L13.5 9.5" stroke="var(--accent)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
+const BrandMark = ({ size = 22, state = "locked", showDepth = false }) => {
+  const unlocked = state === "unlocked";
+  const dialStyle = {
+    opacity: unlocked ? 0 : 1,
+    transform: `scale(${unlocked ? 0 : 1})`,
+    transformOrigin: "12px 10.8px",
+    transition: "transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.26s ease",
+  };
+  const depthStyle = {
+    opacity: showDepth && unlocked ? 0.32 : 0,
+    transition: "opacity 0.3s ease",
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <rect x="2.4" y="2.4" width="19.2" height="16.8" rx="3.84" stroke="var(--accent)" strokeWidth="1.5" strokeLinejoin="round" />
+      <path className="brand-mark-stub" d="M7.2 19.2v1.9" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" />
+      <path className="brand-mark-stub" d="M16.8 19.2v1.9" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" />
+      <g style={depthStyle}>
+        <rect x="4.8" y="4.8" width="14.4" height="12" rx="1.9" stroke="var(--accent)" strokeWidth="0.5" strokeDasharray="1.1 1.1" />
+      </g>
+      <g style={dialStyle}>
+        <circle cx="12" cy="10.8" r="2.9" stroke="var(--accent)" strokeWidth="1.25" />
+        <path d="M12 7.9v1.45" stroke="var(--accent)" strokeWidth="1.25" strokeLinecap="round" />
+      </g>
+    </svg>
+  );
+};
 
 /* ============================================================ */
 /* TOPBAR                                                        */
@@ -167,11 +184,18 @@ const GateStage = () => {
         {/* gate glow */}
         <circle cx="200" cy="200" r="80" fill="url(#gateGlow)" />
 
-        {/* gate */}
-        <g transform="translate(200,200)">
-          <rect x="-32" y="-44" width="64" height="88" rx="3" stroke="var(--accent)" strokeWidth="1.4" fill="rgba(90,214,192,0.04)"/>
-          <line x1="0" y1="-40" x2="0" y2="40" stroke="var(--accent)" strokeWidth="1.2" />
-          <path d="M-12 0 l8 8 16 -16" stroke="var(--accent)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+        {/* vault gate */}
+        <g className="gate-vault-mark" transform="translate(156,156) scale(3.65)">
+          <rect x="2.4" y="2.4" width="19.2" height="16.8" rx="3.84" stroke="var(--accent)" strokeWidth="1.5" strokeLinejoin="round" fill="rgba(90,214,192,0.04)"/>
+          <path d="M7.2 19.2v1.9" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+          <path d="M16.8 19.2v1.9" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+          <g className="vault-depth">
+            <rect x="4.8" y="4.8" width="14.4" height="12" rx="1.9" stroke="var(--accent)" strokeWidth="0.5" strokeDasharray="1.1 1.1" fill="none"/>
+          </g>
+          <g className="vault-dial">
+            <circle cx="12" cy="10.8" r="2.9" stroke="var(--accent)" strokeWidth="1.25" fill="none"/>
+            <path d="M12 7.9v1.45" stroke="var(--accent)" strokeWidth="1.25" strokeLinecap="round" fill="none"/>
+          </g>
         </g>
 
         {/* outgoing fanout, three platforms */}
@@ -297,7 +321,26 @@ const TRANSFORMS = {
 
 const TransformationDiagram = () => {
   const [target, setTarget] = useState("claude-code");
+  const [engineState, setEngineState] = useState("locked");
+  const firstTarget = useRef(true);
+  const engineLockTimer = useRef(null);
   const t = TRANSFORMS[target];
+
+  useEffect(() => {
+    if (firstTarget.current) {
+      firstTarget.current = false;
+      return undefined;
+    }
+    setEngineState("unlocked");
+    if (engineLockTimer.current) clearTimeout(engineLockTimer.current);
+    engineLockTimer.current = setTimeout(() => {
+      setEngineState("locked");
+      engineLockTimer.current = null;
+    }, 560);
+    return () => {
+      if (engineLockTimer.current) clearTimeout(engineLockTimer.current);
+    };
+  }, [target]);
 
   return (
     <section className="section" id="how">
@@ -381,8 +424,8 @@ const TransformationDiagram = () => {
           <div className="xform-col" style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
             <div className="xform-col-head" style={{ justifyContent: "center" }}><span className="num">2</span> Engine</div>
             <div className="xform-engine">
-              <div className="ring">
-                <BrandMark size={26} />
+              <div className={"ring" + (engineState === "unlocked" ? " is-unlocking" : "")}>
+                <BrandMark size={26} state={engineState} showDepth />
               </div>
             </div>
             <div className="platforms">

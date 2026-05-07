@@ -1,13 +1,18 @@
 <template>
   <section class="hosted-funnel" :data-entry="entry">
     <div class="hosted-funnel-head">
-      <div>
-        <div class="mono-label">hosted vault</div>
-        <h3>{{ headline }}</h3>
-        <p>
-          AutoVault reserves a paid tenant namespace and stores pending onboarding drafts.
-          Cloud sync is not enabled yet; your local CLI remains the source of truth for gated, signed files.
-        </p>
+      <div class="hosted-heading">
+        <span class="hosted-vault-lock" :class="`is-${hostedVaultPhase}`">
+          <BrandMark :size="34" :state="hostedVaultState" show-depth />
+        </span>
+        <div>
+          <div class="mono-label">hosted vault</div>
+          <h3>{{ headline }}</h3>
+          <p>
+            AutoVault reserves a paid tenant namespace and stores pending onboarding drafts.
+            Cloud sync is not enabled yet; your local CLI remains the source of truth for gated, signed files.
+          </p>
+        </div>
       </div>
       <button class="hosted-primary" type="button" :disabled="busy" @click="startFlow">
         {{ busy ? "Working..." : primaryLabel }}
@@ -90,6 +95,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import BrandMark from "./BrandMark.vue";
 import ClerkAuthControls from "./ClerkAuthControls.vue";
 import { skills } from "../data/skills";
 import type { GateEvaluation } from "../utils/skillGate";
@@ -145,6 +151,8 @@ const primaryLabel = computed(() => props.entry === "playground" ? "Reserve name
 const showSetupDetails = computed(() => signedIn.value || paid.value || Boolean(vault.value) || props.entry === "playground");
 const showLocalHandoff = computed(() => signedIn.value || Boolean(vault.value));
 const namespaceStatusLabel = computed(() => vault.value ? "Hosted namespace reserved:" : "Planned namespace:");
+const hostedVaultState = computed<"locked" | "unlocked">(() => (vault.value || provisioning.value ? "unlocked" : "locked"));
+const hostedVaultPhase = computed(() => (vault.value ? "ready" : provisioning.value ? "active" : "locked"));
 const commandBlock = computed(() => [
   "curl -fsSL https://autovault.sh | sh",
   ". \"$HOME/.autovault/env\"",

@@ -96,7 +96,7 @@
             <div class="xform-spacer" />
             <div class="xform-col" style="display: flex; flex-direction: column; justify-content: center">
               <div class="mono-label" style="text-align: center">2 · Engine</div>
-              <div class="xform-engine"><div class="ring"><BrandMark :size="26" /></div></div>
+              <div class="xform-engine"><div class="ring" :class="{ 'is-unlocking': engineState === 'unlocked' }"><BrandMark :size="26" :state="engineState" show-depth /></div></div>
               <div class="platforms">
                 <button v-for="key in transformKeys" :key="key" class="platform" :class="{ active: target === key }" type="button" @click="target = key" @mouseenter="target = key">
                   <span class="platform-mark">{{ key[0].toUpperCase() }}</span><span class="name">{{ key }}</span><span class="tool muted" style="margin-left: auto">→ render</span>
@@ -299,7 +299,6 @@ const GateStage = defineComponent({
           ];
         }),
         h("circle", { cx: "200", cy: "200", r: "80", fill: "url(#gateGlow)" }),
-        h("g", { transform: "translate(200,200)" }, [h("rect", { x: "-32", y: "-44", width: "64", height: "88", rx: "3", stroke: "var(--accent)", "stroke-width": "1.4", fill: "rgba(90,214,192,0.04)" }), h("line", { x1: "0", y1: "-40", x2: "0", y2: "40", stroke: "var(--accent)", "stroke-width": "1.2" }), h("path", { d: "M-12 0 l8 8 16 -16", stroke: "var(--accent)", "stroke-width": "1.6", "stroke-linecap": "round", "stroke-linejoin": "round", fill: "none" })]),
         ...outgoing.flatMap((p, i) => {
           const path = `M232 200 C 280 200, 320 ${p.y}, 400 ${p.y}`;
           return [
@@ -313,7 +312,8 @@ const GateStage = defineComponent({
             h("text", { x: "350", y: p.y - 8, fill: "var(--ink-2)", "font-family": "var(--mono)", "font-size": "10", "text-anchor": "end" }, p.label)
           ];
         })
-      ])
+      ]),
+      h("span", { class: "gate-stage-brand", "aria-hidden": "true" }, h(BrandMark, { size: 88, showDepth: true }))
     ]);
   }
 });
@@ -351,10 +351,12 @@ const copied = ref(false);
 const target = ref<TransformTarget>("claude-code");
 const transformKeys = Object.keys(transforms) as TransformTarget[];
 const activeTransform = computed(() => transforms[target.value]);
+const engineState = ref<"locked" | "unlocked">("locked");
 const tick = ref(0);
 const running = ref(true);
 const verifiedSeen = ref(false);
 let gateTimer: number | undefined;
+let engineLockTimer: number | undefined;
 
 onMounted(() => {
   gateTimer = window.setInterval(() => {
@@ -364,6 +366,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (gateTimer) window.clearInterval(gateTimer);
+  if (engineLockTimer) window.clearTimeout(engineLockTimer);
 });
 
 async function copyInstall() {
@@ -392,6 +395,15 @@ function stepStatus(i: number) {
 
 watch(tick, (value) => {
   if (value > gateStages.length) verifiedSeen.value = true;
+});
+
+watch(target, () => {
+  engineState.value = "unlocked";
+  if (engineLockTimer) window.clearTimeout(engineLockTimer);
+  engineLockTimer = window.setTimeout(() => {
+    engineState.value = "locked";
+    engineLockTimer = undefined;
+  }, 560);
 });
 
 const problems = [
