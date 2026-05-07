@@ -44,7 +44,7 @@
     <section class="sec-section">
       <div class="eyebrow"><span class="dash" /> The gate, in detail</div>
       <h2>What each of the five stages actually checks.</h2>
-      <p class="sub">Every skill installed, imported, proposed by an agent, or handed over through <code>add-local</code> runs through these stages in order. The source implementation keeps the denylist extensible and currently documents 12 active patterns.</p>
+      <p class="sub">Every skill installed, imported, proposed by an agent, or handed over through <code>add-local</code> runs through these stages in order. The source implementation keeps the denylist extensible and currently documents {{ activePatternCount }} active patterns.</p>
 
       <div class="gate-stages-board panel">
         <div class="gsb-head">
@@ -92,7 +92,7 @@
         <aside class="deny-side">
           <div>
             <h4>Patterns active</h4>
-            <div class="denynum">12<span class="of">/ extensible</span></div>
+            <div class="denynum">{{ activePatternCount }}<span class="of">/ extensible</span></div>
           </div>
           <div class="breakdown">
             <h4>By severity</h4>
@@ -196,9 +196,11 @@ const roles = [
   }
 ];
 
+const activePatternCount = denyRows.length;
+
 const gateDetails = [
   { title: "YAML auto-repair", desc: "Frontmatter is the most common source of breakage. Trailing commas, mixed indentation, and unquoted special chars are normalized before the strict schema check.", rows: [{ label: "frontmatter parsed", count: "required", kind: "ok" }, { label: "schema checked", count: "zod", kind: "ok" }, { label: "invalid yaml", count: "blocked", kind: "bad" }] },
-  { title: "Security denylist", desc: "Known-bad patterns include credential reads, pipe-to-shell installs, decoded shell execution, setuid chmod, and insecure transport flags.", rows: [{ label: "strict mode", count: "blocks", kind: "ok" }, { label: "non-strict mode", count: "warns", kind: "warn" }, { label: "active patterns", count: "12", kind: "bad" }] },
+  { title: "Security denylist", desc: "Known-bad patterns include credential reads, pipe-to-shell installs, decoded shell execution, setuid chmod, and insecure transport flags.", rows: [{ label: "strict mode", count: "blocks", kind: "ok" }, { label: "non-strict mode", count: "warns", kind: "warn" }, { label: "active patterns", count: String(activePatternCount), kind: "bad" }] },
   { title: "Capability vs. behavior", desc: "Does the skill actually do what its frontmatter claims? Mismatch between declared capabilities and observed behavior is rejected.", rows: [{ label: "network false + curl", count: "blocked", kind: "bad" }, { label: "readonly + write", count: "blocked", kind: "bad" }, { label: "declared tools align", count: "passed", kind: "ok" }] },
   { title: "Dedup", desc: "Three tiers catch exact content matches, near-exact similarity, and functional overlap warnings before the vault fills with clones.", rows: [{ label: "exact hash", count: "duplicate", kind: "bad" }, { label: "near exact", count: ">=0.9", kind: "bad" }, { label: "functional overlap", count: ">=0.75", kind: "warn" }] },
   { title: "Ed25519 sign", desc: "If AutoVault admits a skill, it writes a detached signature sidecar and records source metadata for drift checks.", rows: [{ label: "stored skill", count: "signed", kind: "ok" }, { label: "source sidecar", count: "hash", kind: "ok" }, { label: "tamper check", count: "warns", kind: "warn" }] }
@@ -206,11 +208,27 @@ const gateDetails = [
 
 const selectedDeny = ref(denyRows[0].id);
 const selectedPattern = computed(() => denyRows.find((row) => row.id === selectedDeny.value));
-const severityBreakdown = [
-  { label: "Critical", count: 3, width: "25%", color: "var(--bad)" },
-  { label: "High", count: 5, width: "42%", color: "var(--warn)" },
-  { label: "Medium", count: 4, width: "33%", color: "var(--ink-4)" }
-];
+const severityLabels = {
+  crit: "Critical",
+  high: "High",
+  med: "Medium"
+} as const;
+const severityColors = {
+  crit: "var(--bad)",
+  high: "var(--warn)",
+  med: "var(--ink-4)"
+} as const;
+const severityBreakdown = (Object.keys(severityLabels) as Array<keyof typeof severityLabels>).map((severity) => {
+  const count = denyRows.filter((row) => row.sev === severity).length;
+  const width = activePatternCount > 0 ? Math.round((count / activePatternCount) * 100) : 0;
+
+  return {
+    label: severityLabels[severity],
+    count,
+    width: `${width}%`,
+    color: severityColors[severity]
+  };
+});
 const provenance = [
   { role: "LINK / 01 · author", id: "@autoworks-ai", when: "2026-04-28 12:14Z" },
   { role: "LINK / 02 · gate", id: "vault.autoworks-ai", when: "2026-04-28 12:18Z" },

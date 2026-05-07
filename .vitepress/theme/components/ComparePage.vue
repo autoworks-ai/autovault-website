@@ -117,6 +117,8 @@
 </template>
 
 <script setup lang="ts">
+import { denyRows } from "../data/security";
+
 type Verdict = "yes" | "no" | "partial" | "bad";
 type ComparisonCell = { value: Verdict; title: string; detail: string };
 type ComparisonRow =
@@ -147,7 +149,7 @@ const rows: ComparisonRow[] = [
   row("Pre-publish gate", "Programmatic checks before admission", ["yes", "5 stages, reproducible", "Repair → denylist → capability → dedup → sign"], ["no", "—", "Best-effort community moderation"], ["partial", "Per-fork lint", "Inconsistent across forks"], ["no", "—", "Whatever ships, ships"]),
   row("Cryptographic signing", "Ed25519 sigs bind author + content + gate verdict", ["yes", "Ed25519 chain", "Author → vault → mirror"], ["no", "—", "Trust by URL only"], ["no", "—", "No signing"], ["no", "—", "No signing"]),
   row("Reproducible verdicts", "Same bytes in = same gate verdict out", ["yes", "Gate v0.2+", "Run locally with autovault verify"], ["no", "n/a", "No verdict to reproduce"], ["partial", "Best-effort", "Depends on fork lint"], ["no", "n/a", "—"]),
-  row("Public denylist", "Auditable, signed bad-pattern bundle", ["yes", "343 patterns, signed", "Same artifact format as skills"], ["no", "—", "—"], ["no", "—", "—"], ["no", "—", "—"]),
+  row("Public denylist", "Auditable bad-pattern bundle", ["yes", `${denyRows.length} active patterns`, "Same artifact format as skills"], ["no", "—", "—"], ["no", "—", "—"], ["no", "—", "—"]),
   { kind: "section", label: "Operations" },
   row("Dedup at submission", "Stops duplicate-skill explosion before it starts", ["yes", "Text in V1", "Embedding in V2 preview"], ["no", "Browser ranking only", "Near-duplicates surface"], ["no", "—", "Forks are duplicates by design"], ["no", "—", "—"]),
   row("Self-hostable", "Run a private vault behind your VPN", ["yes", "Docker / Railway / Render", "Same gate, your keys, your mirror"], ["partial", "Mirrors only", "No gate to self-host"], ["no", "Cloud only", "—"], ["yes", "By definition", "Each machine is the host"]),
