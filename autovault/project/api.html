@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>API reference — AutoVault</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="docs-shell.css">
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<style>
+.api-shell {
+  display: grid; grid-template-columns: 260px 1fr 240px;
+  max-width: 1320px; margin: 0 auto; padding: 0;
+  min-height: calc(100vh - 60px);
+}
+
+/* LEFT NAV */
+.api-nav {
+  border-right: 1px solid var(--line);
+  padding: 32px 28px 32px 32px;
+  position: sticky; top: 60px; align-self: start;
+  height: calc(100vh - 60px); overflow-y: auto;
+}
+.api-nav-title { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px; }
+.api-nav-section { margin-bottom: 24px; }
+.api-nav-section-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11.5px; font-family: var(--mono); color: var(--ink-3); letter-spacing: 0.04em; text-transform: uppercase;
+  margin-bottom: 10px;
+  padding-bottom: 6px; border-bottom: 1px solid var(--line);
+}
+.api-nav-section-title .dot { width: 6px; height: 6px; border-radius: 2px; }
+.api-nav a {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 10px; font-size: 12.5px; color: var(--ink-2);
+  border-radius: 4px; cursor: pointer;
+  font-family: var(--mono);
+}
+.api-nav a:hover { color: var(--ink); background: var(--panel); }
+.api-nav a.active { color: var(--accent); background: var(--accent-soft); }
+.api-nav a .meth {
+  font-size: 9.5px; padding: 1px 5px; border-radius: 3px;
+  letter-spacing: 0.06em; flex-shrink: 0;
+}
+.api-nav a .meth.cli { background: rgba(90,157,214,0.12); color: #5a9dd6; }
+.api-nav a .meth.fn  { background: rgba(180,138,214,0.12); color: #b48ad6; }
+.api-nav a .meth.get { background: rgba(90,214,192,0.12); color: var(--accent); }
+.api-nav a .meth.post{ background: rgba(232,168,102,0.12); color: var(--warn); }
+
+/* MAIN */
+.api-main {
+  padding: 36px 56px 80px;
+  max-width: 880px;
+  min-width: 0;
+}
+.api-hero {
+  padding-bottom: 32px; border-bottom: 1px solid var(--line);
+  margin-bottom: 36px;
+}
+.api-hero .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; color: var(--ink-3); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 16px; }
+.api-hero .eyebrow .dash { width: 18px; height: 1px; background: var(--ink-4); }
+.api-hero h1 { font-size: 42px; line-height: 1.05; letter-spacing: -0.025em; font-weight: 500; margin: 0 0 14px; }
+.api-hero .lede { color: var(--ink-2); font-size: 16px; line-height: 1.6; margin: 0 0 22px; max-width: 700px; }
+
+.api-versions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.api-versions .v { padding: 12px 16px; border-right: 1px solid var(--line); }
+.api-versions .v:last-child { border-right: 0; }
+.api-versions .lbl { font-family: var(--mono); font-size: 10px; color: var(--ink-3); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px; }
+.api-versions .val { font-family: var(--mono); font-size: 14px; color: var(--ink); }
+.api-versions .val .meta { font-size: 10.5px; color: var(--ink-3); margin-left: 4px; }
+
+/* SECTION TITLE */
+.api-h2 { display: flex; align-items: baseline; gap: 14px; margin: 56px 0 6px; padding-top: 16px; border-top: 1px solid var(--line); }
+.api-h2 h2 { font-size: 26px; font-weight: 500; letter-spacing: -0.02em; margin: 0; }
+.api-h2 .meta { font-family: var(--mono); font-size: 11px; color: var(--ink-3); letter-spacing: 0.04em; }
+.api-section-lede { color: var(--ink-2); font-size: 14.5px; max-width: 700px; margin: 0 0 28px; line-height: 1.6; }
+
+/* ENDPOINT / COMMAND BLOCK */
+.api-endpoint { margin-top: 36px; padding-top: 8px; }
+.api-endpoint .head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+.api-endpoint h3 {
+  font-size: 19px; font-weight: 500; letter-spacing: -0.015em; margin: 0;
+  font-family: var(--mono); color: var(--ink);
+}
+.api-endpoint .since { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); margin-left: auto; }
+.api-endpoint .since.beta { color: var(--warn); }
+.api-endpoint .since.deprecated { color: var(--bad); text-decoration: line-through; }
+
+.api-endpoint .desc { color: var(--ink-2); font-size: 14px; line-height: 1.6; margin: 0 0 18px; }
+
+.api-sig {
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 14px 18px;
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.7;
+  color: var(--ink);
+  margin-bottom: 18px;
+  position: relative;
+  overflow-x: auto;
+}
+.api-sig .pmt { color: var(--accent); }
+.api-sig .key { color: #b48ad6; }
+.api-sig .str { color: var(--accent); }
+.api-sig .com { color: var(--ink-4); font-style: italic; }
+.api-sig .num { color: #5a9dd6; }
+.api-sig .opt { color: var(--ink-3); }
+.api-sig .copy {
+  position: absolute; top: 10px; right: 12px;
+  background: var(--panel); border: 1px solid var(--line-2); color: var(--ink-3);
+  font: inherit; font-family: var(--mono); font-size: 10px;
+  padding: 3px 8px; border-radius: 3px; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer;
+}
+.api-sig .copy:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ARGS / RETURNS table */
+.api-args {
+  margin-bottom: 14px;
+  border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
+}
+.api-args .head {
+  display: grid; grid-template-columns: 180px 130px 1fr;
+  padding: 10px 16px; background: var(--bg-2);
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); letter-spacing: 0.06em; text-transform: uppercase;
+}
+.api-args .row {
+  display: grid; grid-template-columns: 180px 130px 1fr;
+  padding: 12px 16px; border-top: 1px solid var(--line);
+  align-items: start;
+  font-size: 13px;
+}
+.api-args .row .nm { font-family: var(--mono); color: var(--ink); font-size: 12.5px; }
+.api-args .row .nm .req { color: var(--bad); margin-left: 4px; }
+.api-args .row .nm .opt { color: var(--ink-4); margin-left: 4px; font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; }
+.api-args .row .ty { font-family: var(--mono); font-size: 11.5px; color: var(--accent); }
+.api-args .row .ty .def { color: var(--ink-3); margin-left: 4px; }
+.api-args .row .desc { color: var(--ink-2); font-size: 13px; line-height: 1.55; }
+.api-args .row .desc code { font-family: var(--mono); font-size: 11.5px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px; }
+
+/* TABBED EXAMPLES */
+.api-examples { margin-top: 18px; }
+.api-examples .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--line); margin-bottom: 0; }
+.api-examples .tabs button {
+  background: none; border: 0; color: var(--ink-3); font: inherit; font-size: 12px;
+  padding: 8px 14px; cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px; font-family: var(--mono); letter-spacing: 0.04em;
+}
+.api-examples .tabs button.active { color: var(--ink); border-bottom-color: var(--accent); }
+.api-examples .body {
+  background: var(--bg-2); border: 1px solid var(--line); border-top: 0;
+  border-radius: 0 0 8px 8px;
+  padding: 16px 18px;
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.75;
+}
+.api-examples .body .pmt { color: var(--accent); }
+.api-examples .body .com { color: var(--ink-4); font-style: italic; }
+.api-examples .body .key { color: #b48ad6; }
+.api-examples .body .str { color: var(--accent); }
+.api-examples .body .num { color: #5a9dd6; }
+.api-examples .body .ok { color: var(--accent); }
+.api-examples .body .h { color: var(--ink); font-weight: 600; }
+
+/* RIGHT TOC */
+.api-toc {
+  border-left: 1px solid var(--line);
+  padding: 36px 28px 32px 28px;
+  position: sticky; top: 60px; align-self: start;
+  height: calc(100vh - 60px); overflow-y: auto;
+}
+.api-toc .ttl { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px; }
+.api-toc a { display: block; padding: 4px 8px; font-size: 12px; color: var(--ink-3); cursor: pointer; border-left: 2px solid transparent; padding-left: 10px; }
+.api-toc a:hover { color: var(--ink); }
+.api-toc a.l2 { padding-left: 22px; font-family: var(--mono); font-size: 11px; }
+.api-toc a.l2.active { color: var(--accent); border-left-color: var(--accent); }
+
+/* Status pill */
+.status-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 6px; border-radius: 3px;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.status-pill.stable { background: var(--accent-soft); color: var(--accent); }
+.status-pill.beta { background: rgba(232,168,102,0.12); color: var(--warn); }
+.status-pill.alpha { background: rgba(90,157,214,0.12); color: #5a9dd6; }
+.status-pill.dep { background: rgba(217,113,113,0.12); color: var(--bad); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="docs-shell.jsx"></script>
+<script type="text/babel">
+const { useState } = React;
+const { Topbar } = window;
+
+const NAV = [
+  { kind: "section", lbl: "CLI", color: "#5a9dd6" },
+  { kind: "item", id: "cli-init", meth: "cli", lbl: "init" },
+  { kind: "item", id: "cli-add", meth: "cli", lbl: "add" },
+  { kind: "item", id: "cli-list", meth: "cli", lbl: "list" },
+  { kind: "item", id: "cli-publish", meth: "cli", lbl: "publish" },
+  { kind: "item", id: "cli-verify", meth: "cli", lbl: "verify" },
+  { kind: "item", id: "cli-import", meth: "cli", lbl: "import" },
+  { kind: "section", lbl: "Library", color: "#b48ad6" },
+  { kind: "item", id: "lib-load", meth: "fn", lbl: "loadSkill()" },
+  { kind: "item", id: "lib-render", meth: "fn", lbl: "renderForTarget()" },
+  { kind: "item", id: "lib-verify", meth: "fn", lbl: "verifyChain()" },
+  { kind: "section", lbl: "HTTP / MCP", color: "#5ad6c0" },
+  { kind: "item", id: "http-skill", meth: "get", lbl: "/skill/{name}" },
+  { kind: "item", id: "http-resolve", meth: "post", lbl: "/resolve" },
+  { kind: "item", id: "http-verify", meth: "post", lbl: "/verify" },
+];
+
+const TabbedExample = ({ tabs }) => {
+  const [active, setActive] = useState(0);
+  return (
+    <div className="api-examples">
+      <div className="tabs">
+        {tabs.map((t, i) => (
+          <button key={i} className={i === active ? "active" : ""} onClick={() => setActive(i)}>{t.label}</button>
+        ))}
+      </div>
+      <div className="body" dangerouslySetInnerHTML={{ __html: tabs[active].body }}/>
+    </div>
+  );
+};
+
+const App = () => {
+  const [activeId, setActiveId] = useState("cli-init");
+
+  return (
+    <>
+      <Topbar/>
+      <div className="api-shell">
+        <aside className="api-nav">
+          <div className="api-nav-title">API reference</div>
+          {NAV.map((n, i) => {
+            if (n.kind === "section") {
+              return (
+                <div key={i} className="api-nav-section-title">
+                  <span className="dot" style={{ background: n.color }}/>
+                  {n.lbl}
+                </div>
+              );
+            }
+            return (
+              <a key={n.id} href={"#" + n.id} className={activeId === n.id ? "active" : ""} onClick={() => setActiveId(n.id)}>
+                <span className={"meth " + n.meth}>{n.meth.toUpperCase()}</span>
+                {n.lbl}
+              </a>
+            );
+          })}
+        </aside>
+
+        <main className="api-main">
+          <div className="api-hero">
+            <div className="eyebrow"><span className="dash"/> Reference · v0.4.1 · 2026-05</div>
+            <h1>Three surfaces. <span className="ital">One vocabulary.</span></h1>
+            <p className="lede">AutoVault exposes the same primitives — load, render, verify — through three interfaces: a CLI for humans, a library for programs, and an HTTP/MCP endpoint for remote agents. They're versioned together; if a name appears here, it works the same way in all three.</p>
+
+            <div className="api-versions">
+              <div className="v">
+                <div className="lbl">CLI</div>
+                <div className="val">autovault@0.4.1 <span className="meta">npm · brew · cargo</span></div>
+              </div>
+              <div className="v">
+                <div className="lbl">Library</div>
+                <div className="val">@autovault/sdk@0.4.1 <span className="meta">node, deno, bun</span></div>
+              </div>
+              <div className="v">
+                <div className="lbl">HTTP</div>
+                <div className="val">/api/v1 <span className="meta">+ MCP 2024-11-05</span></div>
+              </div>
+            </div>
+          </div>
+
+          {/* CLI */}
+          <div className="api-h2" id="cli">
+            <h2>CLI</h2>
+            <span className="meta">six commands · everything else is a flag</span>
+          </div>
+          <p className="api-section-lede">The CLI is the canonical surface. Library and HTTP are thin wrappers over the same machinery. If a workflow can't be expressed as a CLI invocation, it can't be expressed at all.</p>
+
+          {/* init */}
+          <div className="api-endpoint" id="cli-init">
+            <div className="head">
+              <h3>autovault init</h3>
+              <span className="status-pill stable">stable</span>
+              <span className="since">since 0.1.0</span>
+            </div>
+            <p className="desc">Scaffold a new vault in the current directory. Generates a signing key (or imports an existing one), creates the <code style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--accent)" }}>.autovault/</code> directory, and writes a starter <code style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--accent)" }}>vault.toml</code>.</p>
+            <div className="api-sig">
+              <button className="copy">Copy</button>
+              <div><span className="pmt">$</span> autovault init <span className="opt">[--key &lt;path&gt;] [--anchor &lt;url&gt;] [--no-key]</span></div>
+            </div>
+            <div className="api-args">
+              <div className="head">
+                <span>Flag</span><span>Type</span><span>Description</span>
+              </div>
+              <div className="row">
+                <span className="nm">--key <span className="opt">opt</span></span>
+                <span className="ty">path</span>
+                <span className="desc">Existing Ed25519 private key to import. If omitted, a new key is generated and written to <code>.autovault/key.pem</code>.</span>
+              </div>
+              <div className="row">
+                <span className="nm">--anchor <span className="opt">opt</span></span>
+                <span className="ty">url <span className="def">= autovault.dev</span></span>
+                <span className="desc">Trust anchor URL. Override to point at a private vault for self-hosted deployments.</span>
+              </div>
+              <div className="row">
+                <span className="nm">--no-key <span className="opt">opt</span></span>
+                <span className="ty">flag</span>
+                <span className="desc">Skip key generation. Use this if you only intend to consume skills, not publish them.</span>
+              </div>
+            </div>
+            <TabbedExample tabs={[
+              { label: "Bash", body: `<div><span class="com"># in a fresh repo</span></div><div><span class="pmt">$</span> autovault init</div><div><span class="ok">  ✓</span> generated key:0x9af4…2c81</div><div><span class="ok">  ✓</span> .autovault/ created</div><div><span class="ok">  ✓</span> anchored to autovault.dev (root)</div><div><span class="com"># next: autovault add &lt;skill&gt;</span></div>` },
+              { label: "Self-hosted", body: `<div><span class="pmt">$</span> autovault init \\</div><div>    --anchor https://vault.internal.acme.com</div><div><span class="ok">  ✓</span> generated key:0xC4F9…E10A</div><div><span class="ok">  ✓</span> anchored to vault.internal.acme.com</div><div><span class="com"># key fingerprint must be added to your private vault's allowlist</span></div>` },
+              { label: "Import existing key", body: `<div><span class="pmt">$</span> autovault init --key ./signing.pem</div><div><span class="ok">  ✓</span> imported key:0xD6A8…5AB4</div><div><span class="ok">  ✓</span> .autovault/ created</div>` },
+            ]}/>
+          </div>
+
+          {/* add */}
+          <div className="api-endpoint" id="cli-add">
+            <div className="head">
+              <h3>autovault add &lt;skill&gt;</h3>
+              <span className="status-pill stable">stable</span>
+              <span className="since">since 0.1.0</span>
+            </div>
+            <p className="desc">Resolve, fetch, verify, and install a skill into the current vault. Renders the appropriate transformation for each agent declared in <code style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--accent)" }}>vault.toml</code>'s <code style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--accent)" }}>[targets]</code>.</p>
+            <div className="api-sig">
+              <button className="copy">Copy</button>
+              <div><span className="pmt">$</span> autovault add <span className="key">&lt;skill&gt;</span> <span className="opt">[@&lt;version&gt;] [--target &lt;agent&gt;] [--dry-run]</span></div>
+            </div>
+            <div className="api-args">
+              <div className="head"><span>Argument</span><span>Type</span><span>Description</span></div>
+              <div className="row">
+                <span className="nm">skill <span className="req">*</span></span>
+                <span className="ty">string</span>
+                <span className="desc">Fully-qualified name: <code>org/name</code>. Can include <code>@version</code> suffix; otherwise resolves to latest signed version.</span>
+              </div>
+              <div className="row">
+                <span className="nm">--target <span className="opt">opt</span></span>
+                <span className="ty">enum</span>
+                <span className="desc">Restrict installation to a specific agent: <code>claude-code</code>, <code>codex</code>, <code>cursor</code>, <code>autohub</code>. Repeatable.</span>
+              </div>
+              <div className="row">
+                <span className="nm">--dry-run <span className="opt">opt</span></span>
+                <span className="ty">flag</span>
+                <span className="desc">Verify and render without writing any files. Useful in CI gates.</span>
+              </div>
+            </div>
+            <TabbedExample tabs={[
+              { label: "Bash", body: `<div><span class="pmt">$</span> autovault add autoworks-ai/extract-pdf</div><div><span class="ok">  ✓</span> resolved @1.4.0</div><div><span class="ok">  ✓</span> verified ed25519 sig</div><div><span class="ok">  ✓</span> rendered → CLAUDE.md, AGENTS.md, .cursorrules</div>` },
+              { label: "Pinned", body: `<div><span class="pmt">$</span> autovault add autoworks-ai/extract-pdf@1.3.2</div><div><span class="ok">  ✓</span> resolved @1.3.2 (pinned)</div>` },
+              { label: "Single target", body: `<div><span class="pmt">$</span> autovault add autoworks-ai/extract-pdf \\</div><div>    --target claude-code</div><div><span class="ok">  ✓</span> rendered → CLAUDE.md only</div>` },
+            ]}/>
+          </div>
+
+          {/* list */}
+          <div className="api-endpoint" id="cli-list">
+            <div className="head">
+              <h3>autovault list</h3>
+              <span className="status-pill stable">stable</span>
+              <span className="since">since 0.1.0</span>
+            </div>
+            <p className="desc">Print the installed skills in this vault, their versions, and the last verification timestamp. Adds <code style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--accent)" }}>--json</code> for machine output.</p>
+            <div className="api-sig">
+              <button className="copy">Copy</button>
+              <div><span className="pmt">$</span> autovault list <span className="opt">[--json] [--stale]</span></div>
+            </div>
+          </div>
+
+          {/* publish */}
+          <div className="api-endpoint" id="cli-publish">
+            <div className="head">
+              <h3>autovault publish &lt;path&gt;</h3>
+              <span className="status-pill stable">stable</span>
+              <span className="since">since 0.2.0</span>
+            </div>
+            <p className="desc">Submit a SKILL.md to the configured anchor. Runs the gate locally first; the server re-runs it independently and only signs if both verdicts match.</p>
+            <div className="api-sig">
+              <button className="copy">Copy</button>
+              <div><span className="pmt">$</span> autovault publish <span className="key">&lt;path&gt;</span> <span className="opt">[--draft] [--reason &lt;str&gt;]</span></div>
+            </div>
+            <div className="api-args">
+              <div className="head"><span>Argument</span><span>Type</span><span>Description</span></div>
+              <div className="row">
+                <span className="nm">path <span className="req">*</span></span>
+                <span className="ty">path</span>
+                <span className="desc">Path to a SKILL.md file. Globs accepted: <code>./drafts/*.md</code>.</span>
+              </div>
+              <div className="row">
+                <span className="nm">--draft <span className="opt">opt</span></span>
+                <span className="ty">flag</span>
+                <span className="desc">Run the gate but skip publishing. Returns the same verdict the server would.</span>
+              </div>
+              <div className="row">
+                <span className="nm">--reason <span className="opt">opt</span></span>
+                <span className="ty">string</span>
+                <span className="desc">Free-text changelog entry. Required when bumping minor or major.</span>
+              </div>
+            </div>
+          </div>
+
+          {/* verify */}
+          <div className="api-endpoint" id="cli-verify">
+            <div className="head">
+              <h3>autovault verify</h3>
+              <span className="status-pill stable">stable</span>
+              <span className="since">since 0.3.0</span>
+            </div>
+            <p className="desc">Walk the provenance chain for a skill. Resolves the latest version, fetches the signature bundle, and verifies every link from author through mirror. <strong style={{ color: "var(--ink)" }}>Reproducible</strong> — the same input always returns the same verdict.</p>
+            <div className="api-sig">
+              <button className="copy">Copy</button>
+              <div><span className="pmt">$</span> autovault verify <span className="key">&lt;skill&gt;</span> <span className="opt">[--chain] [--offline]</span></div>
+            </div>
+          </div>
+
+          {/* import */}
+          <div className="api-endpoint" id="cli-import">
+            <div className="head">
+              <h3>autovault import</h3>
+              <span className="status-pill beta">beta</span>
+              <span className="since">since 0.4.0</span>
+            </div>
+            <p className="desc">Migrate skills from RawHub, ForkFlow, or hand-maintained CLAUDE.md / AGENTS.md / .cursorrules. Each importer parses, normalizes, and runs the gate before anything lands.</p>
+            <div className="api-sig">
+              <button className="copy">Copy</button>
+              <div><span className="pmt">$</span> autovault import <span className="key">&lt;rawhub | forkflow | manual&gt;</span> <span className="opt">[options]</span></div>
+            </div>
+          </div>
+
+          {/* LIBRARY */}
+          <div className="api-h2" id="lib">
+            <h2>Library</h2>
+            <span className="meta">@autovault/sdk · TypeScript-first</span>
+          </div>
+          <p className="api-section-lede">The library is what the CLI calls under the hood. Every CLI command is a thin wrapper. Use it directly when you want skill resolution inside your own tooling — agent harnesses, CI checks, custom inspectors.</p>
+
+          <div className="api-endpoint" id="lib-load">
+            <div className="head">
+              <h3>loadSkill(spec, options?)</h3>
+              <span className="status-pill stable">stable</span>
+              <span className="since">since 0.2.0</span>
+            </div>
+            <p className="desc">Resolve and verify a signed skill bundle. Returns the canonical SKILL.md plus its frontmatter, transformations, and provenance chain.</p>
+            <div className="api-sig">
+              <button className="copy">Copy</button>
+              <div><span className="key">async function</span> <span className="num">loadSkill</span>(</div>
+              <div>  <span className="key">spec</span>: <span className="ty" style={{ color: "var(--accent)" }}>string</span>,                       <span className="com">// "org/name@version" or "org/name"</span></div>
+              <div>  <span className="key">options</span>?: <span className="ty" style={{ color: "var(--accent)" }}>LoadOptions</span></div>
+              <div>): <span className="key">Promise</span>&lt;<span className="ty" style={{ color: "var(--accent)" }}>SignedSkill</span>&gt;</div>
+            </div>
+            <div className="api-args">
+              <div className="head"><span>Field</span><span>Type</span><span>Description</span></div>
+              <div className="row">
+                <span className="nm">options.anchor</span>
+                <span className="ty">string <span className="def">= "autovault.dev"</span></span>
+                <span className="desc">Trust anchor URL. Skill must chain to a key trusted by this anchor.</span>
+              </div>
+              <div className="row">
+                <span className="nm">options.cache</span>
+                <span className="ty">"prefer" | "none"</span>
+                <span className="desc">Whether to use the local cache. <code>"none"</code> forces a network round-trip.</span>
+              </div>
+              <div className="row">
+                <span className="nm">options.signal</span>
+                <span className="ty">AbortSignal</span>
+                <span className="desc">Standard cancellation signal.</span>
+              </div>
+            </div>
+            <TabbedExample tabs={[
+              { label: "TypeScript", body: `<div><span class="key">import</span> { loadSkill } <span class="key">from</span> <span class="str">"@autovault/sdk"</span>;</div><div></div><div><span class="key">const</span> skill = <span class="key">await</span> loadSkill(<span class="str">"autoworks-ai/extract-pdf"</span>);</div><div><span class="com">// skill.frontmatter.version === "1.4.0"</span></div><div><span class="com">// skill.transformations["claude-code"] is a rendered CLAUDE.md fragment</span></div>` },
+              { label: "Pinned + offline", body: `<div><span class="key">const</span> skill = <span class="key">await</span> loadSkill(</div><div>  <span class="str">"autoworks-ai/extract-pdf@1.4.0"</span>,</div><div>  { cache: <span class="str">"prefer"</span> }</div><div>);</div>` },
+            ]}/>
+          </div>
+
+          <div className="api-endpoint" id="lib-render">
+            <div className="head">
+              <h3>renderForTarget(skill, target)</h3>
+              <span className="status-pill stable">stable</span>
+              <span className="since">since 0.2.0</span>
+            </div>
+            <p className="desc">Pure function. Takes a verified skill and a target identifier; returns the agent-specific output string. The same logic the server runs at install time, exposed for clients that want to render locally.</p>
+            <div className="api-sig">
+              <button className="copy">Copy</button>
+              <div><span className="key">function</span> <span className="num">renderForTarget</span>(</div>
+              <div>  <span className="key">skill</span>: <span className="ty" style={{ color: "var(--accent)" }}>SignedSkill</span>,</div>
+              <div>  <span className="key">target</span>: <span className="ty" style={{ color: "var(--accent)" }}>"claude-code" | "codex" | "cursor" | "autohub"</span></div>
+              <div>): <span className="ty" style={{ color: "var(--accent)" }}>string</span></div>
+            </div>
+          </div>
+
+          <div className="api-endpoint" id="lib-verify">
+            <div className="head">
+              <h3>verifyChain(bundle)</h3>
+              <span className="status-pill stable">stable</span>
+              <span className="since">since 0.3.0</span>
+            </div>
+            <p className="desc">Verify a provenance chain offline. Takes a bundle from <code style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--accent)" }}>loadSkill()</code>; returns a structured verdict with which links passed, which failed, and why.</p>
+            <div className="api-sig">
+              <button className="copy">Copy</button>
+              <div><span className="key">function</span> <span className="num">verifyChain</span>(</div>
+              <div>  <span className="key">bundle</span>: <span className="ty" style={{ color: "var(--accent)" }}>SignedSkill</span></div>
+              <div>): <span className="ty" style={{ color: "var(--accent)" }}>VerifyResult</span></div>
+            </div>
+          </div>
+
+          {/* HTTP / MCP */}
+          <div className="api-h2" id="http">
+            <h2>HTTP & MCP</h2>
+            <span className="meta">remote endpoint · for sandboxed agents</span>
+          </div>
+          <p className="api-section-lede">Use the HTTP surface when an agent runs in an environment without local CLI access — mobile, hosted notebooks, browser-only runtimes. The MCP server bundled with the vault speaks both the vanilla HTTP API below and the MCP protocol on the same port.</p>
+
+          <div className="api-endpoint" id="http-skill">
+            <div className="head">
+              <h3>GET /api/v1/skill/{`{org}`}/{`{name}`}</h3>
+              <span className="status-pill stable">stable</span>
+              <span className="since">since 0.3.0</span>
+            </div>
+            <p className="desc">Fetch a signed skill bundle. Response is signed JSON; clients should verify the signature with the public key from the trust anchor before consuming the body.</p>
+            <div className="api-sig">
+              <button className="copy">Copy</button>
+              <div>GET /api/v1/skill/<span className="key">{`{org}`}</span>/<span className="key">{`{name}`}</span><span className="opt">?version=1.4.0&target=claude-code</span></div>
+            </div>
+            <div className="api-args">
+              <div className="head"><span>Param</span><span>In</span><span>Description</span></div>
+              <div className="row">
+                <span className="nm">org <span className="req">*</span></span>
+                <span className="ty">path</span>
+                <span className="desc">Publisher org, e.g. <code>autoworks-ai</code> or <code>community/elvissun</code>.</span>
+              </div>
+              <div className="row">
+                <span className="nm">name <span className="req">*</span></span>
+                <span className="ty">path</span>
+                <span className="desc">Skill name within the org.</span>
+              </div>
+              <div className="row">
+                <span className="nm">version <span className="opt">opt</span></span>
+                <span className="ty">query</span>
+                <span className="desc">Specific version. Omit for latest signed.</span>
+              </div>
+              <div className="row">
+                <span className="nm">target <span className="opt">opt</span></span>
+                <span className="ty">query</span>
+                <span className="desc">Pre-render the transformation for this target. Reduces caller-side work.</span>
+              </div>
+            </div>
+            <TabbedExample tabs={[
+              { label: "curl", body: `<div><span class="pmt">$</span> curl https://vault.autovault.dev/api/v1/skill/autoworks-ai/extract-pdf</div><div></div><div><span class="key">{</span></div><div>  <span class="str">"name"</span>: <span class="str">"extract-pdf"</span>,</div><div>  <span class="str">"version"</span>: <span class="str">"1.4.0"</span>,</div><div>  <span class="str">"signature"</span>: <span class="str">"ed25519:9af42c81…7e7e"</span>,</div><div>  <span class="str">"chain"</span>: <span class="str">[ ... ]</span>,</div><div>  <span class="str">"body"</span>: <span class="str">"# Extract PDF\\n\\n..."</span></div><div><span class="key">}</span></div>` },
+              { label: "MCP", body: `<div><span class="com">// MCP tool call</span></div><div><span class="key">{</span></div><div>  <span class="str">"method"</span>: <span class="str">"skill.fetch"</span>,</div><div>  <span class="str">"params"</span>: <span class="key">{</span></div><div>    <span class="str">"org"</span>: <span class="str">"autoworks-ai"</span>,</div><div>    <span class="str">"name"</span>: <span class="str">"extract-pdf"</span>,</div><div>    <span class="str">"target"</span>: <span class="str">"claude-code"</span></div><div>  <span class="key">}</span></div><div><span class="key">}</span></div>` },
+            ]}/>
+          </div>
+
+          <div className="api-endpoint" id="http-resolve">
+            <div className="head">
+              <h3>POST /api/v1/resolve</h3>
+              <span className="status-pill stable">stable</span>
+              <span className="since">since 0.3.0</span>
+            </div>
+            <p className="desc">Batch-resolve a list of skill specs to their latest signed versions. Useful for vaults that want to refresh many skills in one round-trip.</p>
+            <div className="api-sig">
+              <button className="copy">Copy</button>
+              <div>POST /api/v1/resolve</div>
+              <div></div>
+              <div><span className="key">{"{"}</span></div>
+              <div>  <span className="str">"specs"</span>: [<span className="str">"autoworks-ai/extract-pdf"</span>, <span className="str">"autoworks-ai/ocr-image"</span>],</div>
+              <div>  <span className="str">"target"</span>: <span className="str">"claude-code"</span></div>
+              <div><span className="key">{"}"}</span></div>
+            </div>
+          </div>
+
+          <div className="api-endpoint" id="http-verify">
+            <div className="head">
+              <h3>POST /api/v1/verify</h3>
+              <span className="status-pill beta">beta</span>
+              <span className="since">since 0.4.0</span>
+            </div>
+            <p className="desc">Server-side reproducible verification. Send a bundle; the vault re-runs the gate and returns whether its verdict matches what the bundle claims. The point is mutual proof: a malicious mirror cannot fake this round-trip.</p>
+            <div className="api-sig">
+              <button className="copy">Copy</button>
+              <div>POST /api/v1/verify</div>
+              <div></div>
+              <div><span className="com">{"// body: a SignedSkill bundle"}</span></div>
+              <div><span className="com">{"// returns: { match: true, verdict: \"ok\", stages: [...] }"}</span></div>
+            </div>
+          </div>
+        </main>
+
+        <aside className="api-toc">
+          <div className="ttl">On this page</div>
+          <a href="#cli">CLI</a>
+          <a className={"l2" + (activeId === "cli-init" ? " active" : "")} href="#cli-init" onClick={() => setActiveId("cli-init")}>init</a>
+          <a className={"l2" + (activeId === "cli-add" ? " active" : "")} href="#cli-add" onClick={() => setActiveId("cli-add")}>add</a>
+          <a className={"l2" + (activeId === "cli-list" ? " active" : "")} href="#cli-list" onClick={() => setActiveId("cli-list")}>list</a>
+          <a className={"l2" + (activeId === "cli-publish" ? " active" : "")} href="#cli-publish" onClick={() => setActiveId("cli-publish")}>publish</a>
+          <a className={"l2" + (activeId === "cli-verify" ? " active" : "")} href="#cli-verify" onClick={() => setActiveId("cli-verify")}>verify</a>
+          <a className={"l2" + (activeId === "cli-import" ? " active" : "")} href="#cli-import" onClick={() => setActiveId("cli-import")}>import</a>
+          <a href="#lib">Library</a>
+          <a className={"l2" + (activeId === "lib-load" ? " active" : "")} href="#lib-load" onClick={() => setActiveId("lib-load")}>loadSkill</a>
+          <a className={"l2" + (activeId === "lib-render" ? " active" : "")} href="#lib-render" onClick={() => setActiveId("lib-render")}>renderForTarget</a>
+          <a className={"l2" + (activeId === "lib-verify" ? " active" : "")} href="#lib-verify" onClick={() => setActiveId("lib-verify")}>verifyChain</a>
+          <a href="#http">HTTP & MCP</a>
+          <a className={"l2" + (activeId === "http-skill" ? " active" : "")} href="#http-skill" onClick={() => setActiveId("http-skill")}>GET /skill</a>
+          <a className={"l2" + (activeId === "http-resolve" ? " active" : "")} href="#http-resolve" onClick={() => setActiveId("http-resolve")}>POST /resolve</a>
+          <a className={"l2" + (activeId === "http-verify" ? " active" : "")} href="#http-verify" onClick={() => setActiveId("http-verify")}>POST /verify</a>
+        </aside>
+      </div>
+    </>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>

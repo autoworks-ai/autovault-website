@@ -35,6 +35,8 @@ export default defineConfig({
       { text: "Quick start", link: "/quick-start.html" },
       { text: "Authoring", link: "/authoring.html" },
       { text: "Skills", link: "/skills-directory.html" },
+      { text: "API", link: "/api.html" },
+      { text: "Deploy", link: "/deploy.html" },
       { text: "Security", link: "/security.html" },
       { text: "Changelog", link: "/changelog.html" }
     ],
@@ -61,6 +63,9 @@ export default defineConfig({
         text: "Reference",
         items: [
           { text: "Skills directory", link: "/skills-directory.html" },
+          { text: "API reference", link: "/api.html" },
+          { text: "Deploy remote vault", link: "/deploy.html" },
+          { text: "Compare alternatives", link: "/compare.html" },
           { text: "Security & provenance", link: "/security.html" },
           { text: "Changelog", link: "/changelog.html" }
         ]

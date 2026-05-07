@@ -67,7 +67,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import BrandMark from "./BrandMark.vue";
 import UiIcon from "./UiIcon.vue";
 
-type PageKey = "quick-start" | "authoring" | "skills" | "security" | "changelog";
+type PageKey = "quick-start" | "authoring" | "skills" | "api" | "deploy" | "compare" | "skill-detail" | "author-profile" | "security" | "changelog";
 type ShellVariant = "docs" | "full";
 type TocItem = { label: string; id: string };
 
@@ -79,6 +79,8 @@ const navItems = [
   { label: "Quick start", href: "/quick-start.html" },
   { label: "Authoring", href: "/authoring.html" },
   { label: "Skills", href: "/skills-directory.html" },
+  { label: "API", href: "/api.html" },
+  { label: "Deploy", href: "/deploy.html" },
   { label: "Security", href: "/security.html" },
   { label: "Changelog", href: "/changelog.html" }
 ];
@@ -103,6 +105,9 @@ const sidebarGroups = [
     title: "Reference",
     items: [
       { label: "Skills", href: "/skills-directory.html" },
+      { label: "API", href: "/api.html" },
+      { label: "Deploy", href: "/deploy.html" },
+      { label: "Compare", href: "/compare.html" },
       { label: "Security", href: "/security.html" },
       { label: "Changelog", href: "/changelog.html", badge: "v0.4.1" }
     ]
@@ -135,6 +140,11 @@ const configs: Record<PageKey, { active: string; sidebarActive: string; variant:
     ]
   },
   skills: { active: "Skills", sidebarActive: "Skills", variant: "full", toc: [] },
+  api: { active: "API", sidebarActive: "API", variant: "full", toc: [] },
+  deploy: { active: "Deploy", sidebarActive: "Deploy", variant: "full", toc: [] },
+  compare: { active: "Overview", sidebarActive: "Compare", variant: "full", toc: [] },
+  "skill-detail": { active: "Skills", sidebarActive: "Skills", variant: "full", toc: [] },
+  "author-profile": { active: "Skills", sidebarActive: "Skills", variant: "full", toc: [] },
   security: { active: "Security", sidebarActive: "Security", variant: "full", toc: [] },
   changelog: { active: "Changelog", sidebarActive: "Changelog", variant: "full", toc: [] }
 };
@@ -144,6 +154,11 @@ const searchResults = [
   { title: "Authoring skills", section: "Authoring", href: "/authoring.html", terms: "skill md transformation manifest permissions publish gate" },
   { title: "Verify a skill", section: "Authoring", href: "/authoring.html#playground", terms: "paste url playground browser gate diagnostics verify check skill" },
   { title: "Skills directory", section: "Reference", href: "/skills-directory.html", terms: "skills filters agent category org installs" },
+  { title: "API reference", section: "Reference", href: "/api.html", terms: "cli library http mcp endpoint load render verify resolve" },
+  { title: "Deploy remote vault", section: "Reference", href: "/deploy.html", terms: "deploy remote mcp oauth pkce railway render docker fly endpoint" },
+  { title: "Compare alternatives", section: "Reference", href: "/compare.html", terms: "comparison rawhub forkflow manualops alternatives signing provenance" },
+  { title: "extract-pdf", section: "Skills", href: "/skill-detail.html", terms: "extract pdf skill detail transformations permissions provenance versions" },
+  { title: "autoworks-ai", section: "Skills", href: "/author-autoworks-ai.html", terms: "publisher author profile certificate maintainers skills" },
   { title: "Security & provenance", section: "Reference", href: "/security.html", terms: "security signature signing provenance denylist gate verifier" },
   { title: "Changelog", section: "Reference", href: "/changelog.html", terms: "release notes changes security patch minor" }
 ];
