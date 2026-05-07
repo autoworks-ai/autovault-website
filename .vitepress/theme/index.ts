@@ -1,5 +1,6 @@
 import DefaultTheme from "vitepress/theme";
 import type { Theme } from "vitepress";
+import { clerkPlugin } from "@clerk/vue";
 import "./styles.css";
 
 import LandingPage from "./components/LandingPage.vue";
@@ -17,9 +18,19 @@ import AuthorProfilePage from "./components/AuthorProfilePage.vue";
 import AboutPage from "./components/AboutPage.vue";
 import CloudPage from "./components/CloudPage.vue";
 
+const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+
 export default {
   extends: DefaultTheme,
   enhanceApp({ app }) {
+    if (!import.meta.env.SSR && clerkPublishableKey) {
+      app.use(clerkPlugin, {
+        publishableKey: clerkPublishableKey,
+        afterSignOutUrl: "/cloud#launch-path",
+        signInFallbackRedirectUrl: "/cloud#launch-path",
+        signUpFallbackRedirectUrl: "/cloud#launch-path"
+      });
+    }
     app.component("LandingPage", LandingPage);
     app.component("DocsShell", DocsShell);
     app.component("QuickStartPage", QuickStartPage);

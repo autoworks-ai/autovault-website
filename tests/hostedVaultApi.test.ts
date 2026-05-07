@@ -74,10 +74,23 @@ describe("hosted vault provisioning", () => {
     });
 
     expect(vault.slug).toMatch(/^jack-[a-f0-9]{6}$/);
+    expect(vault.status).toBe("reserved");
     expect(vault.public_url).toBe(`https://vault.autovault.dev/${vault.slug}`);
     expect(pending.name).toBe("weather-app");
     expect(env.state.pendingSkills).toHaveLength(1);
     expect(env.state.kvWrites[0].key).toMatch(/^vaults\/.+\/pending\/.+\.md$/);
+  });
+
+  it("returns a clear configuration error when pending source storage lacks KV", async () => {
+    const env = createFakeEnv({ subscriptionStatus: "active" });
+    delete (env as { AUTOVAULT_VAULT_OBJECTS?: unknown }).AUTOVAULT_VAULT_OBJECTS;
+    const user = { id: "github_1", email: "jack@example.com" };
+    const vault = await provisionVault(env, user);
+
+    await expect(savePendingSkill(env, user, vault, {
+      skill_name: "weather",
+      source_text: "---\nname: weather\n---\n# Weather"
+    })).rejects.toMatchObject({ status: 503, message: "AUTOVAULT_VAULT_OBJECTS binding is not configured." });
   });
 });
 

@@ -1,3 +1,4 @@
+import { createClerkClient } from "@clerk/backend";
 import { ApiError, redirectWithError, safeReturnTo } from "./http.js";
 import { first, isoAfter, nowIso, run } from "./db.js";
 import { randomToken, sha256Hex } from "./crypto.js";
@@ -18,6 +19,10 @@ export function parseCookies(header) {
 }
 
 export async function getSessionUser(request, env) {
+  const clerkUser = await getClerkSessionUser(request, env);
+  if (clerkUser) return clerkUser;
+  if (clerkModeEnabled(env)) return null;
+
   const cookies = parseCookies(request.headers.get("cookie"));
   const token = cookies[SESSION_COOKIE];
   if (!token) return null;
@@ -120,6 +125,75 @@ export async function upsertUser(env, provider, profile) {
   `, id, provider, profile.providerUserId, profile.email, profile.name, profile.avatarUrl, nowIso(), nowIso());
 
   return first(env, "select id, email, name, avatar_url, provider from users where provider = ? and provider_user_id = ?", provider, profile.providerUserId);
+}
+
+async function getClerkSessionUser(request, env) {
+  if (!clerkModeEnabled(env)) return null;
+
+  const secretKey = env.CLERK_SECRET_KEY;
+  const publishableKey = clerkPublishableKey(env);
+  if (!secretKey || !publishableKey) return null;
+
+  try {
+    const client = createClerkClient({ secretKey, publishableKey });
+    const requestState = await client.authenticateRequest(request, {
+      authorizedParties: authorizedPartiesFor(request, env)
+    });
+    if (!requestState.isAuthenticated) return null;
+
+    const auth = requestState.toAuth();
+    const clerkUserId = auth?.userId;
+    if (!clerkUserId) return null;
+
+    const profile = await clerkProfile(client, clerkUserId);
+    return upsertUser(env, "clerk", profile);
+  } catch {
+    return null;
+  }
+}
+
+function clerkModeEnabled(env) {
+  return Boolean(env.CLERK_SECRET_KEY && clerkPublishableKey(env));
+}
+
+function clerkPublishableKey(env) {
+  return env.VITE_CLERK_PUBLISHABLE_KEY || env.CLERK_PUBLISHABLE_KEY || "";
+}
+
+function authorizedPartiesFor(request, env) {
+  const origin = new URL(request.url).origin;
+  const configured = String(env.CLERK_AUTHORIZED_PARTIES || "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return unique([
+    origin,
+    "https://autovault.dev",
+    "https://www.autovault.dev",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:4173",
+    "http://127.0.0.1:4173",
+    ...configured
+  ]);
+}
+
+async function clerkProfile(client, clerkUserId) {
+  try {
+    const user = await client.users.getUser(clerkUserId);
+    return {
+      providerUserId: clerkUserId,
+      email: user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress || null,
+      name: user.fullName || [user.firstName, user.lastName].filter(Boolean).join(" ") || user.username || null,
+      avatarUrl: user.imageUrl || null
+    };
+  } catch {
+    return { providerUserId: clerkUserId, email: null, name: null, avatarUrl: null };
+  }
+}
+
+function unique(values) {
+  return [...new Set(values.filter(Boolean))];
 }
 
 function providerConfig(provider, request, env) {

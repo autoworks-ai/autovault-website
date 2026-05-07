@@ -32,9 +32,9 @@
           </div>
         </div>
 
-        <MarkdownActions v-if="showMarkdownActions" :page="markdownPage" />
         <a class="icon-btn cd-github" href="https://github.com/autoworks-ai/autovault" title="GitHub"><UiIcon name="github" :size="15" /></a>
-        <a class="pill-btn primary cd-install" href="/cloud" title="Launch for free in 5 minutes on our hardware">Launch free <UiIcon name="arrow" /></a>
+        <ClerkAuthControls cta-label="Create vault" signed-in-label="Onboarding" />
+        <a class="pill-btn primary cd-install" href="/cloud" title="Reserve a hosted AutoVault namespace">Reserve namespace <UiIcon name="arrow" /></a>
       </div>
     </header>
 
@@ -49,6 +49,9 @@
         </div>
       </aside>
       <main class="cd-docs-content">
+        <div v-if="showMarkdownActions" class="cd-page-markdown-actions">
+          <MarkdownActions :page="markdownPage" />
+        </div>
         <slot />
       </main>
       <aside v-if="config.toc.length" class="cd-toc" aria-label="On this page">
@@ -58,6 +61,9 @@
     </div>
 
     <main v-else class="cd-full-content">
+      <div v-if="showMarkdownActions" class="cd-page-markdown-actions">
+        <MarkdownActions :page="markdownPage" />
+      </div>
       <slot />
     </main>
   </div>
@@ -66,6 +72,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import BrandMark from "./BrandMark.vue";
+import ClerkAuthControls from "./ClerkAuthControls.vue";
 import MarkdownActions from "./MarkdownActions.vue";
 import UiIcon from "./UiIcon.vue";
 import type { PageDocKey } from "../../shared/pageDocs";
@@ -77,15 +84,10 @@ type TocItem = { label: string; id: string };
 const props = defineProps<{ page: PageKey }>();
 
 const navItems = [
-  { label: "Overview", href: "/" },
-  { label: "How it works", href: "/#how" },
   { label: "Quick start", href: "/quick-start" },
-  { label: "Cloud", href: "/cloud" },
   { label: "Authoring", href: "/authoring" },
   { label: "Skills", href: "/skills-directory" },
-  { label: "Security", href: "/security" },
-  { label: "About", href: "/about" },
-  { label: "Changelog", href: "/changelog" }
+  { label: "Security", href: "/security" }
 ];
 
 const sidebarGroups = [
@@ -165,7 +167,7 @@ const searchResults = [
   { title: "extract-pdf", section: "Skills", href: "/skill-detail", terms: "extract pdf skill detail transformations permissions provenance versions" },
   { title: "autoworks-ai", section: "Skills", href: "/author-autoworks-ai", terms: "publisher author profile certificate maintainers skills" },
   { title: "Security & provenance", section: "Reference", href: "/security", terms: "security signature signing provenance denylist gate verifier oauth remote mcp" },
-  { title: "Cloud launch", section: "Hosted", href: "/cloud", terms: "launch free hosted hardware remote mcp oauth cloud five minutes" },
+  { title: "Cloud launch", section: "Hosted", href: "/cloud", terms: "paid hosted onboarding clerk stripe reserved namespace cloud sync coming soon" },
   { title: "About AutoVault", section: "Team", href: "/about", terms: "jack arturo autojack jason coleman flint zack katz daniel iser team credits" },
   { title: "Changelog", section: "Reference", href: "/changelog", terms: "release notes remote mcp oauth add-local transforms resource drift" }
 ];

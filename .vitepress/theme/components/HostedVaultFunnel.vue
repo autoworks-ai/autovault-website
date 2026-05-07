@@ -5,8 +5,8 @@
         <div class="mono-label">hosted vault</div>
         <h3>{{ headline }}</h3>
         <p>
-          AutoVault stores pending drafts, signed manifests, skill bundles, and rendered profiles in a tenant namespace.
-          The host does not execute skills; your local CLI gates, signs, and syncs the files.
+          AutoVault reserves a paid tenant namespace and stores pending onboarding drafts.
+          Cloud sync is not enabled yet; your local CLI remains the source of truth for gated, signed files.
         </p>
       </div>
       <button class="hosted-primary" type="button" :disabled="busy" @click="startFlow">
@@ -14,10 +14,35 @@
       </button>
     </div>
 
+    <div v-if="staticPreview" class="hosted-notice warn">
+      This preview can show Clerk, but the checkout and provisioning APIs run through Cloudflare Pages Functions. Use http://127.0.0.1:8788/cloud for an end-to-end local test.
+    </div>
+
     <div v-if="notice" class="hosted-notice" :class="notice.kind">{{ notice.text }}</div>
 
-    <div class="hosted-flow">
-      <div v-for="item in flowItems" :key="item.label" class="hosted-flow-item" :class="item.state">
+    <div class="hosted-stage-card" :class="stageFocus.state">
+      <div class="hosted-stage-kicker">{{ stageFocus.kicker }}</div>
+      <h4>{{ stageFocus.title }}</h4>
+      <p>{{ stageFocus.body }}</p>
+      <div class="hosted-stage-action">
+        <ClerkAuthControls
+          v-if="stageFocus.action === 'auth'"
+          variant="funnel"
+          cta-label="Create your account"
+          signed-in-label="Continue onboarding"
+          @click.capture="persistDraft"
+        />
+        <button v-else-if="stageFocus.action === 'checkout'" class="hosted-primary" type="button" :disabled="busy" @click="startFlow">
+          {{ checkoutStarted ? "Opening Checkout..." : "Open test checkout" }}
+        </button>
+        <button v-else-if="stageFocus.action === 'reserve'" class="hosted-primary" type="button" :disabled="busy" @click="startFlow">
+          {{ provisioning ? "Reserving..." : "Reserve namespace" }}
+        </button>
+      </div>
+    </div>
+
+    <div class="hosted-flow hosted-flow--compact" aria-label="Hosted onboarding steps">
+      <div v-for="(item, index) in flowItems" :key="item.label" class="hosted-flow-item" :class="item.state" :style="{ '--step-index': index }">
         <span class="hosted-dot" />
         <span class="hosted-flow-copy">
           <strong>{{ item.label }}</strong>
@@ -26,12 +51,7 @@
       </div>
     </div>
 
-    <div v-if="showAuthActions" class="hosted-auth-actions">
-      <a class="hosted-auth-btn" :href="authStartUrl('github')" @click="persistDraft">Continue with GitHub</a>
-      <a class="hosted-auth-btn" :href="authStartUrl('google')" @click="persistDraft">Continue with Google</a>
-    </div>
-
-    <div class="hosted-provision-grid">
+    <div v-if="showSetupDetails" class="hosted-provision-grid">
       <div class="hosted-panel">
         <div class="panel-title">Provisioning</div>
         <div class="provision-list">
@@ -56,11 +76,11 @@
       </div>
     </div>
 
-    <div class="hosted-command-card">
-      <div class="panel-title">Agent handoff</div>
+    <div v-if="showLocalHandoff" class="hosted-command-card">
+      <div class="panel-title">Local handoff</div>
       <pre><code>{{ commandBlock }}</code></pre>
       <div class="hosted-copy-row">
-        <button type="button" @click="copyCommands">Copy terminal commands</button>
+        <button type="button" @click="copyCommands">Copy local commands</button>
         <button type="button" @click="copyAgentHandoff('claude-code')">Copy Claude Code handoff</button>
         <button type="button" @click="copyAgentHandoff('cursor')">Copy Cursor handoff</button>
       </div>
@@ -70,12 +90,12 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import ClerkAuthControls from "./ClerkAuthControls.vue";
 import { skills } from "../data/skills";
 import type { GateEvaluation } from "../utils/skillGate";
 
 const PENDING_DRAFT_KEY = "autovault.hostedVault.pendingDraft";
 
-type AuthProvider = "github" | "google";
 type Notice = { kind: "ok" | "warn" | "fail"; text: string };
 type MeResponse = {
   user: { id: string; email?: string | null; name?: string | null; avatar_url?: string | null } | null;
@@ -111,6 +131,7 @@ const notice = ref<Notice | null>(null);
 const provisioning = ref(false);
 const pendingSaved = ref(false);
 const checkoutStarted = ref(false);
+const staticPreview = ref(false);
 const queuedSkillNames = ref<string[]>(skills.filter((skill) => skill.featured).slice(0, 2).map((skill) => skill.name));
 
 const starterSkills = computed(() => skills.filter((skill) => skill.featured).slice(0, 4));
@@ -119,34 +140,77 @@ const paid = computed(() => Boolean(me.value?.subscription?.active));
 const vault = computed(() => me.value?.vault ?? null);
 const teamSlug = computed(() => vault.value?.slug ?? slugify(me.value?.user?.email || me.value?.user?.name || "your-team"));
 const hostedEndpoint = computed(() => vault.value?.public_url ?? `https://vault.autovault.dev/${teamSlug.value}`);
-const headline = computed(() => props.entry === "playground" ? "Move this passing skill into a hosted vault" : "Create a hosted static vault namespace");
-const primaryLabel = computed(() => props.entry === "playground" ? "Move this skill to hosted vault" : "Start hosted vault");
-const showAuthActions = computed(() => !signedIn.value);
+const headline = computed(() => props.entry === "playground" ? "Reserve a namespace for this passing skill" : "Reserve a hosted AutoVault namespace");
+const primaryLabel = computed(() => props.entry === "playground" ? "Reserve namespace" : "Start paid onboarding");
+const showSetupDetails = computed(() => signedIn.value || paid.value || Boolean(vault.value) || props.entry === "playground");
+const showLocalHandoff = computed(() => signedIn.value || Boolean(vault.value));
+const namespaceStatusLabel = computed(() => vault.value ? "Hosted namespace reserved:" : "Planned namespace:");
 const commandBlock = computed(() => [
-  `autovault cloud connect ${hostedEndpoint.value}`,
-  "autovault sync --cloud",
-  "autovault cloud pull --pending"
+  "curl -fsSL https://autovault.sh | sh",
+  ". \"$HOME/.autovault/env\"",
+  "autovault skill list",
+  "",
+  `# ${namespaceStatusLabel.value}`,
+  `# ${hostedEndpoint.value}`,
+  vault.value ? "# Cloud sync is not enabled yet." : "# Checkout must complete before this namespace is reserved."
 ].join("\n"));
+
+const stageFocus = computed(() => {
+  if (!signedIn.value) {
+    return {
+      kicker: "Step 1 of 4",
+      title: "Create your AutoVault account",
+      body: "Clerk will open a secure sign-up window. After it finishes, this page will unlock checkout without asking you to restart.",
+      action: "auth",
+      state: "ready"
+    };
+  }
+  if (!paid.value) {
+    return {
+      kicker: "Step 2 of 4",
+      title: "Finish test checkout",
+      body: "Stripe Checkout records the subscription state through a webhook before AutoVault reserves your namespace.",
+      action: "checkout",
+      state: checkoutStarted.value ? "active" : "ready"
+    };
+  }
+  if (!vault.value) {
+    return {
+      kicker: "Step 3 of 4",
+      title: "Reserve your namespace",
+      body: "AutoVault will create the stable hosted URL now. Cloud sync stays disabled until the CLI commands ship.",
+      action: "reserve",
+      state: provisioning.value ? "active" : "ready"
+    };
+  }
+  return {
+    kicker: "Step 4 of 4",
+    title: "Namespace reserved",
+    body: `${hostedEndpoint.value} is held for this account. Keep using the local CLI for signing and profile sync while hosted sync is in progress.`,
+    action: "local",
+    state: "done"
+  };
+});
 
 const flowItems = computed(() => [
   {
     label: "Auth",
-    detail: signedIn.value ? userLabel.value : "Continue with GitHub or Google",
+    detail: signedIn.value ? userLabel.value : "Create an account or sign in",
     state: signedIn.value ? "done" : "ready"
   },
   {
     label: "Checkout",
-    detail: paid.value ? "Stripe subscription active" : checkoutStarted.value ? "Redirecting to Stripe Checkout" : "Stripe-hosted payment form",
+    detail: paid.value ? "Stripe subscription active" : checkoutStarted.value ? "Redirecting to Stripe Checkout" : "Stripe-hosted test-mode payment form",
     state: paid.value ? "done" : signedIn.value ? "ready" : "pending"
   },
   {
     label: "Namespace",
-    detail: vault.value ? hostedEndpoint.value : "Shared static vault storage",
+    detail: vault.value ? `${hostedEndpoint.value} reserved` : "Reserved namespace anchor",
     state: vault.value ? "done" : provisioning.value ? "active" : paid.value ? "ready" : "pending"
   },
   {
     label: "Sync",
-    detail: pendingSaved.value ? "Pending cloud import saved" : "CLI signs and syncs local files",
+    detail: pendingSaved.value ? "Pending import saved for later cloud sync" : "Cloud CLI sync is coming soon",
     state: pendingSaved.value ? "done" : vault.value ? "ready" : "pending"
   }
 ]);
@@ -154,9 +218,9 @@ const flowItems = computed(() => [
 const provisionSteps = computed(() => [
   { label: props.entry === "playground" ? "Store browser draft in session" : "Queue selected starter skills", done: props.entry === "playground" ? hasDraft() : queuedSkillNames.value.length > 0, active: false },
   { label: "Confirm paid access from webhook state", done: paid.value, active: signedIn.value && !paid.value },
-  { label: "Allocate tenant namespace", done: Boolean(vault.value), active: provisioning.value },
-  { label: "Save pending cloud import", done: pendingSaved.value, active: Boolean(vault.value) && !pendingSaved.value },
-  { label: "Sync signed bundles from CLI", done: false, active: Boolean(vault.value) }
+  { label: "Reserve tenant namespace", done: Boolean(vault.value), active: provisioning.value },
+  { label: "Save pending onboarding import", done: pendingSaved.value, active: Boolean(vault.value) && !pendingSaved.value },
+  { label: "Cloud CLI sync coming soon", done: false, active: Boolean(vault.value) }
 ]);
 
 const userLabel = computed(() => {
@@ -165,6 +229,7 @@ const userLabel = computed(() => {
 });
 
 onMounted(async () => {
+  staticPreview.value = canUseBrowser() && window.location.port === "5173";
   await loadMe();
   resumeCheckoutReturn();
 });
@@ -177,7 +242,7 @@ async function startFlow() {
   try {
     await loadMe();
     if (!signedIn.value) {
-      notice.value = { kind: "warn", text: "Sign in first; the draft will stay in this browser through checkout." };
+      notice.value = { kind: "warn", text: "Create your account first. The draft will stay in this browser through checkout." };
       return;
     }
     if (!paid.value) {
@@ -227,7 +292,7 @@ function hasDraft() {
 
 async function loadMe() {
   try {
-    const response = await fetch("/api/me", { credentials: "include", headers: { accept: "application/json" } });
+    const response = await fetch("/api/me", { credentials: "include", headers: await authHeaders({ accept: "application/json" }) });
     if (!response.ok) {
       me.value = { user: null };
       return;
@@ -243,12 +308,12 @@ async function startCheckout() {
   const response = await fetch("/api/checkout/hosted-vault", {
     method: "POST",
     credentials: "include",
-    headers: { "content-type": "application/json", accept: "application/json" },
+    headers: await authHeaders({ "content-type": "application/json", accept: "application/json" }),
     body: JSON.stringify({ return_to: currentReturnPath(), source: props.entry })
   });
 
   if (response.status === 401) {
-    notice.value = { kind: "warn", text: "Your session expired. Continue with GitHub or Google to resume." };
+    notice.value = { kind: "warn", text: "Your session expired. Sign in again to resume." };
     checkoutStarted.value = false;
     return;
   }
@@ -268,7 +333,7 @@ async function provisionVault() {
   const response = await fetch("/api/vaults/provision", {
     method: "POST",
     credentials: "include",
-    headers: { "content-type": "application/json", accept: "application/json" },
+    headers: await authHeaders({ "content-type": "application/json", accept: "application/json" }),
     body: JSON.stringify({ queued_skills: queuedSkillNames.value })
   });
   const payload = await response.json().catch(() => ({}));
@@ -288,7 +353,7 @@ async function provisionVault() {
   me.value = { ...(me.value ?? { user: null }), vault: payload.vault };
   await savePendingImport();
   provisioning.value = false;
-  notice.value = { kind: "ok", text: "Hosted namespace ready. Run the CLI commands to sign, sync, and pull pending imports." };
+  notice.value = { kind: "ok", text: "Hosted namespace reserved. Cloud sync is not enabled yet; keep signing and serving skills locally for now." };
 }
 
 async function savePendingImport() {
@@ -298,7 +363,7 @@ async function savePendingImport() {
   const response = await fetch("/api/vaults/current/pending-skills", {
     method: "POST",
     credentials: "include",
-    headers: { "content-type": "application/json", accept: "application/json" },
+    headers: await authHeaders({ "content-type": "application/json", accept: "application/json" }),
     body: JSON.stringify({
       skill_name: draft?.skillName,
       version: draft?.version,
@@ -322,14 +387,10 @@ function resumeCheckoutReturn() {
   }
   if (hosted !== "success") return;
 
-  notice.value = { kind: "warn", text: "Checkout returned. Waiting for Stripe webhook state before final vault activation." };
+  notice.value = { kind: "warn", text: "Checkout returned. Waiting for Stripe webhook state before reserving the namespace." };
   if (paid.value) {
     void provisionVault();
   }
-}
-
-function authStartUrl(provider: AuthProvider) {
-  return `/api/auth/start?provider=${provider}&return_to=${encodeURIComponent(currentReturnPath())}`;
 }
 
 function currentReturnPath() {
@@ -345,12 +406,12 @@ function toggleSkill(name: string) {
 
 async function copyCommands() {
   await copyText(commandBlock.value);
-  notice.value = { kind: "ok", text: "Terminal commands copied." };
+  notice.value = { kind: "ok", text: "Local commands copied." };
 }
 
 async function copyAgentHandoff(agent: "claude-code" | "cursor") {
   const label = agent === "claude-code" ? "Claude Code" : "Cursor";
-  await copyText(`# ${label} hosted AutoVault handoff\n${commandBlock.value}\n`);
+  await copyText(`# ${label} paid hosted AutoVault handoff\n${commandBlock.value}\n\nCloud sync commands are not enabled in this MVP. Keep using the local AutoVault CLI until hosted sync ships.\n`);
   notice.value = { kind: "ok", text: `${label} handoff copied.` };
 }
 
@@ -369,5 +430,16 @@ function slugify(value: string) {
 
 function canUseBrowser() {
   return typeof window !== "undefined";
+}
+
+async function authHeaders(headers: Record<string, string>) {
+  const token = await clerkSessionToken();
+  return token ? { ...headers, authorization: `Bearer ${token}` } : headers;
+}
+
+async function clerkSessionToken() {
+  if (!canUseBrowser()) return null;
+  const clerk = (window as unknown as { Clerk?: { session?: { getToken?: () => Promise<string | null> } } }).Clerk;
+  return await clerk?.session?.getToken?.() ?? null;
 }
 </script>

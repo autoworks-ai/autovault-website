@@ -10,7 +10,7 @@ describe("hosted vault Pages Function smoke tests", () => {
     vi.unstubAllGlobals();
   });
 
-  it("starts unauthenticated playground auth through GitHub", async () => {
+  it("starts unauthenticated playground auth through GitHub legacy fallback", async () => {
     const env = createPagesEnv({ subscriptionStatus: null });
     const request = new Request(`https://autovault.dev/api/auth/start?provider=github&return_to=${encodeURIComponent("/authoring.html#playground")}`);
     const response = await authStart({ request, env });
@@ -42,16 +42,32 @@ describe("hosted vault Pages Function smoke tests", () => {
     expect((fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].headers["stripe-version"]).toBe("2026-02-25.clover");
   });
 
+  it("rejects checkout for anonymous users", async () => {
+    const env = createPagesEnv({ subscriptionStatus: null });
+    const request = new Request("https://autovault.dev/api/checkout/hosted-vault", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ source: "deploy" })
+    });
+
+    const response = await checkoutHostedVault({ request, env });
+    const payload = await response.json() as { error: string };
+
+    expect(response.status).toBe(401);
+    expect(payload.error).toMatch(/authentication required/i);
+  });
+
   it("provisions a namespace for a paid user", async () => {
     const env = createPagesEnv({ subscriptionStatus: "active" });
     const cookie = await createSession(new Request("https://autovault.dev"), env, "github_1");
     const request = new Request("https://autovault.dev/api/vaults/provision", { method: "POST", headers: { cookie } });
 
     const response = await provisionHostedVault({ request, env });
-    const payload = await response.json() as { vault: { slug: string; public_url: string } };
+    const payload = await response.json() as { vault: { slug: string; public_url: string; status: string } };
 
     expect(response.status).toBe(200);
     expect(payload.vault.slug).toMatch(/^jack-[a-f0-9]{6}$/);
+    expect(payload.vault.status).toBe("reserved");
     expect(payload.vault.public_url).toBe(`https://vault.autovault.dev/${payload.vault.slug}`);
   });
 

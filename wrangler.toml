@@ -3,6 +3,7 @@ pages_build_output_dir = ".vitepress/dist"
 compatibility_date = "2026-05-06"
 
 [vars]
+CLOUDFLARE_ACCOUNT_ID = "2cc725912d479c0bd6c08fc24931a478"
 AUTOVAULT_INSTALLER_URL = "https://raw.githubusercontent.com/autoworks-ai/autovault/main/scripts/install.sh"
 STRIPE_BRAND_DISPLAY_NAME = "AutoVault"
 STRIPE_BRAND_BACKGROUND_COLOR = "#0b1014"
@@ -10,12 +11,21 @@ STRIPE_BRAND_BUTTON_COLOR = "#5ad6c0"
 STRIPE_BRAND_BORDER_STYLE = "rounded"
 STRIPE_BRAND_FONT_FAMILY = "inter"
 
-# Production bindings must be attached in Cloudflare Pages before enabling the
-# hosted-vault funnel:
-# - D1 binding AUTOVAULT_DB, migrated with migrations/0001_hosted_vault.sql
+[[d1_databases]]
+binding = "AUTOVAULT_DB"
+database_name = "autovault-hosted"
+database_id = "0223c717-ac9a-4fb1-bc5a-1be29ccd7faa"
+
+[[kv_namespaces]]
+binding = "AUTOVAULT_VAULT_OBJECTS"
+id = "f483d8cf70724b0bb1c0d4628a6b4839"
+
+# Paid hosted onboarding production requirements:
+# - Clerk secrets: CLERK_SECRET_KEY, VITE_CLERK_PUBLISHABLE_KEY
+# - Stripe secrets: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+# - Stripe price: AUTOVAULT_HOSTED_PRICE_ID
+# - D1 binding AUTOVAULT_DB migrated with migrations/0001_hosted_vault.sql
 # - KV binding AUTOVAULT_VAULT_OBJECTS for pending browser drafts and small vault artifacts
 #
-# Required provider secrets:
-# GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
-# SESSION_SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
-# AUTOVAULT_HOSTED_PRICE_ID
+# Legacy GitHub/Google OAuth variables are optional fallback auth paths, not
+# required for the Clerk + Stripe paid onboarding funnel.
