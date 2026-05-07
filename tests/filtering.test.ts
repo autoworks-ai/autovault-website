@@ -38,14 +38,14 @@ describe("changelog helpers", () => {
 
     expect(counts.all).toBe(releases.length);
     expect(counts.security).toBeGreaterThan(0);
-    expect(counts.patch).toBe(2);
+    expect(counts.patch).toBe(0);
   });
 
   it("filters releases by security section and query", () => {
-    const result = filterReleases(releases, "security", "denylist");
+    const result = filterReleases(releases, "security", "OAuth");
 
     expect(result).toHaveLength(1);
-    expect(result[0].version).toBe("0.4.1");
+    expect(result[0].version).toBe("Unreleased");
   });
 
   it("returns preview releases only when requested", () => {

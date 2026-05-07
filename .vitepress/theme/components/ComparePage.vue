@@ -1,7 +1,7 @@
 <template>
   <div class="cm-page reveal-page">
     <section class="cm-hero reveal-item">
-      <div class="eyebrow"><span class="dash" /> Comparison · v0.4.1 · 2026-05</div>
+      <div class="eyebrow"><span class="dash" /> Comparison · v0.2.0 · 2026-05</div>
       <h1>The honest breakdown of <span class="ital">where AutoVault wins, ties, and doesn't.</span></h1>
       <p class="lede">The homepage table is a teaser. This page is the long form — including the cases where another approach is genuinely better. We re-evaluate every release; if a competitor closes a gap, we say so here first.</p>
     </section>
@@ -62,7 +62,7 @@
 
       <div class="cm-honest">
         <div class="ttl">Honesty box</div>
-        <p><strong>Where AutoVault is genuinely behind.</strong> RawHub has more skills (3,400 vs. our 241) — community indexes always do. ForkFlow has a richer GUI for browsing per-agent forks; if you live mostly in one agent's tooling and don't care about cross-agent skills, that may matter to you. We do not have a hosted tier and we don't plan to add one — if you want zero-ops, our remote MCP one-click deploy is the closest equivalent.</p>
+        <p><strong>Where AutoVault is genuinely behind.</strong> RawHub has more skills (3,400 vs. our 241) — community indexes always do. ForkFlow has a richer GUI for browsing per-agent forks; if you live mostly in one agent's tooling and don't care about cross-agent skills, that may matter to you. Hosted AutoVault is intentionally narrow right now: fast launch, remote MCP, OAuth, and signed skill delivery before the broader team-management surface grows.</p>
       </div>
     </section>
 
@@ -117,6 +117,8 @@
 </template>
 
 <script setup lang="ts">
+import { denyRows } from "../data/security";
+
 type Verdict = "yes" | "no" | "partial" | "bad";
 type ComparisonCell = { value: Verdict; title: string; detail: string };
 type ComparisonRow =
@@ -132,7 +134,7 @@ type ComparisonRow =
     };
 
 const players = [
-  { id: "av" as const, name: "AutoVault", desc: "Validating registry. Author once, render per caller. Local CLI; signed; reproducible.", badge: "AV", color: "#5ad6c0", ink: "#062821", us: true, meta: ["v0.4.1", "Apache-2.0", "self-hosted"] },
+  { id: "av" as const, name: "AutoVault", desc: "Validating registry. Author once, render per caller. Local CLI; signed; reproducible.", badge: "AV", color: "#5ad6c0", ink: "#062821", us: true, meta: ["v0.2.0", "MIT", "self-hosted"] },
   { id: "rh" as const, name: "RawHub", desc: "Public skill index. No gate, no signing. Browse and copy-paste from a community wiki.", badge: "RH", color: "#5a9dd6", ink: "#06182a", meta: ["community", "no validation", "browser only"] },
   { id: "fl" as const, name: "ForkFlow", desc: "Fork-and-edit catalog. Each agent maintains its own format-specific fork of every skill.", badge: "FF", color: "#d6a85a", ink: "#2a1a06", meta: ["per-agent forks", "manual sync"] },
   { id: "ml" as const, name: "ManualOps", desc: "No tooling. Engineers paste skills directly into CLAUDE.md / .cursorrules / AGENTS.md by hand.", badge: "—", color: "#4a5b6b", ink: "#0a0d11", meta: ["zero tooling", "high drift"] }
@@ -146,15 +148,15 @@ const rows: ComparisonRow[] = [
   { kind: "section", label: "Validation & trust" },
   row("Pre-publish gate", "Programmatic checks before admission", ["yes", "5 stages, reproducible", "Repair → denylist → capability → dedup → sign"], ["no", "—", "Best-effort community moderation"], ["partial", "Per-fork lint", "Inconsistent across forks"], ["no", "—", "Whatever ships, ships"]),
   row("Cryptographic signing", "Ed25519 sigs bind author + content + gate verdict", ["yes", "Ed25519 chain", "Author → vault → mirror"], ["no", "—", "Trust by URL only"], ["no", "—", "No signing"], ["no", "—", "No signing"]),
-  row("Reproducible verdicts", "Same bytes in = same gate verdict out", ["yes", "Gate v0.4+", "Run locally with autovault verify"], ["no", "n/a", "No verdict to reproduce"], ["partial", "Best-effort", "Depends on fork lint"], ["no", "n/a", "—"]),
-  row("Public denylist", "Auditable, signed bad-pattern bundle", ["yes", "343 patterns, signed", "Same artifact format as skills"], ["no", "—", "—"], ["no", "—", "—"], ["no", "—", "—"]),
+  row("Reproducible verdicts", "Same bytes in = same gate verdict out", ["yes", "Gate v0.2+", "Run locally with autovault verify"], ["no", "n/a", "No verdict to reproduce"], ["partial", "Best-effort", "Depends on fork lint"], ["no", "n/a", "—"]),
+  row("Public denylist", "Auditable bad-pattern bundle", ["yes", `${denyRows.length} active patterns`, "Same artifact format as skills"], ["no", "—", "—"], ["no", "—", "—"], ["no", "—", "—"]),
   { kind: "section", label: "Operations" },
   row("Dedup at submission", "Stops duplicate-skill explosion before it starts", ["yes", "Text in V1", "Embedding in V2 preview"], ["no", "Browser ranking only", "Near-duplicates surface"], ["no", "—", "Forks are duplicates by design"], ["no", "—", "—"]),
   row("Self-hostable", "Run a private vault behind your VPN", ["yes", "Docker / Railway / Render", "Same gate, your keys, your mirror"], ["partial", "Mirrors only", "No gate to self-host"], ["no", "Cloud only", "—"], ["yes", "By definition", "Each machine is the host"]),
   row("Remote MCP endpoint", "Mobile and sandboxed agents fetch over HTTPS", ["yes", "Bundled MCP server", "One-click deploy, signed responses"], ["no", "—", "Browser-only"], ["partial", "Per-agent", "Format-specific endpoints"], ["no", "—", "—"]),
   row("License clarity", "SPDX license declared and surfaced", ["yes", "Required field", "Gate-checked"], ["partial", "Optional", "Often blank"], ["partial", "Per-fork inconsistency", "—"], ["no", "Lost in copy-paste", "—"]),
   { kind: "section", label: "Cost & openness" },
-  row("Pricing", "Cost to author, host, or consume", ["yes", "Free, Apache-2.0", "All open. No paid plans."], ["yes", "Free", "Donations"], ["partial", "Free tier + paid", "Private forks behind paywall"], ["yes", "Free", "Labor cost is high"]),
+  row("Pricing", "Cost to author, host, or consume", ["yes", "Free, MIT", "All open. No paid plans."], ["yes", "Free", "Donations"], ["partial", "Free tier + paid", "Private forks behind paywall"], ["yes", "Free", "Labor cost is high"]),
   row("Vendor lock-in risk", "If the project disappears tomorrow", ["yes", "Plain SKILL.md files", "Markdown + signed JSON"], ["yes", "Plain text", "Caller has copies"], ["partial", "Forks survive", "Formats drift"], ["yes", "Yours already", "—"])
 ];
 

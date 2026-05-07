@@ -5,10 +5,10 @@
       <section class="section hero" id="overview">
         <div class="hero-grid">
           <div>
-            <div class="hero-tag"><span class="badge">v0.4</span><span>First public release · May 2026</span></div>
+            <div class="hero-tag"><span class="badge">v0.2</span><span>Current source release · May 2026</span></div>
             <h1>The skill registry<br />with a <span class="ital">gate</span>.</h1>
             <p class="hero-sub">
-              Curated skills for AI agents — validated at the door, signed with provenance, scoped per caller, and transformed to fit every agent platform without forking. Local-first. Self-hostable.
+              Curated skills for AI agents: validated at the door, signed with provenance, scoped per caller, served over local stdio or remote Streamable HTTP MCP, and transformed without forking. Local-first. Self-hostable.
             </p>
             <div class="install">
               <div class="install-head"><span class="dot live" /><span class="dot" /><span class="dot" /><span class="label">~ &nbsp;bash</span></div>
@@ -20,8 +20,8 @@
             </div>
             <div class="hero-meta">
               <span><UiIcon name="check" class="arg" /> Ed25519 signed</span>
-              <span><UiIcon name="check" class="arg" /> MCP-native + bridge</span>
-              <span><UiIcon name="check" class="arg" /> Apache-2.0</span>
+              <span><UiIcon name="check" class="arg" /> OAuth remote MCP</span>
+              <span><UiIcon name="check" class="arg" /> MIT</span>
             </div>
           </div>
           <GateStage />
@@ -157,7 +157,7 @@
               </div>
             </div>
             <div class="gate-output" :class="{ verified: tick > gateStages.length }" :style="{ opacity: tick > gateStages.length ? 1 : 0.4 }"><span class="tag">VERIFIED</span><span style="flex: 1">weather-skill@1.2.0 — admitted</span><span class="arg">sig:0x9af4…2c81</span></div>
-            <a v-if="verifiedSeen" class="gate-verify-flag" href="/authoring.html#playground">
+            <a v-if="verifiedSeen" class="gate-verify-flag" href="/authoring#playground">
               <span class="mono-label">Your turn</span>
               <strong>Verify your own skill URL</strong>
               <UiIcon name="arrow" :size="14" />
@@ -218,7 +218,8 @@
           <h2>Signed skills. Real provenance.<br /><span class="ital">No mystery code.</span></h2>
           <p>One vault. Every agent. No drift. Self-host the team mode, or run local-only — same engine, same gate.</p>
           <div style="display: inline-flex; gap: 12px; flex-wrap: wrap; justify-content: center">
-            <a class="pill-btn primary" href="/quick-start.html">Install AutoVault <UiIcon name="arrow" /></a>
+            <a class="pill-btn primary" href="/cloud">Launch free in 5 minutes <UiIcon name="arrow" /></a>
+            <a class="pill-btn" href="/quick-start">Install locally</a>
             <a class="pill-btn" href="https://github.com/autoworks-ai/autovault"><UiIcon name="github" /> github.com/autoworks-ai/autovault</a>
           </div>
         </div>
@@ -234,6 +235,7 @@ import BrandMark from "./BrandMark.vue";
 import UiIcon from "./UiIcon.vue";
 import { gateStages } from "../data/security";
 import { transforms, type TransformTarget } from "../data/transforms";
+import { copyText } from "../utils/clipboard";
 
 const Mark = defineComponent({
   props: { kind: { type: String, required: true } },
@@ -248,17 +250,18 @@ const LandingTopbar = defineComponent({
       ["Overview", "#overview"],
       ["How it works", "#how"],
       ["Concepts", "#concepts"],
-      ["Quick start", "/quick-start.html"],
-      ["Compare", "/compare.html"]
+      ["Quick start", "/quick-start"],
+      ["Compare", "#compare"],
+      ["About", "/about"]
     ];
     return () => h("div", { class: "av-topbar" }, h("div", { class: "av-topbar-inner" }, [
       h("a", { class: "av-brand", href: "/" }, [h(BrandMark), h("span", [h("span", { class: "auto" }, "Auto"), h("span", { class: "vault" }, "Vault")])]),
-      h("span", { class: "av-version" }, "v0.4.1"),
+      h("span", { class: "av-version" }, "v0.2.0"),
       h("nav", { class: "av-nav" }, items.map(([label, href]) => h("a", { href }, label))),
       h("div", { class: "av-actions" }, [
         h("a", { class: "icon-btn", href: "https://github.com/autoworks-ai/autovault", title: "GitHub" }, h(UiIcon, { name: "github", size: 15 })),
-        h("a", { class: "pill-btn", href: "/quick-start.html" }, [h("span", { class: "status-dot" }), "Docs"]),
-        h("a", { class: "pill-btn primary", href: "/quick-start.html" }, ["Install", h(UiIcon, { name: "arrow" })])
+        h("a", { class: "pill-btn", href: "/quick-start" }, [h("span", { class: "status-dot" }), "Docs"]),
+        h("a", { class: "pill-btn primary", href: "/cloud", title: "Launch for free in 5 minutes on our hardware" }, ["Launch free", h(UiIcon, { name: "arrow" })])
       ])
     ]));
   }
@@ -318,11 +321,26 @@ const AutoVaultFooter = defineComponent({
     return () => h("footer", { class: "footer" }, [
       h("div", { class: "footer-inner" }, [
         h("div", [h("div", { class: "av-brand", style: "margin-bottom:14px" }, [h(BrandMark), h("span", [h("span", { class: "auto" }, "Auto"), h("span", { class: "vault" }, "Vault")])]), h("p", { class: "card-p", style: "max-width:320px" }, "A curated skills layer for AI agents. Validated at the door, signed with provenance, scoped per caller.")]),
-        h("div", [h("h5", "Product"), h("a", { href: "/" }, "Overview"), h("a", { href: "/skills-directory.html" }, "Skills directory"), h("a", { href: "/compare.html" }, "Compare"), h("a", { href: "/changelog.html" }, "Changelog")]),
-        h("div", [h("h5", "Develop"), h("a", { href: "/quick-start.html" }, "Quick start"), h("a", { href: "/authoring.html" }, "Authoring skills"), h("a", { href: "/api.html" }, "API reference"), h("a", { href: "/deploy.html" }, "Deploy remote")]),
-        h("div", [h("h5", "Org"), h("a", { href: "/author-autoworks-ai.html" }, "autoworks-ai"), h("span", { class: "footer-text" }, "AutoMem"), h("span", { class: "footer-text" }, "AutoHub"), h("a", { href: "/security.html" }, "Security policy")])
+        h("div", [h("h5", "Product"), h("a", { href: "/" }, "Overview"), h("a", { href: "/cloud" }, "Cloud launch"), h("a", { href: "/skills-directory" }, "Skills directory"), h("a", { href: "/compare" }, "Compare"), h("a", { href: "/changelog" }, "Changelog")]),
+        h("div", [h("h5", "Develop"), h("a", { href: "/quick-start" }, "Quick start"), h("a", { href: "/authoring" }, "Authoring skills"), h("a", { href: "/api" }, "API reference"), h("a", { href: "/deploy" }, "Deploy remote"), h("a", { href: "/security" }, "Security model")]),
+        h("div", [h("h5", "Org"), h("a", { href: "/about" }, "About"), h("a", { href: "https://github.com/autoworks-ai/autovault" }, "autoworks-ai"), h("a", { href: "https://automem.ai" }, "AutoMem"), h("a", { href: "https://drunk.support" }, "drunk.support"), h("a", { href: "https://github.com/autoworks-ai/autovault/security" }, "Security policy")])
       ]),
-      h("div", { class: "footer-bottom" }, [h("span", "© 2026 autoworks-ai · Apache-2.0"), h("span", "autovault.dev")])
+      h("div", { class: "credit-line" }, [
+        "Brought to you by ",
+        h("a", { href: "https://drunk.support/about/" }, "Jack Arturo"),
+        ", ",
+        h("a", { href: "https://drunk.support/category/autojack/" }, "AutoJack"),
+        ", ",
+        h("a", { href: "https://www.paidmembershipspro.com/" }, "Jason Coleman"),
+        ", ",
+        h("a", { href: "https://github.com/flintfromthebasement" }, "Flint"),
+        ", ",
+        h("a", { href: "https://www.gravitykit.com/" }, "Zack Katz"),
+        ", and ",
+        h("a", { href: "https://wppopupmaker.com/" }, "Daniel Iser"),
+        "."
+      ]),
+      h("div", { class: "footer-bottom" }, [h("span", "© 2026 autoworks-ai · MIT"), h("span", "autovault.dev")])
     ]);
   }
 });
@@ -347,8 +365,7 @@ onUnmounted(() => {
 });
 
 async function copyInstall() {
-  await navigator.clipboard?.writeText("curl -fsSL https://autovault.sh | sh");
-  copied.value = true;
+  copied.value = await copyText("curl -fsSL https://autovault.sh | sh");
   window.setTimeout(() => (copied.value = false), 1400);
 }
 
@@ -399,14 +416,14 @@ const compareRows = [
   ["Dedup at submission", "yes", "no", "no", "no", "no"],
   ["Local-first (no required cloud)", "yes", "no", "no", "yes", "yes"],
   ["Self-hostable team mode", "yes", "no", "yes", "no", "partial"],
-  ["MCP-native + non-MCP bridge", "yes", "partial", "no", "yes", "no"],
+  ["Local stdio + remote HTTP MCP", "yes", "partial", "no", "yes", "no"],
   ["Progressive disclosure (no bloat)", "yes", "no", "no", "no", "no"]
 ];
 
 const quickSteps = [
-  { title: "Install the local vault", body: '<div><span class="pmt">$</span> curl -fsSL https://autovault.sh | sh</div><div class="muted">↳ installed → ~/.autovault/app</div><div class="arg">● vault healthy · 0 skills · ed25519 keypair generated</div>' },
+  { title: "Install the local vault", body: '<div><span class="pmt">$</span> curl -fsSL https://autovault.sh | sh</div><div class="muted">↳ installed → ~/.autovault/app</div><div class="arg">● vault healthy · bundled skills bootstrapped</div>' },
   { title: "Add a validated skill", body: '<div><span class="pmt">$</span> autovault add github:autoworks-ai/skills/extract-pdf</div><div class="muted">↳ [1/5] yaml-repair: ok</div><div class="muted">↳ [5/5] sign: 0x9af4…2c81</div><div class="arg">✓ admitted to vault</div>' },
-  { title: "Scope to a project", body: '<div><span class="pmt">$</span> autovault scope extract-pdf --project autovault-website --agent claude-code,codex</div><div class="muted">↳ scoped: 2 agents × 1 project</div><div class="arg">✓ ready · cached</div>' },
+  { title: "Add a local bundle", body: '<div><span class="pmt">$</span> autovault add-local ./skills/railway --source railway/skills --sync-profiles</div><div class="muted">↳ source: local · resources collected</div><div class="arg">✓ signed · profiles refreshed</div>' },
   { title: "Run from either agent", body: '<div class="muted"># in claude-code</div><div>&gt; use extract-pdf to summarize report.pdf</div><div class="arg">✓ tool resolved: chrome-devtools, read</div><div class="muted" style="margin-top:12px"># in codex</div><div>&gt; use extract-pdf to summarize report.pdf</div><div class="arg">✓ tool resolved: browser_form, file_read</div>' }
 ];
 </script>

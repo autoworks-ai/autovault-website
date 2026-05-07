@@ -1,6 +1,6 @@
 ---
 title: Skills Directory
-description: Browse and filter signed AutoVault skills.
+description: Browse signed AutoVault skills by agent, category, organization, install count, and license, with first-party examples aligned to MIT.
 layout: false
 ---
 

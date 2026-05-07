@@ -1,6 +1,6 @@
 ---
 title: Changelog
-description: Signed AutoVault release notes and changelog filters.
+description: Read AutoVault release notes covering remote MCP, OAuth, add-local, bundled-skill bootstrap, transforms, resource reads, and drift checks.
 layout: false
 ---
 

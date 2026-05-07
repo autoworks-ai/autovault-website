@@ -11,14 +11,14 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
+import { copyText } from "../utils/clipboard";
 
 const props = withDefaults(defineProps<{ lang?: string; file?: string }>(), { lang: "bash" });
 const copied = ref(false);
 
 async function copy() {
   const text = document.activeElement?.closest(".code")?.querySelector("pre")?.textContent ?? "";
-  await navigator.clipboard?.writeText(text);
-  copied.value = true;
+  copied.value = await copyText(text);
   window.setTimeout(() => {
     copied.value = false;
   }, 1200);

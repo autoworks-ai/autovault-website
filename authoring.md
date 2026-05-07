@@ -1,6 +1,6 @@
 ---
 title: Authoring
-description: Write AutoVault skills with metadata, transformations, permissions, and gate checks.
+description: Write SKILL.md files with MIT-compatible metadata, capability declarations, resources, permissions, and vault-local transform overlays.
 layout: false
 ---
 

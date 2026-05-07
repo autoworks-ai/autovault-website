@@ -14,6 +14,8 @@ import DeployPage from "./components/DeployPage.vue";
 import ComparePage from "./components/ComparePage.vue";
 import SkillDetailPage from "./components/SkillDetailPage.vue";
 import AuthorProfilePage from "./components/AuthorProfilePage.vue";
+import AboutPage from "./components/AboutPage.vue";
+import CloudPage from "./components/CloudPage.vue";
 
 export default {
   extends: DefaultTheme,
@@ -30,5 +32,7 @@ export default {
     app.component("ComparePage", ComparePage);
     app.component("SkillDetailPage", SkillDetailPage);
     app.component("AuthorProfilePage", AuthorProfilePage);
+    app.component("AboutPage", AboutPage);
+    app.component("CloudPage", CloudPage);
   }
 } satisfies Theme;

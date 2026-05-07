@@ -8,7 +8,7 @@
           <span class="pr">PR #11 · merging</span>
         </div>
         <h1>From a local CLI to <span class="ital">a network service</span> in two minutes.</h1>
-        <p class="lede">As of 0.4, the same vault binary speaks Streamable HTTP MCP with OAuth auth-code + PKCE. Stand it up on a real host so your agents — wherever they run, sandboxed or not — can resolve, verify, and install signed skills without ever touching a local filesystem.</p>
+        <p class="lede">In remote mode, the same vault binary speaks Streamable HTTP MCP with OAuth auth-code + PKCE. Stand it up on a real host so your agents — wherever they run, sandboxed or not — can resolve, verify, and install signed skills without ever touching a local filesystem.</p>
         <div class="hero-meta">
           <div class="m">Transport: <strong>Streamable HTTP MCP</strong></div>
           <div class="m">Auth: <strong>OAuth 2.1 + PKCE</strong></div>
@@ -92,7 +92,7 @@
 
     <section class="env-section reveal-item">
       <h2>Environment</h2>
-      <p class="lede">All knobs are env-var driven. The first card is the breaking change in 0.4 — Compose now hard-fails if these aren't set, instead of falling back to a known-default password.</p>
+      <p class="lede">All knobs are env-var driven. The first card is the breaking change in remote mode — Compose now hard-fails if these aren't set, instead of falling back to a known-default password.</p>
       <div class="env-grid">
         <div v-for="group in envGroups" :key="group.title" class="env-card">
           <div class="head">{{ group.title }} <span :class="['req-chip', group.required ? 'req' : 'opt']">{{ group.required ? "required" : "optional" }}</span></div>
@@ -238,7 +238,7 @@ const providers: Provider[] = [
     desc: "Self-host with Compose. Brings up the remote MCP service, SQLite volume, and reverse proxy.",
     feat: ["self-hosted", "SQLite", "Compose", "BYO TLS"],
     steps: [
-      { title: "Pull image and seed env", body: "The container defaults to remote mode in 0.4. Compose now requires explicit admin credentials.", command: "docker pull autoworks/autovault:0.4.1\ncp .env.example .env\n$EDITOR .env" },
+      { title: "Pull image and seed env", body: "The container defaults to remote mode. Compose now requires explicit admin credentials.", command: "docker pull autoworks/autovault:0.2.0\ncp .env.example .env\n$EDITOR .env" },
       { title: "Validate compose", body: "Compose hard-fails if the admin vars are unset.", command: "docker compose config\n✓ AUTOVAULT_ADMIN_EMAIL set\n✓ AUTOVAULT_ADMIN_PASSWORD set" },
       { title: "Bring it up", body: "Service binds to 8080 inside the container. Put Caddy, Traefik, or nginx in front for TLS.", command: "docker compose up -d\n✓ autovault-remote running on :8080" },
       { title: "Test the MCP endpoint", body: "POST a discovery request to /mcp to confirm transport, auth middleware, and CORS.", command: "curl -X POST https://your.vault/mcp \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"method\":\"initialize\"}'" }
@@ -295,7 +295,7 @@ const remoteStatusLines = [
   "",
   "endpoint      https://your.vault/mcp",
   "issuer        https://your.vault",
-  "version       0.4.1",
+  "version       0.2.0",
   "transport     streamable-http",
   "auth          oauth2.1 · pkce required",
   "storage       sqlite (3.2 MB · 47 caps)",

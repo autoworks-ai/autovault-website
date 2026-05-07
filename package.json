@@ -2,6 +2,7 @@
   "name": "autovault-website",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "docs:dev": "vitepress dev --host 0.0.0.0",
@@ -11,6 +12,7 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "devDependencies": {
+    "@types/node": "^22.19.17",
     "@vitejs/plugin-vue": "^5.2.4",
     "vitepress": "^1.6.4",
     "vitest": "^3.2.4",
