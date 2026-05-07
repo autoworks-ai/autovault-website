@@ -8,6 +8,7 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["vite/client", "vitest/globals"],
     "skipLibCheck": true,
+    "allowJs": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
@@ -17,6 +18,7 @@
   "include": [
     ".vitepress/**/*.ts",
     ".vitepress/**/*.vue",
+    "functions/**/*.js",
     "tests/**/*.ts",
     "env.d.ts"
   ]

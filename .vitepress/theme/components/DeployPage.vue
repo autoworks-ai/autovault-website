@@ -48,9 +48,9 @@
       </div>
     </section>
 
-    <section class="providers-section reveal-item">
+    <section id="hosts" class="providers-section reveal-item">
       <h2>Pick a host</h2>
-      <p class="lede">Four officially-tested deploy targets. Each one builds the same Docker image, sets the same env vars, and passes the same remote smoke suite. Pick whichever your team already pays for.</p>
+      <p class="lede">Start with managed static vault hosting, or self-host the remote MCP service on one of four officially-tested targets. Managed stores signed files and rendered profiles; self-hosted targets run the full Docker image with OAuth and policy enforcement.</p>
       <div class="providers">
         <button v-for="provider in providers" :key="provider.id" type="button" :class="['provider', { active: active === provider.id }]" @click="active = provider.id">
           <span class="head">
@@ -87,6 +87,7 @@
           </div>
         </div>
       </div>
+      <HostedVaultFunnel v-if="active === 'managed'" entry="deploy" />
     </section>
 
     <section class="env-section reveal-item">
@@ -160,6 +161,7 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, h, ref } from "vue";
+import HostedVaultFunnel from "./HostedVaultFunnel.vue";
 import UiIcon from "./UiIcon.vue";
 
 type Provider = {
@@ -174,10 +176,26 @@ type Provider = {
   steps: Array<{ title: string; body: string; command?: string }>;
 };
 
-const active = ref("railway");
+const active = ref("managed");
 const copied = ref(false);
 
 const providers: Provider[] = [
+  {
+    id: "managed",
+    name: "Managed by AutoVault",
+    short: "AV",
+    logoBg: "#D6A85A",
+    logoFg: "#17120A",
+    time: "~30 sec",
+    desc: "Hosted static vault storage for signed skills and rendered profiles. No servers to manage, no user code executed.",
+    feat: ["hosted", "signed files", "CLI sync", "shared infra"],
+    steps: [
+      { title: "Create hosted vault", body: "Create a team vault on AutoVault's managed static origin. It stores manifests, signed skill bundles, and rendered agent profiles only." },
+      { title: "Provision namespace", body: "AutoVault allocates an isolated tenant namespace on shared infrastructure. The host never executes uploaded skills; trust stays anchored in local signatures." },
+      { title: "Connect local CLI", body: "Link your local vault to the hosted namespace. The command pins the remote origin before any sync happens.", command: "autovault cloud connect https://vault.autovault.dev/your-team" },
+      { title: "Sync signed files", body: "The CLI scans local skills, runs the gate, signs accepted bundles, and pushes only the manifest, bundles, and rendered profiles.", command: "autovault sync --cloud\nautovault status --cloud" }
+    ]
+  },
   {
     id: "railway",
     name: "Railway",
@@ -254,7 +272,25 @@ const topoRoutes = [
   { y: 236, label: "CORS · origin guard", desc: "allowed origins" }
 ];
 
-const statusLines = [
+const managedStatusLines = [
+  "$ autovault status --cloud",
+  "",
+  "vault         your-team",
+  "endpoint      https://vault.autovault.dev/your-team",
+  "mode          hosted static vault",
+  "storage       signed manifests + skill bundles",
+  "runtime       none · skills are not executed on host",
+  "",
+  "sync",
+  "  manifest    18 skills · ed25519:9af4...2c81",
+  "  rendered    claude-code, codex, cursor",
+  "  namespace   tenant:yteam_7f2c",
+  "  last push   26s ago",
+  "",
+  "✓ synced · local signatures verified"
+];
+
+const remoteStatusLines = [
   "$ autovault status --remote https://your.vault",
   "",
   "endpoint      https://your.vault/mcp",
@@ -271,6 +307,8 @@ const statusLines = [
   "",
   "✓ healthy · uptime 4d 02:11:09"
 ];
+
+const statusLines = computed(() => active.value === "managed" ? managedStatusLines : remoteStatusLines);
 
 const smokeLines = [
   "$ AUTOVAULT_REMOTE_URL=https://vault.acme.dev npm run smoke:remote",

@@ -116,6 +116,14 @@
                 <div class="mono-label">{{ evaluation.passed ? "Hub install preview" : "Install blocked" }}</div>
                 <pre>{{ evaluation.installLines.join("\n") }}</pre>
               </div>
+              <HostedVaultFunnel
+                v-if="evaluation?.passed"
+                entry="playground"
+                :skill-source="src"
+                :skill-name="evaluation.skill?.name"
+                :source-label="sourceLabel"
+                :evaluation="evaluation"
+              />
             </template>
             <span v-else class="muted">Run the gate to see yaml-repair, denylist, capability, dedup, transformation, and sign checks.</span>
           </div>
@@ -134,6 +142,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import HostedVaultFunnel from "./HostedVaultFunnel.vue";
 import UiIcon from "./UiIcon.vue";
 import { transforms } from "../data/transforms";
 import { evaluateSkillDocument, normalizeSkillUrl, type GateCheck, type GateEvaluation, type GateIssue } from "../utils/skillGate";
