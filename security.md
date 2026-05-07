@@ -1,6 +1,6 @@
 ---
 title: Security & Provenance
-description: Inspect AutoVault signing, gate checks, denylist, and provenance chain.
+description: Inspect AutoVault's trust boundary, validation gate, Ed25519 provenance, OAuth-protected remote MCP mode, and drift detection model.
 layout: false
 ---
 

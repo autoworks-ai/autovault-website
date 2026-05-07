@@ -4,7 +4,7 @@
       <div>
         <div class="eyebrow"><span class="dash" /> Security & provenance</div>
         <h1>Signing isn't the same as <span class="ital">safe.</span></h1>
-        <p class="lede">A signature proves <em>who said what, when</em>. It does not prove the thing they said is correct or harmless. AutoVault's security model rests on three pillars — what we sign, what we don't sign, and where the trust boundary actually lives. This page is for staff engineers and security teams who want to inspect that model before they deploy.</p>
+        <p class="lede">A signature proves <em>who said what, when</em>. It does not prove the thing they said is correct or harmless. AutoVault's security model rests on three pillars: what we sign, what we don't sign, and where the trust boundary actually lives. This page is for staff engineers and security teams who want to inspect that model before local or remote MCP deployment.</p>
       </div>
       <VerifierDemo />
     </section>
@@ -44,12 +44,12 @@
     <section class="sec-section">
       <div class="eyebrow"><span class="dash" /> The gate, in detail</div>
       <h2>What each of the five stages actually checks.</h2>
-      <p class="sub">Every skill — installed, mirrored, or proposed by an agent at runtime — runs through these five stages in this order. Counts shown are from the public vault as of v0.4.1.</p>
+      <p class="sub">Every skill installed, imported, proposed by an agent, or handed over through <code>add-local</code> runs through these stages in order. The source implementation keeps the denylist extensible and currently documents 12 active patterns.</p>
 
       <div class="gate-stages-board panel">
         <div class="gsb-head">
-          <span class="ttl">Gate v0.4.1 · last 30 days</span>
-          <span class="meta">3,118 submissions · 11.4% rejected</span>
+          <span class="ttl">Gate v0.2.0 · source sync</span>
+          <span class="meta">schema · denylist · capability · dedup · sign</span>
         </div>
         <div class="gsb-grid">
           <article v-for="(stage, index) in gateDetails" :key="stage.title" class="gsb-stage">
@@ -69,7 +69,7 @@
     <section class="sec-section">
       <div class="eyebrow"><span class="dash" /> Denylist inspector</div>
       <h2>Public, auditable, signed.</h2>
-      <p class="sub">The denylist is itself an artifact under the same trust model — a signed, versioned bundle published at <code>autovault.dev/denylist/v1.json</code>. You can mirror it, audit it, propose additions through public review.</p>
+      <p class="sub">The denylist is an auditable, versioned artifact under the same trust model. You can mirror it, audit it, and propose additions through public review.</p>
 
       <div class="deny-grid">
         <div class="deny-list">
@@ -79,7 +79,7 @@
             <span>Pattern</span>
             <span>Source</span>
             <span>Age</span>
-            <span class="count">{{ denyRows.length }} of 343</span>
+            <span class="count">{{ denyRows.length }} shown</span>
           </div>
           <button v-for="row in denyRows" :key="row.id" class="deny-row" type="button" @click="selectedDeny = row.id">
             <span class="sev" :class="row.sev">{{ row.sev[0].toUpperCase() }}</span>
@@ -92,7 +92,7 @@
         <aside class="deny-side">
           <div>
             <h4>Patterns active</h4>
-            <div class="denynum">343<span class="of">/ +12 this month</span></div>
+            <div class="denynum">12<span class="of">/ extensible</span></div>
           </div>
           <div class="breakdown">
             <h4>By severity</h4>
@@ -135,7 +135,7 @@
       <div class="disc-grid">
         <article class="disc-card">
           <h3>Report a vulnerability</h3>
-          <p>If you've found a vulnerability in the gate, the CLI, the renderer, or a denylist bypass — please report it before public disclosure. We respond within 48 hours and ship critical fixes within 7 days.</p>
+          <p>If you've found a vulnerability in the gate, CLI, renderer, remote OAuth flow, or a denylist bypass, please report it before public disclosure. We respond within 48 hours and ship critical fixes within 7 days.</p>
           <div class="kv">
             <span class="k">Email</span><span class="v accent">security@autoworks-ai</span>
             <span class="k">PGP</span><span class="v">0xC4F9 7E10 A2C8 1B3D</span>
@@ -145,10 +145,10 @@
         </article>
         <article class="disc-card">
           <h3>Audit & transparency</h3>
-          <p>The CLI is Apache-2.0 and self-buildable from a tagged commit. The denylist is a public, signed JSON artifact. The gate is reproducible — given the same skill bytes you should always get the same verdict.</p>
+          <p>The CLI is MIT licensed and self-buildable from a tagged commit. The denylist is public and versioned. The gate is reproducible: given the same skill bytes you should always get the same verdict.</p>
           <div class="kv">
-            <span class="k">License</span><span class="v">Apache-2.0</span>
-            <span class="k">Reproducible</span><span class="v accent">yes · gate v0.4+</span>
+            <span class="k">License</span><span class="v">MIT</span>
+            <span class="k">Reproducible</span><span class="v accent">yes · gate v0.2+</span>
             <span class="k">External audit</span><span class="v">scheduled · Q3 2026</span>
             <span class="k">SBOM</span><span class="v">CycloneDX · per release</span>
           </div>
@@ -197,19 +197,19 @@ const roles = [
 ];
 
 const gateDetails = [
-  { title: "YAML auto-repair", desc: "Frontmatter is the #1 source of breakage. Trailing commas, mixed indentation, unquoted special chars are fixed before the strict schema check.", rows: [{ label: "passed clean", count: "2,640", kind: "ok" }, { label: "repaired", count: "478", kind: "warn" }, { label: "rejected", count: "0", kind: "bad" }] },
-  { title: "Security denylist", desc: "~340 known-bad patterns: credential stealers, fork bombs, exfil paths. Sourced from public CVEs, internal research, and community submissions.", rows: [{ label: "clean", count: "3,066", kind: "ok" }, { label: "flagged", count: "52", kind: "bad" }] },
-  { title: "Capability vs. behavior", desc: "Does the skill actually do what its frontmatter claims? Mismatch between declared tools_required and observed behavior in the body = reject.", rows: [{ label: "aligned", count: "2,718", kind: "ok" }, { label: "over-declared", count: "220", kind: "warn" }, { label: "under-declared", count: "128", kind: "bad" }] },
-  { title: "Dedup", desc: "Text similarity in V1, embedding-space matching in V2 preview. Stops the duplicate explosion at the door — too aggressive and authors complain, too lenient and the vault becomes ClawdHub.", rows: [{ label: "unique", count: "2,762", kind: "ok" }, { label: "near-duplicate", count: "176", kind: "bad" }] },
-  { title: "Ed25519 sign", desc: "If we admit it, we sign it. Provenance becomes a first-class artifact with a verifiable chain back to the original author key.", rows: [{ label: "signed", count: "2,762", kind: "ok" }, { label: "key error", count: "0", kind: "bad" }] }
+  { title: "YAML auto-repair", desc: "Frontmatter is the most common source of breakage. Trailing commas, mixed indentation, and unquoted special chars are normalized before the strict schema check.", rows: [{ label: "frontmatter parsed", count: "required", kind: "ok" }, { label: "schema checked", count: "zod", kind: "ok" }, { label: "invalid yaml", count: "blocked", kind: "bad" }] },
+  { title: "Security denylist", desc: "Known-bad patterns include credential reads, pipe-to-shell installs, decoded shell execution, setuid chmod, and insecure transport flags.", rows: [{ label: "strict mode", count: "blocks", kind: "ok" }, { label: "non-strict mode", count: "warns", kind: "warn" }, { label: "active patterns", count: "12", kind: "bad" }] },
+  { title: "Capability vs. behavior", desc: "Does the skill actually do what its frontmatter claims? Mismatch between declared capabilities and observed behavior is rejected.", rows: [{ label: "network false + curl", count: "blocked", kind: "bad" }, { label: "readonly + write", count: "blocked", kind: "bad" }, { label: "declared tools align", count: "passed", kind: "ok" }] },
+  { title: "Dedup", desc: "Three tiers catch exact content matches, near-exact similarity, and functional overlap warnings before the vault fills with clones.", rows: [{ label: "exact hash", count: "duplicate", kind: "bad" }, { label: "near exact", count: ">=0.9", kind: "bad" }, { label: "functional overlap", count: ">=0.75", kind: "warn" }] },
+  { title: "Ed25519 sign", desc: "If AutoVault admits a skill, it writes a detached signature sidecar and records source metadata for drift checks.", rows: [{ label: "stored skill", count: "signed", kind: "ok" }, { label: "source sidecar", count: "hash", kind: "ok" }, { label: "tamper check", count: "warns", kind: "warn" }] }
 ] satisfies Array<{ title: string; desc: string; rows: Array<{ label: string; count: string; kind: RowKind }> }>;
 
 const selectedDeny = ref(denyRows[0].id);
 const selectedPattern = computed(() => denyRows.find((row) => row.id === selectedDeny.value));
 const severityBreakdown = [
-  { label: "Critical", count: 109, width: "32%", color: "var(--bad)" },
-  { label: "High", count: 152, width: "44%", color: "var(--warn)" },
-  { label: "Medium", count: 82, width: "24%", color: "var(--ink-4)" }
+  { label: "Critical", count: 3, width: "25%", color: "var(--bad)" },
+  { label: "High", count: 5, width: "42%", color: "var(--warn)" },
+  { label: "Medium", count: 4, width: "33%", color: "var(--ink-4)" }
 ];
 const provenance = [
   { role: "LINK / 01 · author", id: "@autoworks-ai", when: "2026-04-28 12:14Z" },

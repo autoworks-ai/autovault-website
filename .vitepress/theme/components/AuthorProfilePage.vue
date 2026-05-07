@@ -1,7 +1,7 @@
 <template>
   <div class="au-page reveal-page">
     <nav class="au-crumb reveal-item" aria-label="Breadcrumb">
-      <a href="/skills-directory.html">Skills</a>
+      <a href="/skills-directory">Skills</a>
       <span class="sep">/</span>
       <span class="cur">autoworks-ai</span>
     </nav>
@@ -60,7 +60,7 @@
         <span class="ct">{{ filteredSkills.length }} of {{ authorSkills.length }} skills</span>
       </div>
       <div class="au-skills-grid">
-        <a v-for="skill in filteredSkills" :key="skill.name" :class="['au-skill-tile', { flagship: skill.flagship }]" href="/skill-detail.html">
+        <a v-for="skill in filteredSkills" :key="skill.name" :class="['au-skill-tile', { flagship: skill.flagship }]" href="/skill-detail">
           <div class="row1">
             <div class="icon-tile">{{ skill.icon }}</div>
             <span class="name">{{ skill.name }}</span>

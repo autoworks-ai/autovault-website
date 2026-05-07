@@ -16,12 +16,12 @@
 
     <main class="api-main">
       <section class="api-hero reveal-item">
-        <div class="eyebrow"><span class="dash" /> Reference · v0.4.1 · 2026-05</div>
+        <div class="eyebrow"><span class="dash" /> Reference · v0.2.0 · 2026-05</div>
         <h1>Three surfaces. <span class="ital">One vocabulary.</span></h1>
         <p class="lede">AutoVault exposes the same primitives — load, render, verify — through three interfaces: a CLI for humans, a library for programs, and an HTTP/MCP endpoint for remote agents. They're versioned together; if a name appears here, it works the same way in all three.</p>
         <div class="api-versions">
-          <div class="v"><div class="lbl">CLI</div><div class="val">autovault@0.4.1 <span class="meta">npm · brew · cargo</span></div></div>
-          <div class="v"><div class="lbl">Library</div><div class="val">@autovault/sdk@0.4.1 <span class="meta">node, deno, bun</span></div></div>
+          <div class="v"><div class="lbl">CLI</div><div class="val">autovault@0.2.0 <span class="meta">npm · brew · cargo</span></div></div>
+          <div class="v"><div class="lbl">Library</div><div class="val">@autovault/sdk@0.2.0 <span class="meta">node, deno, bun</span></div></div>
           <div class="v"><div class="lbl">HTTP</div><div class="val">/api/v1 <span class="meta">+ MCP 2024-11-05</span></div></div>
         </div>
       </section>

@@ -10,7 +10,7 @@
       </div>
       <div class="eyebrow"><span class="dash" /> Authoring · 12 min read</div>
       <h1>Write one skill.<br><span class="ital">Run it everywhere.</span></h1>
-      <p class="lede">Authoring an AutoVault skill is writing a single SKILL.md that declares <strong>what it does</strong>, <strong>what it needs</strong>, and <strong>how it should be rendered</strong> for each calling agent. The vault handles the rest — validation, signing, scoping, transformation.</p>
+      <p class="lede">Authoring an AutoVault skill is writing a single SKILL.md that declares <strong>what it does</strong>, <strong>what it needs</strong>, and <strong>how it should be rendered</strong> for each calling agent. The vault handles the rest: validation, signing, scoping, resources, and transform overlays.</p>
       <div class="pillrow">
         <span class="pill">YAML frontmatter</span>
         <span class="pill">Canonical capabilities</span>
@@ -39,7 +39,7 @@
     </div>
 
     <h2 id="manifest">The transformation manifest</h2>
-    <p>This is the part that distinguishes AutoVault from every other registry. The manifest is a flat dictionary keyed by agent identifier, mapping canonical capability names to whatever each agent calls them.</p>
+    <p>This is the part that distinguishes AutoVault from every other registry. The manifest is a flat dictionary keyed by agent identifier, mapping canonical capability names to whatever each agent calls them. For workspace-specific edits, use <code>propose_skill_transform</code> instead of forking the upstream skill.</p>
     <div class="man-grid">
       <div v-for="agent in manifestAgents" :key="agent.name" class="man-card">
         <div class="mono-label"><span class="swatch" :style="{ background: agent.color, display: 'inline-block', marginRight: '8px' }" />{{ agent.name }}</div>
@@ -49,7 +49,7 @@
       </div>
     </div>
     <p>You don't have to map every agent. Unmapped agents fall through to the canonical name — which usually fails, which is intentional. Better to fail loudly with <code>tool browser.fill_form not found</code> than silently with a confused caller.</p>
-    <p>If your team uses an agent we haven't mapped, just add it to the manifest. The renderer will use it as soon as the next scope refresh fires.</p>
+    <p>If your team uses an agent we haven't mapped, just add it to the manifest. The renderer will use it as soon as the next scope refresh fires. Transform reviews show up during <code>check_updates</code> when the pinned base skill drifts.</p>
 
     <h2 id="perms">Permissions: declared vs. enforced</h2>
     <p>This trips up new authors, so it's worth being clear: AutoVault is a <strong>content provider</strong>, not an executor. The vault never runs your skill. Permissions you declare are <strong>signals to the host agent</strong> about what the skill expects to do.</p>
@@ -136,7 +136,7 @@
     <div class="process-ribbon">
       <div v-for="(step, idx) in process" :key="step.title" class="step"><div class="num mono-label">{{ String(idx + 1).padStart(2, "0") }}</div><div style="font-weight:500">{{ step.title }}</div><div class="muted" style="font-size:12px">{{ step.sub }}</div></div>
     </div>
-    <p>The other path uses <code>autovault publish</code> to push directly from the CLI — useful for quick iteration, with the same gate enforcement. Either way, the skill is signed against your vault's keypair before it leaves your machine.</p>
+    <p>The other path uses <code>install_skill</code> or <code>add-local</code> depending on whether the bytes come from a remote source or a local bundle. Either way, the skill is signed against your vault's keypair before it is rendered into an agent profile, and packaged resources stay available through <code>read_skill_resource</code>.</p>
   </div>
 </template>
 
@@ -155,7 +155,7 @@ const skillLines: Array<{ id: string; text: string; group: AnnotationGroup | nul
   { id: "fm-version", text: "version: 1.4.0", group: "id" },
   { id: "fm-desc", text: 'description: "Extract structured text from PDF files."', group: "id" },
   { id: "fm-author", text: "author: autoworks-ai", group: "id" },
-  { id: "fm-license", text: "license: Apache-2.0", group: "id" },
+  { id: "fm-license", text: "license: MIT", group: "id" },
   { id: "blank-1", text: "", group: null },
   { id: "tools-key", text: "tools_required:", group: "tools" },
   { id: "t-1", text: "  - browser.fill_form", group: "tools" },
@@ -192,7 +192,7 @@ const explanations = {
   tools: { lines: "L8–L12", title: "Canonical tool requirements", body: "<p>The skill declares what it needs in <strong>canonical capability names</strong> — a stable namespace AutoVault maintains, independent of any specific agent's vocabulary.</p><p>This is the part the gate's capability/behavior check audits. If the skill body uses <code>fs.read</code> but never declares it here, or declares it but never uses it, the skill is rejected.</p>" },
   trans: { lines: "L14–L20", title: "Per-caller transformation", body: "<p>The transformation manifest maps each canonical capability to the actual tool name the calling agent expects. Same skill, three rendered views — written once.</p><p>If a tool isn't mapped for a given agent, the skill renders without that capability and the gate emits a warning at scope-time. Agents you haven't mapped fall through to the canonical name (which usually fails — that's the point).</p>" },
   perm: { lines: "L22–L25", title: "Permission boundaries", body: "<p>The skill declares its own runtime boundaries. <code>network: false</code> tells the host agent to refuse outbound HTTP from this skill's tool calls. <code>fs_scope</code> restricts filesystem access to specific path prefixes.</p><p>These are enforced by <em>the agent</em> at execution time, not by AutoVault. AutoVault is content provider, not executor — but it surfaces the declared boundary so callers know what they're admitting.</p>" },
-  body: { lines: "L29–L33", title: "Skill body", body: "<p>Plain markdown. This is what the agent reads and follows when the skill is loaded into context. Keep it tight: under 200 tokens for a skill of this size, under 500 for anything bigger.</p><p><strong>Progressive disclosure:</strong> AutoVault returns only the frontmatter from <code>list_skills</code> calls. The full body is loaded on demand via <code>get_skill</code>, so a vault of 200 skills doesn't burn tokens at startup.</p>" }
+  body: { lines: "L29–L33", title: "Skill body", body: "<p>Plain markdown. This is what the agent reads and follows when the skill is loaded into context. Keep it tight: under 200 tokens for a skill of this size, under 500 for anything bigger.</p><p><strong>Progressive disclosure:</strong> AutoVault returns summaries from <code>list_skills</code> and <code>search_skills</code>. The full body is loaded on demand via <code>get_skill</code>, while packaged files are loaded through <code>read_skill_resource</code>.</p>" }
 } as const;
 
 const hovered = ref<AnnotationGroup>("trans");

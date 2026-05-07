@@ -1,9 +1,9 @@
 <template>
   <div class="sd-page reveal-page">
     <nav class="sd-crumb reveal-item" aria-label="Breadcrumb">
-      <a href="/skills-directory.html">Skills</a>
+      <a href="/skills-directory">Skills</a>
       <span class="sep">/</span>
-      <a href="/author-autoworks-ai.html">autoworks-ai</a>
+      <a href="/author-autoworks-ai">autoworks-ai</a>
       <span class="sep">/</span>
       <span class="cur">extract-pdf</span>
     </nav>
@@ -17,14 +17,14 @@
             <div class="sub-row">
               <span class="verified"><UiIcon name="check" /> Signed</span>
               <span>v1.4.0</span><span class="dot" />
-              <span>Apache-2.0</span><span class="dot" />
+              <span>MIT</span><span class="dot" />
               <span>2,847 bytes</span><span class="dot" />
               <span>updated 2d ago</span><span class="dot" />
               <span>maintained by 2 contributors</span>
             </div>
           </div>
         </div>
-        <p class="desc">Extract structured text from PDF files while preserving heading hierarchy, list structure, and table layout where possible. Wraps a local parsing library — never reaches the network. Pairs naturally with <a href="/skill-detail.html">ocr-image</a> for scanned documents and <a href="/skill-detail.html">extract-table</a> for structured data.</p>
+        <p class="desc">Extract structured text from PDF files while preserving heading hierarchy, list structure, and table layout where possible. Wraps a local parsing library — never reaches the network. Pairs naturally with <a href="/skill-detail">ocr-image</a> for scanned documents and <a href="/skill-detail">extract-table</a> for structured data.</p>
       </div>
       <div class="actions">
         <button class="sd-installbtn" type="button" @click="copyInstall">Install in your vault <UiIcon name="arrow" /></button>
@@ -101,7 +101,7 @@
           <div class="sd-related-wrap">
             <div class="mono-label">Related skills</div>
             <div class="sd-related">
-              <a v-for="skill in relatedSkills" :key="skill.name" class="sd-rel-tile" href="/skill-detail.html">
+              <a v-for="skill in relatedSkills" :key="skill.name" class="sd-rel-tile" href="/skill-detail">
                 <div class="name">{{ skill.name }}</div>
                 <div class="desc">{{ skill.desc }}</div>
               </a>
@@ -274,7 +274,7 @@ const frontmatterLines = [
   "<span class=\"key\">version</span>: <span class=\"str\">1.4.0</span>",
   "<span class=\"key\">description</span>: <span class=\"str\">Extract structured text from PDF files. Preserves headings, lists, tables.</span>",
   "<span class=\"key\">author</span>: <span class=\"str\">autoworks-ai</span>",
-  "<span class=\"key\">license</span>: <span class=\"str\">Apache-2.0</span>",
+  "<span class=\"key\">license</span>: <span class=\"str\">MIT</span>",
   "<span class=\"key\">tools_required</span>:",
   "  - <span class=\"str\">read</span>     <span class=\"com\"># reads .pdf bytes from disk</span>",
   "  - <span class=\"str\">write</span>    <span class=\"com\"># writes .txt or .json sidecar</span>",
@@ -379,7 +379,7 @@ const permissionGroups = [
 
 const provenance = [
   { icon: "check" as const, ok: true, title: "Authored & signed by @autoworks-ai", detail: "commit f4e02c1 · key: 0x9af4…2c81 · 2,847 bytes", when: "2026-04-28 12:14Z" },
-  { icon: "check" as const, ok: true, title: "Gate run · v0.4.1 · all 5 stages passed", detail: "repair: 0 fixes · denylist: clean · capabilities: aligned · dedup: unique · sign: ed25519", when: "2026-04-28 12:18Z" },
+  { icon: "check" as const, ok: true, title: "Gate run · v0.2.0 · all 5 stages passed", detail: "repair: 0 fixes · denylist: clean · capabilities: aligned · dedup: unique · sign: ed25519", when: "2026-04-28 12:18Z" },
   { icon: "shield" as const, ok: true, title: "Vault counter-signature", detail: "vault.autoworks-ai · key: vault-2026-04 · isnad link 02", when: "2026-04-28 14:21Z" },
   { icon: "check" as const, ok: true, title: "Published to public mirror", detail: "cdn.autovault.dev · 3 regional replicas synced", when: "2026-04-28 14:22Z" },
   { icon: "lock" as const, title: "Available for install", detail: "verify locally with <code>autovault verify autoworks-ai/extract-pdf@1.4.0</code>", when: "on demand" }
@@ -398,7 +398,7 @@ const versions = [
 const metadata = [
   { key: "version", value: "1.4.0", mono: true },
   { key: "size", value: "2,847 B", mono: true },
-  { key: "license", value: "Apache-2.0" },
+  { key: "license", value: "MIT" },
   { key: "author", value: "autoworks-ai", accent: true },
   { key: "signed", value: "ed25519", mono: true },
   { key: "key", value: "0x9af4…2c81", mono: true },

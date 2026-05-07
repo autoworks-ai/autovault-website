@@ -4,7 +4,7 @@
       <div>
         <div class="eyebrow"><span class="dash" /> Get started · 5 minutes</div>
         <h1>Run one skill across <span class="ital">two agents.</span></h1>
-        <p class="lede">By the end of this page you'll have a local vault, a validated skill, and the same skill running from both Claude Code and Codex with zero forks.</p>
+        <p class="lede">By the end of this page you'll have a local vault, bundled skills, a validated install path, and the same skill available from Claude Code and Codex with zero forks.</p>
         <div class="stats-grid">
           <div class="stat"><div class="mono-label">Time</div><div class="val">5<span class="muted" style="font-size: 12px"> min</span></div></div>
           <div class="stat"><div class="mono-label">Disk</div><div class="val">12<span class="muted" style="font-size: 12px"> MB</span></div></div>
@@ -15,25 +15,28 @@
     </section>
 
     <h2 id="install">Step 1 — Install the local vault</h2>
-    <p>The installer drops a single binary at <code>~/.autovault/bin/autovault</code>, generates an ed25519 keypair, and symlinks each agent's skill profile directory into the rendered output of the vault. Nothing runs as a daemon — the CLI does sync on demand and a drift check on shell startup.</p>
+    <p>The installer builds the Node app under <code>~/.autovault/app</code>, drops the shim at <code>~/.autovault/bin/autovault</code>, preserves <code>~/.autovault</code> as storage, and bootstraps bundled skills unless <code>AUTOVAULT_NO_BOOTSTRAP=1</code> is set. Nothing runs as a daemon; local MCP hosts spawn stdio on demand.</p>
     <CodeBlock lang="bash"><span class="pmt">$</span> curl <span class="arg">-fsSL</span> autovault.sh <span class="muted">|</span> sh<br />
 <span class="yaml-comment"># macOS: also available via brew</span><br />
-<span class="pmt">$</span> brew install autoworks-ai/tap/autovault</CodeBlock>
-    <div class="callout tip"><UiIcon name="tip" class="arg" /><div><strong>Privacy.</strong> The installer does not phone home. <code>autovault.sh</code> redirects to the GitHub release artifact; you can audit the script before piping it. The signing key is fetched from <code>autovault.dev/.well-known/keys.json</code> with TOFU-pinning.</div></div>
+<span class="pmt">$</span> brew install autoworks-ai/tap/autovault<br />
+<span class="pmt">$</span> autovault skill list</CodeBlock>
+    <div class="callout tip"><UiIcon name="tip" class="arg" /><div><strong>Bundled skills.</strong> The installer seeds <code>autovault-skill</code>, <code>commit-message</code>, and <code>skill-author</code> through the same validation path used by remote installs and proposals.</div></div>
 
     <h2 id="first">Step 2 — Add your first skill</h2>
-    <p>Skills enter the vault through a <strong>source adapter</strong>. Each adapter knows how to fetch from one origin (GitHub repo, local path, HTTPS bundle, ClawdHub mirror with reduced trust) and hand the raw skill to the validation gate. Whatever the source, the gate runs the same five checks before admission.</p>
+    <p>Skills enter the vault through a <strong>source adapter</strong>. Each adapter knows how to fetch from one origin (GitHub repo, agentskills slug, HTTPS bundle, or local directory) and hand the raw skill to the validation gate. Whatever the source, the gate runs the same checks before admission.</p>
     <CodeBlock lang="bash"><span class="pmt">$</span> autovault <span class="arg">add</span> github:autoworks-ai/skills/extract-pdf</CodeBlock>
     <p>You'll see the gate run live in your terminal — yaml-repair, denylist, capability/behavior, dedup, sign. If any step fails, the skill is rejected and never touches your vault.</p>
-    <div class="callout warn"><UiIcon name="tip" class="warn" /><div><strong>What gets rejected.</strong> About 11% of submissions in private beta were rejected. Most common reasons: declared tools the skill never actually uses (capability/behavior mismatch), or near-duplicates of a skill already in the vault. Both surface clear error messages with diff output.</div></div>
+    <div class="callout warn"><UiIcon name="tip" class="warn" /><div><strong>Local bundles.</strong> Third-party installers should use <code>autovault add-local ./skill-dir --source vendor/name --sync-profiles</code> instead of copying the same SKILL.md into every native host directory. <code>AUTOVAULT_SKILL_INSTALL</code> controls AutoVault-first, native-first, both, native-only, and off modes.</div></div>
 
     <h2 id="scope">Step 3 — Scope it to your context</h2>
-    <p>By default a freshly-added skill is unscoped — admitted to the vault, but not visible to any caller. Scope it explicitly to the agents and projects that should see it. The four-axis permission system means dev-machine skills don't leak into prod, and client work doesn't bleed across project boundaries.</p>
+    <p>By default a freshly-added skill is unscoped: admitted to the vault, but not visible to any caller. Scope it explicitly to the agents and projects that should see it. The four-axis permission system means dev-machine skills don't leak into prod, and client work doesn't bleed across project boundaries.</p>
     <CodeBlock lang="bash"><span class="pmt">$</span> autovault <span class="arg">scope</span> extract-pdf \<br />
     <span class="arg">--agent</span> claude-code,codex \<br />
     <span class="arg">--project</span> autovault-website \<br />
     <span class="arg">--device</span> $(hostname)</CodeBlock>
     <p>Each scope rule is additive. A caller sees a skill only if it matches at least one rule on every axis it requests. Unspecified axes default to "any."</p>
+    <CodeBlock lang="bash"><span class="pmt">$</span> autovault sync-profiles <span class="arg">--discover</span></CodeBlock>
+    <p>Profile discovery checks native roots such as <code>~/.claude/skills</code>, <code>~/.codex/skills</code>, and <code>~/.cursor/skills</code>. Set <code>AUTOVAULT_PROFILE_LINKS</code> when you want install, proposal, or transform changes to refresh managed links automatically.</p>
 
     <h2 id="run">Step 4 — Run it from your agent</h2>
     <p>The skill is now installed, validated, scoped, and rendered for each target agent. Open whichever agent you use most — the same skill name works in all of them, but the underlying tool calls have been transformed to match each agent's vocabulary.</p>
@@ -48,10 +51,10 @@
     <h2 id="next">Where to next</h2>
     <p>You've completed the install + add + scope + run loop. From here, most people branch into one of three places:</p>
     <div class="cmd-grid">
-      <a class="cmd-card" href="/authoring.html"><div class="cmd-name">→ Author your own</div><div class="cmd-desc">Write a SKILL.md, attach a transformation manifest, propose it through the gate.</div></a>
-      <a class="cmd-card" href="/skills-directory.html"><div class="cmd-name">→ Browse skills</div><div class="cmd-desc">241 community skills, all signed and gated.</div></a>
-      <a class="cmd-card" href="/security.html"><div class="cmd-name">→ Security model</div><div class="cmd-desc">Provenance chain, denylist sources, what we sign and why.</div></a>
-      <a class="cmd-card" href="/AutoVault.html#concepts"><div class="cmd-name">→ Concepts</div><div class="cmd-desc">The five-step gate, four-axis scoping, transformation manifest in depth.</div></a>
+      <a class="cmd-card" href="/authoring"><div class="cmd-name">→ Author your own</div><div class="cmd-desc">Write a SKILL.md, attach a transformation manifest, propose it through the gate.</div></a>
+      <a class="cmd-card" href="/skills-directory"><div class="cmd-name">→ Browse skills</div><div class="cmd-desc">First-party and community skills, all signed and gated.</div></a>
+      <a class="cmd-card" href="/security"><div class="cmd-name">→ Security model</div><div class="cmd-desc">Provenance chain, denylist sources, remote OAuth, what we sign and why.</div></a>
+      <a class="cmd-card" href="/#concepts"><div class="cmd-name">→ Concepts</div><div class="cmd-desc">The five-step gate, four-axis scoping, transformation manifest in depth.</div></a>
     </div>
   </div>
 </template>
@@ -84,7 +87,7 @@ const TerminalDemo = defineComponent({
       { type: "out", text: "    ~/.claude/skills → ~/.autovault/render/claude-code" },
       { type: "out", text: "    ~/.codex/skills  → ~/.autovault/render/codex" },
       { type: "out", text: "    ~/.cursor/skills → ~/.autovault/render/cursor" },
-      { type: "ok", text: "✓ vault ready · 0 skills · ed25519 keypair generated" },
+      { type: "ok", text: "✓ vault ready · bundled skills bootstrapped" },
       { type: "blank", text: "" },
       { type: "cmd", text: "autovault add github:autoworks-ai/skills/extract-pdf" },
       { type: "out", text: "↳ fetching extract-pdf@1.4.0… 1.4kb" },

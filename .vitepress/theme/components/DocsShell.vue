@@ -5,7 +5,7 @@
         <a class="cd-brand" href="/">
           <BrandMark :size="22" />
           <span><span class="auto">Auto</span><span class="vault">Vault</span></span>
-          <span class="cd-version">v0.4.1</span>
+          <span class="cd-version">v0.2.0</span>
         </a>
 
         <button class="icon-btn cd-menu-toggle" type="button" aria-controls="cd-primary-nav" :aria-expanded="navOpen" aria-label="Open navigation" @click="navOpen = !navOpen">
@@ -33,7 +33,7 @@
         </div>
 
         <a class="icon-btn cd-github" href="https://github.com/autoworks-ai/autovault" title="GitHub"><UiIcon name="github" :size="15" /></a>
-        <a class="pill-btn primary cd-install" href="/quick-start.html">Install <UiIcon name="arrow" /></a>
+        <a class="pill-btn primary cd-install" href="/cloud" title="Launch for free in 5 minutes on our hardware">Launch free <UiIcon name="arrow" /></a>
       </div>
     </header>
 
@@ -67,7 +67,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import BrandMark from "./BrandMark.vue";
 import UiIcon from "./UiIcon.vue";
 
-type PageKey = "quick-start" | "authoring" | "skills" | "api" | "deploy" | "compare" | "skill-detail" | "author-profile" | "security" | "changelog";
+type PageKey = "quick-start" | "authoring" | "skills" | "api" | "deploy" | "compare" | "skill-detail" | "author-profile" | "security" | "about" | "cloud" | "changelog";
 type ShellVariant = "docs" | "full";
 type TocItem = { label: string; id: string };
 
@@ -76,40 +76,40 @@ const props = defineProps<{ page: PageKey }>();
 const navItems = [
   { label: "Overview", href: "/" },
   { label: "How it works", href: "/#how" },
-  { label: "Quick start", href: "/quick-start.html" },
-  { label: "Authoring", href: "/authoring.html" },
-  { label: "Skills", href: "/skills-directory.html" },
-  { label: "API", href: "/api.html" },
-  { label: "Deploy", href: "/deploy.html" },
-  { label: "Security", href: "/security.html" },
-  { label: "Changelog", href: "/changelog.html" }
+  { label: "Quick start", href: "/quick-start" },
+  { label: "Cloud", href: "/cloud" },
+  { label: "Authoring", href: "/authoring" },
+  { label: "Skills", href: "/skills-directory" },
+  { label: "Security", href: "/security" },
+  { label: "About", href: "/about" },
+  { label: "Changelog", href: "/changelog" }
 ];
 
 const sidebarGroups = [
   {
     title: "Start",
     items: [
-      { label: "Quick start", href: "/quick-start.html", badge: "5 min" },
-      { label: "Verify a skill", href: "/authoring.html#playground" }
+      { label: "Quick start", href: "/quick-start", badge: "5 min" },
+      { label: "Verify a skill", href: "/authoring#playground" }
     ]
   },
   {
     title: "Build",
     items: [
-      { label: "Authoring", href: "/authoring.html" },
-      { label: "Manifest", href: "/authoring.html#manifest" },
-      { label: "Permissions", href: "/authoring.html#perms" }
+      { label: "Authoring", href: "/authoring" },
+      { label: "Manifest", href: "/authoring#manifest" },
+      { label: "Permissions", href: "/authoring#perms" }
     ]
   },
   {
     title: "Reference",
     items: [
-      { label: "Skills", href: "/skills-directory.html" },
-      { label: "API", href: "/api.html" },
-      { label: "Deploy", href: "/deploy.html" },
-      { label: "Compare", href: "/compare.html" },
-      { label: "Security", href: "/security.html" },
-      { label: "Changelog", href: "/changelog.html", badge: "v0.4.1" }
+      { label: "Skills", href: "/skills-directory" },
+      { label: "API", href: "/api" },
+      { label: "Deploy", href: "/deploy" },
+      { label: "Compare", href: "/compare" },
+      { label: "Security", href: "/security" },
+      { label: "Changelog", href: "/changelog", badge: "v0.2.0" }
     ]
   }
 ];
@@ -146,21 +146,25 @@ const configs: Record<PageKey, { active: string; sidebarActive: string; variant:
   "skill-detail": { active: "Skills", sidebarActive: "Skills", variant: "full", toc: [] },
   "author-profile": { active: "Skills", sidebarActive: "Skills", variant: "full", toc: [] },
   security: { active: "Security", sidebarActive: "Security", variant: "full", toc: [] },
+  about: { active: "About", sidebarActive: "About", variant: "full", toc: [] },
+  cloud: { active: "Cloud", sidebarActive: "Cloud", variant: "full", toc: [] },
   changelog: { active: "Changelog", sidebarActive: "Changelog", variant: "full", toc: [] }
 };
 
 const searchResults = [
-  { title: "Quick start", section: "Get started", href: "/quick-start.html", terms: "install local vault first skill scope run" },
-  { title: "Authoring skills", section: "Authoring", href: "/authoring.html", terms: "skill md transformation manifest permissions publish gate" },
-  { title: "Verify a skill", section: "Authoring", href: "/authoring.html#playground", terms: "paste url playground browser gate diagnostics verify check skill" },
-  { title: "Skills directory", section: "Reference", href: "/skills-directory.html", terms: "skills filters agent category org installs" },
-  { title: "API reference", section: "Reference", href: "/api.html", terms: "cli library http mcp endpoint load render verify resolve" },
-  { title: "Deploy remote vault", section: "Reference", href: "/deploy.html", terms: "deploy remote mcp oauth pkce railway render docker fly endpoint" },
-  { title: "Compare alternatives", section: "Reference", href: "/compare.html", terms: "comparison rawhub forkflow manualops alternatives signing provenance" },
-  { title: "extract-pdf", section: "Skills", href: "/skill-detail.html", terms: "extract pdf skill detail transformations permissions provenance versions" },
-  { title: "autoworks-ai", section: "Skills", href: "/author-autoworks-ai.html", terms: "publisher author profile certificate maintainers skills" },
-  { title: "Security & provenance", section: "Reference", href: "/security.html", terms: "security signature signing provenance denylist gate verifier" },
-  { title: "Changelog", section: "Reference", href: "/changelog.html", terms: "release notes changes security patch minor" }
+  { title: "Quick start", section: "Get started", href: "/quick-start", terms: "install local vault first skill scope run add-local autovault_skill_install bootstrap" },
+  { title: "Authoring skills", section: "Authoring", href: "/authoring", terms: "skill md transformation manifest permissions publish gate propose_skill_transform read_skill_resource" },
+  { title: "Verify a skill", section: "Authoring", href: "/authoring#playground", terms: "paste url playground browser gate diagnostics verify check skill" },
+  { title: "Skills directory", section: "Reference", href: "/skills-directory", terms: "skills filters agent category org installs mit license" },
+  { title: "API reference", section: "Reference", href: "/api", terms: "cli library http mcp endpoint load render verify resolve" },
+  { title: "Deploy remote vault", section: "Reference", href: "/deploy", terms: "deploy remote mcp oauth pkce railway docker fly endpoint" },
+  { title: "Compare alternatives", section: "Reference", href: "/compare", terms: "comparison rawhub forkflow manualops alternatives signing provenance" },
+  { title: "extract-pdf", section: "Skills", href: "/skill-detail", terms: "extract pdf skill detail transformations permissions provenance versions" },
+  { title: "autoworks-ai", section: "Skills", href: "/author-autoworks-ai", terms: "publisher author profile certificate maintainers skills" },
+  { title: "Security & provenance", section: "Reference", href: "/security", terms: "security signature signing provenance denylist gate verifier oauth remote mcp" },
+  { title: "Cloud launch", section: "Hosted", href: "/cloud", terms: "launch free hosted hardware remote mcp oauth cloud five minutes" },
+  { title: "About AutoVault", section: "Team", href: "/about", terms: "jack arturo autojack jason coleman flint zack katz daniel iser team credits" },
+  { title: "Changelog", section: "Reference", href: "/changelog", terms: "release notes remote mcp oauth add-local transforms resource drift" }
 ];
 
 const config = computed(() => configs[props.page]);

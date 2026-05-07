@@ -24,97 +24,49 @@ export interface Release {
 
 export const releases: Release[] = [
   {
-    version: "0.4.1",
-    date: "May 2, 2026",
-    ago: "4 days ago",
-    type: "patch",
-    tag: "patch",
-    codename: "Hempseed",
-    title: "Source adapter timeout fix · denylist refresh",
-    summary: "Quick patch following last week's 0.4 release. Fixes a hang in the GitHub source adapter when fetching skills from rate-limited orgs, and ships an updated denylist with three new exfiltration patterns reported by community researchers.",
-    sections: [
-      { kind: "fixed", items: ["GitHub source adapter could hang for 30s on rate-limited fetches; now fails fast with a clear retry message (#412)", "Drift check on shell startup occasionally double-counted symlinked profiles on macOS", "Permissions fs_scope with relative paths now resolves against the calling agent's CWD, not the vault"] },
-      { kind: "security", items: ["Denylist update: three new exfil patterns matching data:text/plain;base64 abuse paths reported by @elvissun"] }
-    ],
-    commit: "a3f9e21",
-    author: "jack",
-    contributors: 3
-  },
-  {
-    version: "0.4.0",
-    date: "Apr 28, 2026",
-    ago: "1 week ago",
+    version: "Unreleased",
+    date: "May 2026",
+    ago: "in progress",
     type: "minor",
-    tag: "minor",
-    codename: "Front Door",
+    tag: "preview",
+    codename: "Bootstrap",
     featured: true,
-    title: "Per-caller transformation manifest · MCP-native tool surface",
-    summary: "The headline release. Skills now declare a transformation manifest in their frontmatter, and AutoVault renders a per-caller view at delivery time. Same skill, three rendered views; written once, no forks.",
+    title: "Bundled skills, local installers, and remote polish",
+    summary: "The current source branch documents the post-0.2 work: bundled skills, bootstrap installs, add-local, vendor installer routing, remote Streamable HTTP MCP with OAuth, resource reads, transforms, and drift checks.",
     sections: [
-      { kind: "added", items: ["Transformation manifest in skill frontmatter maps canonical capability names to per-agent tool names", "Native MCP tools: list_skills, search_skills, get_skill, read_skill_resource, install_skill, propose_skill, check_updates", "Progressive disclosure returns metadata first, full body on demand, reducing cold-start token load", "Bridge skill autovault-skill for non-MCP agents"] },
-      { kind: "changed", items: ["Skill resolution caches rendered views per caller; first hit around 4ms, subsequent hits under 1ms", "CLI flag --agent now accepts comma-separated lists for multi-agent scoping"] },
-      { kind: "removed", items: ["Deprecated autovault sync alias removed; use autovault refresh"] }
+      { kind: "added", items: ["Bundled skills: autovault-skill, commit-message, and skill-author", "scripts/bootstrap-skills.mjs seeds bundled skills through the real install_skill validation path", "autovault add-local installs local skill bundles from third-party installers with local provenance", "AUTOVAULT_SKILL_INSTALL controls AutoVault-first, native-first, both, native-only, and off routing", "Remote Streamable HTTP MCP at /mcp with OAuth discovery, login, token issuance, and role-aware skill visibility"] },
+      { kind: "changed", items: ["Profile sync materializes transform overlays into rendered per-agent directories before linking native roots", "README and INSTALL now document Claude Code, Cursor, Codex, Docker, Railway, and remote MCP setup"] },
+      { kind: "security", items: ["Expanded capability-declaration cross-checks and denylist coverage; Ed25519 sidecars are written for installed skills"] }
     ],
-    commit: "f4e2c81",
+    commit: "main",
     author: "jack",
-    contributors: 7
-  },
-  {
-    version: "0.3.2",
-    date: "Apr 14, 2026",
-    ago: "3 weeks ago",
-    type: "patch",
-    tag: "patch",
-    title: "Dedup tuning · CI runner mode",
-    summary: "Tuned the V1 text-similarity dedup threshold based on private beta data: too aggressive on near-paraphrases, too lenient on actual duplicates.",
-    sections: [
-      { kind: "added", items: ["autovault --runner-mode for ephemeral CI environments"] },
-      { kind: "fixed", items: ["Dedup threshold tuned: 94% true-positive, 0.8% false-positive", "Sign step occasionally produced non-canonical YAML output for deeply nested transformations"] }
-    ],
-    commit: "b7d1a04",
-    author: "jack",
-    contributors: 2
-  },
-  {
-    version: "0.3.0",
-    date: "Apr 1, 2026",
-    ago: "5 weeks ago",
-    type: "minor",
-    tag: "minor",
-    codename: "Quartermaster",
-    title: "Four-axis permission scoping · cloud mode preview",
-    summary: "Every skill request now carries a four-axis context: agent, device, project, tool/user. The vault filters per-caller and opens the private preview of cloud-mode self-host.",
-    sections: [
-      { kind: "added", items: ["Four-axis permission scoping", "Private preview of cloud-mode self-host", "Project-scoped profile generation"] },
-      { kind: "changed", items: ["Profile dirs are now generated from canonical vault state rather than copied skill files"] }
-    ],
-    commit: "8f41bc2",
-    author: "jack",
-    contributors: 5
+    contributors: 4
   },
   {
     version: "0.2.0",
-    date: "Mar 12, 2026",
-    ago: "8 weeks ago",
+    date: "Apr 19, 2026",
+    ago: "2 weeks ago",
     type: "minor",
-    tag: "preview",
-    title: "Validation gate private beta",
-    summary: "First private beta of the gate: YAML auto-repair, security denylist, capability/behavior checks, dedup, and Ed25519 signing.",
+    tag: "minor",
+    title: "Focused TypeScript MCP server",
+    summary: "First implementation release of the local stdio MCP server, filesystem skill storage, source adapters, validation, provenance sidecars, resource reads, and update checks.",
     sections: [
-      { kind: "added", items: ["Five-stage validation pipeline", "Signed vault artifact format", "GitHub and local path source adapters"] }
+      { kind: "added", items: ["MCP tools for list_skills, search_skills, get_skill, propose_skill, install_skill, read_skill_resource, and check_updates", "Filesystem-backed skill storage with .autovault-source.json provenance sidecars", "GitHub, agentskills, and HTTPS source adapters", "Validation pipeline with frontmatter repair, schema checks, denylist scanning, and duplicate detection"] },
+      { kind: "changed", items: ["Replaced the previous skill-manager / skill-importer scaffold with a focused TypeScript MCP server", "Standardized on a stdio-first local deployment story"] },
+      { kind: "security", items: ["Tool boundaries validate skill names to block traversal attempts", "propose_skill pre-validates resource paths before writes", "Invalid config values fail fast at startup"] }
     ],
-    commit: "3d0c8a9",
+    commit: "0.2.0",
     author: "jack",
     contributors: 4
   },
   {
     version: "0.1.0",
-    date: "Feb 18, 2026",
-    ago: "11 weeks ago",
+    date: "early 2026",
+    ago: "prototype",
     type: "minor",
     tag: "preview",
     title: "Initial vault prototype",
-    summary: "Initial local vault prototype and profile-rendering experiment.",
+    summary: "Initial local vault prototype, profile-rendering experiment, and compatibility planning around the SKILL.md format.",
     sections: [
       { kind: "added", items: ["Canonical skill storage", "Profile render directories", "First bridge skill experiment"] }
     ],

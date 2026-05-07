@@ -2,10 +2,14 @@ import { defineConfig } from "vitepress";
 
 export default defineConfig({
   title: "AutoVault",
-  description: "The skill registry with a gate.",
+  description: "AutoVault is an MIT-licensed skill registry and capability layer for AI agents with validation, signing, scoped delivery, transforms, and MCP access.",
   lang: "en-US",
-  cleanUrls: false,
+  cleanUrls: true,
   lastUpdated: false,
+  srcExclude: ["autovault/**", "AutoVault.md"],
+  sitemap: {
+    hostname: "https://autovault.dev"
+  },
   markdown: {
     theme: {
       light: "github-dark",
@@ -32,42 +36,44 @@ export default defineConfig({
     },
     nav: [
       { text: "Overview", link: "/" },
-      { text: "Quick start", link: "/quick-start.html" },
-      { text: "Authoring", link: "/authoring.html" },
-      { text: "Skills", link: "/skills-directory.html" },
-      { text: "API", link: "/api.html" },
-      { text: "Deploy", link: "/deploy.html" },
-      { text: "Security", link: "/security.html" },
-      { text: "Changelog", link: "/changelog.html" }
+      { text: "Cloud", link: "/cloud" },
+      { text: "Quick start", link: "/quick-start" },
+      { text: "Authoring", link: "/authoring" },
+      { text: "Skills", link: "/skills-directory" },
+      { text: "Security", link: "/security" },
+      { text: "About", link: "/about" },
+      { text: "Changelog", link: "/changelog" }
     ],
     sidebar: [
       {
         text: "Get started",
         items: [
           { text: "Overview", link: "/" },
-          { text: "Quick start", link: "/quick-start.html" },
-          { text: "Installation", link: "/quick-start.html#install" },
-          { text: "Your first skill", link: "/quick-start.html#first" }
+          { text: "Cloud launch", link: "/cloud" },
+          { text: "Quick start", link: "/quick-start" },
+          { text: "Installation", link: "/quick-start#install" },
+          { text: "Your first skill", link: "/quick-start#first" }
         ]
       },
       {
         text: "Authoring",
         items: [
-          { text: "Anatomy of a SKILL.md", link: "/authoring.html" },
-          { text: "Transformation manifest", link: "/authoring.html#manifest" },
-          { text: "Permissions", link: "/authoring.html#perms" },
-          { text: "Publishing", link: "/authoring.html#publish" }
+          { text: "Anatomy of a SKILL.md", link: "/authoring" },
+          { text: "Transformation manifest", link: "/authoring#manifest" },
+          { text: "Permissions", link: "/authoring#perms" },
+          { text: "Publishing", link: "/authoring#publish" }
         ]
       },
       {
         text: "Reference",
         items: [
-          { text: "Skills directory", link: "/skills-directory.html" },
-          { text: "API reference", link: "/api.html" },
-          { text: "Deploy remote vault", link: "/deploy.html" },
-          { text: "Compare alternatives", link: "/compare.html" },
-          { text: "Security & provenance", link: "/security.html" },
-          { text: "Changelog", link: "/changelog.html" }
+          { text: "Skills directory", link: "/skills-directory" },
+          { text: "API reference", link: "/api" },
+          { text: "Deploy remote vault", link: "/deploy" },
+          { text: "Compare alternatives", link: "/compare" },
+          { text: "Security & provenance", link: "/security" },
+          { text: "About", link: "/about" },
+          { text: "Changelog", link: "/changelog" }
         ]
       }
     ],
@@ -80,7 +86,7 @@ export default defineConfig({
     ],
     footer: {
       message: "A curated skills layer for AI agents.",
-      copyright: "Copyright © 2026 autoworks-ai · Apache-2.0"
+      copyright: "Copyright © 2026 autoworks-ai · MIT"
     }
   }
 });
