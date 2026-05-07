@@ -1,4 +1,42 @@
-import { defineConfig } from "vitepress";
+import { defineConfig, type HeadConfig } from "vitepress";
+import { writeAgentArtifacts } from "./build/agentArtifacts";
+import { canonicalUrl, findPageDocByFile, SITE_URL, type PageDoc } from "./shared/pageDocs";
+
+function pageHead(doc: PageDoc): HeadConfig[] {
+  const url = canonicalUrl(doc);
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": doc.key === "overview" ? "SoftwareApplication" : "TechArticle",
+    name: doc.title,
+    description: doc.description,
+    url,
+    license: "https://opensource.org/license/mit",
+    publisher: {
+      "@type": "Organization",
+      name: "autoworks-ai",
+      url: SITE_URL
+    },
+    isPartOf: {
+      "@type": "WebSite",
+      name: "AutoVault",
+      url: SITE_URL
+    }
+  };
+
+  return [
+    ["link", { rel: "canonical", href: url }],
+    ["meta", { name: "description", content: doc.description }],
+    ["meta", { property: "og:type", content: "website" }],
+    ["meta", { property: "og:site_name", content: "AutoVault" }],
+    ["meta", { property: "og:title", content: doc.title }],
+    ["meta", { property: "og:description", content: doc.description }],
+    ["meta", { property: "og:url", content: url }],
+    ["meta", { name: "twitter:card", content: "summary_large_image" }],
+    ["meta", { name: "twitter:title", content: doc.title }],
+    ["meta", { name: "twitter:description", content: doc.description }],
+    ["script", { type: "application/ld+json" }, JSON.stringify(schema)]
+  ];
+}
 
 export default defineConfig({
   title: "AutoVault",
@@ -8,7 +46,7 @@ export default defineConfig({
   lastUpdated: false,
   srcExclude: ["autovault/**", "AutoVault.md"],
   sitemap: {
-    hostname: "https://autovault.dev"
+    hostname: SITE_URL
   },
   markdown: {
     theme: {
@@ -28,6 +66,14 @@ export default defineConfig({
     ],
     ["meta", { name: "theme-color", content: "#0b1014" }]
   ],
+  transformHead({ pageData }) {
+    const doc = findPageDocByFile(pageData.relativePath);
+    if (!doc) return [];
+    return pageHead(doc);
+  },
+  async buildEnd(siteConfig) {
+    await writeAgentArtifacts(siteConfig.outDir);
+  },
   themeConfig: {
     logo: { src: "/brand-mark.svg", width: 22, height: 22 },
     siteTitle: "AutoVault",

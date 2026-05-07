@@ -32,6 +32,7 @@
           </div>
         </div>
 
+        <MarkdownActions v-if="showMarkdownActions" :page="markdownPage" />
         <a class="icon-btn cd-github" href="https://github.com/autoworks-ai/autovault" title="GitHub"><UiIcon name="github" :size="15" /></a>
         <a class="pill-btn primary cd-install" href="/cloud" title="Launch for free in 5 minutes on our hardware">Launch free <UiIcon name="arrow" /></a>
       </div>
@@ -65,7 +66,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import BrandMark from "./BrandMark.vue";
+import MarkdownActions from "./MarkdownActions.vue";
 import UiIcon from "./UiIcon.vue";
+import type { PageDocKey } from "../../shared/pageDocs";
 
 type PageKey = "quick-start" | "authoring" | "skills" | "api" | "deploy" | "compare" | "skill-detail" | "author-profile" | "security" | "about" | "cloud" | "changelog";
 type ShellVariant = "docs" | "full";
@@ -168,6 +171,8 @@ const searchResults = [
 ];
 
 const config = computed(() => configs[props.page]);
+const markdownPage = computed<PageDocKey>(() => (props.page === "skills" ? "skills-directory" : props.page));
+const showMarkdownActions = computed(() => !["about", "cloud"].includes(props.page));
 const query = ref("");
 const searchOpen = ref(false);
 const navOpen = ref(false);
