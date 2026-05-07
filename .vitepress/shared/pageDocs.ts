@@ -46,15 +46,14 @@ curl -fsSL https://autovault.sh | sh
 autovault skill list
 \`\`\`
 
-## Current agent surfaces
+## Current MCP surface
 
-- list_skills and search_skills for discovery.
-- get_skill for full SKILL.md content and parsed metadata.
-- read_skill_resource for packaged resources.
-- install_skill for GitHub, agentskills, and HTTPS sources.
-- propose_skill for new gated skills.
-- propose_skill_transform, list_skill_transforms, and remove_skill_transform for overlays.
-- check_updates for drift detection.
+- get_skill for exact reads, query-based discovery, rendered agent variants, and optional packaged resources.
+- add_skill for trusted GitHub, agentskills, HTTPS, and local bundle sources.
+- update_skill for refreshing installed skills from their recorded source or replacing them from a new source.
+- delete_skill for removing a skill and refreshing generated profiles.
+- propose_skill for new gated skills authored during a conversation.
+- check_updates for upstream drift detection.
 
 ## License
 
@@ -81,7 +80,7 @@ npm run build
 node scripts/bootstrap-skills.mjs
 \`\`\`
 
-Bundled skills currently include autovault-skill, commit-message, and skill-author. They install through the same validation path as any other skill.
+Bootstrap installs every bundled skill (skills/*/SKILL.md) through the same validation path as any other skill and refreshes discovered host profiles.
 
 ## 3. Add a remote skill
 
@@ -97,7 +96,7 @@ Remote skills are untrusted until they pass validation and signing.
 autovault add-local ./skills/railway --source railway/skills --sync-profiles
 \`\`\`
 
-add-local requires SKILL.md, gathers sibling resources, refuses symlinks, records local provenance, and can refresh discovered profile roots.
+add-local requires SKILL.md, gathers sibling resources, refuses symlinks, records local provenance, and can refresh discovered profile roots. MCP add_skill and update_skill local-bundle calls sync configured profile links by default.
 
 ## 5. Sync native agent profiles
 
@@ -105,7 +104,7 @@ add-local requires SKILL.md, gathers sibling resources, refuses symlinks, record
 autovault sync-profiles --discover
 \`\`\`
 
-Discovery checks native skill roots such as ~/.claude/skills, ~/.codex/skills, and ~/.cursor/skills. Set AUTOVAULT_PROFILE_LINKS for managed roots that should refresh on install, propose, or transform changes.
+Discovery checks native skill roots such as ~/.claude/skills, ~/.codex/skills, and ~/.cursor/skills. Set AUTOVAULT_PROFILE_LINKS for managed roots that should refresh on install, propose, update, delete, or transform changes.
 
 ## 6. Vendor installer routing
 
@@ -161,16 +160,16 @@ Use this skill when the user asks for text, structure, or summaries from a PDF.
 - Keep the name kebab-case and the version semver-like.
 - Declare every tool or capability the body actually uses.
 - Keep secrets as named references, never literal credentials.
-- Package resources beside SKILL.md and let agents read them through read_skill_resource.
+- Package resources beside SKILL.md and load them through get_skill with include_resources when an agent needs the extra files.
 - Use the narrowest useful permission scope.
 
 ## Transforms
 
-Use propose_skill_transform for vault-local overlays when a workspace or agent needs different instructions, tools, or setup without forking the upstream skill. AutoVault stores the transform under the vault, pins the base skill, signs a transform manifest, and reports base drift through check_updates.
+Vault-local transforms let a workspace or agent apply different instructions, tools, or setup without forking the upstream skill. AutoVault stores the transform under the vault, pins the base skill, applies it when get_skill renders for an agent, and reports base drift through check_updates.
 
 ## Publishing
 
-Use propose_skill while iterating, install_skill for trusted remote sources, and add-local for local bundles from third-party installers. All paths run through the validation and signing gate.`;
+Use propose_skill while iterating, add_skill for trusted remote sources or local bundles, and update_skill when replacing an existing skill. All write paths run through the validation and signing gate.`;
 
 const skillsMarkdown = `# AutoVault Skills Directory
 
@@ -188,7 +187,7 @@ First-party AutoVault examples are MIT licensed. Community examples keep their s
 
 ## Agent use
 
-Agents should discover with search_skills or list_skills, fetch full content only when needed with get_skill, and read packaged files through read_skill_resource instead of assuming filesystem paths.`;
+Agents should use get_skill with a query for discovery, fetch full content only when needed, and set include_resources when packaged files are required instead of assuming filesystem paths.`;
 
 const apiMarkdown = `# AutoVault API Reference
 
@@ -197,12 +196,12 @@ AutoVault exposes the same skill primitives through CLI, library, HTTP, and MCP 
 ## Current surfaces
 
 - CLI commands for installing, listing, proposing, verifying, syncing profiles, and checking updates.
-- MCP tools for discovery, full skill reads, resource reads, installs, proposals, transforms, and drift checks.
+- MCP tools for discovery/full reads through get_skill, trusted adds, updates, deletes, proposals, and drift checks.
 - Remote Streamable HTTP MCP with OAuth and role-aware filtering.
 
 ## Agent guidance
 
-Prefer discovery first, full reads second, and packaged resource reads through read_skill_resource instead of guessing filesystem paths.`;
+Prefer discovery first, full reads second, and get_skill with include_resources when packaged resources are needed.`;
 
 const deployMarkdown = `# Deploy A Remote AutoVault
 
@@ -308,10 +307,9 @@ AutoVault is currently pre-1.0. The public source package is MIT licensed and th
 - OAuth and role-aware access checks for remote mode.
 - add-local for third-party installers that already have a local skill bundle.
 - AUTOVAULT_SKILL_INSTALL vendor routing modes.
-- Bundled skills: autovault-skill, commit-message, and skill-author.
-- scripts/bootstrap-skills.mjs to seed bundled skills through the real validation path.
-- propose_skill_transform, list_skill_transforms, and remove_skill_transform for vault-local overlays.
-- read_skill_resource for packaged resources.
+- Bundled skills are installed from each skills/*/SKILL.md bundle.
+- scripts/bootstrap-skills.mjs to seed bundled skills through the real validation path and refresh discovered host profiles.
+- get_skill agent rendering and include_resources for transformed variants and packaged resources.
 - check_updates for upstream drift and transform review state.
 
 ## v0.2.0

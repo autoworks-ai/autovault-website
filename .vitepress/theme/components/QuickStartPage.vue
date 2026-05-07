@@ -20,7 +20,7 @@
 <span class="yaml-comment"># macOS: also available via brew</span><br />
 <span class="pmt">$</span> brew install autoworks-ai/tap/autovault<br />
 <span class="pmt">$</span> autovault skill list</CodeBlock>
-    <div class="callout tip"><UiIcon name="tip" class="arg" /><div><strong>Bundled skills.</strong> The installer seeds <code>autovault-skill</code>, <code>commit-message</code>, and <code>skill-author</code> through the same validation path used by remote installs and proposals.</div></div>
+    <div class="callout tip"><UiIcon name="tip" class="arg" /><div><strong>Bundled skills.</strong> The installer seeds every bundled skill (<code>skills/*/SKILL.md</code>) through the same validation path used by remote installs and proposals, then refreshes discovered host profiles.</div></div>
 
     <h2 id="first">Step 2 — Add your first skill</h2>
     <p>Skills enter the vault through a <strong>source adapter</strong>. Each adapter knows how to fetch from one origin (GitHub repo, agentskills slug, HTTPS bundle, or local directory) and hand the raw skill to the validation gate. Whatever the source, the gate runs the same checks before admission.</p>
@@ -36,7 +36,7 @@
     <span class="arg">--device</span> $(hostname)</CodeBlock>
     <p>Each scope rule is additive. A caller sees a skill only if it matches at least one rule on every axis it requests. Unspecified axes default to "any."</p>
     <CodeBlock lang="bash"><span class="pmt">$</span> autovault sync-profiles <span class="arg">--discover</span></CodeBlock>
-    <p>Profile discovery checks native roots such as <code>~/.claude/skills</code>, <code>~/.codex/skills</code>, and <code>~/.cursor/skills</code>. Set <code>AUTOVAULT_PROFILE_LINKS</code> when you want install, proposal, or transform changes to refresh managed links automatically.</p>
+    <p>Profile discovery checks native roots such as <code>~/.claude/skills</code>, <code>~/.codex/skills</code>, and <code>~/.cursor/skills</code>. Set <code>AUTOVAULT_PROFILE_LINKS</code> when you want installs, proposals, updates, deletes, or transform changes to refresh managed links automatically.</p>
 
     <h2 id="run">Step 4 — Run it from your agent</h2>
     <p>The skill is now installed, validated, scoped, and rendered for each target agent. Open whichever agent you use most — the same skill name works in all of them, but the underlying tool calls have been transformed to match each agent's vocabulary.</p>
@@ -83,11 +83,11 @@ const TerminalDemo = defineComponent({
       { type: "out", text: "↳ verifying ed25519 signature…" },
       { type: "ok", text: "✓ signature ok · key:0xC4F9…E10A" },
       { type: "out", text: "↳ installed to ~/.autovault" },
-      { type: "out", text: "↳ symlinking profile dirs:" },
-      { type: "out", text: "    ~/.claude/skills → ~/.autovault/render/claude-code" },
-      { type: "out", text: "    ~/.codex/skills  → ~/.autovault/render/codex" },
-      { type: "out", text: "    ~/.cursor/skills → ~/.autovault/render/cursor" },
-      { type: "ok", text: "✓ vault ready · bundled skills bootstrapped" },
+      { type: "out", text: "↳ refreshing managed profile links:" },
+      { type: "out", text: "    ~/.claude/skills/autovault-skill → ~/.autovault/profiles/claude-code/autovault-skill" },
+      { type: "out", text: "    ~/.codex/skills/autovault-skill  → ~/.autovault/profiles/codex/autovault-skill" },
+      { type: "out", text: "    ~/.cursor/skills/autovault-skill → ~/.autovault/profiles/cursor/autovault-skill" },
+      { type: "ok", text: "✓ vault ready · bundled skills bootstrapped · profiles synced" },
       { type: "blank", text: "" },
       { type: "cmd", text: "autovault add github:autoworks-ai/skills/extract-pdf" },
       { type: "out", text: "↳ fetching extract-pdf@1.4.0… 1.4kb" },

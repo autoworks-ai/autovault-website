@@ -156,10 +156,10 @@ const configs: Record<PageKey, { active: string; sidebarActive: string; variant:
 
 const searchResults = [
   { title: "Quick start", section: "Get started", href: "/quick-start", terms: "install local vault first skill scope run add-local autovault_skill_install bootstrap" },
-  { title: "Authoring skills", section: "Authoring", href: "/authoring", terms: "skill md transformation manifest permissions publish gate propose_skill_transform read_skill_resource" },
+  { title: "Authoring skills", section: "Authoring", href: "/authoring", terms: "skill md transformation manifest permissions publish gate propose_skill get_skill add_skill update_skill delete_skill include_resources" },
   { title: "Verify a skill", section: "Authoring", href: "/authoring#playground", terms: "paste url playground browser gate diagnostics verify check skill" },
   { title: "Skills directory", section: "Reference", href: "/skills-directory", terms: "skills filters agent category org installs mit license" },
-  { title: "API reference", section: "Reference", href: "/api", terms: "cli library http mcp endpoint load render verify resolve" },
+  { title: "API reference", section: "Reference", href: "/api", terms: "cli library http mcp endpoint load render verify resolve add_skill update_skill delete_skill propose_skill get_skill check_updates" },
   { title: "Deploy remote vault", section: "Reference", href: "/deploy", terms: "deploy remote mcp oauth pkce railway docker fly endpoint" },
   { title: "Compare alternatives", section: "Reference", href: "/compare", terms: "comparison rawhub forkflow manualops alternatives signing provenance" },
   { title: "extract-pdf", section: "Skills", href: "/skill-detail", terms: "extract pdf skill detail transformations permissions provenance versions" },
