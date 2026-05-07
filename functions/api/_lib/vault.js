@@ -32,7 +32,7 @@ export async function provisionVault(env, user) {
     id: crypto.randomUUID(),
     user_id: user.id,
     slug,
-    status: "active",
+    status: "reserved",
     public_url: `https://vault.autovault.dev/${slug}`,
     created_at: nowIso(),
     provisioned_at: nowIso()
@@ -51,6 +51,7 @@ export async function savePendingSkill(env, user, vault, input) {
   const queuedSkills = Array.isArray(input.queued_skills) ? input.queued_skills.slice(0, 12).map(String) : [];
   if (!sourceText && queuedSkills.length === 0) throw new ApiError(400, "Pending import requires a skill draft or queued starter skills.");
   if (sourceText.length > 100_000) throw new ApiError(413, "Skill draft is too large.");
+  if (sourceText && !env.AUTOVAULT_VAULT_OBJECTS) throw new ApiError(503, "AUTOVAULT_VAULT_OBJECTS binding is not configured.");
 
   const id = crypto.randomUUID();
   const sourceHash = sourceText ? await sha256Hex(sourceText) : null;
@@ -62,7 +63,7 @@ export async function savePendingSkill(env, user, vault, input) {
     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, id, vault.id, user.id, skillName, cleanString(input.version), cleanString(input.source_label), sourceHash, sourceText || null, cleanString(input.signature), JSON.stringify(queuedSkills), createdAt);
 
-  if (env.AUTOVAULT_VAULT_OBJECTS && sourceText) {
+  if (sourceText) {
     await env.AUTOVAULT_VAULT_OBJECTS.put(`vaults/${vault.id}/pending/${id}.md`, sourceText, {
       metadata: { user_id: user.id, vault_id: vault.id, skill_name: skillName, source_hash: sourceHash }
     });

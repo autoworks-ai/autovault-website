@@ -50,7 +50,7 @@
 
     <section id="hosts" class="providers-section reveal-item">
       <h2>Pick a host</h2>
-      <p class="lede">Start with managed static vault hosting, or self-host the remote MCP service on one of four officially-tested targets. Managed stores signed files and rendered profiles; self-hosted targets run the full Docker image with OAuth and policy enforcement.</p>
+      <p class="lede">Start with paid hosted onboarding, or self-host the remote MCP service on one of four officially-tested targets. Managed onboarding reserves a namespace today; full cloud CLI sync is still coming soon.</p>
       <div class="providers">
         <button v-for="provider in providers" :key="provider.id" type="button" :class="['provider', { active: active === provider.id }]" @click="active = provider.id">
           <span class="head">
@@ -187,13 +187,13 @@ const providers: Provider[] = [
     logoBg: "#D6A85A",
     logoFg: "#17120A",
     time: "~30 sec",
-    desc: "Hosted static vault storage for signed skills and rendered profiles. No servers to manage, no user code executed.",
-    feat: ["hosted", "signed files", "CLI sync", "shared infra"],
+    desc: "Paid hosted onboarding that reserves a namespace and keeps the local CLI as the source of truth until cloud sync ships.",
+    feat: ["paid onboarding", "reserved namespace", "local CLI", "shared infra"],
     steps: [
-      { title: "Create hosted vault", body: "Create a team vault on AutoVault's managed static origin. It stores manifests, signed skill bundles, and rendered agent profiles only." },
-      { title: "Provision namespace", body: "AutoVault allocates an isolated tenant namespace on shared infrastructure. The host never executes uploaded skills; trust stays anchored in local signatures." },
-      { title: "Connect local CLI", body: "Link your local vault to the hosted namespace. The command pins the remote origin before any sync happens.", command: "autovault cloud connect https://vault.autovault.dev/your-team" },
-      { title: "Sync signed files", body: "The CLI scans local skills, runs the gate, signs accepted bundles, and pushes only the manifest, bundles, and rendered profiles.", command: "autovault sync --cloud\nautovault status --cloud" }
+      { title: "Create account", body: "Sign in with Clerk so AutoVault can map the hosted onboarding state to an internal user row." },
+      { title: "Subscribe in Stripe", body: "Checkout records subscription state through the webhook before any namespace can be reserved." },
+      { title: "Reserve namespace", body: "AutoVault allocates a tenant namespace anchor on shared infrastructure. The host does not execute uploaded skills; trust stays anchored in local signatures." },
+      { title: "Keep local CLI", body: "Install AutoVault locally and use the current local commands while hosted sync is being built.", command: "curl -fsSL https://autovault.sh | sh\n. \"$HOME/.autovault/env\"\nautovault skill list" }
     ]
   },
   {
@@ -273,21 +273,20 @@ const topoRoutes = [
 ];
 
 const managedStatusLines = [
-  "$ autovault status --cloud",
+  "$ autovault skill list",
   "",
   "vault         your-team",
   "endpoint      https://vault.autovault.dev/your-team",
-  "mode          hosted static vault",
-  "storage       signed manifests + skill bundles",
+  "mode          paid onboarding",
+  "status        namespace reserved",
   "runtime       none · skills are not executed on host",
   "",
-  "sync",
-  "  manifest    18 skills · ed25519:9af4...2c81",
-  "  rendered    claude-code, codex, cursor",
-  "  namespace   tenant:yteam_7f2c",
-  "  last push   26s ago",
+  "local",
+  "  install     curl -fsSL https://autovault.sh | sh",
+  "  profiles    autovault sync-profiles --discover",
+  "  namespace   reserved until hosted sync ships",
   "",
-  "✓ synced · local signatures verified"
+  "cloud sync    not enabled yet"
 ];
 
 const remoteStatusLines = [

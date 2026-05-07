@@ -3,3 +3,7 @@ declare module "*.vue" {
   const component: DefineComponent<Record<string, never>, Record<string, never>, unknown>;
   export default component;
 }
+
+interface ImportMetaEnv {
+  readonly VITE_CLERK_PUBLISHABLE_KEY?: string;
+}

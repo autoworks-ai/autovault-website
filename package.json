@@ -8,6 +8,7 @@
     "docs:dev": "vitepress dev --host 0.0.0.0",
     "docs:build": "vitepress build",
     "docs:preview": "vitepress preview --host 0.0.0.0",
+    "deploy:pages": "npm run docs:build && npx wrangler pages deploy .vitepress/dist --project-name autovault-website",
     "test": "vitest run",
     "typecheck": "vue-tsc --noEmit"
   },
@@ -20,6 +21,8 @@
     "vue-tsc": "^2.2.12"
   },
   "dependencies": {
+    "@clerk/backend": "^3.4.6",
+    "@clerk/vue": "^2.2.1",
     "yaml": "^2.8.4"
   }
 }

@@ -112,19 +112,19 @@ AUTOVAULT_SKILL_INSTALL controls whether vendor installers prefer AutoVault, ins
 
 const cloudMarkdown = `# AutoVault Cloud Launch
 
-AutoVault Cloud is the hosted path for teams that want remote MCP, OAuth, role-aware access, bundled skills, and drift checks without standing up their own vault first.
+AutoVault Cloud is currently paid hosted onboarding: users create an account, subscribe through Stripe Checkout, and reserve a hosted namespace while full cloud sync is being built.
 
 ## Promise
 
-- Launch a free hosted vault in about five minutes.
-- Serve skills over the same remote Streamable HTTP MCP surface.
-- Keep OAuth and role-aware filtering on by default.
-- Seed bundled skills through the same validation path as local AutoVault.
+- Create a Clerk-backed account and internal user row.
+- Subscribe through Stripe Checkout before namespace reservation.
+- Reserve a stable hosted URL such as https://vault.autovault.dev/your-team.
+- Keep local AutoVault as the signing and profile-sync source of truth.
 - Preserve portability: the public source remains MIT licensed and local-first.
 
 ## When to use it
 
-Use hosted AutoVault when a team wants a shared remote vault or a fast first run. Use the local quick start when a single developer wants to keep the whole vault on their machine.`;
+Use hosted AutoVault when a team wants to reserve its cloud namespace and join the paid onboarding path. Use the local quick start when a single developer wants the working CLI surface today.`;
 
 const authoringMarkdown = `# Authoring AutoVault Skills
 
@@ -334,7 +334,7 @@ export const pageDocs: PageDoc[] = [
     key: "cloud",
     file: "cloud.md",
     title: "AutoVault Cloud Launch",
-    description: "Launch AutoVault for free in five minutes on hosted AutoVault hardware with remote MCP, OAuth, bundled skills, and drift checks.",
+    description: "Create a Clerk account, subscribe through Stripe Checkout, and reserve a hosted AutoVault namespace while cloud sync is coming soon.",
     route: "/cloud",
     agentPath: "/agents/cloud",
     markdown: cloudMarkdown

@@ -218,7 +218,7 @@
           <h2>Signed skills. Real provenance.<br /><span class="ital">No mystery code.</span></h2>
           <p>One vault. Every agent. No drift. Self-host the team mode, or run local-only — same engine, same gate.</p>
           <div style="display: inline-flex; gap: 12px; flex-wrap: wrap; justify-content: center">
-            <a class="pill-btn primary" href="/cloud">Launch free in 5 minutes <UiIcon name="arrow" /></a>
+            <a class="pill-btn primary" href="/cloud">Reserve namespace <UiIcon name="arrow" /></a>
             <a class="pill-btn" href="/quick-start">Install locally</a>
             <a class="pill-btn" href="https://github.com/autoworks-ai/autovault"><UiIcon name="github" /> github.com/autoworks-ai/autovault</a>
           </div>
@@ -232,6 +232,7 @@
 <script setup lang="ts">
 import { computed, defineComponent, h, onMounted, onUnmounted, ref, watch } from "vue";
 import BrandMark from "./BrandMark.vue";
+import ClerkAuthControls from "./ClerkAuthControls.vue";
 import UiIcon from "./UiIcon.vue";
 import { gateStages } from "../data/security";
 import { transforms, type TransformTarget } from "../data/transforms";
@@ -261,7 +262,8 @@ const LandingTopbar = defineComponent({
       h("div", { class: "av-actions" }, [
         h("a", { class: "icon-btn", href: "https://github.com/autoworks-ai/autovault", title: "GitHub" }, h(UiIcon, { name: "github", size: 15 })),
         h("a", { class: "pill-btn", href: "/quick-start" }, [h("span", { class: "status-dot" }), "Docs"]),
-        h("a", { class: "pill-btn primary", href: "/cloud", title: "Launch for free in 5 minutes on our hardware" }, ["Launch free", h(UiIcon, { name: "arrow" })])
+        h(ClerkAuthControls, { ctaLabel: "Create vault", signedInLabel: "Onboarding" }),
+        h("a", { class: "pill-btn primary", href: "/cloud", title: "Reserve a hosted AutoVault namespace" }, ["Reserve namespace", h(UiIcon, { name: "arrow" })])
       ])
     ]));
   }
