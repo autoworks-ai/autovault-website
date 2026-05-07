@@ -142,13 +142,15 @@ const SkillTile = defineComponent({
   props: { skill: { type: Object as () => Skill, required: true }, big: Boolean },
   setup(props) {
     return () => h("article", { class: ["skill-tile", props.skill.featured ? "featured" : "", props.big ? "big" : ""] }, [
-      h("div", { class: "stl-head" }, [
-        h("span", { class: "stl-icon" }, props.skill.icon),
-        h("div", { class: "stl-name" }, [h("span", { class: "name" }, props.skill.name), h("span", { class: "org" }, props.skill.org)]),
-        h("span", { class: "verified" }, "SIGNED")
+      h("a", { class: "stl-main", href: "/skill-detail.html" }, [
+        h("div", { class: "stl-head" }, [
+          h("span", { class: "stl-icon" }, props.skill.icon),
+          h("div", { class: "stl-name" }, [h("span", { class: "name" }, props.skill.name), h("span", { class: "org" }, props.skill.org)]),
+          h("span", { class: "verified" }, "SIGNED")
+        ]),
+        h("p", { class: "stl-desc" }, props.skill.desc),
+        h("div", { class: "stl-agents" }, skillAgents(props.skill).map((agent) => h("span", { class: "ag", style: agent.on ? { background: agent.color, color: "#0a0d11", borderColor: agent.color } : undefined }, agent.id)))
       ]),
-      h("p", { class: "stl-desc" }, props.skill.desc),
-      h("div", { class: "stl-agents" }, skillAgents(props.skill).map((agent) => h("span", { class: "ag", style: agent.on ? { background: agent.color, color: "#0a0d11", borderColor: agent.color } : undefined }, agent.id))),
       h("div", { class: "stl-meta" }, [h("span", `v${props.skill.v}`), h("span", props.skill.license), h("span", { style: "flex:1" }), h("span", `${props.skill.installs.toLocaleString()} installs`), h("button", { class: "copy-btn", type: "button" }, "Install")])
     ]);
   }
@@ -157,7 +159,7 @@ const SkillTile = defineComponent({
 const SkillListItem = defineComponent({
   props: { skill: { type: Object as () => Skill, required: true } },
   setup(props) {
-    return () => h("article", { class: "dir-list-item" }, [
+    return () => h("a", { class: "dir-list-item", href: "/skill-detail.html" }, [
       h("div", { class: "stl-head" }, [h("span", { class: "stl-icon" }, props.skill.icon), h("div", { class: "stl-name" }, [h("span", { class: "name" }, props.skill.name), h("span", { class: "org" }, props.skill.org)])]),
       h("div", { class: "desc-cell" }, props.skill.desc),
       h("div", { class: "agents-cell" }, skillAgents(props.skill).map((agent) => h("span", { class: "ag", style: agent.on ? { background: agent.color, color: "#0a0d11", borderColor: agent.color } : undefined }, agent.id))),

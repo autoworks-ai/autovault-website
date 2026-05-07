@@ -29,6 +29,8 @@ window.Topbar = ({ active }) => {
     ["Quick start", "quick-start.html"],
     ["Authoring", "authoring.html"],
     ["Skills", "skills-directory.html"],
+    ["API", "api.html"],
+    ["Deploy", "deploy.html"],
     ["Security", "security.html"],
     ["Changelog", "changelog.html"],
   ];

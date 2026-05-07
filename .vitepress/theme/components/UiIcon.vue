@@ -18,6 +18,14 @@
   <svg v-else-if="name === 'menu'" viewBox="0 0 16 16" :width="size" :height="size" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
     <path d="M3 4.5h10M3 8h10M3 11.5h10" />
   </svg>
+  <svg v-else-if="name === 'shield'" viewBox="0 0 16 16" :width="size" :height="size" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true">
+    <path d="M8 1.8 3 3.7v3.8c0 3.2 2 5.5 5 6.7 3-1.2 5-3.5 5-6.7V3.7L8 1.8Z" />
+    <path d="m5.6 8.1 1.5 1.5 3.3-3.4" stroke-linecap="round" />
+  </svg>
+  <svg v-else-if="name === 'lock'" viewBox="0 0 16 16" :width="size" :height="size" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+    <rect x="3.5" y="7" width="9" height="6.5" rx="1.4" />
+    <path d="M5.5 7V5.3a2.5 2.5 0 0 1 5 0V7" stroke-linecap="round" />
+  </svg>
   <svg v-else viewBox="0 0 16 16" :width="size" :height="size" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
     <circle cx="8" cy="8" r="6" />
     <path d="M8 5v3.5M8 11v.01" stroke-linecap="round" />
@@ -25,5 +33,5 @@
 </template>
 
 <script setup lang="ts">
-withDefaults(defineProps<{ name: "check" | "x" | "arrow" | "github" | "search" | "menu" | "tip"; size?: number }>(), { size: 14 });
+withDefaults(defineProps<{ name: "check" | "x" | "arrow" | "github" | "search" | "menu" | "tip" | "shield" | "lock"; size?: number }>(), { size: 14 });
 </script>

@@ -249,7 +249,7 @@ const LandingTopbar = defineComponent({
       ["How it works", "#how"],
       ["Concepts", "#concepts"],
       ["Quick start", "/quick-start.html"],
-      ["Compare", "#compare"]
+      ["Compare", "/compare.html"]
     ];
     return () => h("div", { class: "av-topbar" }, h("div", { class: "av-topbar-inner" }, [
       h("a", { class: "av-brand", href: "/" }, [h(BrandMark), h("span", [h("span", { class: "auto" }, "Auto"), h("span", { class: "vault" }, "Vault")])]),
@@ -318,9 +318,9 @@ const AutoVaultFooter = defineComponent({
     return () => h("footer", { class: "footer" }, [
       h("div", { class: "footer-inner" }, [
         h("div", [h("div", { class: "av-brand", style: "margin-bottom:14px" }, [h(BrandMark), h("span", [h("span", { class: "auto" }, "Auto"), h("span", { class: "vault" }, "Vault")])]), h("p", { class: "card-p", style: "max-width:320px" }, "A curated skills layer for AI agents. Validated at the door, signed with provenance, scoped per caller.")]),
-        h("div", [h("h5", "Product"), h("a", { href: "/" }, "Overview"), h("a", { href: "/skills-directory.html" }, "Skills directory"), h("a", { href: "/changelog.html" }, "Changelog")]),
-        h("div", [h("h5", "Develop"), h("a", { href: "/quick-start.html" }, "Quick start"), h("a", { href: "/authoring.html" }, "Authoring skills"), h("a", { href: "/security.html" }, "Security model")]),
-        h("div", [h("h5", "Org"), h("a", "autoworks-ai"), h("a", "AutoMem"), h("a", "AutoHub"), h("a", "Security policy")])
+        h("div", [h("h5", "Product"), h("a", { href: "/" }, "Overview"), h("a", { href: "/skills-directory.html" }, "Skills directory"), h("a", { href: "/compare.html" }, "Compare"), h("a", { href: "/changelog.html" }, "Changelog")]),
+        h("div", [h("h5", "Develop"), h("a", { href: "/quick-start.html" }, "Quick start"), h("a", { href: "/authoring.html" }, "Authoring skills"), h("a", { href: "/api.html" }, "API reference"), h("a", { href: "/deploy.html" }, "Deploy remote")]),
+        h("div", [h("h5", "Org"), h("a", { href: "/author-autoworks-ai.html" }, "autoworks-ai"), h("span", { class: "footer-text" }, "AutoMem"), h("span", { class: "footer-text" }, "AutoHub"), h("a", { href: "/security.html" }, "Security policy")])
       ]),
       h("div", { class: "footer-bottom" }, [h("span", "© 2026 autoworks-ai · Apache-2.0"), h("span", "autovault.dev")])
     ]);

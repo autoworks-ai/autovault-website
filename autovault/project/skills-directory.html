@@ -284,7 +284,7 @@ const ORGS = [
 ];
 
 const Tile = ({ s, big = false }) => (
-  <div className={"skill-tile" + (s.featured ? " featured" : "") + (big ? " big" : "")}>
+  <a href="skill-detail.html" className={"skill-tile" + (s.featured ? " featured" : "") + (big ? " big" : "")} style={{ textDecoration: "none", color: "inherit" }}>
     <div className="stl-head">
       <div className="stl-icon">{s.icon}</div>
       <div className="stl-name">
@@ -306,11 +306,11 @@ const Tile = ({ s, big = false }) => (
       <span className="spc"/>
       <button className="install-mini">Install</button>
     </div>
-  </div>
+  </a>
 );
 
 const ListItem = ({ s }) => (
-  <div className="dir-list-item">
+  <a href="skill-detail.html" className="dir-list-item" style={{ textDecoration: "none", color: "inherit" }}>
     <div className="name-cell">
       <div className="stl-icon">{s.icon}</div>
       <div className="col">
@@ -330,7 +330,7 @@ const ListItem = ({ s }) => (
     <div className="install-cell">
       <button className="install-mini" style={{ background: "none", border: "1px solid var(--line-2)", color: "var(--ink-2)", padding: "5px 10px", fontFamily: "var(--mono)", fontSize: 10.5, borderRadius: 4, letterSpacing: "0.04em", textTransform: "uppercase", cursor: "pointer" }}>Install</button>
     </div>
-  </div>
+  </a>
 );
 
 const App = () => {

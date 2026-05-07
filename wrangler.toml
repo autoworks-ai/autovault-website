@@ -4,3 +4,18 @@ compatibility_date = "2026-05-06"
 
 [vars]
 AUTOVAULT_INSTALLER_URL = "https://raw.githubusercontent.com/autoworks-ai/autovault/main/scripts/install.sh"
+STRIPE_BRAND_DISPLAY_NAME = "AutoVault"
+STRIPE_BRAND_BACKGROUND_COLOR = "#0b1014"
+STRIPE_BRAND_BUTTON_COLOR = "#5ad6c0"
+STRIPE_BRAND_BORDER_STYLE = "rounded"
+STRIPE_BRAND_FONT_FAMILY = "inter"
+
+# Production bindings must be attached in Cloudflare Pages before enabling the
+# hosted-vault funnel:
+# - D1 binding AUTOVAULT_DB, migrated with migrations/0001_hosted_vault.sql
+# - KV binding AUTOVAULT_VAULT_OBJECTS for pending browser drafts and small vault artifacts
+#
+# Required provider secrets:
+# GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
+# SESSION_SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
+# AUTOVAULT_HOSTED_PRICE_ID
