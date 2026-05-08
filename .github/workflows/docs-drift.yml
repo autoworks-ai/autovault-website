@@ -14,18 +14,16 @@ on:
         default: Manual docs drift audit
 
 permissions:
+  actions: read
   contents: write
   pull-requests: write
   id-token: write
-
-env:
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
 
 jobs:
   update-docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Resolve source payload
         id: resolve
@@ -53,16 +51,16 @@ jobs:
           echo "reason=$REASON" >> "$GITHUB_OUTPUT"
 
       - name: Checkout source repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ steps.resolve.outputs.source_repo }}
           ref: ${{ steps.resolve.outputs.source_sha }}
           path: .source-repo
           token: ${{ secrets.DOCS_DRIFT_TOKEN || github.token }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: "22"
+          node-version: "24"
           cache: npm
 
       - run: npm ci
@@ -101,8 +99,8 @@ jobs:
         if: success()
         env:
           GH_TOKEN: ${{ secrets.DOCS_DRIFT_TOKEN || github.token }}
-          RUN_STARTED_AT: ${{ github.run_started_at }}
         run: |
+          RUN_STARTED_AT=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}" -q '.created_at')
           PRS=$(gh pr list \
             --state open \
             --limit 200 \

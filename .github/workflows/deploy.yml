@@ -1,50 +1,49 @@
 name: Deploy to Cloudflare Pages
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
   workflow_dispatch:
     inputs:
       branch:
         description: Branch to deploy
         required: false
+        default: main
 
 permissions:
   contents: read
   deployments: write
 
 env:
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
+  NODE_VERSION: "24"
+  PAGES_PROJECT_NAME: autovault-website
+  WRANGLER_VERSION: "4.90.0"
 
 concurrency:
-  group: pages-${{ github.event.workflow_run.head_branch || inputs.branch || github.ref_name }}
+  group: pages-manual-${{ inputs.branch || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
   deploy:
-    if: >-
-      ${{
-        (github.event_name == 'workflow_run' &&
-          github.event.workflow_run.conclusion == 'success' &&
-          github.event.workflow_run.event == 'push') ||
-        github.event_name == 'workflow_dispatch'
-      }}
     runs-on: ubuntu-latest
     env:
-      DEPLOY_BRANCH: ${{ github.event.workflow_run.head_branch || inputs.branch || github.ref_name }}
-      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      DEPLOY_BRANCH: ${{ inputs.branch || github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
-          ref: ${{ env.DEPLOY_SHA }}
+          ref: ${{ env.DEPLOY_BRANCH }}
 
-      - uses: actions/setup-node@v4
+      - name: Resolve deploy SHA
+        id: deploy_ref
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v6
         with:
-          node-version: "22"
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
       - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run pages:functions:build
       - run: npm run docs:build
 
       - name: Deploy to Cloudflare Pages
@@ -52,8 +51,10 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: ${{ env.WRANGLER_VERSION }}
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
           command: >-
             pages deploy .vitepress/dist
-            --project-name autovault-website
+            --project-name "${{ env.PAGES_PROJECT_NAME }}"
             --branch "${{ env.DEPLOY_BRANCH }}"
-            --commit-hash "${{ env.DEPLOY_SHA }}"
+            --commit-hash "${{ steps.deploy_ref.outputs.sha }}"

@@ -2,26 +2,192 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
+  deployments: write
+  issues: write
+  pull-requests: write
 
 env:
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
+  NODE_VERSION: "24"
+  PAGES_PROJECT_NAME: autovault-website
+  WRANGLER_VERSION: "4.90.0"
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
         with:
-          node-version: "22"
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - run: npm run pages:functions:build
       - run: npm run docs:build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: pages-dist
+          path: .vitepress/dist
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy-preview:
+    needs: build-test
+    if: >-
+      ${{
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.actor != 'dependabot[bot]'
+      }}
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_PREVIEW_D1_DATABASE_ID: ${{ vars.CLOUDFLARE_PREVIEW_D1_DATABASE_ID }}
+      CLOUDFLARE_PREVIEW_D1_DATABASE_NAME: ${{ vars.CLOUDFLARE_PREVIEW_D1_DATABASE_NAME }}
+      CLOUDFLARE_PREVIEW_KV_NAMESPACE_ID: ${{ vars.CLOUDFLARE_PREVIEW_KV_NAMESPACE_ID }}
+      DEPLOY_BRANCH: ${{ github.head_ref }}
+      DEPLOY_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v6
+        if: ${{ env.CLOUDFLARE_PREVIEW_D1_DATABASE_ID != '' && env.CLOUDFLARE_PREVIEW_KV_NAMESPACE_ID != '' }}
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+
+      - uses: actions/setup-node@v6
+        if: ${{ env.CLOUDFLARE_PREVIEW_D1_DATABASE_ID != '' && env.CLOUDFLARE_PREVIEW_KV_NAMESPACE_ID != '' }}
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - uses: actions/download-artifact@v8
+        if: ${{ env.CLOUDFLARE_PREVIEW_D1_DATABASE_ID != '' && env.CLOUDFLARE_PREVIEW_KV_NAMESPACE_ID != '' }}
+        with:
+          name: pages-dist
+          path: .vitepress/dist
+
+      - run: npm ci
+        if: ${{ env.CLOUDFLARE_PREVIEW_D1_DATABASE_ID != '' && env.CLOUDFLARE_PREVIEW_KV_NAMESPACE_ID != '' }}
+
+      - name: Write preview Pages config
+        if: ${{ env.CLOUDFLARE_PREVIEW_D1_DATABASE_ID != '' && env.CLOUDFLARE_PREVIEW_KV_NAMESPACE_ID != '' }}
+        run: |
+          rm wrangler.toml
+          npm run pages:preview-config
+
+      - name: Deploy preview to Cloudflare Pages
+        id: preview_deploy
+        if: ${{ env.CLOUDFLARE_PREVIEW_D1_DATABASE_ID != '' && env.CLOUDFLARE_PREVIEW_KV_NAMESPACE_ID != '' }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: ${{ env.WRANGLER_VERSION }}
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          command: >-
+            pages deploy .vitepress/dist
+            --project-name "${{ env.PAGES_PROJECT_NAME }}"
+            --branch "${{ env.DEPLOY_BRANCH }}"
+            --commit-hash "${{ env.DEPLOY_SHA }}"
+
+      - name: Comment with preview URL
+        if: ${{ steps.preview_deploy.outputs['deployment-url'] != '' }}
+        uses: actions/github-script@v9
+        env:
+          PREVIEW_URL: ${{ steps.preview_deploy.outputs['pages-deployment-alias-url'] || steps.preview_deploy.outputs['deployment-url'] }}
+          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
+        with:
+          script: |
+            const marker = '<!-- autovault-pages-preview -->';
+            const body = `${marker}
+            Cloudflare Pages preview: [${process.env.PREVIEW_URL}](${process.env.PREVIEW_URL})
+
+            Commit: \`${process.env.DEPLOY_SHA}\``;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number,
+              per_page: 100
+            });
+            const existing = comments.find((comment) => comment.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body
+              });
+            }
+
+      - name: Note missing preview bindings
+        if: ${{ env.CLOUDFLARE_PREVIEW_D1_DATABASE_ID == '' || env.CLOUDFLARE_PREVIEW_KV_NAMESPACE_ID == '' }}
+        run: |
+          {
+            echo "### Cloudflare Pages preview skipped"
+            echo
+            echo "Set repository variables CLOUDFLARE_PREVIEW_D1_DATABASE_ID and CLOUDFLARE_PREVIEW_KV_NAMESPACE_ID to enable safe PR previews."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-production:
+    needs: build-test
+    if: >-
+      ${{
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/main'
+      }}
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_BRANCH: main
+      DEPLOY_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: pages-dist
+          path: .vitepress/dist
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Deploy production to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: ${{ env.WRANGLER_VERSION }}
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          command: >-
+            pages deploy .vitepress/dist
+            --project-name "${{ env.PAGES_PROJECT_NAME }}"
+            --branch "${{ env.DEPLOY_BRANCH }}"
+            --commit-hash "${{ env.DEPLOY_SHA }}"
