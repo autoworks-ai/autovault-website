@@ -2,23 +2,16 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, extname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { pageDocs } from "../.vitepress/shared/pageDocs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+// Derive markdown files from pageDocs so newly added pages are automatically covered.
 const scannedRoots = [
   ".vitepress/config.ts",
   ".vitepress/theme/components",
+  ".vitepress/theme/index.ts",
   "public/_redirects",
-  "about.md",
-  "api.md",
-  "authoring.md",
-  "changelog.md",
-  "compare.md",
-  "deploy.md",
-  "index.md",
-  "quick-start.md",
-  "security.md",
-  "skill-detail.md",
-  "skills-directory.md"
+  ...pageDocs.map((doc) => doc.file)
 ];
 
 const allowedCloudLinkFiles = new Set([
