@@ -6,5 +6,5 @@ node_modules/
 .vitepress/dist/
 dist/
 coverage/
-wrangler.preview.json
+wrangler.json
 .DS_Store

@@ -87,7 +87,9 @@ jobs:
 
       - name: Write preview Pages config
         if: ${{ env.CLOUDFLARE_PREVIEW_D1_DATABASE_ID != '' && env.CLOUDFLARE_PREVIEW_KV_NAMESPACE_ID != '' }}
-        run: npm run pages:preview-config
+        run: |
+          rm wrangler.toml
+          npm run pages:preview-config
 
       - name: Deploy preview to Cloudflare Pages
         id: preview_deploy
@@ -103,7 +105,6 @@ jobs:
             --project-name "${{ env.PAGES_PROJECT_NAME }}"
             --branch "${{ env.DEPLOY_BRANCH }}"
             --commit-hash "${{ env.DEPLOY_SHA }}"
-            --config wrangler.preview.json
 
       - name: Comment with preview URL
         if: ${{ steps.preview_deploy.outputs['deployment-url'] != '' }}

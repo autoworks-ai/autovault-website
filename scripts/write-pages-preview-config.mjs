@@ -40,4 +40,4 @@ const config = {
   ]
 };
 
-writeFileSync("wrangler.preview.json", `${JSON.stringify(config, null, 2)}\n`);
+writeFileSync("wrangler.json", `${JSON.stringify(config, null, 2)}\n`);
