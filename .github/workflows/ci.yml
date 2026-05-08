@@ -27,6 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - uses: actions/setup-node@v4
         with:
@@ -65,6 +67,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         if: ${{ env.CLOUDFLARE_PREVIEW_D1_DATABASE_ID != '' && env.CLOUDFLARE_PREVIEW_KV_NAMESPACE_ID != '' }}
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
 
       - uses: actions/setup-node@v4
         if: ${{ env.CLOUDFLARE_PREVIEW_D1_DATABASE_ID != '' && env.CLOUDFLARE_PREVIEW_KV_NAMESPACE_ID != '' }}
@@ -166,6 +170,13 @@ jobs:
         with:
           name: pages-dist
           path: .vitepress/dist
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
 
       - name: Deploy production to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
