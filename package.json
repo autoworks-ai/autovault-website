@@ -5,20 +5,24 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
+    "ci": "npm run typecheck && npm test && npm run pages:functions:build && npm run docs:build",
     "docs:dev": "vitepress dev --host 0.0.0.0",
     "docs:build": "vitepress build",
     "docs:preview": "vitepress preview --host 0.0.0.0",
-    "deploy:pages": "npm run docs:build && npx wrangler pages deploy .vitepress/dist --project-name autovault-website",
+    "deploy:pages": "npm run docs:build && wrangler pages deploy .vitepress/dist --project-name autovault-website",
+    "pages:functions:build": "wrangler pages functions build functions --outdir .wrangler/tmp/pages-functions",
+    "pages:preview-config": "node scripts/write-pages-preview-config.mjs",
     "test": "vitest run",
     "typecheck": "vue-tsc --noEmit"
   },
   "devDependencies": {
-    "@types/node": "^22.19.17",
-    "@vitejs/plugin-vue": "^5.2.4",
+    "@types/node": "^22.19.18",
+    "@vitejs/plugin-vue": "^6.0.6",
     "vitepress": "^1.6.4",
-    "vitest": "^3.2.4",
+    "vitest": "^4.1.5",
     "vue": "^3.5.18",
-    "vue-tsc": "^2.2.12"
+    "vue-tsc": "^3.2.8",
+    "wrangler": "^4.90.0"
   },
   "dependencies": {
     "@clerk/backend": "^3.4.6",

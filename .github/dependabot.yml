@@ -1,0 +1,70 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      security-updates:
+        applies-to: security-updates
+        patterns:
+          - "*"
+      production-minor-patch:
+        applies-to: version-updates
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      cloudflare-minor-patch:
+        applies-to: version-updates
+        dependency-type: "development"
+        patterns:
+          - "wrangler"
+          - "@cloudflare/*"
+        update-types:
+          - "minor"
+          - "patch"
+      vitepress-minor-patch:
+        applies-to: version-updates
+        dependency-type: "development"
+        patterns:
+          - "vite"
+          - "vitepress"
+          - "@vitejs/*"
+          - "vue"
+          - "vue-tsc"
+        update-types:
+          - "minor"
+          - "patch"
+      test-tooling-minor-patch:
+        applies-to: version-updates
+        dependency-type: "development"
+        patterns:
+          - "@vitest/*"
+          - "vitest"
+        update-types:
+          - "minor"
+          - "patch"
+      types-minor-patch:
+        applies-to: version-updates
+        dependency-type: "development"
+        patterns:
+          - "@types/*"
+        update-types:
+          - "minor"
+          - "patch"
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 5
