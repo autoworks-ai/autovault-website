@@ -23,7 +23,7 @@ jobs:
   update-docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Resolve source payload
         id: resolve
@@ -51,16 +51,16 @@ jobs:
           echo "reason=$REASON" >> "$GITHUB_OUTPUT"
 
       - name: Checkout source repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ steps.resolve.outputs.source_repo }}
           ref: ${{ steps.resolve.outputs.source_sha }}
           path: .source-repo
           token: ${{ secrets.DOCS_DRIFT_TOKEN || github.token }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: "22"
+          node-version: "24"
           cache: npm
 
       - run: npm ci

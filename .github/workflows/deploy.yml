@@ -13,7 +13,7 @@ permissions:
   deployments: write
 
 env:
-  NODE_VERSION: "22"
+  NODE_VERSION: "24"
   PAGES_PROJECT_NAME: autovault-website
   WRANGLER_VERSION: "4.90.0"
 
@@ -27,7 +27,7 @@ jobs:
     env:
       DEPLOY_BRANCH: ${{ inputs.branch || github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ env.DEPLOY_BRANCH }}
 
@@ -35,7 +35,7 @@ jobs:
         id: deploy_ref
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
