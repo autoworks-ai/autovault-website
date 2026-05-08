@@ -689,6 +689,19 @@
   .text-mono { font-family: var(--mono); }
   .text-dim { color: var(--ink-3); }
 
+  @media (prefers-reduced-motion: reduce) {
+    .gate-vault-mark .vault-dial,
+    .gate-vault-mark .vault-depth,
+    .xform-engine .ring::before {
+      animation: none !important;
+    }
+
+    .xform-engine .ring,
+    .xform-engine .ring::before {
+      transition: none !important;
+    }
+  }
+
   /* responsive guards */
   @media (max-width: 1080px) {
     .hero-grid, .gate-section { grid-template-columns: 1fr; gap: 48px; }
