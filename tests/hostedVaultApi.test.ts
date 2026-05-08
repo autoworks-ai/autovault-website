@@ -9,7 +9,7 @@ describe("hosted vault auth helpers", () => {
   it("parses session cookies and constrains return paths", () => {
     expect((parseCookies(`${SESSION_COOKIE}=abc123; theme=dark`) as Record<string, string>)[SESSION_COOKIE]).toBe("abc123");
     expect(safeReturnTo("/authoring.html#playground")).toBe("/authoring.html#playground");
-    expect(safeReturnTo("https://evil.example/callback")).toBe("/deploy.html#hosts");
+    expect(safeReturnTo("https://evil.example/callback")).toBe("/cloud#launch-path");
   });
 });
 
@@ -31,7 +31,8 @@ describe("hosted vault Stripe checkout", () => {
     expect(params.get("amount")).toBeNull();
     expect(params.get("metadata[user_id]")).toBe("github_1");
     expect(params.get("branding_settings[display_name]")).toBe("AutoVault Test");
-    expect(params.get("success_url")).toContain("{CHECKOUT_SESSION_ID}");
+    expect(params.get("success_url")).toBe("https://autovault.dev/cloud?hosted=success&session_id={CHECKOUT_SESSION_ID}#launch-path");
+    expect(params.get("cancel_url")).toBe("https://autovault.dev/cloud?hosted=cancelled#launch-path");
   });
 
   it("rejects checkout creation when the hosted price is not configured", () => {

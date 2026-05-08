@@ -50,7 +50,7 @@
 
     <section id="hosts" class="providers-section reveal-item">
       <h2>Pick a host</h2>
-      <p class="lede">Start with paid hosted onboarding, or self-host the remote MCP service on one of four officially-tested targets. Managed onboarding reserves a namespace today; full cloud CLI sync is still coming soon.</p>
+      <p class="lede">Self-host the remote MCP service on one of four officially-tested targets. Local installs remain the source of truth; remote mode adds OAuth-protected HTTPS access for agents that cannot read your local filesystem.</p>
       <div class="providers">
         <button v-for="provider in providers" :key="provider.id" type="button" :class="['provider', { active: active === provider.id }]" @click="active = provider.id">
           <span class="head">
@@ -87,7 +87,6 @@
           </div>
         </div>
       </div>
-      <HostedVaultFunnel v-if="active === 'managed'" entry="deploy" />
     </section>
 
     <section class="env-section reveal-item">
@@ -161,7 +160,6 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, h, ref } from "vue";
-import HostedVaultFunnel from "./HostedVaultFunnel.vue";
 import UiIcon from "./UiIcon.vue";
 
 type Provider = {
@@ -176,26 +174,10 @@ type Provider = {
   steps: Array<{ title: string; body: string; command?: string }>;
 };
 
-const active = ref("managed");
+const active = ref("railway");
 const copied = ref(false);
 
 const providers: Provider[] = [
-  {
-    id: "managed",
-    name: "Managed by AutoVault",
-    short: "AV",
-    logoBg: "#D6A85A",
-    logoFg: "#17120A",
-    time: "~30 sec",
-    desc: "Paid hosted onboarding that reserves a namespace and keeps the local CLI as the source of truth until cloud sync ships.",
-    feat: ["paid onboarding", "reserved namespace", "local CLI", "shared infra"],
-    steps: [
-      { title: "Create account", body: "Sign in with Clerk so AutoVault can map the hosted onboarding state to an internal user row." },
-      { title: "Subscribe in Stripe", body: "Checkout records subscription state through the webhook before any namespace can be reserved." },
-      { title: "Reserve namespace", body: "AutoVault allocates a tenant namespace anchor on shared infrastructure. The host does not execute uploaded skills; trust stays anchored in local signatures." },
-      { title: "Keep local CLI", body: "Install AutoVault locally and use the current local commands while hosted sync is being built.", command: "curl -fsSL https://autovault.sh | sh\n. \"$HOME/.autovault/env\"\nautovault skill list" }
-    ]
-  },
   {
     id: "railway",
     name: "Railway",
@@ -272,23 +254,6 @@ const topoRoutes = [
   { y: 236, label: "CORS · origin guard", desc: "allowed origins" }
 ];
 
-const managedStatusLines = [
-  "$ autovault skill list",
-  "",
-  "vault         your-team",
-  "endpoint      https://vault.autovault.dev/your-team",
-  "mode          paid onboarding",
-  "status        namespace reserved",
-  "runtime       none · skills are not executed on host",
-  "",
-  "local",
-  "  install     curl -fsSL https://autovault.sh | sh",
-  "  profiles    autovault sync-profiles --discover",
-  "  namespace   reserved until hosted sync ships",
-  "",
-  "cloud sync    not enabled yet"
-];
-
 const remoteStatusLines = [
   "$ autovault status --remote https://your.vault",
   "",
@@ -307,7 +272,7 @@ const remoteStatusLines = [
   "✓ healthy · uptime 4d 02:11:09"
 ];
 
-const statusLines = computed(() => active.value === "managed" ? managedStatusLines : remoteStatusLines);
+const statusLines = computed(() => remoteStatusLines);
 
 const smokeLines = [
   "$ AUTOVAULT_REMOTE_URL=https://vault.acme.dev npm run smoke:remote",

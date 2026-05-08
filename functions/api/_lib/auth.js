@@ -98,7 +98,7 @@ export async function handleOAuthCallback(request, env, provider, fetcher = fetc
     where state = ? and provider = ? and expires_at > ?
   `, state, provider, nowIso());
 
-  if (!stored || !code) return redirectWithError(request, "/deploy.html#hosts", "oauth_state_invalid");
+  if (!stored || !code) return redirectWithError(request, "/cloud#launch-path", "oauth_state_invalid");
 
   await run(env, "delete from oauth_states where state = ?", state);
   const config = providerConfig(provider, request, env);

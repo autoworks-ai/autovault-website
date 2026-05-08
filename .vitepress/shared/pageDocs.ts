@@ -23,6 +23,7 @@ export interface PageDoc {
   route: string;
   agentPath: string;
   markdown: string;
+  listed?: boolean;
 }
 
 const overviewMarkdown = `# AutoVault
@@ -212,10 +213,7 @@ Deploy AutoVault when a team needs a shared remote vault, OAuth-protected MCP ac
 - Serves Streamable HTTP MCP at /mcp.
 - Uses OAuth for registration, login, token issuance, and protected-resource metadata.
 - Keeps validation, signing, transforms, resource reads, and drift checks on the same code path as local mode.
-
-## Hosted path
-
-Use /cloud for the quickest hosted launch. Use this deploy page when you want to operate the remote service yourself.`;
+`;
 
 const compareMarkdown = `# AutoVault Comparison
 
@@ -337,7 +335,8 @@ export const pageDocs: PageDoc[] = [
     description: "Create a Clerk account, subscribe through Stripe Checkout, and reserve a hosted AutoVault namespace while cloud sync is coming soon.",
     route: "/cloud",
     agentPath: "/agents/cloud",
-    markdown: cloudMarkdown
+    markdown: cloudMarkdown,
+    listed: false
   },
   {
     key: "quick-start",
@@ -440,6 +439,8 @@ export const pageDocs: PageDoc[] = [
   }
 ];
 
+export const listedPageDocs = pageDocs.filter((doc) => doc.listed !== false);
+
 export function getPageDoc(key: PageDocKey): PageDoc {
   const page = pageDocs.find((doc) => doc.key === key);
   if (!page) throw new Error(`Unknown page doc: ${key}`);
@@ -463,7 +464,7 @@ export function buildAgentsIndex() {
     title: "AutoVault agent documentation",
     description: "Extensionless markdown endpoints for agents reading AutoVault documentation.",
     generated_at: new Date().toISOString(),
-    pages: pageDocs.map((doc) => ({
+    pages: listedPageDocs.map((doc) => ({
       key: doc.key,
       title: doc.title,
       description: doc.description,
@@ -480,7 +481,7 @@ export function buildLlmsTxt(): string {
     "> AutoVault is an MIT-licensed skill registry and capability layer for AI agents. It validates, signs, scopes, transforms, and serves SKILL.md files over local stdio MCP and remote Streamable HTTP MCP.",
     "",
     "## Canonical Docs",
-    ...pageDocs.map((doc) => `- [${doc.title}](${agentUrl(doc)}): ${doc.description}`),
+    ...listedPageDocs.map((doc) => `- [${doc.title}](${agentUrl(doc)}): ${doc.description}`),
     "",
     "## Agent Notes",
     "- Prefer the /agents/* markdown endpoints for compact agent context.",
@@ -492,5 +493,5 @@ export function buildLlmsTxt(): string {
 }
 
 export function buildLlmsFullTxt(): string {
-  return `${buildLlmsTxt()}\n${pageDocs.map((doc) => `---\nurl: ${canonicalUrl(doc)}\nmarkdown: ${agentUrl(doc)}\n---\n\n${doc.markdown}`).join("\n\n")}\n`;
+  return `${buildLlmsTxt()}\n${listedPageDocs.map((doc) => `---\nurl: ${canonicalUrl(doc)}\nmarkdown: ${agentUrl(doc)}\n---\n\n${doc.markdown}`).join("\n\n")}\n`;
 }

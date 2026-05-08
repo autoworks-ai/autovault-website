@@ -1,7 +1,8 @@
 ---
 title: AutoVault Cloud Launch
-description: Launch AutoVault for free in five minutes on hosted AutoVault hardware with remote MCP, OAuth, bundled skills, and drift checks.
+description: Unlisted hosted AutoVault onboarding for direct account, checkout, and namespace reservation flows.
 layout: false
+search: false
 ---
 
 <DocsShell page="cloud"><CloudPage /></DocsShell>

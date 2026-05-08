@@ -1,30 +1,30 @@
 <template>
   <div class="clerk-auth-controls" :class="`clerk-auth-controls--${variant}`">
-    <template v-if="clerkEnabled">
+    <template v-if="hydrated && clerkEnabled">
       <ClerkLoaded>
         <Show when="signed-out">
           <SignInButton mode="modal" :fallback-redirect-url="returnPath" :sign-up-fallback-redirect-url="returnPath">
             <button class="clerk-auth-action" type="button">Sign in</button>
           </SignInButton>
-          <SignUpButton mode="modal" :fallback-redirect-url="returnPath" :sign-in-fallback-redirect-url="returnPath">
+          <SignUpButton v-if="variant === 'funnel'" mode="modal" :fallback-redirect-url="returnPath" :sign-in-fallback-redirect-url="returnPath">
             <button class="clerk-auth-action primary" type="button">{{ ctaLabel }}</button>
           </SignUpButton>
         </Show>
         <Show when="signed-in">
-          <a class="clerk-auth-action" href="/cloud#launch-path">{{ signedInLabel }}</a>
+          <a v-if="variant === 'funnel'" class="clerk-auth-action" :href="returnPath">{{ signedInLabel }}</a>
           <UserButton />
         </Show>
       </ClerkLoaded>
     </template>
 
-    <template v-else>
-      <a class="clerk-auth-action primary" href="/cloud#launch-path">{{ ctaLabel }}</a>
+    <template v-else-if="hydrated && variant === 'funnel'">
+      <a class="clerk-auth-action primary" :href="hostedPath">{{ ctaLabel }}</a>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { ClerkLoaded, Show, SignInButton, SignUpButton, UserButton } from "@clerk/vue";
 
 const props = withDefaults(defineProps<{
@@ -38,9 +38,14 @@ const props = withDefaults(defineProps<{
 });
 
 const clerkEnabled = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY) && !import.meta.env.SSR;
+const hostedPath = "/cloud#launch-path";
+const hydrated = ref(false);
 const returnPath = computed(() => {
-  if (typeof window === "undefined") return "/cloud#launch-path";
-  if (props.variant !== "funnel") return "/cloud#launch-path";
+  if (typeof window === "undefined") return "/";
   return `${window.location.pathname}${window.location.search}${window.location.hash || ""}`;
+});
+
+onMounted(() => {
+  hydrated.value = true;
 });
 </script>

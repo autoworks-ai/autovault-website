@@ -23,7 +23,7 @@ function pageHead(doc: PageDoc): HeadConfig[] {
     }
   };
 
-  return [
+  const head: HeadConfig[] = [
     ["link", { rel: "canonical", href: url }],
     ["meta", { name: "description", content: doc.description }],
     ["meta", { property: "og:type", content: "website" }],
@@ -36,6 +36,21 @@ function pageHead(doc: PageDoc): HeadConfig[] {
     ["meta", { name: "twitter:description", content: doc.description }],
     ["script", { type: "application/ld+json" }, JSON.stringify(schema)]
   ];
+
+  if (doc.listed === false) {
+    head.splice(2, 0, ["meta", { name: "robots", content: "noindex,nofollow" }]);
+  }
+
+  return head;
+}
+
+function isHiddenSitemapItem(item: { url: string }) {
+  const path = item.url.startsWith("http")
+    ? new URL(item.url).pathname
+    : item.url.startsWith("/")
+      ? item.url
+      : `/${item.url}`;
+  return path === "/cloud" || path === "/cloud/";
 }
 
 export default defineConfig({
@@ -46,7 +61,8 @@ export default defineConfig({
   lastUpdated: false,
   srcExclude: ["autovault/**", "AutoVault.md"],
   sitemap: {
-    hostname: SITE_URL
+    hostname: SITE_URL,
+    transformItems: (items) => items.filter((item) => !isHiddenSitemapItem(item))
   },
   markdown: {
     theme: {
@@ -82,7 +98,6 @@ export default defineConfig({
     },
     nav: [
       { text: "Overview", link: "/" },
-      { text: "Cloud", link: "/cloud" },
       { text: "Quick start", link: "/quick-start" },
       { text: "Authoring", link: "/authoring" },
       { text: "Skills", link: "/skills-directory" },
@@ -95,7 +110,6 @@ export default defineConfig({
         text: "Get started",
         items: [
           { text: "Overview", link: "/" },
-          { text: "Cloud launch", link: "/cloud" },
           { text: "Quick start", link: "/quick-start" },
           { text: "Installation", link: "/quick-start#install" },
           { text: "Your first skill", link: "/quick-start#first" }

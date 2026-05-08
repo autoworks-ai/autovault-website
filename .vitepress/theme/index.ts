@@ -26,9 +26,9 @@ export default {
     if (!import.meta.env.SSR && clerkPublishableKey) {
       app.use(clerkPlugin, {
         publishableKey: clerkPublishableKey,
-        afterSignOutUrl: "/cloud#launch-path",
-        signInFallbackRedirectUrl: "/cloud#launch-path",
-        signUpFallbackRedirectUrl: "/cloud#launch-path"
+        afterSignOutUrl: "/",
+        signInFallbackRedirectUrl: "/",
+        signUpFallbackRedirectUrl: "/"
       });
     }
     app.component("LandingPage", LandingPage);

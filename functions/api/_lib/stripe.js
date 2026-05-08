@@ -14,8 +14,8 @@ export function buildHostedVaultCheckoutParams({ request, env, user, source = "h
   if (!env.AUTOVAULT_HOSTED_PRICE_ID) throw new ApiError(503, "AUTOVAULT_HOSTED_PRICE_ID is not configured.");
 
   const origin = new URL(request.url).origin;
-  const successUrl = `${origin}/deploy.html?hosted=success&session_id={CHECKOUT_SESSION_ID}#hosts`;
-  const cancelUrl = `${origin}/deploy.html?hosted=cancelled#hosts`;
+  const successUrl = `${origin}/cloud?hosted=success&session_id={CHECKOUT_SESSION_ID}#launch-path`;
+  const cancelUrl = `${origin}/cloud?hosted=cancelled#launch-path`;
   const params = new URLSearchParams();
   params.set("mode", "subscription");
   params.set("client_reference_id", user.id);

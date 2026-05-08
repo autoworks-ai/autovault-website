@@ -1,13 +1,13 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { buildAgentsIndex, buildLlmsFullTxt, buildLlmsTxt, pageDocs } from "../shared/pageDocs";
+import { buildAgentsIndex, buildLlmsFullTxt, buildLlmsTxt, listedPageDocs } from "../shared/pageDocs";
 
 export async function writeAgentArtifacts(outDir: string): Promise<void> {
   const agentsDir = path.join(outDir, "agents");
   await mkdir(agentsDir, { recursive: true });
 
   await Promise.all([
-    ...pageDocs.map(async (doc) => {
+    ...listedPageDocs.map(async (doc) => {
       const destination = path.join(outDir, doc.agentPath.replace(/^\//, ""));
       await mkdir(path.dirname(destination), { recursive: true });
       await writeFile(destination, `${doc.markdown}\n`, "utf8");
