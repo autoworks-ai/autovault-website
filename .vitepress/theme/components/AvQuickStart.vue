@@ -43,7 +43,7 @@ onBeforeUnmount(stop)
     </div>
 
     <div class="av-qs-grid">
-      <div class="av-qs-step" :class="{ active: active === 0 }" role="button" tabindex="0" @click="choose(0)" @focus="choose(0)">
+      <button class="av-qs-step" :class="{ active: active === 0 }" type="button" @click="choose(0)" @focus="choose(0)">
         <div class="av-qs-step-head">
           <span class="av-qs-step-num">STEP / 01</span>
           <span class="av-qs-step-title">Install the local vault</span>
@@ -55,9 +55,9 @@ onBeforeUnmount(stop)
           <div class="row" style="margin-top: 10px"><span class="pmt">$</span><span>autovault status</span></div>
           <div class="ok" style="margin-top: 6px">● vault healthy · 0 skills · ed25519 keypair generated</div>
         </div>
-      </div>
+      </button>
 
-      <div class="av-qs-step" :class="{ active: active === 1 }" role="button" tabindex="0" @click="choose(1)" @focus="choose(1)">
+      <button class="av-qs-step" :class="{ active: active === 1 }" type="button" @click="choose(1)" @focus="choose(1)">
         <div class="av-qs-step-head">
           <span class="av-qs-step-num">STEP / 02</span>
           <span class="av-qs-step-title">Add a validated skill</span>
@@ -72,9 +72,9 @@ onBeforeUnmount(stop)
           <div class="out">↳ <span class="ok">[5/5]</span> sign: 0x9af4…2c81</div>
           <div class="ok" style="margin-top: 6px">✓ admitted to vault</div>
         </div>
-      </div>
+      </button>
 
-      <div class="av-qs-step" :class="{ active: active === 2 }" role="button" tabindex="0" @click="choose(2)" @focus="choose(2)">
+      <button class="av-qs-step" :class="{ active: active === 2 }" type="button" @click="choose(2)" @focus="choose(2)">
         <div class="av-qs-step-head">
           <span class="av-qs-step-num">STEP / 03</span>
           <span class="av-qs-step-title">Scope to a project</span>
@@ -86,9 +86,9 @@ onBeforeUnmount(stop)
           <div class="out">↳ rendering for codex → fs.read → file_read</div>
           <div class="ok" style="margin-top: 6px">✓ ready · cached</div>
         </div>
-      </div>
+      </button>
 
-      <div class="av-qs-step" :class="{ active: active === 3 }" role="button" tabindex="0" @click="choose(3)" @focus="choose(3)">
+      <button class="av-qs-step" :class="{ active: active === 3 }" type="button" @click="choose(3)" @focus="choose(3)">
         <div class="av-qs-step-head">
           <span class="av-qs-step-num">STEP / 04</span>
           <span class="av-qs-step-title">Run from either agent</span>
@@ -101,7 +101,7 @@ onBeforeUnmount(stop)
           <div>&gt; use extract-pdf to summarize report.pdf</div>
           <div class="ok" style="margin-top: 4px">✓ tool resolved: browser_form, file_read</div>
         </div>
-      </div>
+      </button>
     </div>
   </section>
 </template>

@@ -191,11 +191,11 @@ function resumeCycle() {
       </div>
 
       <div class="av-folder-cta">
-        <div class="av-folder-cmd" @click="copyInstall">
+        <button class="av-folder-cmd" type="button" @click="copyInstall">
           <span class="prompt">$</span>
           <span class="text">curl <span class="dim">-fsSL</span> https://autovault.sh <span class="dim">|</span> sh</span>
           <span class="copy">{{ copied ? '✓ copied' : 'click to copy' }}</span>
-        </div>
+        </button>
         <div class="av-folder-secondary">
           <span class="dim">Or self-host the team mode →</span>
           <a class="link" href="/deploy">Deploy a remote vault</a>

@@ -92,7 +92,11 @@ onBeforeUnmount(stop)
 
 function stepState(i: number): StepState {
   if (tick.value === 0) return ''
-  if (activeScenario.value.failAt === i && tick.value > i + 1) return 'failed'
+  if (activeScenario.value.failAt !== null && tick.value > activeScenario.value.failAt + 1) {
+    if (i < activeScenario.value.failAt) return 'done'
+    if (i === activeScenario.value.failAt) return 'failed'
+    return ''
+  }
   if (tick.value > STEPS.length) return 'done'
   if (i < tick.value - 1) return 'done'
   if (i === tick.value - 1) return 'active'

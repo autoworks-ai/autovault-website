@@ -10039,11 +10039,13 @@ body {
 
 .av-platform {
   display: flex;
+  width: 100%;
   align-items: center;
   gap: 12px;
   border: 1px solid var(--line-2);
   border-radius: 6px;
   background: var(--bg);
+  color: inherit;
   padding: 10px 14px;
   font-family: var(--mono);
   font-size: 12px;
@@ -10712,10 +10714,14 @@ body {
 
 .av-qs-step {
   position: relative;
+  width: 100%;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel);
+  color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
   transition: border-color 180ms, transform 180ms, box-shadow 180ms;
 }

@@ -227,7 +227,7 @@ const chips = chipLabels.map((label) => {
           <span class="r-pill r-render">rendered per agent</span>
         </div>
         <div class="resolve-sub">
-          One canonical file. Three native renders — <code>read</code> for Claude Code, <code>file_read</code> for Codex, <code>read</code> for Cursor — generated at install time, not forked by hand.
+          One canonical file. Three native renders — <code>read</code> for Claude Code, <code>file_read</code> for Codex, <code>fs_read</code> for Cursor — generated at install time, not forked by hand.
         </div>
       </div>
     </div>
@@ -252,7 +252,7 @@ const chips = chipLabels.map((label) => {
 
 .drift-col {
   position: relative;
-  background: var(--surface);
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 18px 18px 14px;
@@ -270,7 +270,7 @@ const chips = chipLabels.map((label) => {
 }
 .mark {
   width: 28px; height: 28px; border-radius: 7px;
-  background: var(--ink-7); color: var(--ink-2);
+  background: var(--bg-2); color: var(--ink-2);
   display: grid; place-items: center;
   font-family: var(--mono); font-size: 12px; font-weight: 600;
   letter-spacing: 0;
@@ -297,7 +297,7 @@ const chips = chipLabels.map((label) => {
 .pill {
   font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.02em;
   padding: 3px 8px; border-radius: 999px;
-  background: var(--ink-8); color: var(--ink-3);
+  background: var(--bg); color: var(--ink-3);
   border: 1px solid var(--line);
 }
 .pill.ver { color: var(--ink-2); }
@@ -354,7 +354,7 @@ const chips = chipLabels.map((label) => {
 .r-pill {
   font-family: var(--mono); font-size: 11px;
   padding: 3px 8px; border-radius: 999px;
-  background: var(--ink-8); color: var(--ink-2);
+  background: var(--bg); color: var(--ink-2);
   border: 1px solid var(--line);
 }
 .r-sig { color: var(--accent); border-color: rgba(90, 214, 192, 0.3); }
@@ -366,7 +366,7 @@ const chips = chipLabels.map((label) => {
 .resolve-sub code {
   font-family: var(--mono); font-size: 11.5px;
   padding: 1px 5px; border-radius: 4px;
-  background: var(--ink-8); color: var(--ink-2);
+  background: var(--bg); color: var(--ink-2);
 }
 
 @media (max-width: 1080px) {
@@ -408,7 +408,7 @@ const chips = chipLabels.map((label) => {
   font-size: 11px;
   letter-spacing: 0.01em;
   color: var(--ink-3);
-  background: var(--ink-8);
+  background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 4px 10px;

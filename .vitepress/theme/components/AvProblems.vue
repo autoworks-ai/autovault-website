@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const items = [
   { num: '01', title: 'Skill drift',           body: 'The same SKILL.md gets copy-pasted across repos and adapted locally. No upstream tracking, no merge story. Vendored code without a lockfile.', badge: 'no provenance' },
-  { num: '02', title: 'Supply chain attacks',  body: 'Public registries have shipped credential stealers disguised as utilities. No code signing, no permission manifests, no isnad chain.',          badge: 'shipping malware' },
+  { num: '02', title: 'Supply chain attacks',  body: 'Public registries have shipped credential stealers disguised as utilities. No code signing, no permission manifests, no trust chain.',          badge: 'shipping malware' },
   { num: '03', title: 'Duplicate explosion',   body: 'Agents write skills on the fly with no dedup. You end up with seventeen variants of extract-pdf-text and the agent picks one at random.',     badge: 'no dedup' },
   { num: '04', title: 'Platform inconsistency',body: 'Same skill, three forks — each calling agent expects different tool names. Fork once, maintain three.',                                       badge: 'fork × 3' },
   { num: '05', title: 'Context bloat',         body: 'Every agent loads every SKILL.md at startup. Forty skills means thousands of tokens burned before the conversation begins.',                  badge: 'token tax' },

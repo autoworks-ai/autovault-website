@@ -151,13 +151,12 @@ function selectRow(index: number) {
             </div>
           </div>
           <div class="av-platforms">
-            <div
+            <button
               v-for="k in keys"
               :key="k"
               class="av-platform"
               :class="{ active: target === k }"
-              role="button"
-              tabindex="0"
+              type="button"
               @click="selectTarget(k)"
               @mouseenter="selectTarget(k)"
               @focus="selectTarget(k)"
@@ -165,7 +164,7 @@ function selectRow(index: number) {
               <span class="av-platform-mark">{{ k[0].toUpperCase() }}</span>
               <span class="name">{{ k }}</span>
               <span class="tool">→ render</span>
-            </div>
+            </button>
           </div>
         </div>
 
