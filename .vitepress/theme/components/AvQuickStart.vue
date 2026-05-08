@@ -1,10 +1,49 @@
+<script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref } from 'vue'
+
+const active = ref(0)
+const playing = ref(true)
+let timer: number | undefined
+
+function stop() {
+  if (timer) {
+    clearInterval(timer)
+    timer = undefined
+  }
+}
+
+function start() {
+  stop()
+  timer = window.setInterval(() => {
+    active.value = (active.value + 1) % 4
+  }, 1800)
+}
+
+function choose(index: number) {
+  active.value = index
+  playing.value = false
+  stop()
+}
+
+function toggle() {
+  playing.value = !playing.value
+  playing.value ? start() : stop()
+}
+
+onMounted(() => playing.value && start())
+onBeforeUnmount(stop)
+</script>
+
 <template>
   <section class="av-section" id="start">
     <div class="av-eyebrow"><span class="dash" /> Five minutes, two agents</div>
-    <h2 style="margin-top: 16px; max-width: 760px">Same skill, two callers, zero forks.</h2>
+    <div class="av-qs-head">
+      <h2 style="margin-top: 16px; max-width: 760px">Same skill, two callers, zero forks.</h2>
+      <button class="av-pill-btn" type="button" @click="toggle">{{ playing ? '❚❚ Pause scan' : '▶ Replay scan' }}</button>
+    </div>
 
     <div class="av-qs-grid">
-      <div class="av-qs-step">
+      <div class="av-qs-step" :class="{ active: active === 0 }" role="button" tabindex="0" @click="choose(0)" @focus="choose(0)">
         <div class="av-qs-step-head">
           <span class="av-qs-step-num">STEP / 01</span>
           <span class="av-qs-step-title">Install the local vault</span>
@@ -18,7 +57,7 @@
         </div>
       </div>
 
-      <div class="av-qs-step">
+      <div class="av-qs-step" :class="{ active: active === 1 }" role="button" tabindex="0" @click="choose(1)" @focus="choose(1)">
         <div class="av-qs-step-head">
           <span class="av-qs-step-num">STEP / 02</span>
           <span class="av-qs-step-title">Add a validated skill</span>
@@ -35,7 +74,7 @@
         </div>
       </div>
 
-      <div class="av-qs-step">
+      <div class="av-qs-step" :class="{ active: active === 2 }" role="button" tabindex="0" @click="choose(2)" @focus="choose(2)">
         <div class="av-qs-step-head">
           <span class="av-qs-step-num">STEP / 03</span>
           <span class="av-qs-step-title">Scope to a project</span>
@@ -49,7 +88,7 @@
         </div>
       </div>
 
-      <div class="av-qs-step">
+      <div class="av-qs-step" :class="{ active: active === 3 }" role="button" tabindex="0" @click="choose(3)" @focus="choose(3)">
         <div class="av-qs-step-head">
           <span class="av-qs-step-num">STEP / 04</span>
           <span class="av-qs-step-title">Run from either agent</span>

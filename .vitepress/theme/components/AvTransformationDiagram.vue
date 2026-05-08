@@ -35,7 +35,16 @@ const TRANSFORMS: Record<TKey, { color: string; rows: { from: string; to: string
 }
 
 const target = ref<TKey>('claude-code')
+const activeRow = ref(0)
 const keys = Object.keys(TRANSFORMS) as TKey[]
+
+function selectTarget(key: TKey) {
+  target.value = key
+}
+
+function selectRow(index: number) {
+  activeRow.value = index
+}
 </script>
 
 <template>
@@ -53,15 +62,15 @@ const keys = Object.keys(TRANSFORMS) as TKey[]
       <div class="av-xform-head">
         <div>
           <h3>Transformation manifest in flight</h3>
-          <p>Hover the platforms to see the rendered view change. The skill on the left never moves.</p>
+          <p>Click a platform or individual capability to see exactly what gets rewritten. The skill on the left never moves.</p>
         </div>
         <div class="av-xform-toggle">
           <button
             v-for="k in keys"
             :key="k"
             :class="{ active: target === k }"
-            @click="target = k"
-            @mouseenter="target = k"
+            @click="selectTarget(k)"
+            @mouseenter="selectTarget(k)"
           >
             <span class="swatch" :style="{ background: TRANSFORMS[k].color }" />{{ k }}
           </button>
@@ -69,7 +78,7 @@ const keys = Object.keys(TRANSFORMS) as TKey[]
       </div>
 
       <div class="av-xform-stage">
-        <svg class="flow" viewBox="0 0 1000 400" preserveAspectRatio="none">
+        <svg class="flow" viewBox="0 0 1000 400" preserveAspectRatio="none" :style="{ '--target-color': TRANSFORMS[target].color }">
           <defs>
             <linearGradient id="avFlow1" x1="0" x2="1">
               <stop offset="0%" stop-color="var(--accent)" stop-opacity="0" />
@@ -80,8 +89,24 @@ const keys = Object.keys(TRANSFORMS) as TKey[]
               <stop offset="100%" stop-color="var(--accent)" stop-opacity="0" />
             </linearGradient>
           </defs>
-          <path v-for="y in [120, 170, 220, 270]" :key="'l' + y" :d="`M280 ${y} L500 200`" stroke="url(#avFlow1)" stroke-width="0.8" fill="none" />
-          <path v-for="y in [120, 170, 220, 270]" :key="'r' + y" :d="`M500 200 L720 ${y}`" stroke="url(#avFlow2)" stroke-width="0.8" fill="none" />
+          <path
+            v-for="(row, i) in TRANSFORMS[target].rows"
+            :key="'l' + row.from"
+            class="flow-line"
+            :class="{ active: activeRow === i }"
+            :d="`M280 ${120 + i * 50} L500 200`"
+            stroke="url(#avFlow1)"
+            fill="none"
+          />
+          <path
+            v-for="(row, i) in TRANSFORMS[target].rows"
+            :key="'r' + row.to"
+            class="flow-line out"
+            :class="{ active: activeRow === i }"
+            :d="`M500 200 L720 ${120 + i * 50}`"
+            stroke="url(#avFlow2)"
+            fill="none"
+          />
         </svg>
 
         <div class="av-xform-col">
@@ -95,10 +120,18 @@ const keys = Object.keys(TRANSFORMS) as TKey[]
               <div><span class="yaml-key">name:</span> <span class="yaml-str">extract-pdf</span></div>
               <div><span class="yaml-key">version:</span> <span class="yaml-val">1.4.0</span></div>
               <div><span class="yaml-key">tools_required:</span></div>
-              <div class="yaml-list">&nbsp;&nbsp;- browser.fill_form</div>
-              <div class="yaml-list">&nbsp;&nbsp;- browser.click</div>
-              <div class="yaml-list">&nbsp;&nbsp;- fs.read</div>
-              <div class="yaml-list">&nbsp;&nbsp;- fs.write</div>
+              <button
+                v-for="(r, i) in TRANSFORMS[target].rows"
+                :key="r.from"
+                class="av-source-tool"
+                :class="{ active: activeRow === i }"
+                type="button"
+                @click="selectRow(i)"
+                @mouseenter="selectRow(i)"
+              >
+                <span>- {{ r.from }}</span>
+                <span>{{ activeRow === i ? 'mapping' : 'source' }}</span>
+              </button>
               <div class="yaml-comment"># transformations:</div>
               <div class="yaml-comment"># &nbsp;&nbsp;applied at delivery</div>
             </div>
@@ -109,14 +142,25 @@ const keys = Object.keys(TRANSFORMS) as TKey[]
 
         <div class="av-xform-col" style="display: flex; flex-direction: column; justify-content: center">
           <div class="av-xform-col-head" style="justify-content: center"><span class="num">2</span> Engine</div>
-          <div class="av-xform-engine"><div class="ring"><BrandMark :size="26" /></div></div>
+          <div class="av-xform-engine">
+            <div class="ring"><BrandMark :size="26" /></div>
+            <div class="av-xform-readout" :key="target + activeRow">
+              <span>{{ TRANSFORMS[target].rows[activeRow].from }}</span>
+              <strong>→</strong>
+              <span :style="{ color: TRANSFORMS[target].color }">{{ TRANSFORMS[target].rows[activeRow].to }}</span>
+            </div>
+          </div>
           <div class="av-platforms">
             <div
               v-for="k in keys"
               :key="k"
               class="av-platform"
               :class="{ active: target === k }"
-              @mouseenter="target = k"
+              role="button"
+              tabindex="0"
+              @click="selectTarget(k)"
+              @mouseenter="selectTarget(k)"
+              @focus="selectTarget(k)"
             >
               <span class="av-platform-mark">{{ k[0].toUpperCase() }}</span>
               <span class="name">{{ k }}</span>
@@ -134,13 +178,21 @@ const keys = Object.keys(TRANSFORMS) as TKey[]
               <span class="agent" :style="{ color: TRANSFORMS[target].color }">● {{ target }}</span>
               <span style="margin-left: auto; color: var(--ink-3)">SKILL.md (rewritten)</span>
             </div>
-            <div class="rt-body">
+            <div class="rt-body" :key="target">
               <div style="color: var(--ink-3); margin-bottom: 8px">tools_required:</div>
-              <div v-for="r in TRANSFORMS[target].rows" :key="r.from" class="row">
+              <button
+                v-for="(r, i) in TRANSFORMS[target].rows"
+                :key="r.from"
+                class="row"
+                :class="{ active: activeRow === i }"
+                type="button"
+                @click="selectRow(i)"
+                @mouseenter="selectRow(i)"
+              >
                 <span class="key">{{ r.from }}</span>
                 <span style="color: var(--ink-4)">→</span>
                 <span class="val">{{ r.to }}</span>
-              </div>
+              </button>
             </div>
           </div>
           <div style="margin-top: 14px; font-family: var(--mono); font-size: 11px; color: var(--ink-3); line-height: 1.6">

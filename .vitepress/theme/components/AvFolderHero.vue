@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { copyText } from '../utils/clipboard'
 
 const copied = ref(false)
@@ -8,27 +8,96 @@ async function copyInstall() {
   window.setTimeout(() => (copied.value = false), 1400)
 }
 
-// Hover-able skill rows in the folder tree. Each shows a side-card with sig + scope.
 const TREE = [
-  { id: 'extract-pdf',     sig: '0x9af4…2c81', scopes: ['claude-code', 'codex'],          ver: '1.4.0' },
-  { id: 'parse-csv',       sig: '0x3b71…f042', scopes: ['claude-code', 'codex', 'cursor'], ver: '0.7.2' },
-  { id: 'summarize-thread', sig: '0xc108…ae2d', scopes: ['claude-code'],                    ver: '2.1.0' },
+  {
+    id: 'extract-pdf',
+    sig: '0x9af4…2c81',
+    scopes: ['claude-code', 'codex'],
+    ver: '1.4.0',
+    intent: 'Extract tables and summary text from PDF reports.',
+    path: '~/.autovault/skills/extract-pdf/SKILL.md',
+    tools: ['fs.read', 'browser.fill_form', 'browser.click'],
+    agents: [
+      ['claude-code', 'read · chrome-devtools'],
+      ['codex', 'file_read · browser_form'],
+    ],
+    frontmatter: [
+      ['name', 'extract-pdf'],
+      ['version', '1.4.0'],
+      ['permissions', 'fs.read, browser'],
+      ['scope', 'project:autovault-website'],
+    ],
+  },
+  {
+    id: 'parse-csv',
+    sig: '0x3b71…f042',
+    scopes: ['claude-code', 'codex', 'cursor'],
+    ver: '0.7.2',
+    intent: 'Normalize messy CSV exports before analysis.',
+    path: '~/.autovault/skills/parse-csv/SKILL.md',
+    tools: ['fs.read', 'fs.write'],
+    agents: [
+      ['claude-code', 'read · write'],
+      ['codex', 'file_read · file_write'],
+      ['cursor', 'fs_read · fs_write'],
+    ],
+    frontmatter: [
+      ['name', 'parse-csv'],
+      ['version', '0.7.2'],
+      ['permissions', 'fs.read, fs.write'],
+      ['scope', 'machine:laptop-jack'],
+    ],
+  },
+  {
+    id: 'summarize-thread',
+    sig: '0xc108…ae2d',
+    scopes: ['claude-code'],
+    ver: '2.1.0',
+    intent: 'Turn a Slack or Discord thread into decisions and next actions.',
+    path: '~/.autovault/skills/summarize-thread/SKILL.md',
+    tools: ['net.fetch', 'clipboard.write'],
+    agents: [
+      ['claude-code', 'web_fetch · clipboard'],
+    ],
+    frontmatter: [
+      ['name', 'summarize-thread'],
+      ['version', '2.1.0'],
+      ['permissions', 'network, clipboard'],
+      ['scope', 'agent:claude-code'],
+    ],
+  },
 ]
-const hover = ref<string>('extract-pdf')
+const selected = ref<string>('extract-pdf')
+const userPinned = ref(false)
+const readPulse = ref(0)
+const current = computed(() => TREE.find(t => t.id === selected.value) ?? TREE[0])
 
-// Auto-cycle when nothing hovered, stop while hovered.
 let timer: number | undefined
-const userHovering = ref(false)
 function cycle() {
-  if (userHovering.value) return
-  const i = TREE.findIndex(t => t.id === hover.value)
-  hover.value = TREE[(i + 1) % TREE.length].id
+  if (userPinned.value) return
+  const i = TREE.findIndex(t => t.id === selected.value)
+  selected.value = TREE[(i + 1) % TREE.length].id
+  readPulse.value += 1
 }
 onMounted(() => { timer = window.setInterval(cycle, 2200) })
 onBeforeUnmount(() => { if (timer) clearInterval(timer) })
 
-function pin(id: string) { hover.value = id; userHovering.value = true }
-function unpin() { userHovering.value = false }
+function selectSkill(id: string) {
+  selected.value = id
+  userPinned.value = true
+  readPulse.value += 1
+}
+
+function previewSkill(id: string) {
+  if (!userPinned.value) {
+    selected.value = id
+    readPulse.value += 1
+  }
+}
+
+function resumeCycle() {
+  userPinned.value = false
+}
 </script>
 
 <template>
@@ -58,29 +127,65 @@ function unpin() { userHovering.value = false }
             <span>~/.autovault</span>
             <span class="watching">watching · 142 skills · 4 agents</span>
           </div>
-          <pre class="av-folder-tree"><span class="path">~/.autovault/</span>
-├── <span class="dir">skills/</span>
-│   ├── <span class="dir-row" :class="{ on: hover === 'extract-pdf' }" @mouseenter="pin('extract-pdf')" @mouseleave="unpin"><span class="dir">extract-pdf/</span>  <span class="dim">SKILL.md  · sig 0x9af4…2c81</span></span>
-│   ├── <span class="dir-row" :class="{ on: hover === 'parse-csv' }" @mouseenter="pin('parse-csv')" @mouseleave="unpin"><span class="dir">parse-csv/</span>  <span class="dim">SKILL.md  · sig 0x3b71…f042</span></span>
-│   └── <span class="dir-row" :class="{ on: hover === 'summarize-thread' }" @mouseenter="pin('summarize-thread')" @mouseleave="unpin"><span class="dir">summarize-thread/</span>  <span class="dim">SKILL.md  · sig 0xc108…ae2d</span></span>
-├── <span class="dir">signatures/</span>
-│   └── <span class="file">trust.toml</span>
-└── <span class="file">vault.toml</span></pre>
+          <div class="av-folder-tree" role="tree" aria-label="AutoVault skills folder">
+            <div><span class="path">~/.autovault/</span></div>
+            <div>├── <span class="dir">skills/</span></div>
+            <button
+              v-for="(t, index) in TREE"
+              :key="t.id"
+              class="dir-row"
+              :class="{ on: selected === t.id }"
+              type="button"
+              role="treeitem"
+              :aria-selected="selected === t.id"
+              @click="selectSkill(t.id)"
+              @mouseenter="previewSkill(t.id)"
+              @focus="previewSkill(t.id)"
+            >
+              <span class="tree-prefix">{{ index === TREE.length - 1 ? '│   └──' : '│   ├──' }}</span>
+              <span class="dir">{{ t.id }}/</span>
+              <span class="dim">SKILL.md · sig {{ t.sig }}</span>
+              <span class="row-action">{{ selected === t.id ? 'reading' : 'inspect' }}</span>
+            </button>
+            <div>├── <span class="dir">signatures/</span></div>
+            <div>│   └── <span class="file">trust.toml</span></div>
+            <div>└── <span class="file">vault.toml</span></div>
+          </div>
         </div>
-        <div class="av-folder-side">
-          <div class="side-eyebrow">scoped render →</div>
-          <div v-for="t in TREE" :key="t.id" v-show="hover === t.id" class="side-card">
+        <div class="av-folder-side" :key="current.id + readPulse">
+          <div class="side-eyebrow">read path →</div>
+          <div class="side-card">
             <div class="side-head">
-              <span class="side-name">{{ t.id }}</span>
-              <span class="side-ver">v{{ t.ver }}</span>
+              <span class="side-name">{{ current.id }}</span>
+              <span class="side-ver">v{{ current.ver }}</span>
             </div>
-            <div class="side-row"><span class="lbl">sig</span><span class="val">{{ t.sig }}</span></div>
+            <div class="read-rail">
+              <span>open</span>
+              <span>verify</span>
+              <span>scope</span>
+              <span>render</span>
+            </div>
+            <div class="side-row"><span class="lbl">path</span><span class="val">{{ current.path }}</span></div>
+            <div class="side-row"><span class="lbl">intent</span><span class="val">{{ current.intent }}</span></div>
+            <div class="side-row"><span class="lbl">sig</span><span class="val">{{ current.sig }}</span></div>
             <div class="side-row"><span class="lbl">scope</span>
               <span class="chips">
-                <span v-for="s in t.scopes" :key="s" class="chip">{{ s }}</span>
+                <span v-for="s in current.scopes" :key="s" class="chip">{{ s }}</span>
               </span>
             </div>
-            <div class="side-row"><span class="lbl">status</span><span class="val ok">● admitted</span></div>
+            <div class="manifest-mini">
+              <div v-for="[key, value] in current.frontmatter" :key="key">
+                <span class="yaml-key">{{ key }}:</span>
+                <span class="yaml-val">{{ value }}</span>
+              </div>
+            </div>
+            <div class="agent-reads">
+              <div v-for="[agent, tools] in current.agents" :key="agent" class="agent-read">
+                <span>{{ agent }}</span>
+                <span>{{ tools }}</span>
+              </div>
+            </div>
+            <button v-if="userPinned" class="side-link" type="button" @click="resumeCycle">Resume live scan</button>
           </div>
         </div>
       </div>
@@ -106,7 +211,7 @@ function unpin() { userHovering.value = false }
   border-top: 0;
 }
 .av-folder-stage {
-  max-width: 720px;
+  max-width: 960px;
   margin: 0 auto;
   text-align: left;
 }
@@ -153,7 +258,7 @@ function unpin() { userHovering.value = false }
 .av-folder-explorer {
   margin: 48px 0 0;
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.9fr);
   gap: 16px;
   align-items: stretch;
 }
@@ -185,24 +290,65 @@ function unpin() { userHovering.value = false }
   line-height: 1.95;
   color: var(--ink-3);
   overflow-x: auto;
-  white-space: pre;
+  white-space: nowrap;
 }
 .av-folder-tree .path { color: var(--accent); font-weight: 500; }
 .av-folder-tree .dir  { color: var(--ink); }
 .av-folder-tree .file { color: var(--ink-2); }
 .av-folder-tree .dim  { color: var(--ink-4); font-size: 11.5px; }
 .av-folder-tree .dir-row {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-width: 420px;
+  align-items: baseline;
+  gap: 8px;
   cursor: pointer;
+  border: 0;
   border-radius: 3px;
+  background: none;
+  color: inherit;
   padding: 0 6px;
   margin: 0 -6px;
-  transition: background 160ms;
+  font: inherit;
+  line-height: inherit;
+  text-align: left;
+  transition: background 160ms, color 160ms, transform 160ms;
 }
 .av-folder-tree .dir-row:hover,
 .av-folder-tree .dir-row.on {
   background: rgba(90,214,192,0.08);
 }
+.av-folder-tree .dir-row:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+.av-folder-tree .dir-row.on {
+  transform: translateX(2px);
+}
+.av-folder-tree .dir-row.on::before {
+  position: absolute;
+  inset: 3px auto 3px -10px;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 12px rgba(90, 214, 192, 0.8);
+  content: "";
+}
 .av-folder-tree .dir-row.on .dir { color: var(--accent); }
+.av-folder-tree .tree-prefix {
+  color: var(--ink-3);
+}
+.av-folder-tree .row-action {
+  margin-left: auto;
+  color: var(--ink-4);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.av-folder-tree .dir-row.on .row-action {
+  color: var(--accent);
+}
 
 .av-folder-side {
   display: flex; flex-direction: column; gap: 10px;
@@ -215,7 +361,12 @@ function unpin() { userHovering.value = false }
   color: var(--ink-3); letter-spacing: 0.08em; text-transform: uppercase;
   margin-bottom: 6px;
 }
-.side-card { display: flex; flex-direction: column; gap: 12px; }
+.side-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: folderReadIn 260ms var(--ease);
+}
 .side-head {
   display: flex; align-items: baseline; gap: 8px;
   padding-bottom: 10px; border-bottom: 1px solid var(--line);
@@ -229,6 +380,7 @@ function unpin() { userHovering.value = false }
 }
 .side-row .lbl { color: var(--ink-4); letter-spacing: 0.04em; text-transform: uppercase; font-size: 10px; padding-top: 2px; }
 .side-row .val { color: var(--ink-2); }
+.side-row .val { overflow-wrap: anywhere; }
 .side-row .val.ok { color: var(--accent); }
 .side-row .chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .side-row .chip {
@@ -236,6 +388,125 @@ function unpin() { userHovering.value = false }
   color: var(--accent); background: var(--accent-soft);
   padding: 2px 8px; border-radius: 3px;
   letter-spacing: 0.02em;
+}
+.read-rail {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 2px 0 4px;
+  color: var(--ink-4);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.read-rail::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  z-index: 0;
+  width: 100%;
+  height: 1px;
+  background: var(--line-2);
+  content: "";
+}
+.read-rail::after {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  z-index: 1;
+  width: 26%;
+  height: 1px;
+  background: var(--accent);
+  box-shadow: 0 0 14px rgba(90, 214, 192, 0.45);
+  content: "";
+  animation: folderReadRail 1450ms var(--ease) both;
+}
+.read-rail span {
+  position: relative;
+  z-index: 2;
+  justify-self: start;
+  background: var(--panel);
+  padding-right: 6px;
+}
+.manifest-mini {
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  padding: 10px 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.manifest-mini .yaml-key {
+  color: var(--ink-3);
+}
+.manifest-mini .yaml-val {
+  margin-left: 6px;
+  color: var(--ink-2);
+}
+.agent-reads {
+  display: grid;
+  gap: 6px;
+}
+.agent-read {
+  display: grid;
+  grid-template-columns: minmax(92px, 0.8fr) 1fr;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--bg);
+  padding: 7px 9px;
+  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: 10.5px;
+}
+.agent-read span:first-child {
+  color: var(--accent);
+}
+.side-link {
+  align-self: flex-start;
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--ink-2);
+  padding: 5px 9px;
+  font: 500 10.5px var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.side-link:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+@keyframes folderReadIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes folderReadRail {
+  0% {
+    width: 0;
+    opacity: 0.35;
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    width: 100%;
+    opacity: 0.9;
+  }
 }
 
 @media (max-width: 720px) {
