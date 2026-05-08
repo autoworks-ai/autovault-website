@@ -232,6 +232,25 @@
   }
   .gate-stage svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 
+  .gate-vault-mark .vault-dial {
+    transform-box: view-box;
+    transform-origin: 12px 10.8px;
+    animation: gate-vault-dial 3.1s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+  }
+  .gate-vault-mark .vault-depth {
+    opacity: 0;
+    animation: gate-vault-depth 3.1s ease infinite;
+  }
+  @keyframes gate-vault-dial {
+    0%, 28%, 100% { opacity: 1; transform: scale(1); }
+    44%, 62% { opacity: 0; transform: scale(0); }
+    78% { opacity: 1; transform: scale(1.06); }
+  }
+  @keyframes gate-vault-depth {
+    0%, 24%, 76%, 100% { opacity: 0; }
+    44%, 62% { opacity: 0.35; }
+  }
+
   .gate-label {
     position: absolute; font-family: var(--mono); font-size: 10.5px;
     color: var(--ink-3); letter-spacing: 0.05em; text-transform: uppercase;
@@ -378,11 +397,20 @@
     display: grid; place-items: center;
     background: var(--panel);
     position: relative;
+    transition: border-color 220ms ease, box-shadow 220ms ease;
   }
   .xform-engine .ring::before {
     content: ""; position: absolute; inset: -6px; border-radius: 50%;
     border: 1px dashed var(--line);
     animation: spin 12s linear infinite;
+  }
+  .xform-engine .ring.is-unlocking {
+    border-color: color-mix(in srgb, var(--accent) 70%, var(--line-2));
+    box-shadow: 0 0 28px rgba(90,214,192,0.12);
+  }
+  .xform-engine .ring.is-unlocking::before {
+    border-color: rgba(90,214,192,0.3);
+    animation-duration: 3s;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -660,6 +688,19 @@
   .mb-8 { margin-bottom: 8px; } .mb-16 { margin-bottom: 16px; } .mb-32 { margin-bottom: 32px; }
   .text-mono { font-family: var(--mono); }
   .text-dim { color: var(--ink-3); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .gate-vault-mark .vault-dial,
+    .gate-vault-mark .vault-depth,
+    .xform-engine .ring::before {
+      animation: none !important;
+    }
+
+    .xform-engine .ring,
+    .xform-engine .ring::before {
+      transition: none !important;
+    }
+  }
 
   /* responsive guards */
   @media (max-width: 1080px) {

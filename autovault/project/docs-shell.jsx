@@ -14,13 +14,33 @@ window.Icon = {
   Lock: (p) => <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" {...p}><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5 7V5a3 3 0 1 1 6 0v2"/></svg>,
 };
 
-window.BrandMark = ({ size = 22 }) => (
+window.BrandMark = ({ size = 22, state = "locked", showDepth = false }) => {
+  const unlocked = state === "unlocked";
+  const dialStyle = {
+    opacity: unlocked ? 0 : 1,
+    transform: `scale(${unlocked ? 0 : 1})`,
+    transformOrigin: "12px 10.8px",
+    transition: "transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.26s ease",
+  };
+  const depthStyle = {
+    opacity: showDepth && unlocked ? 0.32 : 0,
+    transition: "opacity 0.3s ease",
+  };
+  return (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <rect x="2.5" y="2.5" width="19" height="19" rx="2" stroke="var(--accent)" strokeWidth="1.4"/>
-    <path d="M12 4v16" stroke="var(--accent)" strokeWidth="1.4"/>
-    <path d="M7 12.5l2.2 2.2L13.5 9.5" stroke="var(--accent)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+    <rect x="2.4" y="2.4" width="19.2" height="16.8" rx="3.84" stroke="var(--accent)" strokeWidth="1.5" strokeLinejoin="round"/>
+    <path className="brand-mark-stub" d="M7.2 19.2v1.9" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round"/>
+    <path className="brand-mark-stub" d="M16.8 19.2v1.9" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round"/>
+    <g style={depthStyle}>
+      <rect x="4.8" y="4.8" width="14.4" height="12" rx="1.9" stroke="var(--accent)" strokeWidth="0.5" strokeDasharray="1.1 1.1"/>
+    </g>
+    <g style={dialStyle}>
+      <circle cx="12" cy="10.8" r="2.9" stroke="var(--accent)" strokeWidth="1.25"/>
+      <path d="M12 7.9v1.45" stroke="var(--accent)" strokeWidth="1.25" strokeLinecap="round"/>
+    </g>
   </svg>
-);
+  );
+};
 
 window.Topbar = ({ active }) => {
   const items = [
