@@ -47,10 +47,10 @@
 
     <div class="cloud-band">
       <div>
-        <div class="mono-label">What the header button does</div>
-        <h2>It routes people to a single hosted deployment page.</h2>
+        <div class="mono-label">What this direct page does</div>
+        <h2>It keeps hosted onboarding on an unlisted route.</h2>
         <p>
-          The docs still teach local-first setup. The main action now speaks to the first paid milestone for new users: create an account, subscribe, and reserve the namespace they will sync to once hosted sync ships.
+          The public docs teach local-first setup. This direct page still supports the hosted milestone when someone has the link: create an account, subscribe, and reserve the namespace they will sync to once hosted sync ships.
         </p>
       </div>
       <a class="pill-btn primary" href="/quick-start">Read the local docs <UiIcon name="arrow" /></a>

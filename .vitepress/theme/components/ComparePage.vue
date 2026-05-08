@@ -62,7 +62,7 @@
 
       <div class="cm-honest">
         <div class="ttl">Honesty box</div>
-        <p><strong>Where AutoVault is genuinely behind.</strong> RawHub has more skills (3,400 vs. our 241) — community indexes always do. ForkFlow has a richer GUI for browsing per-agent forks; if you live mostly in one agent's tooling and don't care about cross-agent skills, that may matter to you. Hosted AutoVault is intentionally narrow right now: fast launch, remote MCP, OAuth, and signed skill delivery before the broader team-management surface grows.</p>
+        <p><strong>Where AutoVault is genuinely behind.</strong> RawHub has more skills (3,400 vs. our 241) — community indexes always do. ForkFlow has a richer GUI for browsing per-agent forks; if you live mostly in one agent's tooling and don't care about cross-agent skills, that may matter to you. AutoVault is still intentionally narrow: local-first validation, signing, transforms, remote MCP, and OAuth before the broader team-management surface grows.</p>
       </div>
     </section>
 

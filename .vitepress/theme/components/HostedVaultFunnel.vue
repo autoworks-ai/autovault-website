@@ -402,7 +402,7 @@ function resumeCheckoutReturn() {
 }
 
 function currentReturnPath() {
-  if (!canUseBrowser()) return "/deploy.html#hosts";
+  if (!canUseBrowser()) return "/cloud#launch-path";
   return `${window.location.pathname}${window.location.search}${window.location.hash}`;
 }
 

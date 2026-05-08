@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildAgentsIndex, buildLlmsFullTxt, buildLlmsTxt, pageDocs, SITE_URL } from "../.vitepress/shared/pageDocs";
+import vitepressConfig from "../.vitepress/config";
+import { buildAgentsIndex, buildLlmsFullTxt, buildLlmsTxt, listedPageDocs, pageDocs, SITE_URL } from "../.vitepress/shared/pageDocs";
 
 describe("agent markdown docs", () => {
   it("defines one clean markdown endpoint per public page", () => {
@@ -20,11 +21,33 @@ describe("agent markdown docs", () => {
     const llms = buildLlmsTxt();
     const full = buildLlmsFullTxt();
 
-    expect(index.pages).toHaveLength(pageDocs.length);
-    for (const doc of pageDocs) {
+    expect(index.pages).toHaveLength(listedPageDocs.length);
+    for (const doc of listedPageDocs) {
       expect(llms).toContain(`${SITE_URL}${doc.agentPath}`);
       expect(full).toContain(doc.markdown);
       expect(index.pages.find((page) => page.key === doc.key)?.markdown_url).toBe(`${SITE_URL}${doc.agentPath}`);
     }
+  });
+
+  it("keeps the hosted cloud page unlisted but routable", async () => {
+    const cloud = pageDocs.find((doc) => doc.key === "cloud");
+    const index = buildAgentsIndex();
+    const llms = buildLlmsTxt();
+    const full = buildLlmsFullTxt();
+    const transformItems = vitepressConfig.sitemap?.transformItems;
+
+    expect(cloud).toMatchObject({ route: "/cloud", listed: false });
+    expect(listedPageDocs.some((doc) => doc.key === "cloud")).toBe(false);
+    expect(index.pages.some((page) => page.key === "cloud")).toBe(false);
+    expect(llms).not.toContain(`${SITE_URL}/agents/cloud`);
+    expect(full).not.toContain(`url: ${SITE_URL}/cloud`);
+    expect(transformItems).toBeTypeOf("function");
+
+    const sitemapItems = await transformItems?.([
+      { url: "cloud" },
+      { url: "/cloud/" },
+      { url: "quick-start" }
+    ]);
+    expect(sitemapItems?.map((item) => item.url)).toEqual(["quick-start"]);
   });
 });

@@ -33,8 +33,7 @@
         </div>
 
         <a class="icon-btn cd-github" href="https://github.com/autoworks-ai/autovault" title="GitHub"><UiIcon name="github" :size="15" /></a>
-        <ClerkAuthControls cta-label="Create vault" signed-in-label="Onboarding" />
-        <a class="pill-btn primary cd-install" href="/cloud" title="Reserve a hosted AutoVault namespace">Reserve namespace <UiIcon name="arrow" /></a>
+        <ClerkAuthControls />
       </div>
     </header>
 
@@ -167,7 +166,6 @@ const searchResults = [
   { title: "extract-pdf", section: "Skills", href: "/skill-detail", terms: "extract pdf skill detail transformations permissions provenance versions" },
   { title: "autoworks-ai", section: "Skills", href: "/author-autoworks-ai", terms: "publisher author profile certificate maintainers skills" },
   { title: "Security & provenance", section: "Reference", href: "/security", terms: "security signature signing provenance denylist gate verifier oauth remote mcp" },
-  { title: "Cloud launch", section: "Hosted", href: "/cloud", terms: "paid hosted onboarding clerk stripe reserved namespace cloud sync coming soon" },
   { title: "About AutoVault", section: "Team", href: "/about", terms: "jack arturo autojack jason coleman flint zack katz daniel iser team credits" },
   { title: "Changelog", section: "Reference", href: "/changelog", terms: "release notes remote mcp oauth add-local transforms resource drift" }
 ];

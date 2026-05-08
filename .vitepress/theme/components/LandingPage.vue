@@ -218,8 +218,8 @@
           <h2>Signed skills. Real provenance.<br /><span class="ital">No mystery code.</span></h2>
           <p>One vault. Every agent. No drift. Self-host the team mode, or run local-only — same engine, same gate.</p>
           <div style="display: inline-flex; gap: 12px; flex-wrap: wrap; justify-content: center">
-            <a class="pill-btn primary" href="/cloud">Reserve namespace <UiIcon name="arrow" /></a>
-            <a class="pill-btn" href="/quick-start">Install locally</a>
+            <a class="pill-btn primary" href="/quick-start">Install locally <UiIcon name="arrow" /></a>
+            <a class="pill-btn" href="/authoring#playground">Verify a skill</a>
             <a class="pill-btn" href="https://github.com/autoworks-ai/autovault"><UiIcon name="github" /> github.com/autoworks-ai/autovault</a>
           </div>
         </div>
@@ -262,8 +262,7 @@ const LandingTopbar = defineComponent({
       h("div", { class: "av-actions" }, [
         h("a", { class: "icon-btn", href: "https://github.com/autoworks-ai/autovault", title: "GitHub" }, h(UiIcon, { name: "github", size: 15 })),
         h("a", { class: "pill-btn", href: "/quick-start" }, [h("span", { class: "status-dot" }), "Docs"]),
-        h(ClerkAuthControls, { ctaLabel: "Create vault", signedInLabel: "Onboarding" }),
-        h("a", { class: "pill-btn primary", href: "/cloud", title: "Reserve a hosted AutoVault namespace" }, ["Reserve namespace", h(UiIcon, { name: "arrow" })])
+        h(ClerkAuthControls)
       ])
     ]));
   }
@@ -323,7 +322,7 @@ const AutoVaultFooter = defineComponent({
     return () => h("footer", { class: "footer" }, [
       h("div", { class: "footer-inner" }, [
         h("div", [h("div", { class: "av-brand", style: "margin-bottom:14px" }, [h(BrandMark), h("span", [h("span", { class: "auto" }, "Auto"), h("span", { class: "vault" }, "Vault")])]), h("p", { class: "card-p", style: "max-width:320px" }, "A curated skills layer for AI agents. Validated at the door, signed with provenance, scoped per caller.")]),
-        h("div", [h("h5", "Product"), h("a", { href: "/" }, "Overview"), h("a", { href: "/cloud" }, "Cloud launch"), h("a", { href: "/skills-directory" }, "Skills directory"), h("a", { href: "/compare" }, "Compare"), h("a", { href: "/changelog" }, "Changelog")]),
+        h("div", [h("h5", "Product"), h("a", { href: "/" }, "Overview"), h("a", { href: "/quick-start" }, "Quick start"), h("a", { href: "/skills-directory" }, "Skills directory"), h("a", { href: "/compare" }, "Compare"), h("a", { href: "/changelog" }, "Changelog")]),
         h("div", [h("h5", "Develop"), h("a", { href: "/quick-start" }, "Quick start"), h("a", { href: "/authoring" }, "Authoring skills"), h("a", { href: "/api" }, "API reference"), h("a", { href: "/deploy" }, "Deploy remote"), h("a", { href: "/security" }, "Security model")]),
         h("div", [h("h5", "Org"), h("a", { href: "/about" }, "About"), h("a", { href: "https://github.com/autoworks-ai/autovault" }, "autoworks-ai"), h("a", { href: "https://automem.ai" }, "AutoMem"), h("a", { href: "https://drunk.support" }, "drunk.support"), h("a", { href: "https://github.com/autoworks-ai/autovault/security" }, "Security policy")])
       ]),

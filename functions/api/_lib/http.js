@@ -28,7 +28,7 @@ export async function readJson(request, limit = 120_000) {
   }
 }
 
-export function safeReturnTo(value, fallback = "/deploy.html#hosts") {
+export function safeReturnTo(value, fallback = "/cloud#launch-path") {
   if (!value || typeof value !== "string") return fallback;
   try {
     const url = new URL(value, "https://autovault.dev");
