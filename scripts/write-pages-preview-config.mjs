@@ -16,7 +16,6 @@ const config = {
   compatibility_date: "2026-05-06",
   vars: {
     AUTOVAULT_ENVIRONMENT: "preview",
-    CLOUDFLARE_ACCOUNT_ID: "2cc725912d479c0bd6c08fc24931a478",
     AUTOVAULT_INSTALLER_URL:
       "https://raw.githubusercontent.com/autoworks-ai/autovault/main/scripts/install.sh",
     STRIPE_BRAND_DISPLAY_NAME: "AutoVault",
