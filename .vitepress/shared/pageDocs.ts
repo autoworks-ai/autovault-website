@@ -28,7 +28,7 @@ export interface PageDoc {
 
 const overviewMarkdown = `# AutoVault
 
-AutoVault is the skill registry with a gate: a local-first capability layer that validates, signs, scopes, transforms, and serves reusable SKILL.md files for AI agents.
+AutoVault is a local-first vault for agent skills: it validates, signs, scopes, transforms, and serves reusable SKILL.md files from one canonical place.
 
 ## What it does
 
@@ -217,7 +217,7 @@ Deploy AutoVault when a team needs a shared remote vault, OAuth-protected MCP ac
 
 const compareMarkdown = `# AutoVault Comparison
 
-AutoVault is a validating skill registry rather than a raw index or a pile of per-agent forks.
+AutoVault is a validating local vault rather than a raw index, marketplace, or pile of per-agent forks.
 
 ## Where it differs
 
@@ -228,7 +228,7 @@ AutoVault is a validating skill registry rather than a raw index or a pile of pe
 
 ## Tradeoff
 
-AutoVault is stricter than a raw registry. That is useful when provenance, permission signals, transforms, and drift checks matter.`;
+AutoVault is stricter than a raw index. That is useful when provenance, permission signals, transforms, and drift checks matter.`;
 
 const skillDetailMarkdown = `# Example Skill Detail
 
@@ -323,7 +323,7 @@ export const pageDocs: PageDoc[] = [
     key: "overview",
     file: "index.md",
     title: "AutoVault",
-    description: "AutoVault is an MIT-licensed skill registry and capability layer for AI agents with validation, signing, scoped delivery, transforms, and MCP access.",
+    description: "AutoVault is a local-first vault for AI agent skills with validation, signing, scoped delivery, transforms, and MCP access.",
     route: "/",
     agentPath: "/agents/overview",
     markdown: overviewMarkdown
@@ -478,7 +478,7 @@ export function buildLlmsTxt(): string {
   const lines = [
     "# AutoVault",
     "",
-    "> AutoVault is an MIT-licensed skill registry and capability layer for AI agents. It validates, signs, scopes, transforms, and serves SKILL.md files over local stdio MCP and remote Streamable HTTP MCP.",
+    "> AutoVault is an MIT-licensed local-first vault for AI agent skills. It validates, signs, scopes, transforms, and serves SKILL.md files over local stdio MCP and remote Streamable HTTP MCP.",
     "",
     "## Canonical Docs",
     ...listedPageDocs.map((doc) => `- [${doc.title}](${agentUrl(doc)}): ${doc.description}`),

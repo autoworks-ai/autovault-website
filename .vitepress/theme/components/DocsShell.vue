@@ -1,18 +1,18 @@
 <template>
   <div class="cd-page" :class="{ 'nav-open': navOpen }">
-    <header class="cd-topbar">
-      <div class="cd-topbar-inner">
-        <a class="cd-brand" href="/">
+    <header class="cd-topbar av-topbar">
+      <div class="cd-topbar-inner av-topbar-inner">
+        <a class="cd-brand av-brand" href="/">
           <BrandMark :size="22" />
-          <span><span class="auto">Auto</span><span class="vault">Vault</span></span>
+          <span class="av-brand-name"><span class="auto">Auto</span><span class="vault">Vault</span></span>
           <span class="cd-version">v0.2.0</span>
         </a>
 
-        <button class="icon-btn cd-menu-toggle" type="button" aria-controls="cd-primary-nav" :aria-expanded="navOpen" aria-label="Open navigation" @click="navOpen = !navOpen">
+        <button class="icon-btn av-icon-btn cd-menu-toggle" type="button" aria-controls="cd-primary-nav" :aria-expanded="navOpen" aria-label="Open navigation" @click="navOpen = !navOpen">
           <UiIcon name="menu" :size="16" />
         </button>
 
-        <nav id="cd-primary-nav" class="cd-nav" aria-label="Primary">
+        <nav id="cd-primary-nav" class="cd-nav av-nav" aria-label="Primary">
           <a v-for="item in navItems" :key="item.label" :href="item.href" :class="{ active: item.label === config.active }" @click="navOpen = false">{{ item.label }}</a>
         </nav>
 
@@ -32,8 +32,10 @@
           </div>
         </div>
 
-        <a class="icon-btn cd-github" href="https://github.com/autoworks-ai/autovault" title="GitHub"><UiIcon name="github" :size="15" /></a>
-        <ClerkAuthControls />
+        <div class="av-topbar-right cd-topbar-right">
+          <a class="icon-btn av-icon-btn cd-github" href="https://github.com/autoworks-ai/autovault" title="GitHub"><UiIcon name="github" :size="15" /></a>
+          <ClerkAuthControls />
+        </div>
       </div>
     </header>
 
@@ -65,11 +67,14 @@
       </div>
       <slot />
     </main>
+
+    <AvFooter />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import AvFooter from "./AvFooter.vue";
 import BrandMark from "./BrandMark.vue";
 import ClerkAuthControls from "./ClerkAuthControls.vue";
 import MarkdownActions from "./MarkdownActions.vue";
