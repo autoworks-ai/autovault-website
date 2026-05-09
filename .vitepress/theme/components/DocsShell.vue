@@ -1,43 +1,6 @@
 <template>
-  <div class="cd-page" :class="{ 'nav-open': navOpen }">
-    <header class="cd-topbar av-topbar">
-      <div class="cd-topbar-inner av-topbar-inner">
-        <a class="cd-brand av-brand" href="/">
-          <BrandMark :size="22" />
-          <span class="av-brand-name"><span class="auto">Auto</span><span class="vault">Vault</span></span>
-          <span class="cd-version">v0.2.0</span>
-        </a>
-
-        <button class="icon-btn av-icon-btn cd-menu-toggle" type="button" aria-controls="cd-primary-nav" :aria-expanded="navOpen" aria-label="Open navigation" @click="navOpen = !navOpen">
-          <UiIcon name="menu" :size="16" />
-        </button>
-
-        <nav id="cd-primary-nav" class="cd-nav av-nav" aria-label="Primary">
-          <a v-for="item in navItems" :key="item.label" :href="item.href" :class="{ active: item.label === config.active }" @click="navOpen = false">{{ item.label }}</a>
-        </nav>
-
-        <div class="cd-search">
-          <label class="cd-search-box">
-            <UiIcon name="search" :size="14" />
-            <span class="visually-hidden">Search docs</span>
-            <input :value="query" type="search" placeholder="Search docs..." @focus="searchOpen = true" @input="handleSearchInput" />
-            <span class="kbd">⌘K</span>
-          </label>
-          <div v-if="searchOpen && query.trim()" class="cd-search-results">
-            <a v-for="result in filteredResults" :key="result.href" :href="result.href" @click="searchOpen = false">
-              <span>{{ result.title }}</span>
-              <small>{{ result.section }}</small>
-            </a>
-            <span v-if="!filteredResults.length" class="empty-row">No local matches</span>
-          </div>
-        </div>
-
-        <div class="av-topbar-right cd-topbar-right">
-          <a class="icon-btn av-icon-btn cd-github" href="https://github.com/autoworks-ai/autovault" title="GitHub"><UiIcon name="github" :size="15" /></a>
-          <ClerkAuthControls />
-        </div>
-      </div>
-    </header>
+  <div class="cd-page">
+    <AvTopbar :active="config.active" show-search :search-results="searchResults" />
 
     <div v-if="config.variant === 'docs'" class="cd-docs-shell">
       <aside class="cd-sidebar" aria-label="Docs sidebar">
@@ -74,11 +37,9 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import AvTopbar from "./AvTopbar.vue";
 import AvFooter from "./AvFooter.vue";
-import BrandMark from "./BrandMark.vue";
-import ClerkAuthControls from "./ClerkAuthControls.vue";
 import MarkdownActions from "./MarkdownActions.vue";
-import UiIcon from "./UiIcon.vue";
 import type { PageDocKey } from "../../shared/pageDocs";
 
 type PageKey = "quick-start" | "authoring" | "skills" | "api" | "deploy" | "compare" | "skill-detail" | "author-profile" | "security" | "about" | "cloud" | "changelog";
@@ -86,13 +47,6 @@ type ShellVariant = "docs" | "full";
 type TocItem = { label: string; id: string };
 
 const props = defineProps<{ page: PageKey }>();
-
-const navItems = [
-  { label: "Quick start", href: "/quick-start" },
-  { label: "Authoring", href: "/authoring" },
-  { label: "Skills", href: "/skills-directory" },
-  { label: "Security", href: "/security" }
-];
 
 const sidebarGroups = [
   {
@@ -186,15 +140,7 @@ const searchResults = [
 const config = computed(() => configs[props.page]);
 const markdownPage = computed<PageDocKey>(() => (props.page === "skills" ? "skills-directory" : props.page));
 const showMarkdownActions = computed(() => !["about", "cloud"].includes(props.page));
-const query = ref("");
-const searchOpen = ref(false);
-const navOpen = ref(false);
 const currentHash = ref("");
-const filteredResults = computed(() => {
-  const q = query.value.trim().toLowerCase();
-  if (!q) return [];
-  return searchResults.filter((result) => `${result.title} ${result.section} ${result.terms}`.toLowerCase().includes(q)).slice(0, 5);
-});
 const activeSidebarLabel = computed(() => {
   if (props.page === "quick-start" && currentHash.value === "#install") return "Install";
   if (props.page === "quick-start" && currentHash.value === "#vault-anatomy") return "Vault anatomy";
@@ -204,34 +150,15 @@ const activeSidebarLabel = computed(() => {
   return config.value.sidebarActive;
 });
 
-function handleKeydown(event: KeyboardEvent) {
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-    event.preventDefault();
-    searchOpen.value = true;
-    window.setTimeout(() => document.querySelector<HTMLInputElement>(".cd-search input")?.focus(), 0);
-  }
-  if (event.key === "Escape") {
-    searchOpen.value = false;
-    navOpen.value = false;
-  }
-}
-
-function handleSearchInput(event: Event) {
-  query.value = (event.target as HTMLInputElement).value;
-  searchOpen.value = true;
-}
-
 function syncHash() {
   currentHash.value = window.location.hash;
 }
 
 onMounted(() => {
   syncHash();
-  window.addEventListener("keydown", handleKeydown);
   window.addEventListener("hashchange", syncHash);
 });
 onBeforeUnmount(() => {
-  window.removeEventListener("keydown", handleKeydown);
   window.removeEventListener("hashchange", syncHash);
 });
 </script>
