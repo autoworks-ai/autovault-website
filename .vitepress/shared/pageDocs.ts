@@ -1,4 +1,5 @@
 import { PRODUCT_VERSION } from "../theme/data/product";
+import { AUTOVAULT_AGENT_SETUP_PROMPT, AUTOVAULT_BOOTSTRAP_INSTALL_PATH, AUTOVAULT_BOOTSTRAP_SKILL_URL } from "./bootstrap";
 
 const CURRENT_VERSION_LABEL = `v${PRODUCT_VERSION}`;
 
@@ -46,12 +47,12 @@ export const agentSkillArtifacts: AgentSkillArtifact[] = [
     title: "AutoVault Bootstrap Skill",
     description: "A raw SKILL.md an agent can audit, install locally, and use to configure AutoVault for its own profile.",
     rawPath: "/skill.md",
-    installPath: "~/.claude/skills/autovault-bootstrap/SKILL.md"
+    installPath: AUTOVAULT_BOOTSTRAP_INSTALL_PATH
   }
 ];
 
 export function agentSkillUrl(skill: AgentSkillArtifact): string {
-  return `${SITE_URL}${skill.rawPath}`;
+  return skill.rawPath === "/skill.md" ? AUTOVAULT_BOOTSTRAP_SKILL_URL : `${SITE_URL}${skill.rawPath}`;
 }
 
 const overviewMarkdown = `# AutoVault
@@ -109,7 +110,7 @@ The installer writes ~/.autovault, installs the local CLI shim, preserves the fo
 Give Claude Code this prompt when you want the agent to install its own bootstrap skill after review:
 
 \`\`\`text
-Fetch https://autovault.dev/skill.md, show me what it will do, install it into ~/.claude/skills/autovault-bootstrap/SKILL.md if approved, then run /autovault-bootstrap.
+${AUTOVAULT_AGENT_SETUP_PROMPT}
 \`\`\`
 
 The skill is opt-in. It stages the installer for inspection, asks before shell execution, then runs doctor and profile sync after approval.

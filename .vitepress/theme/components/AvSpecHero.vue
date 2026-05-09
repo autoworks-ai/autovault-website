@@ -2,6 +2,7 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import BrandMark from './BrandMark.vue'
 import { copyText } from '../utils/clipboard'
+import { AUTOVAULT_AGENT_SETUP_PROMPT, AUTOVAULT_STAGED_INSTALL_COMMAND, AUTOVAULT_STAGED_RUN_COMMAND } from '../../shared/bootstrap'
 
 // Sources: messy, varied, often unsigned. The "before" column.
 const SOURCES = [
@@ -26,11 +27,8 @@ const copiedStart = ref<'shell' | 'agent' | null>(null)
 let t1: number | undefined
 let t2: number | undefined
 
-const SHELL_INSTALL = 'curl -fsSL https://autovault.sh | sh'
-const AGENT_PROMPT = 'Fetch https://autovault.dev/skill.md, show me what it will do, install it into ~/.claude/skills/autovault-bootstrap/SKILL.md if approved, then run /autovault-bootstrap.'
-
 async function copyStart(kind: 'shell' | 'agent') {
-  const ok = await copyText(kind === 'shell' ? SHELL_INSTALL : AGENT_PROMPT)
+  const ok = await copyText(kind === 'shell' ? AUTOVAULT_STAGED_INSTALL_COMMAND : AUTOVAULT_AGENT_SETUP_PROMPT)
   if (!ok) return
   copiedStart.value = kind
   window.setTimeout(() => {
@@ -82,26 +80,27 @@ function dstY(i: number) { return 90 + i * (VBOX_H - 180) / (ADOPTERS.length - 1
         </p>
       </header>
 
-      <div class="av-start-panel" aria-label="Start AutoVault">
+      <section class="av-start-panel" aria-label="Start AutoVault">
         <div class="av-start-card primary">
           <div class="av-start-kicker">Terminal</div>
-          <div class="av-start-title">Install the local vault</div>
+          <div class="av-start-title">Review, then install the local vault</div>
           <div class="av-start-command">
             <span class="prompt">$</span>
-            <code>{{ SHELL_INSTALL }}</code>
+            <code>{{ AUTOVAULT_STAGED_INSTALL_COMMAND }}</code>
             <button type="button" @click="copyStart('shell')">{{ copiedStart === 'shell' ? 'copied' : 'copy' }}</button>
           </div>
+          <p>Inspect the script, then run <code>{{ AUTOVAULT_STAGED_RUN_COMMAND }}</code>.</p>
         </div>
         <div class="av-start-card">
           <div class="av-start-kicker">Agent-assisted</div>
           <div class="av-start-title">Have Claude Code set itself up</div>
           <div class="av-start-command prompt-block">
-            <code>{{ AGENT_PROMPT }}</code>
+            <code>{{ AUTOVAULT_AGENT_SETUP_PROMPT }}</code>
             <button type="button" @click="copyStart('agent')">{{ copiedStart === 'agent' ? 'copied' : 'copy' }}</button>
           </div>
           <p>Fetches a raw SKILL.md, shows the behavior, installs locally only after approval, then verifies AutoVault.</p>
         </div>
-      </div>
+      </section>
 
       <div class="av-flow-stage">
         <!-- ── Sources column (messy in) ──────────────────── -->

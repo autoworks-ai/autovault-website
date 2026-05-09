@@ -178,6 +178,7 @@ import AvDocBreadcrumb from "./AvDocBreadcrumb.vue";
 import CodeBlock from "./CodeBlock.vue";
 import { useTerminalReplay, type TerminalReplayLine } from "../composables/useTerminalReplay";
 import { PRODUCT_VERSION, PRODUCT_VERSION_BADGE } from "../data/product";
+import { AUTOVAULT_AGENT_SETUP_PROMPT } from "../../shared/bootstrap";
 import { copyText } from "../utils/clipboard";
 
 type Method = "curl" | "brew";
@@ -190,7 +191,7 @@ const INSTALL_COMMANDS: Record<Method, string> = {
 };
 const selectedMethod = ref<Method>("curl");
 const copied = ref(false);
-const AGENT_SETUP_PROMPT = "Fetch https://autovault.dev/skill.md, show me what it will do, install it into ~/.claude/skills/autovault-bootstrap/SKILL.md if approved, then run /autovault-bootstrap.";
+const AGENT_SETUP_PROMPT = AUTOVAULT_AGENT_SETUP_PROMPT;
 
 async function copyInstall() {
   copied.value = await copyText(INSTALL_COMMANDS[selectedMethod.value]);
