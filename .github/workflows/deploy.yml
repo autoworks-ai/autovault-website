@@ -26,6 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DEPLOY_BRANCH: ${{ inputs.branch || github.ref_name }}
+      VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.VITE_CLERK_PUBLISHABLE_KEY || secrets.VITE_CLERK_PUBLISHABLE_KEY }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -44,7 +45,14 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run pages:functions:build
-      - run: npm run docs:build
+      - name: Verify Clerk build configuration
+        run: |
+          if [ -z "$VITE_CLERK_PUBLISHABLE_KEY" ]; then
+            echo "::error::Set the VITE_CLERK_PUBLISHABLE_KEY repository variable or secret so the hosted cloud login UI is included in the Pages artifact."
+            exit 1
+          fi
+      - name: Build docs
+        run: npm run docs:build
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3

@@ -19,7 +19,9 @@ describe("hosted vault Stripe checkout", () => {
       request: new Request("https://autovault.dev/deploy.html"),
       env: {
         AUTOVAULT_HOSTED_PRICE_ID: "price_hosted_vault",
-        STRIPE_BRAND_DISPLAY_NAME: "AutoVault Test"
+        STRIPE_BRAND_DISPLAY_NAME: "AutoVault Test",
+        STRIPE_BRAND_ICON_URL: "https://autovault.dev/brand-mark.svg",
+        STRIPE_CHECKOUT_CUSTOM_TEXT_SUBMIT: "Your hosted vault namespace is reserved after the Stripe webhook confirms the subscription."
       },
       user: { id: "github_1", email: "jack@example.com" },
       source: "playground"
@@ -31,6 +33,9 @@ describe("hosted vault Stripe checkout", () => {
     expect(params.get("amount")).toBeNull();
     expect(params.get("metadata[user_id]")).toBe("github_1");
     expect(params.get("branding_settings[display_name]")).toBe("AutoVault Test");
+    expect(params.get("branding_settings[icon][url]")).toBe("https://autovault.dev/brand-mark.svg");
+    expect(params.get("submit_type")).toBe("subscribe");
+    expect(params.get("custom_text[submit][message]")).toContain("hosted vault namespace");
     expect(params.get("success_url")).toBe("https://autovault.dev/cloud?hosted=success&session_id={CHECKOUT_SESSION_ID}#launch-path");
     expect(params.get("cancel_url")).toBe("https://autovault.dev/cloud?hosted=cancelled#launch-path");
   });

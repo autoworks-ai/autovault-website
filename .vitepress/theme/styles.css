@@ -1032,7 +1032,7 @@ body {
 .callout,
 .cmd-card,
 .skill-tile,
-.cl-card,
+.changelog-card,
 .verifier,
 .trust-col,
 .disc-card {
@@ -1915,7 +1915,7 @@ body {
 
 .dir-header h1,
 .sec-hero h1,
-.cl-header h1 {
+.changelog-header h1 {
   margin: 0 0 14px;
   color: var(--ink);
   font-size: 48px;
@@ -1992,7 +1992,7 @@ body {
 }
 
 .dir-search,
-.cl-search,
+.changelog-search,
 .verifier-input .row {
   display: flex;
   align-items: center;
@@ -2009,7 +2009,7 @@ body {
 }
 
 .dir-search input,
-.cl-search input,
+.changelog-search input,
 .verifier input {
   flex: 1;
   border: 0;
@@ -2165,7 +2165,7 @@ body {
 }
 
 .sec-page,
-.cl-page {
+.changelog-page {
   max-width: 1200px;
   margin: -32px auto 0;
   padding: 0 32px 96px;
@@ -2848,29 +2848,29 @@ body {
   color: var(--accent);
 }
 
-.cl-page {
+.changelog-page {
   max-width: 1100px;
 }
 
-.cl-header {
+.changelog-header {
   margin-bottom: 8px;
   padding: 56px 0 36px;
   border-bottom: 1px solid var(--line);
 }
 
-.cl-header .row {
+.changelog-header .row {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 32px;
 }
 
-.cl-feeds {
+.changelog-feeds {
   display: flex;
   gap: 8px;
 }
 
-.cl-feed-btn {
+.changelog-feed-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -2885,12 +2885,12 @@ body {
   transition: all 120ms;
 }
 
-.cl-feed-btn:hover {
+.changelog-feed-btn:hover {
   border-color: var(--ink-4);
   color: var(--ink);
 }
 
-.cl-filters {
+.changelog-filters {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -2899,7 +2899,7 @@ body {
   padding: 18px 0;
 }
 
-.cl-filter-group {
+.changelog-filter-group {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
@@ -2909,7 +2909,7 @@ body {
   padding: 3px;
 }
 
-.cl-filter-group button {
+.changelog-filter-group button {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2923,22 +2923,22 @@ body {
   font-size: 12px;
 }
 
-.cl-filter-group button.active {
+.changelog-filter-group button.active {
   background: var(--panel);
   color: var(--ink);
 }
 
-.cl-filter-group .count {
+.changelog-filter-group .count {
   color: var(--ink-3);
   font-family: var(--mono);
   font-size: 10px;
 }
 
-.cl-filter-group button.active .count {
+.changelog-filter-group button.active .count {
   color: var(--accent);
 }
 
-.cl-search {
+.changelog-search {
   flex: 1;
   min-width: 200px;
   max-width: 320px;
@@ -2947,7 +2947,7 @@ body {
   font-size: 12px;
 }
 
-.cl-count {
+.changelog-count {
   margin-left: auto;
   color: var(--ink-3);
   font-family: var(--mono);
@@ -2955,12 +2955,12 @@ body {
   letter-spacing: 0.04em;
 }
 
-.cl-timeline {
+.changelog-timeline {
   position: relative;
   padding-top: 32px;
 }
 
-.cl-timeline::before {
+.changelog-timeline::before {
   content: "";
   position: absolute;
   left: 100px;
@@ -2970,7 +2970,7 @@ body {
   background: var(--line);
 }
 
-.cl-release {
+.changelog-release {
   position: relative;
   display: grid;
   grid-template-columns: 100px 1fr;
@@ -2978,7 +2978,7 @@ body {
   padding: 32px 0;
 }
 
-.cl-release::before {
+.changelog-release::before {
   content: "";
   position: absolute;
   left: 96px;
@@ -2990,42 +2990,42 @@ body {
   box-shadow: 0 0 0 4px var(--bg), 0 0 12px var(--accent);
 }
 
-.cl-release.minor::before {
+.changelog-release.minor::before {
   background: var(--ink-3);
   box-shadow: 0 0 0 4px var(--bg);
 }
 
-.cl-release.patch::before {
+.changelog-release.patch::before {
   background: var(--ink-4);
   box-shadow: 0 0 0 4px var(--bg);
 }
 
-.cl-meta {
+.changelog-meta {
   padding-top: 28px;
   padding-right: 24px;
   text-align: right;
 }
 
-.cl-meta .date {
+.changelog-meta .date {
   color: var(--ink-3);
   font-family: var(--mono);
   font-size: 11.5px;
   letter-spacing: 0.04em;
 }
 
-.cl-meta .ago {
+.changelog-meta .ago {
   margin-top: 4px;
   color: var(--ink-4);
   font-family: var(--mono);
   font-size: 10.5px;
 }
 
-.cl-card {
+.changelog-card {
   border-radius: 12px;
   padding: 28px 32px;
 }
 
-.cl-card.featured {
+.changelog-card.featured {
   border-color: rgba(90, 214, 192, 0.35);
   background: linear-gradient(180deg, rgba(90, 214, 192, 0.04) 0%, var(--panel) 80%);
 }
@@ -3093,7 +3093,7 @@ body {
   font-style: italic;
 }
 
-.cl-card h2 {
+.changelog-card h2 {
   margin: 0 0 14px;
   color: var(--ink);
   font-size: 22px;
@@ -3102,19 +3102,19 @@ body {
   line-height: 1.25;
 }
 
-.cl-card .summary {
+.changelog-card .summary {
   margin: 0 0 22px;
   color: var(--ink-2);
   font-size: 14.5px;
   line-height: 1.6;
 }
 
-.cl-sections {
+.changelog-sections {
   display: grid;
   gap: 16px;
 }
 
-.cl-section .sh {
+.changelog-section .sh {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -3125,31 +3125,31 @@ body {
   text-transform: uppercase;
 }
 
-.cl-section.added .sh {
+.changelog-section.added .sh {
   color: var(--accent);
 }
 
-.cl-section.changed .sh {
+.changelog-section.changed .sh {
   color: var(--warn);
 }
 
-.cl-section.fixed .sh {
+.changelog-section.fixed .sh {
   color: var(--blue);
 }
 
-.cl-section.removed .sh,
-.cl-section.security .sh {
+.changelog-section.removed .sh,
+.changelog-section.security .sh {
   color: var(--bad);
 }
 
-.cl-section .marker {
+.changelog-section .marker {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: currentColor;
 }
 
-.cl-section ul {
+.changelog-section ul {
   margin: 0;
   padding-left: 18px;
   color: var(--ink-2);
@@ -3157,7 +3157,7 @@ body {
   line-height: 1.7;
 }
 
-.cl-section li {
+.changelog-section li {
   margin-bottom: 4px;
 }
 
@@ -3437,7 +3437,7 @@ body {
   .docs-hero,
   .sec-page,
   .dir-page,
-  .cl-page,
+  .changelog-page,
   .sec-section,
   .verifier,
   .trust-diagram,
@@ -3532,7 +3532,7 @@ body {
   .section-head,
   .xform-head,
   .toolbar,
-  .cl-header .row {
+  .changelog-header .row {
     display: block;
   }
 
@@ -3630,7 +3630,7 @@ body {
 
   .dir-page,
   .sec-page,
-  .cl-page {
+  .changelog-page {
     margin-top: -16px;
     padding-left: 20px;
     padding-right: 20px;
@@ -3645,21 +3645,21 @@ body {
     gap: 8px;
   }
 
-  .cl-timeline::before {
+  .changelog-timeline::before {
     left: 0;
   }
 
-  .cl-release {
+  .changelog-release {
     grid-template-columns: 1fr;
     gap: 12px;
     padding-left: 22px;
   }
 
-  .cl-release::before {
+  .changelog-release::before {
     left: -4px;
   }
 
-  .cl-meta {
+  .changelog-meta {
     padding: 0;
     text-align: left;
   }
@@ -3672,7 +3672,7 @@ body {
   .docs-hero,
   .sec-page,
   .dir-page,
-  .cl-page {
+  .changelog-page {
     width: min(390px, 100vw) !important;
     max-width: min(390px, 100vw) !important;
     margin-left: 0 !important;
@@ -4191,7 +4191,7 @@ body {
 }
 
 .cd-full-content .dir-page,
-.cd-full-content .cl-page {
+.cd-full-content .changelog-page {
   margin: 0 auto;
 }
 
@@ -4453,7 +4453,7 @@ body {
   .cd-page .docs-hero,
   .cd-page .sec-page,
   .cd-page .dir-page,
-  .cd-page .cl-page {
+  .cd-page .changelog-page {
     width: auto !important;
     max-width: none !important;
     margin-left: 0 !important;
@@ -4638,7 +4638,7 @@ body {
   padding: 0 28px 64px;
 }
 
-.cd-full-content .cl-page {
+.cd-full-content .changelog-page {
   max-width: 1100px;
   margin: 0 auto;
   padding: 56px 32px 96px;
@@ -4869,7 +4869,7 @@ body {
   .cd-docs-content .au-hero h1,
   .cd-full-content .sec-hero h1,
   .cd-full-content .dir-header h1,
-  .cd-full-content .cl-header h1 {
+  .cd-full-content .changelog-header h1 {
     font-size: 38px;
     line-height: 1.05;
   }
@@ -4942,7 +4942,7 @@ body {
   .cd-page .docs-hero,
   .cd-page .sec-page,
   .cd-page .dir-page,
-  .cd-page .cl-page {
+  .cd-page .changelog-page {
     width: auto !important;
     max-width: none !important;
     margin-left: 0 !important;
@@ -4983,7 +4983,7 @@ body {
   .cd-page .docs-hero,
   .cd-page .sec-page,
   .cd-page .dir-page,
-  .cd-page .cl-page {
+  .cd-page .changelog-page {
     padding-left: 0 !important;
     padding-right: 0 !important;
   }
