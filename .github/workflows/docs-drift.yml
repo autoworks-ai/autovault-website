@@ -84,6 +84,7 @@ jobs:
             Reason: ${{ steps.resolve.outputs.reason }}
 
             The source repo is checked out at .source-repo/.
+            For git inspection, use only these allowed forms: `git status --short`, `git --no-pager diff --no-ext-diff`, `git --no-pager log --no-ext-diff`, `git --no-pager show --no-ext-diff`, and `git rev-parse`.
           claude_args: >-
             --model claude-sonnet-4-6
             --max-turns 100
@@ -93,6 +94,7 @@ jobs:
             --allowedTools 'Write'
             --allowedTools 'Glob'
             --allowedTools 'Grep'
+            --allowedTools 'Bash(git status)'
             --allowedTools 'Bash(git status --short:*)'
             --allowedTools 'Bash(git --no-pager diff --no-ext-diff:*)'
             --allowedTools 'Bash(git --no-pager log --no-ext-diff:*)'
