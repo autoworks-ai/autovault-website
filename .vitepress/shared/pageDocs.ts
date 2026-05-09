@@ -62,54 +62,46 @@ AutoVault is MIT licensed.`;
 
 const quickStartMarkdown = `# AutoVault Quick Start
 
-Install AutoVault, seed the bundled skills, add a skill, scope it, and run it from an agent.
+Install AutoVault, verify the local vault, add a signed skill, scope it, and run it from an agent.
 
-## 1. Install
+## Install
 
 \`\`\`bash
 curl -fsSL https://autovault.sh | sh
-export PATH="$HOME/.autovault/bin:$PATH"
+brew install autoworks-ai/tap/autovault
 autovault skill list
 \`\`\`
 
-The installer builds the Node app under ~/.autovault/app, writes the shim to ~/.autovault/bin/autovault, preserves ~/.autovault as storage, and bootstraps bundled skills unless AUTOVAULT_NO_BOOTSTRAP=1 is set.
+The installer writes ~/.autovault, installs the local CLI shim, preserves the folder as user-owned storage, and bootstraps bundled skills unless AUTOVAULT_NO_BOOTSTRAP=1 is set. AutoVault v0.2.0 is currently labeled Unreleased May 2026.
 
-## 2. Seed bundled skills manually
+## Verify
 
 \`\`\`bash
-npm run build
-node scripts/bootstrap-skills.mjs
+autovault doctor
 \`\`\`
 
-Bootstrap installs every bundled skill (skills/*/SKILL.md) through the same validation path as any other skill and refreshes discovered host profiles.
+Doctor confirms the binary, vault folder, signing key, bundled skill index, and discovered agent profiles.
 
-## 3. Add a remote skill
+## Add a skill
 
 \`\`\`bash
 autovault add github:autoworks-ai/skills/extract-pdf
 \`\`\`
 
-Remote skills are untrusted until they pass validation and signing.
+Every source adapter hands raw skill content to the same gate: frontmatter repair, schema validation, denylist scan, capability/behavior check, deduplication, and Ed25519 signing.
 
-## 4. Add a local bundle
+## Vault anatomy
 
-\`\`\`bash
-autovault add-local ./skills/railway --source railway/skills --sync-profiles
-\`\`\`
+The vault is a normal ~/.autovault folder with config.toml, keys, source skills, detached signatures, rendered agent files, cache, and audit.log. Agent profiles read generated files from the vault rather than maintaining hand-edited forks.
 
-add-local requires SKILL.md, gathers sibling resources, refuses symlinks, records local provenance, and can refresh discovered profile roots. MCP add_skill and update_skill local-bundle calls sync configured profile links by default.
-
-## 5. Sync native agent profiles
+## Scope and run
 
 \`\`\`bash
+autovault scope extract-pdf --agent claude-code,codex,cursor --project autovault-website --device $(hostname)
 autovault sync-profiles --discover
 \`\`\`
 
-Discovery checks native skill roots such as ~/.claude/skills, ~/.codex/skills, and ~/.cursor/skills. Set AUTOVAULT_PROFILE_LINKS for managed roots that should refresh on install, propose, update, delete, or transform changes.
-
-## 6. Vendor installer routing
-
-AUTOVAULT_SKILL_INSTALL controls whether vendor installers prefer AutoVault, install both AutoVault and native copies, use native-first fallback, native-only, or skip skill installation.`;
+Scope decides which agents, projects, devices, and profile links can load the signed skill. The skill name stays stable while transforms render caller-specific tool names.`;
 
 const cloudMarkdown = `# AutoVault Cloud Launch
 
@@ -129,7 +121,7 @@ Use hosted AutoVault when a team wants to reserve its cloud namespace and join t
 
 const authoringMarkdown = `# Authoring AutoVault Skills
 
-An AutoVault skill is a SKILL.md file with YAML frontmatter and markdown instructions. The frontmatter declares identity, capabilities, resources, permissions, target agents, and optional transform metadata.
+A skill is one SKILL.md file: YAML frontmatter plus a markdown body. AutoVault validates production fields for identity, capability declarations, transform maps, permission signals, resources, and target agents.
 
 ## Minimal shape
 
@@ -138,17 +130,24 @@ An AutoVault skill is a SKILL.md file with YAML frontmatter and markdown instruc
 name: extract-pdf
 version: 1.4.0
 description: "Extract structured text from PDF files."
-author: autoworks-ai
 license: MIT
 tools_required:
   - fs.read
   - fs.write
+transformations:
+  claude-code:
+    fs.read: read
+    fs.write: write
+  codex:
+    fs.read: file_read
+    fs.write: file_write
 permissions:
   network: false
-  filesystem: readonly
+  fs_scope: ["./inputs", "./outputs"]
+  egress: deny
 agents:
-  - codex
   - claude-code
+  - codex
 ---
 
 # Extract PDF
@@ -156,17 +155,17 @@ agents:
 Use this skill when the user asks for text, structure, or summaries from a PDF.
 \`\`\`
 
-## Validation expectations
+## Schema and validation
 
-- Keep the name kebab-case and the version semver-like.
-- Declare every tool or capability the body actually uses.
-- Keep secrets as named references, never literal credentials.
-- Package resources beside SKILL.md and load them through get_skill with include_resources when an agent needs the extra files.
-- Use the narrowest useful permission scope.
+- Keep name kebab-case, version semver-like, and description short.
+- Declare capabilities in tools_required using canonical names.
+- Map caller-specific tool names in transformations instead of forking the skill.
+- Keep permissions narrow and treat them as runtime signals for the host agent.
+- Package resources beside SKILL.md and load them through get_skill with include_resources.
 
-## Transforms
+## Scope
 
-Vault-local transforms let a workspace or agent apply different instructions, tools, or setup without forking the upstream skill. AutoVault stores the transform under the vault, pins the base skill, applies it when get_skill renders for an agent, and reports base drift through check_updates.
+Scope is local policy, not a frontmatter substitute. Use it to decide which agents, projects, devices, and profile links can load the signed skill after admission.
 
 ## Publishing
 
@@ -342,7 +341,7 @@ export const pageDocs: PageDoc[] = [
     key: "quick-start",
     file: "quick-start.md",
     title: "AutoVault Quick Start",
-    description: "Install AutoVault, bootstrap bundled skills, add remote or local skill bundles, sync native agent profiles, and configure vendor installer routing.",
+    description: "Install AutoVault, verify the local vault, inspect vault anatomy, scope a signed skill, and run it from supported agents.",
     route: "/quick-start",
     agentPath: "/agents/quick-start",
     markdown: quickStartMarkdown
@@ -351,7 +350,7 @@ export const pageDocs: PageDoc[] = [
     key: "authoring",
     file: "authoring.md",
     title: "Authoring AutoVault Skills",
-    description: "Write SKILL.md files with MIT-compatible metadata, capability declarations, resources, permissions, and vault-local transform overlays.",
+    description: "Write production SKILL.md files with canonical tools, transform maps, permissions, agent targets, resources, and browser-gate validation.",
     route: "/authoring",
     agentPath: "/agents/authoring",
     markdown: authoringMarkdown

@@ -1,65 +1,105 @@
 <template>
-  <div class="docs-rich">
-    <section class="docs-hero au-hero">
-      <div class="breadcrumbs">
-        <a href="/">Docs</a>
-        <span class="sep">/</span>
-        <span>Authoring</span>
-        <span class="sep">/</span>
-        <span>Anatomy of a SKILL.md</span>
-      </div>
+  <div class="docs-rich docs-final authoring-final">
+    <section class="docs-hero au-hero au-final-hero">
+      <AvDocBreadcrumb section="Authoring" page="Write a SKILL.md" />
       <div class="eyebrow"><span class="dash" /> Authoring · 12 min read</div>
-      <h1>Write one skill.<br><span class="ital">Run it everywhere.</span></h1>
-      <p class="lede">Authoring an AutoVault skill is writing a single SKILL.md that declares <strong>what it does</strong>, <strong>what it needs</strong>, and <strong>how it should be rendered</strong> for each calling agent. The vault handles the rest: validation, signing, scoping, resources, and transform overlays.</p>
+      <h1>A skill is one file.<br><span class="ital">Frontmatter, body, that's it.</span></h1>
+      <p class="lede">A SKILL.md is markdown with YAML frontmatter. AutoVault keeps the format plain, then validates the extra production fields it needs for capability mapping, permission signals, agent targeting, and signed delivery.</p>
       <div class="pillrow">
         <span class="pill">YAML frontmatter</span>
-        <span class="pill">Canonical capabilities</span>
-        <span class="pill">Per-caller transform</span>
-        <span class="pill">Permission boundaries</span>
+        <span class="pill">tools_required</span>
+        <span class="pill">transformations</span>
+        <span class="pill">permissions</span>
+        <span class="pill">agents</span>
       </div>
     </section>
 
-    <h2 id="anatomy">Anatomy of a SKILL.md</h2>
-    <p>Hover any block in the file below to see what it does and why it's there. The colored bands show how the validation gate parses each section.</p>
-    <div class="skill-viewer">
-      <div class="skill-code">
-        <div class="file-head">
+    <h2 id="anatomy">Hover a field to see what it does</h2>
+    <p>The colored rows show how the validation gate reads a skill: identity first, then tool requirements, rendering transforms, permission signals, and the markdown body the agent actually follows.</p>
+    <div class="skill-viewer final-skill-viewer">
+      <div class="skill-code code-block">
+        <div class="file-head code-tab">
           <span class="signed">● SIGNED</span>
           <span class="name">extract-pdf/SKILL.md</span>
-          <span class="meta">33 lines · ed25519</span>
+          <span class="meta">production shape · v1.4.0</span>
         </div>
-        <pre>
-<div v-for="(line, idx) in skillLines" :key="line.id" class="skill-line" :class="{ active: line.group === hovered }" @mouseenter="line.group && (hovered = line.group)"><span class="ln-num">{{ idx + 1 }}</span><span class="ln-text"><span v-for="(token, tokenIndex) in colorize(line.text)" :key="`${line.id}-${tokenIndex}`" :class="token.kind">{{ token.text }}</span></span></div></pre>
+        <pre class="skill-code-body"><button
+          v-for="(line, idx) in skillLines"
+          :key="line.id"
+          class="skill-line"
+          :class="{ active: line.group === hovered }"
+          :disabled="!line.group"
+          type="button"
+          @mouseenter="setAnnotation(line.group)"
+          @focus="setAnnotation(line.group)"
+          @click="setAnnotation(line.group)"
+        ><span class="ln-num">{{ idx + 1 }}</span><span class="ln-text"><span v-for="(token, tokenIndex) in colorize(line.text)" :key="`${line.id}-${tokenIndex}`" :class="token.kind">{{ token.text }}</span></span></button></pre>
       </div>
-      <aside class="skill-explain">
-        <div class="ex-head"><span>Explainer</span><span class="lns">{{ explanation.lines }}</span></div>
+      <aside class="skill-explain ann-side">
+        <div class="ex-head"><span>Annotation</span><span class="lns">{{ explanation.lines }}</span></div>
         <h3>{{ explanation.title }}</h3>
         <div class="card-p" v-html="explanation.body" />
+        <div class="ann-list" aria-label="Skill annotations">
+          <button
+            v-for="item in annotationRows"
+            :key="item.id"
+            class="ann-row"
+            :class="{ active: hovered === item.id }"
+            type="button"
+            @mouseenter="hovered = item.id"
+            @focus="hovered = item.id"
+            @click="hovered = item.id"
+          >
+            <span class="ann-key">{{ item.label }}<span v-if="item.required" class="req">required</span></span>
+            <span class="ann-body">{{ item.short }}</span>
+          </button>
+        </div>
       </aside>
     </div>
 
+    <h2 id="schema">Frontmatter fields, in full</h2>
+    <p>AutoVault does not need proprietary files beside SKILL.md. The fields below are the current production contract the gate and renderer understand.</p>
+    <div class="schema final-schema" aria-label="SKILL.md frontmatter schema">
+      <div class="schema-row head">
+        <span>Field</span><span>Type</span><span>Required</span><span>Description</span>
+      </div>
+      <div v-for="row in schemaRows" :key="row.field" class="schema-row">
+        <span class="f">{{ row.field }}</span>
+        <span class="t">{{ row.type }}</span>
+        <span><span class="badge" :class="row.required ? 'req' : 'no'">{{ row.required ? "yes" : "optional" }}</span></span>
+        <span class="d">{{ row.description }}</span>
+      </div>
+    </div>
+
     <h2 id="manifest">The transformation manifest</h2>
-    <p>This is the part that distinguishes AutoVault from every other registry. The manifest is a flat dictionary keyed by agent identifier, mapping canonical capability names to whatever each agent calls them. Workspace-specific transforms let a vault adapt an upstream skill without forking it.</p>
+    <p>Authors write against canonical capability names. Transform maps adapt those capabilities for each caller at render time, so one source skill can become Claude Code, Codex, Cursor, or AutoHub-specific output without forking upstream content.</p>
     <div class="man-grid">
       <div v-for="agent in manifestAgents" :key="agent.name" class="man-card">
         <div class="mono-label"><span class="swatch" :style="{ background: agent.color, display: 'inline-block', marginRight: '8px' }" />{{ agent.name }}</div>
-        <div class="mono-block" style="padding:0">
-          <div v-for="row in agent.rows" :key="row.from"><span class="muted">{{ row.from }}</span><span class="muted"> → </span><span class="arg">{{ row.to }}</span></div>
+        <div class="mono-block transform-map">
+          <div v-for="row in agent.rows" :key="row.from"><span class="muted">{{ row.from }}</span><span class="muted"> -> </span><span class="arg">{{ row.to }}</span></div>
         </div>
       </div>
     </div>
-    <p>You don't have to map every agent. Unmapped agents fall through to the canonical name — which usually fails, which is intentional. Better to fail loudly with <code>tool browser.fill_form not found</code> than silently with a confused caller.</p>
-    <p>If your team uses an agent we haven't mapped, just add it to the manifest. The renderer will use it as soon as the next scope refresh fires. Transform reviews show up during <code>check_updates</code> when the pinned base skill drifts.</p>
 
-    <h2 id="perms">Permissions: declared vs. enforced</h2>
-    <p>This trips up new authors, so it's worth being clear: AutoVault is a <strong>content provider</strong>, not an executor. The vault never runs your skill. Permissions you declare are <strong>signals to the host agent</strong> about what the skill expects to do.</p>
-    <div class="dodont">
-      <div class="col do"><div class="mono-label arg">Do</div><ul><li>Declare exact canonical tools.</li><li>Declare network and filesystem scope.</li><li>Keep secrets as named references only.</li></ul></div>
-      <div class="col dont"><div class="mono-label bad">Don't</div><ul><li>Hide shell access inside prose.</li><li>Embed credentials in frontmatter.</li><li>Ship a generic helper skill with broad powers.</li></ul></div>
+    <h2 id="perms">Scope and permissions are separate</h2>
+    <p>Permissions are signals declared inside the skill. Scope is the local policy that decides where that signed skill can load. Keep both narrow; the host agent still owns runtime enforcement.</p>
+    <div class="scope-rows" aria-label="Example scope rows">
+      <div v-for="row in scopeRows" :key="row.axis" class="scope-row">
+        <span class="axis">{{ row.axis }}</span>
+        <span class="vals">
+          <span v-for="value in row.allowed" :key="value" class="v on">{{ value }}</span>
+          <span v-for="value in row.blocked" :key="value" class="v off">{{ value }}</span>
+        </span>
+      </div>
+    </div>
+    <div class="dodont final-dodont">
+      <div class="col do"><div class="mono-label arg">Do</div><ul><li>Declare exact canonical tools in <code>tools_required</code>.</li><li>Use <code>permissions</code> for network and filesystem expectations.</li><li>Use local scope policy to choose agents, projects, and profile links.</li></ul></div>
+      <div class="col dont"><div class="mono-label bad">Don't</div><ul><li>Hide shell or browser access inside prose.</li><li>Embed credentials in frontmatter.</li><li>Ship broad helper skills when a narrow task skill will do.</li></ul></div>
     </div>
 
     <h2 id="playground">Try the gate yourself</h2>
-    <p>This is the same five-step pipeline that runs on every skill admitted to a real vault — minus the actual signing step (we don't have your private key). Paste a SKILL.md, fetch a GitHub/raw URL, and click <strong>Run gate</strong> to see what passes, what warns, and what fails.</p>
+    <p>This is the same five-step pipeline that runs on every skill admitted to a real vault, minus the actual signing step. Paste a SKILL.md, fetch a GitHub/raw URL, and run the browser gate to see what passes, warns, or fails.</p>
     <div class="playground" :data-ready="hydrated ? 'true' : 'false'">
       <div class="playground-head">
         <span class="tag-badge">browser gate</span>
@@ -94,7 +134,7 @@
             <div class="diagnostic-layer" aria-hidden="true">
               <div class="diagnostic-scroll" :style="{ transform: `translateY(-${editorScrollTop}px)` }">
                 <div v-for="line in editorLineRows" :key="line.number" class="diag-line" :class="line.className" :title="line.issue?.message">
-                  <span class="diag-marker">{{ line.issue ? (line.issue.severity === "fail" ? "×" : "!") : "" }}</span>
+                  <span class="diag-marker">{{ line.issue ? (line.issue.severity === "fail" ? "x" : "!") : "" }}</span>
                   <span class="diag-num">{{ line.number }}</span>
                 </div>
               </div>
@@ -108,7 +148,7 @@
             <div v-if="sourceNotice" class="source-notice" :class="sourceNotice.kind">{{ sourceNotice.text }}</div>
             <template v-if="rows">
               <div v-for="row in results" :key="row.name" class="check-row" :class="row.kind">
-                <span class="check-icn">{{ row.kind === "pending" ? "…" : row.kind === "warn" ? "!" : row.kind === "fail" ? "×" : "✓" }}</span>
+                <span class="check-icn">{{ row.kind === "pending" ? "..." : row.kind === "warn" ? "!" : row.kind === "fail" ? "x" : "✓" }}</span>
                 <span class="check-name">{{ row.name }}</span>
                 <span class="check-detail">{{ row.detail }}</span>
               </div>
@@ -124,70 +164,97 @@
     </div>
 
     <h2 id="publish">Publishing through the gate</h2>
-    <p>Once your skill is happy locally, you have two paths to a shareable, validated artifact:</p>
+    <p>Once the skill is clean locally, all write paths use the same validation and signing pipeline before generated agent profiles refresh.</p>
     <div class="process-ribbon">
-      <div v-for="(step, idx) in process" :key="step.title" class="step"><div class="num mono-label">{{ String(idx + 1).padStart(2, "0") }}</div><div style="font-weight:500">{{ step.title }}</div><div class="muted" style="font-size:12px">{{ step.sub }}</div></div>
+      <div v-for="(step, idx) in process" :key="step.title" class="step"><div class="num mono-label">{{ String(idx + 1).padStart(2, "0") }}</div><div class="step-title">{{ step.title }}</div><div class="muted step-sub">{{ step.sub }}</div></div>
     </div>
-    <p>The other path uses <code>add_skill</code> for trusted remote sources or local bundles. Either way, the skill is signed against your vault's keypair before it is rendered into an agent profile, and packaged resources stay available through <code>get_skill</code> with <code>include_resources</code>.</p>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import UiIcon from "./UiIcon.vue";
+import AvDocBreadcrumb from "./AvDocBreadcrumb.vue";
 import { transforms } from "../data/transforms";
 import { evaluateSkillDocument, normalizeSkillUrl, type GateCheck, type GateEvaluation, type GateIssue } from "../utils/skillGate";
 
-type AnnotationGroup = "fm" | "id" | "tools" | "trans" | "perm" | "body";
+type AnnotationGroup = "fm" | "id" | "tools" | "agents" | "trans" | "perm" | "body";
+type SkillLine = { id: string; text: string; group: AnnotationGroup | null };
+type SchemaRow = { field: string; type: string; required: boolean; description: string };
 
-const skillLines: Array<{ id: string; text: string; group: AnnotationGroup | null }> = [
+const skillLines: SkillLine[] = [
   { id: "fm-open", text: "---", group: "fm" },
   { id: "fm-name", text: "name: extract-pdf", group: "id" },
   { id: "fm-version", text: "version: 1.4.0", group: "id" },
   { id: "fm-desc", text: 'description: "Extract structured text from PDF files."', group: "id" },
-  { id: "fm-author", text: "author: autoworks-ai", group: "id" },
   { id: "fm-license", text: "license: MIT", group: "id" },
   { id: "blank-1", text: "", group: null },
   { id: "tools-key", text: "tools_required:", group: "tools" },
-  { id: "t-1", text: "  - browser.fill_form", group: "tools" },
-  { id: "t-2", text: "  - browser.click", group: "tools" },
-  { id: "t-3", text: "  - fs.read", group: "tools" },
-  { id: "t-4", text: "  - fs.write", group: "tools" },
+  { id: "t-1", text: "  - fs.read", group: "tools" },
+  { id: "t-2", text: "  - fs.write", group: "tools" },
   { id: "blank-2", text: "", group: null },
+  { id: "agents-key", text: "agents:", group: "agents" },
+  { id: "agent-1", text: "  - claude-code", group: "agents" },
+  { id: "agent-2", text: "  - codex", group: "agents" },
+  { id: "blank-3", text: "", group: null },
   { id: "trans-key", text: "transformations:", group: "trans" },
   { id: "tr-1", text: "  claude-code:", group: "trans" },
-  { id: "tr-2", text: "    browser.fill_form: chrome-devtools", group: "trans" },
-  { id: "tr-3", text: "    fs.read: read", group: "trans" },
+  { id: "tr-2", text: "    fs.read: read", group: "trans" },
+  { id: "tr-3", text: "    fs.write: write", group: "trans" },
   { id: "tr-4", text: "  codex:", group: "trans" },
-  { id: "tr-5", text: "    browser.fill_form: browser_form", group: "trans" },
-  { id: "tr-6", text: "    fs.read: file_read", group: "trans" },
-  { id: "blank-3", text: "", group: null },
+  { id: "tr-5", text: "    fs.read: file_read", group: "trans" },
+  { id: "tr-6", text: "    fs.write: file_write", group: "trans" },
+  { id: "blank-4", text: "", group: null },
   { id: "perm-key", text: "permissions:", group: "perm" },
   { id: "perm-1", text: "  network: false", group: "perm" },
   { id: "perm-2", text: '  fs_scope: ["./inputs", "./outputs"]', group: "perm" },
   { id: "perm-3", text: "  egress: deny", group: "perm" },
-  { id: "blank-4", text: "", group: null },
-  { id: "fm-close", text: "---", group: "fm" },
   { id: "blank-5", text: "", group: null },
-  { id: "h1", text: "# Extract PDF text", group: "body" },
+  { id: "fm-close", text: "---", group: "fm" },
   { id: "blank-6", text: "", group: null },
+  { id: "h1", text: "# Extract PDF text", group: "body" },
+  { id: "blank-7", text: "", group: null },
   { id: "p1", text: "Use this skill when the user provides a PDF path", group: "body" },
   { id: "p2", text: "and asks for its text contents, structure, or", group: "body" },
-  { id: "p3", text: "summarization. Returns markdown with preserved", group: "body" },
-  { id: "p4", text: "headings, lists, and table layout where possible.", group: "body" }
+  { id: "p3", text: "summary. Return markdown with headings, lists,", group: "body" },
+  { id: "p4", text: "and table layout preserved where possible.", group: "body" }
 ];
 
 const explanations = {
-  fm: { lines: "L1, L27", title: "YAML frontmatter delimiters", body: "<p>The skill begins and ends its frontmatter with <code>---</code>. Everything between is structured metadata; everything after is markdown the agent reads as instructions.</p><p>The validation gate parses this block first. <strong>YAML auto-repair</strong> handles common breakage — trailing commas, mixed indentation, unquoted special chars — before the strict schema check.</p>" },
-  id: { lines: "L2–L6", title: "Identity block", body: "<p>These six fields uniquely identify a skill in the vault. <code>name</code> + <code>version</code> together form the lookup key; <code>author</code> participates in the provenance chain when the skill is signed.</p><p><strong>Naming:</strong> kebab-case, scoped roughly to a verb-object (e.g. <code>extract-pdf</code>, <code>parse-csv</code>, <code>summarize-doc</code>). Avoid generic names like <code>tools</code> or <code>helpers</code> — the dedup gate flags them aggressively.</p>" },
-  tools: { lines: "L8–L12", title: "Canonical tool requirements", body: "<p>The skill declares what it needs in <strong>canonical capability names</strong> — a stable namespace AutoVault maintains, independent of any specific agent's vocabulary.</p><p>This is the part the gate's capability/behavior check audits. If the skill body uses <code>fs.read</code> but never declares it here, or declares it but never uses it, the skill is rejected.</p>" },
-  trans: { lines: "L14–L20", title: "Per-caller transformation", body: "<p>The transformation manifest maps each canonical capability to the actual tool name the calling agent expects. Same skill, three rendered views — written once.</p><p>If a tool isn't mapped for a given agent, the skill renders without that capability and the gate emits a warning at scope-time. Agents you haven't mapped fall through to the canonical name (which usually fails — that's the point).</p>" },
-  perm: { lines: "L22–L25", title: "Permission boundaries", body: "<p>The skill declares its own runtime boundaries. <code>network: false</code> tells the host agent to refuse outbound HTTP from this skill's tool calls. <code>fs_scope</code> restricts filesystem access to specific path prefixes.</p><p>These are enforced by <em>the agent</em> at execution time, not by AutoVault. AutoVault is content provider, not executor — but it surfaces the declared boundary so callers know what they're admitting.</p>" },
-  body: { lines: "L29–L33", title: "Skill body", body: "<p>Plain markdown. This is what the agent reads and follows when the skill is loaded into context. Keep it tight: under 200 tokens for a skill of this size, under 500 for anything bigger.</p><p><strong>Progressive disclosure:</strong> Agents can call <code>get_skill</code> with a query for discovery, load full content only when needed, and set <code>include_resources</code> when packaged files are required.</p>" }
+  fm: { lines: "L1, L28", label: "frontmatter", short: "YAML boundary", required: true, title: "YAML frontmatter delimiters", body: "<p>The skill begins and ends its metadata block with <code>---</code>. Everything between is parsed as YAML; everything after is markdown instruction content.</p><p>The gate repairs common frontmatter mistakes before it performs the strict schema and security checks.</p>" },
+  id: { lines: "L2-L5", label: "identity", short: "name, version, license", required: true, title: "Identity block", body: "<p><code>name</code> and <code>version</code> form the canonical lookup key. <code>description</code> is loaded during discovery, so it should stay direct and short.</p><p>Use kebab-case names and semver-like versions so updates can be compared cleanly.</p>" },
+  tools: { lines: "L7-L9", label: "tools_required", short: "canonical capabilities", required: true, title: "Canonical tool requirements", body: "<p>The skill declares the capabilities it expects using AutoVault's stable names, not one agent's temporary tool vocabulary.</p><p>The capability/behavior check compares these declarations with the body and transform maps.</p>" },
+  agents: { lines: "L11-L13", label: "agents", short: "target callers", required: false, title: "Target agents", body: "<p><code>agents</code> tells the renderer which callers this skill is prepared to support. Local scope policy can narrow this further by project, device, or profile link.</p>" },
+  trans: { lines: "L15-L21", label: "transformations", short: "per-agent mapping", required: false, title: "Per-caller transformation", body: "<p>The transform map rewrites canonical capability names into each agent's native tool names at render time.</p><p>That keeps the source skill reviewable while still producing caller-specific output.</p>" },
+  perm: { lines: "L23-L26", label: "permissions", short: "runtime expectations", required: false, title: "Permission boundaries", body: "<p>Permission fields are signals to the host agent about expected network, filesystem, and egress behavior.</p><p>AutoVault validates and surfaces them. The agent or runtime sandbox owns actual enforcement.</p>" },
+  body: { lines: "L30-L35", label: "body", short: "agent instructions", required: true, title: "Skill body", body: "<p>The markdown body is what the agent reads when the skill is loaded. Keep it operational, specific, and short enough that discovery stays cheap.</p><p>Use packaged resources only when the body needs deeper reference material.</p>" }
 } as const;
 
-const hovered = ref<AnnotationGroup>("trans");
+const hovered = ref<AnnotationGroup>("tools");
 const explanation = computed(() => explanations[hovered.value]);
+const annotationRows = Object.entries(explanations).map(([id, item]) => ({ id: id as AnnotationGroup, ...item }));
+
+function setAnnotation(group: AnnotationGroup | null) {
+  if (group) hovered.value = group;
+}
+
+const schemaRows: SchemaRow[] = [
+  { field: "name", type: "string", required: true, description: "Canonical id. Use kebab-case and keep it stable across releases." },
+  { field: "version", type: "semver-like", required: true, description: "Version used for update checks, drift reporting, and provenance records." },
+  { field: "description", type: "string", required: true, description: "One concise sentence used during discovery and search." },
+  { field: "license", type: "string", required: false, description: "License metadata. First-party examples currently use MIT." },
+  { field: "tools_required", type: "string[]", required: true, description: "Canonical capability names the skill body expects to use." },
+  { field: "transformations", type: "agent map", required: false, description: "Per-agent mapping from canonical capabilities to caller-specific tool names." },
+  { field: "permissions", type: "object", required: false, description: "Network, filesystem, egress, and runtime expectation signals." },
+  { field: "agents", type: "string[]", required: false, description: "Supported target agents before local scope narrows delivery." },
+  { field: "resources", type: "file[]", required: false, description: "Packaged files loaded through get_skill with include_resources." }
+];
+
+const scopeRows = [
+  { axis: "agents", allowed: ["claude-code", "codex"], blocked: ["cursor", "autohub"] },
+  { axis: "project", allowed: ["autovault-website"], blocked: ["client-foo", "internal/*"] },
+  { axis: "device", allowed: ["this host"], blocked: ["ci", "shared runner"] },
+  { axis: "profile link", allowed: ["~/.codex/skills", "~/.claude/skills"], blocked: ["global fallback"] }
+];
 
 const src = ref(`---
 name: weather
@@ -203,6 +270,9 @@ transformations:
 permissions:
   network: true
   egress: allowlist
+agents:
+  - claude-code
+  - codex
 ---
 
 # Weather
@@ -271,6 +341,9 @@ transformations:
 permissions:
   network: true
   egress: allowlist
+agents:
+  - claude-code
+  - codex
 ---
 
 # Weather
@@ -348,6 +421,6 @@ const process = [
   { title: "Repaired", sub: "frontmatter clean" },
   { title: "Scanned", sub: "denylist + behavior" },
   { title: "Signed", sub: "ed25519 provenance" },
-  { title: "Indexed", sub: "searchable · scopable" }
+  { title: "Indexed", sub: "searchable and scoped" }
 ];
 </script>

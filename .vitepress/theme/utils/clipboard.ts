@@ -1,13 +1,24 @@
 export async function copyText(text: string): Promise<boolean> {
+  if (copyViaTextarea(text)) return true;
+
   try {
-    window.focus();
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      return true;
+    if (typeof window !== "undefined") window.focus();
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      const copied = await Promise.race([
+        navigator.clipboard.writeText(text).then(() => true).catch(() => false),
+        new Promise<boolean>((resolve) => globalThis.setTimeout(() => resolve(false), 650))
+      ]);
+      if (copied) return true;
     }
   } catch {
     // Fall through to the textarea path for browsers that require focused inputs.
   }
+
+  return copyViaTextarea(text);
+}
+
+function copyViaTextarea(text: string): boolean {
+  if (typeof document === "undefined" || !document.body) return false;
 
   const textarea = document.createElement("textarea");
   textarea.value = text;
