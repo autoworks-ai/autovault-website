@@ -27,9 +27,11 @@ export function buildHostedVaultCheckoutParams({ request, env, user, source = "h
   params.set("metadata[source]", source);
   params.set("subscription_data[metadata][user_id]", user.id);
   params.set("subscription_data[metadata][source]", source);
+  params.set("submit_type", env.STRIPE_CHECKOUT_SUBMIT_TYPE || "subscribe");
   if (user.email) params.set("customer_email", user.email);
 
   applyBranding(params, env);
+  applyCustomText(params, env);
   return params;
 }
 
@@ -110,6 +112,15 @@ function applyBranding(params, env) {
   if (env.STRIPE_BRAND_LOGO_URL) {
     params.set("branding_settings[logo][type]", "url");
     params.set("branding_settings[logo][url]", env.STRIPE_BRAND_LOGO_URL);
+  }
+}
+
+function applyCustomText(params, env) {
+  if (env.STRIPE_CHECKOUT_CUSTOM_TEXT_SUBMIT) {
+    params.set("custom_text[submit][message]", env.STRIPE_CHECKOUT_CUSTOM_TEXT_SUBMIT);
+  }
+  if (env.STRIPE_CHECKOUT_CUSTOM_TEXT_AFTER_SUBMIT) {
+    params.set("custom_text[after_submit][message]", env.STRIPE_CHECKOUT_CUSTOM_TEXT_AFTER_SUBMIT);
   }
 }
 

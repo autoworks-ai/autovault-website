@@ -10,6 +10,9 @@ STRIPE_BRAND_BACKGROUND_COLOR = "#0b1014"
 STRIPE_BRAND_BUTTON_COLOR = "#5ad6c0"
 STRIPE_BRAND_BORDER_STYLE = "rounded"
 STRIPE_BRAND_FONT_FAMILY = "inter"
+STRIPE_BRAND_ICON_URL = "https://autovault.dev/brand-mark.svg"
+STRIPE_CHECKOUT_SUBMIT_TYPE = "subscribe"
+STRIPE_CHECKOUT_CUSTOM_TEXT_SUBMIT = "AutoVault reserves your hosted namespace after Stripe confirms this test subscription. Cloud sync remains disabled until the CLI handoff ships."
 
 [[d1_databases]]
 binding = "AUTOVAULT_DB"
