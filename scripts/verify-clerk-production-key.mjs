@@ -79,5 +79,8 @@ function normalizeTarget(value) {
   if (normalized === "prod" || normalized === "production") return "production";
   if (normalized === "pr" || normalized === "preview" || normalized === "development" || normalized === "dev") return "preview";
 
-  return normalized;
+  console.error(
+    `Unknown CLERK_DEPLOY_TARGET "${value}". Valid values: production, prod, preview, pr, development, dev.`
+  );
+  process.exit(1);
 }

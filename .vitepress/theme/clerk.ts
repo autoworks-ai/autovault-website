@@ -7,7 +7,7 @@ export const clerkBrand = {
   logoLinkUrl: "/",
   cloudPath,
   docsPath: "/quick-start",
-  supportUrl: "https://drunk.support/category/autojack/"
+  supportUrl: "https://github.com/autoworks-ai/autovault/issues"
 } as const;
 
 export const clerkAppearance = {
