@@ -19,8 +19,8 @@
               <span>v1.4.0</span><span class="dot" />
               <span>MIT</span><span class="dot" />
               <span>2,847 bytes</span><span class="dot" />
-              <span>updated 2d ago</span><span class="dot" />
-              <span>maintained by 2 contributors</span>
+              <span>reference fixture</span><span class="dot" />
+              <span>curated by autoworks-ai</span>
             </div>
           </div>
         </div>
@@ -70,7 +70,7 @@
               <div class="sd-frontmatter">
                 <div v-for="line in frontmatterLines" :key="line" v-html="line" />
               </div>
-              <h1>Extract PDF</h1>
+              <h2>Extract PDF</h2>
               <p>Extract structured text from PDF files while preserving heading hierarchy, list structure, and table layout where possible. Wraps a local pdf-parsing library — never sends bytes off-device.</p>
               <h2>When to use this skill</h2>
               <p>Reach for <code>extract-pdf</code> when the user asks you to read, summarize, or extract content from a PDF file. Don't use this skill for structured data extraction — pair with <code>extract-table</code> downstream for that.</p>
@@ -172,13 +172,13 @@
         </section>
 
         <section v-else class="sd-versions-table">
-          <div class="sd-versions-row head"><span>Version</span><span>Notes</span><span>Date</span><span>Gate</span><span>Refs</span></div>
+          <div class="sd-versions-row head"><span>Version</span><span>Notes</span><span>Date</span><span>Gate</span><span>Example</span></div>
           <div v-for="version in versions" :key="version.version" class="sd-versions-row">
             <span class="ver">{{ version.version }}<span v-if="version.latest" class="latest">latest</span></span>
             <span class="notes">{{ version.notes }}</span>
             <span class="date">{{ version.date }}</span>
             <span class="gate">5/5 ✓</span>
-            <span class="install">{{ version.installs }}</span>
+            <span class="install">{{ version.example }}</span>
           </div>
         </section>
       </main>
@@ -213,7 +213,7 @@
           <button class="sd-link-btn" type="button" @click="tab = 'perms'">View full breakdown →</button>
         </div>
         <div class="sd-card">
-          <h4>Maintainers</h4>
+          <h4>Source model</h4>
           <div class="sd-maintainers">
             <div v-for="maintainer in maintainers" :key="maintainer.name" class="sd-maintainer">
               <div class="avatar" :style="{ background: maintainer.bg }" />
@@ -229,6 +229,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import UiIcon from "./UiIcon.vue";
+import { PRODUCT_VERSION } from "../data/product";
 
 type TabId = "overview" | "transform" | "perms" | "prov" | "versions";
 type TargetId = "cc" | "cx" | "cu";
@@ -247,11 +248,11 @@ const tabs = [
 ];
 
 const stats = [
-  { label: "Reference uses", value: "2,840", trend: "+312 this week" },
-  { label: "Active vaults", value: "1,920", trend: "+204 this week" },
-  { label: "Gate runs", value: "12", trend: "all passed" },
-  { label: "Issues open", value: "3<span class=\"unit\">/ 47 closed</span>", trend: "median 2d", muted: true },
-  { label: "Compatibility", value: "4<span class=\"unit\">/ 4 agents</span>", trend: "universal" }
+  { label: "Example type", value: "skill", trend: "reference fixture" },
+  { label: "Render targets", value: "4<span class=\"unit\">/ 4 agents</span>", trend: "demonstrates transforms" },
+  { label: "Gate stages", value: "5", trend: "all shown" },
+  { label: "Permission model", value: "local", trend: "no network", muted: true },
+  { label: "Resources", value: "0", trend: "body-only example" }
 ];
 
 const agents = [
@@ -379,20 +380,20 @@ const permissionGroups = [
 
 const provenance = [
   { icon: "check" as const, ok: true, title: "Authored & signed by @autoworks-ai", detail: "commit f4e02c1 · key: 0x9af4…2c81 · 2,847 bytes", when: "2026-04-28 12:14Z" },
-  { icon: "check" as const, ok: true, title: "Gate run · v0.2.0 · all 5 stages passed", detail: "repair: 0 fixes · denylist: clean · capabilities: aligned · dedup: unique · sign: ed25519", when: "2026-04-28 12:18Z" },
-  { icon: "shield" as const, ok: true, title: "Vault counter-signature", detail: "vault.autoworks-ai · key: vault-2026-04 · isnad link 02", when: "2026-04-28 14:21Z" },
-  { icon: "check" as const, ok: true, title: "Mirrored with vault signature", detail: "cdn.autovault.dev · 3 regional replicas synced", when: "2026-04-28 14:22Z" },
+  { icon: "check" as const, ok: true, title: `Gate run · ${PRODUCT_VERSION} · all 5 stages passed`, detail: "repair: 0 fixes · denylist: clean · capabilities: aligned · dedup: unique · sign: ed25519", when: "example" },
+  { icon: "shield" as const, ok: true, title: "Vault counter-signature", detail: "local vault key · source sidecar · signed manifest", when: "example" },
+  { icon: "check" as const, ok: true, title: "Rendered profile outputs", detail: "Claude Code, Codex, Cursor, and AutoHub variants generated from the same source", when: "example" },
   { icon: "lock" as const, title: "Available for local admission", detail: "verify locally with <code>autovault verify autoworks-ai/extract-pdf@1.4.0</code>", when: "on demand" }
 ];
 
 const versions = [
-  { version: "1.4.0", latest: true, notes: "Add --pages range support; fix table extraction on rotated layouts", date: "2026-04-28", installs: "2.8k" },
-  { version: "1.3.2", notes: "Patch: handle malformed cross-reference tables", date: "2026-04-12", installs: "1.4k" },
-  { version: "1.3.1", notes: "Patch: heading detection regression on 3-column layouts", date: "2026-04-02", installs: "892" },
-  { version: "1.3.0", notes: "Add JSON output format; structured headings/paragraphs/tables", date: "2026-03-19", installs: "1.1k" },
-  { version: "1.2.0", notes: "Heading hierarchy preserved as # markers", date: "2026-02-21", installs: "640" },
-  { version: "1.1.0", notes: "List structure preservation", date: "2026-01-30", installs: "412" },
-  { version: "1.0.0", notes: "Initial example release", date: "2026-01-08", installs: "201" }
+  { version: "1.4.0", latest: true, notes: "Add --pages range support; fix table extraction on rotated layouts", date: "2026-04-28", example: "current" },
+  { version: "1.3.2", notes: "Patch: handle malformed cross-reference tables", date: "2026-04-12", example: "prior" },
+  { version: "1.3.1", notes: "Patch: heading detection regression on 3-column layouts", date: "2026-04-02", example: "prior" },
+  { version: "1.3.0", notes: "Add JSON output format; structured headings/paragraphs/tables", date: "2026-03-19", example: "prior" },
+  { version: "1.2.0", notes: "Heading hierarchy preserved as # markers", date: "2026-02-21", example: "prior" },
+  { version: "1.1.0", notes: "List structure preservation", date: "2026-01-30", example: "prior" },
+  { version: "1.0.0", notes: "Initial example release", date: "2026-01-08", example: "initial" }
 ];
 
 const metadata = [
@@ -414,8 +415,8 @@ const summaryPermissions = [
 ];
 
 const maintainers = [
-  { name: "elvissun", meta: "lead · 142 commits", bg: "linear-gradient(135deg, #5ad6c0, #5a9dd6)" },
-  { name: "iris-d", meta: "22 commits", bg: "linear-gradient(135deg, #d6a85a, #b48ad6)" }
+  { name: "autoworks-ai", meta: "source owner", bg: "linear-gradient(135deg, #5ad6c0, #5a9dd6)" },
+  { name: "local vault", meta: "signs after admission", bg: "linear-gradient(135deg, #d6a85a, #b48ad6)" }
 ];
 
 async function copyInstall() {

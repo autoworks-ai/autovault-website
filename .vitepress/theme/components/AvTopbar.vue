@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import BrandMark from "./BrandMark.vue";
 import ClerkAuthControls from "./ClerkAuthControls.vue";
 import UiIcon from "./UiIcon.vue";
+import { PRODUCT_VERSION } from "../data/product";
 
 type TopbarSearchResult = { title: string; section: string; href: string; terms: string };
 
@@ -79,7 +80,7 @@ onBeforeUnmount(() => {
       <a class="av-brand" href="/">
         <span class="av-brand-mark"><BrandMark /></span>
         <span class="av-brand-name"><span class="auto">Auto</span><span class="vault">Vault</span></span>
-        <span class="av-topbar-version">v0.2.0</span>
+        <span class="av-topbar-version">{{ PRODUCT_VERSION }}</span>
       </a>
 
       <button class="av-topbar-menu av-icon-btn" type="button" aria-controls="av-primary-nav" :aria-expanded="navOpen" aria-label="Open navigation" @click="navOpen = !navOpen">

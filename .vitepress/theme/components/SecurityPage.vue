@@ -48,7 +48,7 @@
 
       <div class="gate-stages-board panel">
         <div class="gsb-head">
-          <span class="ttl">Gate v0.2.0 · source sync</span>
+          <span class="ttl">Gate {{ PRODUCT_VERSION }} · source sync</span>
           <span class="meta">schema · denylist · capability · dedup · sign</span>
         </div>
         <div class="gsb-grid">
@@ -161,6 +161,7 @@
 <script setup lang="ts">
 import { computed, defineComponent, h, onBeforeUnmount, ref } from "vue";
 import UiIcon from "./UiIcon.vue";
+import { PRODUCT_VERSION } from "../data/product";
 import { denyRows } from "../data/security";
 
 type Phase = "idle" | "running" | "ok" | "fail";

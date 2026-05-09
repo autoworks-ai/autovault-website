@@ -35,6 +35,7 @@ describe("agent markdown docs", () => {
     const llms = buildLlmsTxt();
     const full = buildLlmsFullTxt();
     const transformItems = vitepressConfig.sitemap?.transformItems;
+    const transformHead = vitepressConfig.transformHead;
 
     expect(cloud).toMatchObject({ route: "/cloud", listed: false });
     expect(listedPageDocs.some((doc) => doc.key === "cloud")).toBe(false);
@@ -49,5 +50,21 @@ describe("agent markdown docs", () => {
       { url: "quick-start" }
     ]);
     expect(sitemapItems?.map((item) => item.url)).toEqual(["quick-start"]);
+
+    expect(transformHead).toBeTypeOf("function");
+    const head = transformHead?.({
+      pageData: {
+        relativePath: "cloud.md",
+        filePath: "cloud.md",
+        title: "AutoVault Cloud Launch",
+        description: "",
+        headers: [],
+        frontmatter: {}
+      },
+      siteConfig: {} as never,
+      siteData: {} as never,
+      page: "cloud.md"
+    } as never);
+    expect(JSON.stringify(head)).toContain("noindex,nofollow");
   });
 });

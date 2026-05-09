@@ -68,7 +68,7 @@
           </div>
           <div class="desc">{{ skill.desc }}</div>
           <div class="row3">
-            <span class="install">{{ skill.installs }} refs</span>
+            <span class="install">{{ skill.references }} refs</span>
             <span class="spacer" />
             <div class="agents">
               <span v-for="agent in agentIds" :key="agent" class="a" :style="agentStyle(skill, agent)">{{ agent }}</span>
@@ -79,9 +79,9 @@
     </section>
 
     <section class="au-section reveal-item">
-      <div class="eyebrow"><span class="dash" /> Trust track record</div>
-      <h2>What the gate has seen from this source</h2>
-      <p class="sub">A verified author isn't a free pass. Every admission still runs the same five stages, including the failures. No source should ever look like 100%.</p>
+      <div class="eyebrow"><span class="dash" /> Reference coverage</div>
+      <h2>What this source demonstrates</h2>
+      <p class="sub">This is fixture data for the example set, not a live marketplace score. It shows the kinds of gate outcomes and provenance signals a real source profile should expose.</p>
       <div class="au-track">
         <div class="au-track-grid">
           <div v-for="cell in track" :key="cell.label" class="au-track-cell">
@@ -94,12 +94,12 @@
     </section>
 
     <section class="au-section reveal-item">
-      <div class="eyebrow"><span class="dash" /> Activity</div>
-      <h2>What this source has been doing</h2>
-      <p class="sub">A feed of proposals, admissions, updates, and gate verdicts — including the rejections. Activity is signed and append-only.</p>
+      <div class="eyebrow"><span class="dash" /> Example audit trail</div>
+      <h2>How a source profile should explain changes</h2>
+      <p class="sub">The rows below are representative provenance events for the reference skills. They are intentionally labeled as examples until AutoVault ships a live source feed.</p>
       <div class="au-activity">
         <div class="au-activity-feed">
-          <div class="feed-head">Last 12 weeks · 7 events</div>
+          <div class="feed-head">Representative fixture · 7 events</div>
           <div v-for="item in activity" :key="`${item.kind}-${item.name}`" class="au-activity-row">
             <div :class="['pip', item.kind]"><UiIcon :name="item.kind === 'admit' ? 'check' : item.kind === 'update' ? 'arrow' : 'x'" /></div>
             <div class="body">
@@ -110,8 +110,8 @@
           </div>
         </div>
         <div class="au-cadence">
-          <h4>Admission cadence</h4>
-          <div class="h4-sub">last 26 weeks · 130 events</div>
+          <h4>Review cadence fixture</h4>
+          <div class="h4-sub">sample density for layout testing</div>
           <div class="au-cadence-grid">
             <div v-for="(value, index) in cadenceData" :key="index" class="au-cadence-cell" :style="{ background: cadenceColor(value) }" />
           </div>
@@ -119,24 +119,24 @@
             <span>less</span>
             <div class="scale"><div v-for="value in [0, 1, 2, 3, 4]" :key="value" :style="{ background: cadenceColor(value) }" /></div>
             <span>more</span>
-            <span class="median">median: 4 / week</span>
+            <span class="median">fixture only</span>
           </div>
         </div>
       </div>
     </section>
 
     <section class="au-section reveal-item">
-      <div class="eyebrow"><span class="dash" /> Maintainers</div>
-      <h2>Who's behind these skills</h2>
-      <p class="sub">Each maintainer holds an individual signing key under the org root. Compromise of a personal key revokes only that maintainer's signatures — the org chain stays intact.</p>
+      <div class="eyebrow"><span class="dash" /> Signing model</div>
+      <h2>How maintainer identity is represented</h2>
+      <p class="sub">The public v1 website shows representative signing-key rows rather than claiming a live contributor roster.</p>
       <div class="au-contrib-list">
-        <div v-for="contributor in contributors" :key="contributor.name" class="au-contrib" :class="{ open: contributor.open }">
-          <div class="av" :style="{ background: contributor.bg }" />
+        <div v-for="identity in signingIdentities" :key="identity.name" class="au-contrib" :class="{ open: identity.open }">
+          <div class="av" :style="{ background: identity.bg }" />
           <div class="col">
-            <div class="name">{{ contributor.name }}</div>
-            <div class="meta">{{ contributor.meta }}</div>
+            <div class="name">{{ identity.name }}</div>
+            <div class="meta">{{ identity.meta }}</div>
           </div>
-          <div class="stat">{{ contributor.stat }}</div>
+          <div class="stat">{{ identity.stat }}</div>
         </div>
       </div>
     </section>
@@ -154,9 +154,16 @@ type AuthorSkill = {
   version: string;
   category: string;
   agents: AgentId[];
-  installs: string;
+  references: string;
   desc: string;
   flagship?: boolean;
+};
+type TrackCell = {
+  label: string;
+  value: string;
+  detail: string;
+  kind?: string;
+  sub?: string;
 };
 
 const selectedCategory = ref("all");
@@ -176,38 +183,38 @@ const certificate = [
 ];
 
 const stats = [
-  { label: "Example skills", value: "14", trend: "+2 this month" },
-  { label: "Reference uses", value: "12.8<span class=\"unit\">k</span>", trend: "+1.6k this week" },
-  { label: "Gate pass rate", value: "96.4<span class=\"unit\">%</span>", trend: "81 of 84 submissions" },
-  { label: "Median bundle", value: "3.1<span class=\"unit\">KB</span>", trend: "75th: 5.4KB", dim: true },
-  { label: "Issue response", value: "14<span class=\"unit\">h</span>", trend: "median, last 90d" }
+  { label: "Example skills", value: "14", trend: "curated fixtures" },
+  { label: "Reference rows", value: "14", trend: "source-profile examples" },
+  { label: "Render targets", value: "4", trend: "Claude Code, Codex, Cursor, AutoHub" },
+  { label: "Gate stages", value: "5", trend: "same pipeline as installs" },
+  { label: "Median bundle", value: "3.1<span class=\"unit\">KB</span>", trend: "example payload", dim: true }
 ];
 
 const authorSkills: AuthorSkill[] = [
-  { name: "extract-pdf", icon: "PD", version: "1.4.0", category: "files", agents: ["cc", "cx", "cu", "ah"], installs: "2.8k", desc: "Extract structured text from PDF files. Preserves headings, lists, and table layout.", flagship: true },
-  { name: "summarize-doc", icon: "SD", version: "0.9.2", category: "text", agents: ["cc", "cx", "cu", "ah"], installs: "1.9k", desc: "Recursive multi-pass summarization with configurable depth.", flagship: true },
-  { name: "github-issues", icon: "GH", version: "2.1.0", category: "integrations", agents: ["cc", "cx", "cu"], installs: "1.4k", desc: "Read, search, and create GitHub issues. Scoped to authorized repos.", flagship: true },
-  { name: "ocr-image", icon: "OC", version: "1.2.1", category: "files", agents: ["cc", "cx", "cu", "ah"], installs: "1.1k", desc: "OCR an image to text. Wraps tesseract locally; never sends pixels off-device." },
-  { name: "json-validate", icon: "JV", version: "1.2.0", category: "data", agents: ["cc", "cx", "cu", "ah"], installs: "1.0k", desc: "Validate JSON against a schema with structured error reporting." },
-  { name: "parse-csv", icon: "CV", version: "1.0.4", category: "files", agents: ["cc", "cx", "cu", "ah"], installs: "980", desc: "Parse CSV with type inference and configurable dialects." },
-  { name: "yaml-validate", icon: "YV", version: "0.9.0", category: "data", agents: ["cc", "cx", "cu", "ah"], installs: "840", desc: "Validate YAML with auto-repair suggestions — same engine as the gate." },
-  { name: "extract-table", icon: "TB", version: "0.7.0", category: "files", agents: ["cc", "cx"], installs: "720", desc: "Pull structured tables from HTML, PDF, and image sources into normalized rows." },
-  { name: "diff-summarize", icon: "DS", version: "0.6.0", category: "code", agents: ["cc", "cx", "cu", "ah"], installs: "470", desc: "Walk a diff and produce a structured summary of intent + risk per hunk." },
-  { name: "git-blame", icon: "GB", version: "1.1.0", category: "code", agents: ["cc", "cx", "cu"], installs: "540", desc: "Annotate git blame across a repo with author + commit summary." },
-  { name: "tf-plan-explain", icon: "TF", version: "0.4.0", category: "infra", agents: ["cc", "cx"], installs: "220", desc: "Read a terraform plan and produce a human-readable change summary." },
-  { name: "regex-extract", icon: "RX", version: "1.5.0", category: "text", agents: ["cc", "cx", "cu", "ah"], installs: "1.5k", desc: "Test, refine, and run regex against sample text." },
-  { name: "linear-tasks", icon: "LN", version: "0.4.0", category: "integrations", agents: ["cc", "cx"], installs: "380", desc: "Read and update Linear tasks scoped to a workspace." },
-  { name: "slack-search", icon: "SL", version: "0.3.1", category: "integrations", agents: ["cc", "cx", "cu"], installs: "290", desc: "Search a Slack workspace and return formatted thread context." }
+  { name: "extract-pdf", icon: "PD", version: "1.4.0", category: "files", agents: ["cc", "cx", "cu", "ah"], references: "18", desc: "Extract structured text from PDF files. Preserves headings, lists, and table layout.", flagship: true },
+  { name: "summarize-doc", icon: "SD", version: "0.9.2", category: "text", agents: ["cc", "cx", "cu", "ah"], references: "15", desc: "Recursive multi-pass summarization with configurable depth.", flagship: true },
+  { name: "github-issues", icon: "GH", version: "2.1.0", category: "integrations", agents: ["cc", "cx", "cu"], references: "13", desc: "Read, search, and create GitHub issues. Scoped to authorized repos.", flagship: true },
+  { name: "ocr-image", icon: "OC", version: "1.2.1", category: "files", agents: ["cc", "cx", "cu", "ah"], references: "10", desc: "OCR an image to text. Wraps tesseract locally; never sends pixels off-device." },
+  { name: "json-validate", icon: "JV", version: "1.2.0", category: "data", agents: ["cc", "cx", "cu", "ah"], references: "10", desc: "Validate JSON against a schema with structured error reporting." },
+  { name: "parse-csv", icon: "CV", version: "1.0.4", category: "files", agents: ["cc", "cx", "cu", "ah"], references: "11", desc: "Parse CSV with type inference and configurable dialects." },
+  { name: "yaml-validate", icon: "YV", version: "0.9.0", category: "data", agents: ["cc", "cx", "cu", "ah"], references: "10", desc: "Validate YAML with auto-repair suggestions — same engine as the gate." },
+  { name: "extract-table", icon: "TB", version: "0.7.0", category: "files", agents: ["cc", "cx"], references: "9", desc: "Pull structured tables from HTML, PDF, and image sources into normalized rows." },
+  { name: "diff-summarize", icon: "DS", version: "0.6.0", category: "code", agents: ["cc", "cx", "cu", "ah"], references: "8", desc: "Walk a diff and produce a structured summary of intent + risk per hunk." },
+  { name: "git-blame", icon: "GB", version: "1.1.0", category: "code", agents: ["cc", "cx", "cu"], references: "8", desc: "Annotate git blame across a repo with author + commit summary." },
+  { name: "tf-plan-explain", icon: "TF", version: "0.4.0", category: "infra", agents: ["cc", "cx"], references: "4", desc: "Read a terraform plan and produce a human-readable change summary." },
+  { name: "regex-extract", icon: "RX", version: "1.5.0", category: "text", agents: ["cc", "cx", "cu", "ah"], references: "12", desc: "Test, refine, and run regex against sample text." },
+  { name: "linear-tasks", icon: "LN", version: "0.4.0", category: "integrations", agents: ["cc", "cx"], references: "6", desc: "Read and update Linear tasks scoped to a workspace." },
+  { name: "slack-search", icon: "SL", version: "0.3.1", category: "integrations", agents: ["cc", "cx", "cu"], references: "6", desc: "Search a Slack workspace and return formatted thread context." }
 ];
 
 const categories = ["all", "files", "text", "data", "code", "integrations", "infra"];
 const filteredSkills = computed(() => selectedCategory.value === "all" ? authorSkills : authorSkills.filter((skill) => skill.category === selectedCategory.value));
 
-const track = [
-  { label: "Submissions", value: "84", detail: "across 14 skills · last 12 months" },
-  { label: "Passed clean", value: "81", sub: "/ 96.4%", detail: "no repair, no flag, no dedup hit" },
-  { label: "Auto-repaired", value: "11", sub: "/ 13.1%", kind: "warn", detail: "YAML frontmatter fixes, mostly" },
-  { label: "Rejected", value: "3", sub: "/ 3.6%", kind: "bad", detail: "2 capability mismatch, 1 dedup" }
+const track: TrackCell[] = [
+  { label: "Example rows", value: "14", detail: "curated source-profile fixtures" },
+  { label: "Pass case", value: "clean", detail: "no repair, no flag, no dedup hit" },
+  { label: "Repair case", value: "shown", kind: "warn", detail: "YAML frontmatter fixes" },
+  { label: "Reject case", value: "shown", kind: "bad", detail: "capability mismatch or dedup" }
 ];
 
 const activity = [
@@ -225,11 +232,11 @@ const cadenceData = Array.from({ length: 26 * 5 }, (_, index) => {
   return Math.floor(Math.pow(seed / 233280, 2) * 5);
 });
 
-const contributors = [
-  { name: "elvissun", meta: "key:0xC4F9…E10A · since 2026-01-08", stat: "412 commits", bg: "linear-gradient(135deg, #5ad6c0, #5a9dd6)" },
-  { name: "iris-d", meta: "key:0xD6A8…5AB4 · since 2026-02-19", stat: "180 commits", bg: "linear-gradient(135deg, #d6a85a, #b48ad6)" },
-  { name: "sky-w", meta: "key:0xB48A…D6E2 · since 2026-03-04", stat: "94 commits", bg: "linear-gradient(135deg, #b48ad6, #5ad6c0)" },
-  { name: "Open seat", meta: "contributing@autoworks-ai", stat: "—", bg: "var(--bg-2)", open: true }
+const signingIdentities = [
+  { name: "source owner", meta: "key:0xC4F9…E10A · representative fixture", stat: "author", bg: "linear-gradient(135deg, #5ad6c0, #5a9dd6)" },
+  { name: "vault admission", meta: "key:0xD6A8…5AB4 · representative fixture", stat: "counter-sign", bg: "linear-gradient(135deg, #d6a85a, #b48ad6)" },
+  { name: "release gate", meta: "key:0xB48A…D6E2 · representative fixture", stat: "verify", bg: "linear-gradient(135deg, #b48ad6, #5ad6c0)" },
+  { name: "team key slot", meta: "configured locally per vault", stat: "optional", bg: "var(--bg-2)", open: true }
 ];
 
 function cadenceColor(value: number) {

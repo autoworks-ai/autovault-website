@@ -20,7 +20,7 @@
               {{ method }}
             </button>
             <span class="tabs-sep" />
-            <span class="tabs-meta">v0.2.0 · Unreleased May 2026 · MIT</span>
+            <span class="tabs-meta">{{ PRODUCT_VERSION_BADGE }}</span>
           </div>
           <div class="install-cmd">
             <span class="prompt">$</span>
@@ -60,7 +60,7 @@
       <div class="terminal-head"><span class="dot live" /><span class="dot" /><span class="dot" /><span class="ttl">autovault doctor</span></div>
       <div class="terminal-body compact">
         <div class="line"><span class="pmt">$</span><span>autovault doctor</span></div>
-        <div class="ok">  ✓ binary signed · v0.2.0</div>
+        <div class="ok">  ✓ binary signed · {{ PRODUCT_VERSION }}</div>
         <div class="ok">  ✓ ~/.autovault initialized · bundled skills indexed</div>
         <div class="ok">  ✓ local keypair available · ed25519</div>
         <div class="ok">  ✓ detected agents · claude-code, codex, cursor</div>
@@ -172,6 +172,7 @@ import { computed, defineComponent, h, ref } from "vue";
 import AvDocBreadcrumb from "./AvDocBreadcrumb.vue";
 import CodeBlock from "./CodeBlock.vue";
 import { useTerminalReplay, type TerminalReplayLine } from "../composables/useTerminalReplay";
+import { PRODUCT_VERSION, PRODUCT_VERSION_BADGE } from "../data/product";
 import { copyText } from "../utils/clipboard";
 
 type Method = "curl" | "brew";
@@ -258,7 +259,7 @@ const TerminalDemo = defineComponent({
       { type: "cmd", text: "curl -fsSL https://autovault.sh | sh" },
       { type: "out", text: "↳ downloading autovault-installer" },
       { type: "out", text: "↳ verifying installer signature" },
-      { type: "ok", text: "✓ signature ok · v0.2.0" },
+      { type: "ok", text: `✓ signature ok · ${PRODUCT_VERSION}` },
       { type: "out", text: "↳ installed to ~/.autovault" },
       { type: "out", text: "↳ refreshing managed profile links:" },
       { type: "out", text: "    ~/.claude/skills/autovault-skill → ~/.autovault/profiles/claude-code/autovault-skill" },

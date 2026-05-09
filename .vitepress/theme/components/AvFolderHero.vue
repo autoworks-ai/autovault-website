@@ -108,10 +108,10 @@ function resumeCycle() {
         <span>The simple answer</span>
       </div>
 
-      <h1 class="av-folder-title">
+      <h2 class="av-folder-title">
         It's a folder.<br />
         <span class="ital">That's the whole pitch.</span>
-      </h1>
+      </h2>
 
       <p class="av-folder-lede">
         AutoVault lives at <code>~/.autovault</code>. Your skills go in there.

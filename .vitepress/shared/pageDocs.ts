@@ -1,3 +1,5 @@
+import { PRODUCT_VERSION } from "../theme/data/product";
+
 export const SITE_URL = "https://autovault.dev";
 
 export type PageDocKey =
@@ -74,7 +76,7 @@ brew install autoworks-ai/tap/autovault
 autovault skill list
 \`\`\`
 
-The installer writes ~/.autovault, installs the local CLI shim, preserves the folder as user-owned storage, and bootstraps bundled skills unless AUTOVAULT_NO_BOOTSTRAP=1 is set. AutoVault v0.2.0 is currently labeled Unreleased May 2026.
+The installer writes ~/.autovault, installs the local CLI shim, preserves the folder as user-owned storage, and bootstraps bundled skills unless AUTOVAULT_NO_BOOTSTRAP=1 is set. The current public package is ${PRODUCT_VERSION}; AutoVault remains pre-1.0.
 
 ## Verify
 
@@ -107,7 +109,7 @@ Scope decides which agents, projects, devices, and profile links can load the si
 
 const cloudMarkdown = `# AutoVault Cloud Launch
 
-AutoVault Cloud is currently paid hosted onboarding: users create an account, subscribe through Stripe Checkout, and reserve a hosted namespace while full cloud sync is being built.
+AutoVault Cloud is currently paid hosted onboarding: users create an account, subscribe through Stripe Checkout, and reserve a hosted namespace. Cloud sync is not enabled yet; local AutoVault remains the signing and profile-sync source of truth.
 
 ## Promise
 
@@ -333,7 +335,7 @@ export const pageDocs: PageDoc[] = [
     key: "cloud",
     file: "cloud.md",
     title: "AutoVault Cloud Launch",
-    description: "Create a Clerk account, subscribe through Stripe Checkout, and reserve a hosted AutoVault namespace while cloud sync is coming soon.",
+    description: "Create a Clerk account, subscribe through Stripe Checkout, and reserve a hosted AutoVault namespace. Cloud sync is not enabled yet.",
     route: "/cloud",
     agentPath: "/agents/cloud",
     markdown: cloudMarkdown,

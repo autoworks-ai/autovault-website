@@ -1,7 +1,7 @@
 <template>
   <div class="cm-page reveal-page">
     <section class="cm-hero reveal-item">
-      <div class="eyebrow"><span class="dash" /> Comparison · v0.2.0 · 2026-05</div>
+      <div class="eyebrow"><span class="dash" /> Comparison · {{ PRODUCT_RELEASE_LABEL }}</div>
       <h1>The honest breakdown of <span class="ital">where AutoVault wins, ties, and doesn't.</span></h1>
       <p class="lede">The homepage table is a teaser. This page is the long form — including the cases where another approach is genuinely better. We re-evaluate every release; if a competitor closes a gap, we say so here first.</p>
     </section>
@@ -117,6 +117,7 @@
 </template>
 
 <script setup lang="ts">
+import { PRODUCT_RELEASE_LABEL, PRODUCT_VERSION } from "../data/product";
 import { denyRows } from "../data/security";
 
 type Verdict = "yes" | "no" | "partial" | "bad";
@@ -135,7 +136,7 @@ type ComparisonRow =
     };
 
 const players = [
-  { id: "av" as const, name: "AutoVault", desc: "Local-first vault. Gate, sign, scope, and render one SKILL.md per caller.", badge: "AV", color: "#5ad6c0", ink: "#062821", us: true, meta: ["v0.2.0", "MIT", "self-hosted"] },
+  { id: "av" as const, name: "AutoVault", desc: "Local-first vault. Gate, sign, scope, and render one SKILL.md per caller.", badge: "AV", color: "#5ad6c0", ink: "#062821", us: true, meta: [PRODUCT_VERSION, "MIT", "self-hosted"] },
   { id: "sf" as const, name: "Skillfish", desc: "Open-source skill manager for install, update, sync, and team bundles across many agents.", badge: "SF", color: "#5a9dd6", ink: "#06182a", meta: ["open source", "multi-agent", "team bundles"] },
   { id: "ts" as const, name: "Tessl", desc: "Package and distribution layer for skills and agents, strongest as a published ecosystem.", badge: "TS", color: "#b48ad6", ink: "#1d0f2a", meta: ["ecosystem", "distribution", "hosted"] },
   { id: "sk" as const, name: "SkillKit / specs", desc: "Directory and spec-oriented discovery surfaces for reusable skill source material.", badge: "SK", color: "#d6a85a", ink: "#2a1a06", meta: ["discovery", "specs", "source material"] },
@@ -159,7 +160,7 @@ const rows: ComparisonRow[] = [
   row("Progressive disclosure", "Agents can search first and fetch full instructions only when needed", ["yes", "MCP-native", "Inventory lookup, exact read, resources on demand"], ["partial", "Manager metadata", "Depends on host integration"], ["partial", "Hosted metadata", "Good browsing surface, different runtime model"], ["partial", "Spec metadata", "Useful if tooling uses it"], ["no", "Full file load", "Everything is just text in a folder"]),
   { kind: "section", label: "Operations and openness" },
   row("Dedup before local use", "Stops duplicate-skill sprawl before it reaches profiles", ["yes", "Gate stage", "Exact and near-exact checks before signing"], ["partial", "Manager view", "Can reduce drift, but not positioned as gate-stage dedup"], ["partial", "Discovery ranking", "Catalogs can group similar entries"], ["no", "n/a", "No local inventory"], ["no", "n/a", "Duplicates are easy to create"]),
-  row("Self-hostable remote mode", "Run a private vault behind your VPN", ["yes", "Docker / Railway / Render", "Same gate, your keys, your mirror"], ["partial", "Local/team manager", "Good local story; remote vault is not the central shape"], ["partial", "Hosted ecosystem", "Use when hosted distribution is desired"], ["no", "n/a", "No vault service"], ["partial", "File shares", "Possible, but policy remains manual"]),
+  row("Self-hostable remote mode", "Run a private vault behind your VPN", ["yes", "Docker / Railway", "Same gate, your keys, your mirror"], ["partial", "Local/team manager", "Good local story; remote vault is not the central shape"], ["partial", "Hosted ecosystem", "Use when hosted distribution is desired"], ["no", "n/a", "No vault service"], ["partial", "File shares", "Possible, but policy remains manual"]),
   row("Vendor lock-in risk", "If a project disappears tomorrow", ["yes", "Plain SKILL.md files", "Markdown + signed JSON + source sidecars"], ["yes", "Plain skill files", "Local installs survive"], ["partial", "Published ecosystem", "Artifacts may survive, workflow depends on service"], ["yes", "Plain source", "Spec/examples remain portable"], ["yes", "Your files", "The drift is yours too"])
 ];
 
