@@ -67,7 +67,10 @@
       <div class="deploy-detail">
         <div class="head">
           <div class="logo" :style="{ background: activeProvider.logoBg, color: activeProvider.logoFg }">{{ activeProvider.short }}</div>
-          <div class="ttl">Deploy to <strong>{{ activeProvider.name }}</strong> · 4 steps · {{ activeProvider.time }}</div>
+          <div class="ttl">Deploy to <strong>{{ activeProvider.name }}</strong> · {{ activeProvider.steps.length }} steps · {{ activeProvider.time }}</div>
+          <a v-if="activeProvider.primaryCtaHref" class="deploy-primary" :href="activeProvider.primaryCtaHref" target="_blank" rel="noopener noreferrer">
+            {{ activeProvider.primaryCtaLabel }}
+          </a>
           <button class="copy-btn" type="button" @click="copyProvider">{{ copied ? "Copied" : "Copy all commands" }}</button>
         </div>
         <div class="body">
@@ -79,6 +82,11 @@
                 <p>{{ step.body }}</p>
                 <pre v-if="step.command" class="cmd"><code>{{ step.command }}</code></pre>
               </div>
+            </div>
+            <div v-if="activeProvider.manual" class="manual-image">
+              <div class="manual-label">Manual image deploy</div>
+              <p>{{ activeProvider.manual.body }}</p>
+              <pre class="cmd"><code>{{ activeProvider.manual.command }}</code></pre>
             </div>
           </div>
           <div class="preview">
@@ -173,10 +181,15 @@ type Provider = {
   desc: string;
   feat: string[];
   steps: Array<{ title: string; body: string; command?: string }>;
+  primaryCtaHref?: string;
+  primaryCtaLabel?: string;
+  manual?: { body: string; command: string };
 };
 
 const active = ref("railway");
 const copied = ref(false);
+const RAILWAY_TEMPLATE_URL = "https://railway.com/deploy/autovault?referralCode=VuFE6g&utm_medium=integration&utm_source=template&utm_campaign=generic";
+const MANUAL_GHCR_IMAGE = "ghcr.io/autoworks-ai/autovault:v0.2.1";
 
 const providers: Provider[] = [
   {
@@ -186,13 +199,20 @@ const providers: Provider[] = [
     logoBg: "#0B0D0E",
     logoFg: "#fff",
     time: "~3 min",
-    desc: "Pulls the published GHCR image, attaches a persistent volume at /data/autovault, sets env vars, exposes managed HTTPS.",
-    feat: ["GHCR image", "persistent volume", "managed TLS", "version-pinned"],
+    desc: "Starts from the AutoVault Railway template, keeps state on /data/autovault, and exposes the remote MCP service over managed HTTPS.",
+    feat: ["one-click template", "persistent volume", "managed TLS", "OAuth MCP"],
+    primaryCtaHref: RAILWAY_TEMPLATE_URL,
+    primaryCtaLabel: "Deploy on Railway",
+    manual: {
+      body: "For advanced operators who need to debug the service shape directly, deploy the public GHCR image yourself and keep the same volume and env contract.",
+      command: `${MANUAL_GHCR_IMAGE}\nvolume: /data/autovault\nleave PORT unset`
+    },
     steps: [
-      { title: "Create the service from the image", body: "Use Railway's 'Deploy from Docker image' option. Pin a version for reproducibility (or use :latest if you want auto-update). The package is public, so no registry credentials are required.", command: `ghcr.io/autoworks-ai/autovault:${PRODUCT_VERSION_SHORT}` },
-      { title: "Mount the volume before the first deploy", body: "First boot seeds owner credentials, signing keys, and skills onto the storage path. If the volume isn't attached first, that state lands on ephemeral disk and disappears on the next deploy.", command: "mount path: /data/autovault\nsize: 1 GB (room to grow)" },
-      { title: "Generate the public domain, then set env", body: "Railway injects PORT — do not override it. AUTOVAULT_PUBLIC_URL must match the *.up.railway.app domain because it's used as the OAuth issuer.", command: "AUTOVAULT_MODE=remote\nAUTOVAULT_STORAGE_PATH=/data/autovault\nAUTOVAULT_PUBLIC_URL=https://<your-service>.up.railway.app\nAUTOVAULT_ADMIN_EMAIL=admin@example.com\nAUTOVAULT_ADMIN_PASSWORD=<long random string>\nAUTOVAULT_SECURITY_STRICT=true\nAUTOVAULT_LOG_LEVEL=info" },
-      { title: "Verify with smoke probes", body: "Healthz returns 200, OAuth discovery exposes the issuer, an unauthenticated MCP probe returns 401 with a WWW-Authenticate hint pointing at the OAuth metadata.", command: "URL=https://<your-service>.up.railway.app\ncurl -fsS \"$URL/healthz\" | jq\ncurl -fsS \"$URL/.well-known/oauth-authorization-server\" | jq\nAUTOVAULT_REMOTE_URL=$URL \\\n  AUTOVAULT_ADMIN_EMAIL=... AUTOVAULT_ADMIN_PASSWORD=... \\\n  npm run smoke:remote" }
+      { title: "Open the Railway template", body: "Start from the AutoVault template rather than a raw repo deploy. The template is wired for the remote MCP container and keeps the public setup path reproducible.", command: RAILWAY_TEMPLATE_URL },
+      { title: "Set the owner credentials", body: "Railway should prompt for the first owner email and a secret admin password. The password must be at least 12 characters and is hashed on first boot.", command: "AUTOVAULT_ADMIN_EMAIL=admin@example.com\nAUTOVAULT_ADMIN_PASSWORD=<long random string, min 12 chars>" },
+      { title: "Confirm the persistent volume", body: "The remote server stores users, OAuth keys, signing keys, and skills under the vault path. Keep the Railway volume mounted at /data/autovault before the first healthy deploy.", command: "AUTOVAULT_STORAGE_PATH=/data/autovault\nvolume mount: /data/autovault\nrecommended size: 1 GB" },
+      { title: "Confirm the public URL", body: "Railway injects PORT, so leave it unset. AUTOVAULT_PUBLIC_URL must match the generated *.up.railway.app domain because OAuth metadata uses it as the issuer.", command: "AUTOVAULT_MODE=remote\nAUTOVAULT_PUBLIC_URL=https://<your-service>.up.railway.app\nAUTOVAULT_SECURITY_STRICT=true\nAUTOVAULT_LOG_LEVEL=info" },
+      { title: "Verify the remote MCP service", body: "Healthz returns 200, OAuth discovery exposes the issuer, and unauthenticated MCP returns 401 with a WWW-Authenticate hint pointing at OAuth metadata.", command: "URL=https://<your-service>.up.railway.app\ncurl -fsS \"$URL/healthz\" | jq\ncurl -fsS \"$URL/.well-known/oauth-authorization-server\" | jq\ncurl -i -X POST \"$URL/mcp\" \\\n  -H 'Content-Type: application/json' \\\n  -H 'Accept: application/json, text/event-stream' \\\n  -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}'" }
     ]
   },
   {
@@ -205,7 +225,7 @@ const providers: Provider[] = [
     desc: "Self-host with Compose. Brings up the remote MCP service, SQLite volume, and reverse proxy.",
     feat: ["self-hosted", "SQLite", "Compose", "BYO TLS"],
     steps: [
-      { title: "Pull image and seed env", body: "The container defaults to remote mode. Compose now requires explicit admin credentials.", command: `docker pull ghcr.io/autoworks-ai/autovault:${PRODUCT_VERSION_SHORT}\ncp .env.example .env\n$EDITOR .env` },
+      { title: "Pull image and seed env", body: "The container defaults to remote mode. Compose now requires explicit admin credentials.", command: `docker pull ${MANUAL_GHCR_IMAGE}\ncp .env.example .env\n$EDITOR .env` },
       { title: "Validate compose", body: "Compose hard-fails if the admin vars are unset.", command: "docker compose config\n✓ AUTOVAULT_ADMIN_EMAIL set\n✓ AUTOVAULT_ADMIN_PASSWORD set" },
       { title: "Bring it up", body: "Service binds to 0.0.0.0:3000 inside the container (the bundled compose file publishes 3000:3000). Put Caddy, Traefik, or nginx in front for TLS.", command: "docker compose up -d\n✓ autovault running on :3000" },
       { title: "Test the MCP endpoint", body: "Unauthenticated POST /mcp returns 401 with a WWW-Authenticate header pointing at /.well-known/oauth-protected-resource/mcp. That confirms transport, auth middleware, and CORS in one call.", command: "curl -i -X POST http://localhost:3000/mcp \\\n  -H 'Content-Type: application/json' \\\n  -H 'Accept: application/json, text/event-stream' \\\n  -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}'" }
@@ -385,7 +405,10 @@ function envGroupChipClass(group: EnvGroup) {
 async function copyProvider() {
   copied.value = true;
   try {
-    await navigator.clipboard?.writeText(activeProvider.value.steps.map((step) => step.command).filter(Boolean).join("\n\n"));
+    const provider = activeProvider.value;
+    const parts = provider.steps.map((step) => step.command).filter(Boolean);
+    if (provider.manual) parts.push(provider.manual.command);
+    await navigator.clipboard?.writeText(parts.join("\n\n"));
   } catch {
     // Clipboard is a progressive enhancement in the static docs.
   }

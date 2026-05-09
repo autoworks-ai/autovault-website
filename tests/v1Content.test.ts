@@ -6,10 +6,13 @@ import { comparisonPlayers, comparisonSources, homepageComparisonRows, homepageG
 import { PRODUCT_STATUS, PRODUCT_VERSION, PRODUCT_VERSION_BADGE, PRODUCT_VERSION_SHORT } from "../.vitepress/theme/data/product";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const railwayTemplateUrl =
+  "https://railway.com/deploy/autovault?referralCode=VuFE6g&utm_medium=integration&utm_source=template&utm_campaign=generic";
 
 describe("v1 content guardrails", () => {
   it("keeps primary product version copy centralized", () => {
     expect(PRODUCT_VERSION).toBe(`v${PRODUCT_VERSION_SHORT}`);
+    expect(PRODUCT_VERSION).toBe("v0.2.1");
     expect(PRODUCT_STATUS).toBe("pre-1.0");
     expect(PRODUCT_VERSION_BADGE).toContain(PRODUCT_VERSION);
     expect(PRODUCT_VERSION_BADGE).not.toContain("Unreleased May 2026");
@@ -45,9 +48,15 @@ describe("v1 content guardrails", () => {
 
   it("keeps deploy claims limited to verified v1 providers", () => {
     const deploy = read(".vitepress/theme/components/DeployPage.vue");
+    const deployMarkdown = read(".vitepress/shared/pageDocs.ts");
 
     expect(deploy).toContain('name: "Railway"');
     expect(deploy).toContain('name: "Docker"');
+    expect(deploy).toContain(railwayTemplateUrl);
+    expect(deployMarkdown).toContain(railwayTemplateUrl);
+    expect(deploy).toContain("ghcr.io/autoworks-ai/autovault:v0.2.1");
+    expect(deployMarkdown).toContain("ghcr.io/autoworks-ai/autovault:v0.2.1");
+    expect(deploy).toContain("Manual image deploy");
     expect(deploy).toContain("Min 12 chars");
     expect(deploy).not.toMatch(/\bRender\b|Fly\.io|officially-tested|24 chars|render\.yaml|fly\.toml|LiteFS/);
   });
