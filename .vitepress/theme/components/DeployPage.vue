@@ -168,6 +168,7 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, h, ref } from "vue";
+import { MANUAL_GHCR_IMAGE, RAILWAY_TEMPLATE_URL } from "../../shared/deploy";
 import { PRODUCT_VERSION_SHORT } from "../data/product";
 import UiIcon from "./UiIcon.vue";
 
@@ -188,8 +189,6 @@ type Provider = {
 
 const active = ref("railway");
 const copied = ref(false);
-const RAILWAY_TEMPLATE_URL = "https://railway.com/deploy/autovault?referralCode=VuFE6g&utm_medium=integration&utm_source=template&utm_campaign=generic";
-const MANUAL_GHCR_IMAGE = "ghcr.io/autoworks-ai/autovault:v0.2.1";
 
 const providers: Provider[] = [
   {

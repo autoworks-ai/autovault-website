@@ -1,8 +1,6 @@
 import { PRODUCT_VERSION } from "../theme/data/product";
 import { AUTOVAULT_AGENT_SETUP_PROMPT, AUTOVAULT_BOOTSTRAP_INSTALL_PATH, AUTOVAULT_BOOTSTRAP_SKILL_URL } from "./bootstrap";
-
-const RAILWAY_TEMPLATE_URL = "https://railway.com/deploy/autovault?referralCode=VuFE6g&utm_medium=integration&utm_source=template&utm_campaign=generic";
-const MANUAL_GHCR_IMAGE = "ghcr.io/autoworks-ai/autovault:v0.2.1";
+import { MANUAL_GHCR_IMAGE, RAILWAY_TEMPLATE_URL } from "./deploy";
 
 export const SITE_URL = "https://autovault.dev";
 
