@@ -1,7 +1,7 @@
 {
   "inputDir": "scripts/social-assets/source",
   "outputDir": "public",
-  "chromePath": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "chromePath": null,
   "selector": ".canvas",
   "dpr": 1,
   "generated": [
