@@ -1,6 +1,6 @@
 ---
 title: AutoVault vs Alternatives
-description: Compare AutoVault with Skillfish, Tessl, SkillKit-style directories, and manual per-agent folders.
+description: Compare AutoVault with Skillfish, Tessl, SkillKit / Agent Skills directories, and manual per-agent folders.
 layout: false
 ---
 

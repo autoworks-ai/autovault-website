@@ -76,10 +76,10 @@
     <h2 id="first">Step 3 — Add your first skill</h2>
     <p>Skills enter through a source adapter. Each adapter fetches from one origin and hands the raw skill to the validation gate. Whatever the source, the gate runs the same checks before admission.</p>
     <CodeBlock lang="bash"><span class="pmt">$</span> autovault <span class="arg">add</span> github:autoworks-ai/skills/extract-pdf</CodeBlock>
-    <div class="terminal static-terminal">
+      <div class="terminal static-terminal">
       <div class="terminal-head"><span class="dot live" /><span class="dot" /><span class="dot" /><span class="ttl">gate run · extract-pdf</span></div>
       <div class="terminal-body compact">
-        <div class="out">  ↳ fetching extract-pdf@1.4.0</div>
+        <div class="out">  ↳ fetching extract-pdf v1.4.0</div>
         <div class="ok">  ✓ yaml-repair · frontmatter clean</div>
         <div class="ok">  ✓ denylist · no known bad patterns</div>
         <div class="ok">  ✓ capability/behavior · declared matches observed</div>
@@ -275,7 +275,7 @@ const TerminalDemo = defineComponent({
       { type: "ok", text: "✓ vault ready · bundled skills bootstrapped · profiles synced" },
       { type: "blank", text: "" },
       { type: "cmd", text: "autovault add github:autoworks-ai/skills/extract-pdf" },
-      { type: "out", text: "↳ fetching extract-pdf@1.4.0" },
+      { type: "out", text: "↳ fetching extract-pdf v1.4.0" },
       { type: "out", text: "↳ [1/5] yaml-repair    : ok" },
       { type: "out", text: "↳ [2/5] denylist       : ok" },
       { type: "out", text: "↳ [3/5] cap/behavior   : ok" },

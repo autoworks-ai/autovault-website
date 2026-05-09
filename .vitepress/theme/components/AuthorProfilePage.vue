@@ -218,13 +218,13 @@ const track: TrackCell[] = [
 ];
 
 const activity = [
-  { kind: "admit", name: "extract-pdf@1.4.0", detail: "+--pages range support · 5/5 gate stages green", when: "2d" },
-  { kind: "update", name: "extract-pdf@1.3.2", detail: "patch: malformed cross-reference tables", when: "3w" },
-  { kind: "admit", name: "yaml-validate@0.9.0", detail: "initial release · same engine as the gate", when: "5w" },
-  { kind: "deny", name: "experiment-skill@0.1.0", detail: "rejected by gate stage 03 · capability mismatch", when: "6w" },
-  { kind: "update", name: "github-issues@2.1.0", detail: "minor: support enterprise.github.com hosts", when: "7w" },
-  { kind: "admit", name: "extract-table@0.7.0", detail: "initial release · pairs with extract-pdf", when: "9w" },
-  { kind: "update", name: "summarize-doc@0.9.2", detail: "patch: token budgeting on long docs", when: "10w" }
+  { kind: "admit", name: "extract-pdf v1.4.0", detail: "+--pages range support · 5/5 gate stages green", when: "2d" },
+  { kind: "update", name: "extract-pdf v1.3.2", detail: "patch: malformed cross-reference tables", when: "3w" },
+  { kind: "admit", name: "yaml-validate v0.9.0", detail: "initial release · same engine as the gate", when: "5w" },
+  { kind: "deny", name: "experiment-skill v0.1.0", detail: "rejected by gate stage 03 · capability mismatch", when: "6w" },
+  { kind: "update", name: "github-issues v2.1.0", detail: "minor: support enterprise.github.com hosts", when: "7w" },
+  { kind: "admit", name: "extract-table v0.7.0", detail: "initial release · pairs with extract-pdf", when: "9w" },
+  { kind: "update", name: "summarize-doc v0.9.2", detail: "patch: token budgeting on long docs", when: "10w" }
 ];
 
 const cadenceData = Array.from({ length: 26 * 5 }, (_, index) => {

@@ -19,13 +19,13 @@ export const teamMembers: TeamMember[] = [
   {
     name: "Jack Arturo",
     role: "Creator",
-    company: "AutoVault, AutoMem, drunk.support",
+    company: "AutoVault, AutoMem, Jack's build notes",
     image: "https://drunk.support/wp-content/uploads/2023/02/headshot-rain-square-150x150.jpeg",
     imageAlt: "Jack Arturo",
     href: "https://drunk.support/about/",
     bio: "Builds AutoVault, AutoMem, and the Drunk Support working notebook for memory-bearing agents and half-built systems.",
     links: [
-      { label: "drunk.support", href: "https://drunk.support/about/" },
+      { label: "Jack's build notes", href: "https://drunk.support/about/" },
       { label: "AutoMem", href: "https://automem.ai/" },
       { label: "GitHub", href: "https://github.com/jack-arturo" }
     ]
@@ -33,7 +33,7 @@ export const teamMembers: TeamMember[] = [
   {
     name: "AutoJack",
     role: "Autonomous field notes",
-    company: "drunk.support",
+    company: "Jack's build notes",
     image: "/brand-mark.svg",
     imageAlt: "AutoVault mark used for AutoJack",
     href: "https://drunk.support/category/autojack/",
@@ -41,7 +41,7 @@ export const teamMembers: TeamMember[] = [
     imageFit: "contain",
     links: [
       { label: "AutoJack archive", href: "https://drunk.support/category/autojack/" },
-      { label: "drunk.support", href: "https://drunk.support/" }
+      { label: "Jack's build notes", href: "https://drunk.support/" }
     ]
   },
   {

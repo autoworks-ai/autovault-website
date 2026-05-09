@@ -1,17 +1,8 @@
 <script setup lang="ts">
-type Mark = 'yes' | 'no' | 'partial'
-const ROWS: [string, Mark, Mark, Mark, Mark, Mark][] = [
-  ['Multi-agent install and sync',      'yes', 'yes',     'partial', 'partial', 'no'],
-  ['Validation gate at admission',      'yes', 'partial', 'partial', 'no',      'no'],
-  ['Ed25519 signed provenance',         'yes', 'no',      'partial', 'no',      'no'],
-  ['Per-caller transformation',         'yes', 'partial', 'partial', 'no',      'no'],
-  ['Four-axis permission scoping',      'yes', 'partial', 'partial', 'no',      'no'],
-  ['Dedup before local use',            'yes', 'partial', 'partial', 'no',      'no'],
-  ['Local-first (no required cloud)',   'yes', 'yes',     'partial', 'yes',     'yes'],
-  ['Self-hostable team mode',           'yes', 'partial', 'partial', 'no',      'partial'],
-  ['Progressive disclosure (no bloat)', 'yes', 'partial', 'partial', 'no',      'no'],
-]
-function glyph(k: Mark) { return k === 'yes' ? '●' : k === 'partial' ? '◐' : '○' }
+import { comparisonPlayers, comparisonSources, homepageComparisonRows, type ComparisonMark } from '../data/marketing'
+
+function glyph(k: ComparisonMark) { return k === 'yes' ? '●' : k === 'partial' ? '◐' : '○' }
+function rowMarks(row: (typeof homepageComparisonRows)[number]) { return row.slice(1) as ComparisonMark[] }
 </script>
 
 <template>
@@ -30,21 +21,26 @@ function glyph(k: Mark) { return k === 'yes' ? '●' : k === 'partial' ? '◐' :
         <thead>
           <tr>
             <th style="width: 34%">Capability</th>
-            <th class="us">AutoVault</th>
-            <th>Skillfish</th>
-            <th>Tessl</th>
-            <th>SkillKit / specs</th>
-            <th>Manual folders</th>
+            <th
+              v-for="player in comparisonPlayers"
+              :key="player.key"
+              :class="{ us: player.us }"
+            >
+              <a v-if="player.href" :href="player.href">{{ player.name }}</a>
+              <span v-else>{{ player.name }}</span>
+            </th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="r in ROWS" :key="r[0]">
+          <tr v-for="r in homepageComparisonRows" :key="r[0]">
             <td class="feat">{{ r[0] }}</td>
-            <td class="us"><span :class="r[1]">{{ glyph(r[1]) }}</span></td>
-            <td><span :class="r[2]">{{ glyph(r[2]) }}</span></td>
-            <td><span :class="r[3]">{{ glyph(r[3]) }}</span></td>
-            <td><span :class="r[4]">{{ glyph(r[4]) }}</span></td>
-            <td><span :class="r[5]">{{ glyph(r[5]) }}</span></td>
+            <td
+              v-for="(mark, index) in rowMarks(r)"
+              :key="comparisonPlayers[index]?.key ?? index"
+              :class="{ us: comparisonPlayers[index]?.us }"
+            >
+              <span :class="mark">{{ glyph(mark) }}</span>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -55,5 +51,13 @@ function glyph(k: Mark) { return k === 'yes' ? '●' : k === 'partial' ? '◐' :
       <span><span class="partial" style="color: var(--warn)">◐</span> partial</span>
       <span><span class="no" style="color: var(--ink-4)">○</span> absent</span>
     </div>
+    <nav class="av-compare-sources" aria-label="Comparison source checks">
+      <span>Source checks</span>
+      <ul>
+        <li v-for="source in comparisonSources" :key="source.href">
+          <a :href="source.href">{{ source.label }}</a>
+        </li>
+      </ul>
+    </nav>
   </section>
 </template>
