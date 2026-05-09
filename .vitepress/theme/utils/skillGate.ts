@@ -237,8 +237,8 @@ function finishEvaluation(checks: GateCheck[], skill: ParsedSkill | null, source
     checks: [
       ...checks,
       {
-        name: "hub install simulation",
-        detail: passed ? "dry-run package prepared" : "blocked until failures are fixed",
+        name: "vault admission simulation",
+        detail: passed ? "dry-run bundle prepared" : "blocked until failures are fixed",
         kind: passed ? (warningCount ? "warn" : "ok") : "fail"
       },
       {
@@ -260,9 +260,9 @@ function finishEvaluation(checks: GateCheck[], skill: ParsedSkill | null, source
 function buildInstallLines(skill: ParsedSkill | null, signature: string | null, warningCount: number, passed: boolean): string[] {
   if (!skill || !passed || !signature) {
     return [
-      "$ autovault hub install --dry-run <skill>",
-      "↳ gate rejected package",
-      "✕ hub card not generated"
+      "browser gate preview",
+      "↳ gate rejected bundle",
+      "✕ vault admission blocked"
     ];
   }
 
@@ -271,12 +271,12 @@ function buildInstallLines(skill: ParsedSkill | null, signature: string | null, 
   const targets = skill.transforms.length ? skill.transforms.join(", ") : "canonical-only";
 
   return [
-    `$ autovault hub install --dry-run ${source}`,
+    `browser gate preview · ${source}`,
     `↳ fetched ${skill.name}@${skill.version} · ${size}`,
     `↳ gate passed · ${warningCount} warning${warningCount === 1 ? "" : "s"}`,
     `↳ signed ${signature}`,
     `↳ rendered views: ${targets}`,
-    `✓ hub preview ready · ${skill.name} · ${skill.tools.length} tool${skill.tools.length === 1 ? "" : "s"}`
+    `✓ vault preview ready · ${skill.name} · ${skill.tools.length} tool${skill.tools.length === 1 ? "" : "s"}`
   ];
 }
 

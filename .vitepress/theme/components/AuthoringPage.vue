@@ -153,7 +153,7 @@
                 <span class="check-detail">{{ row.detail }}</span>
               </div>
               <div v-if="evaluation" class="install-preview" :class="{ blocked: !evaluation.passed }">
-                <div class="mono-label">{{ evaluation.passed ? "Hub install preview" : "Install blocked" }}</div>
+                <div class="mono-label">{{ evaluation.passed ? "Vault admission preview" : "Admission blocked" }}</div>
                 <pre>{{ evaluation.installLines.join("\n") }}</pre>
               </div>
             </template>
@@ -163,7 +163,7 @@
       </div>
     </div>
 
-    <h2 id="publish">Publishing through the gate</h2>
+    <h2 id="publish">Admission through the gate</h2>
     <p>Once the skill is clean locally, all write paths use the same validation and signing pipeline before generated agent profiles refresh.</p>
     <div class="process-ribbon">
       <div v-for="(step, idx) in process" :key="step.title" class="step"><div class="num mono-label">{{ String(idx + 1).padStart(2, "0") }}</div><div class="step-title">{{ step.title }}</div><div class="muted step-sub">{{ step.sub }}</div></div>
@@ -290,7 +290,7 @@ const pendingRows: GateCheck[] = [
   { name: "schema", detail: "queued", kind: "pending" },
   { name: "denylist", detail: "queued", kind: "pending" },
   { name: "capability/behavior", detail: "queued", kind: "pending" },
-  { name: "hub install simulation", detail: "queued", kind: "pending" }
+  { name: "vault admission simulation", detail: "queued", kind: "pending" }
 ];
 const evaluation = ref<GateEvaluation | null>(null);
 const results = computed(() => (running.value ? pendingRows : evaluation.value?.checks ?? null));

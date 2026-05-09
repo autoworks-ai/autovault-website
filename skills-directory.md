@@ -1,6 +1,6 @@
 ---
-title: Skills Directory
-description: Browse signed AutoVault skills by agent, category, organization, install count, and license, with first-party examples aligned to MIT.
+title: Skill Examples
+description: Review curated AutoVault example skills that demonstrate validation, transforms, permissions, provenance, and agent targeting.
 layout: false
 ---
 

@@ -1,28 +1,28 @@
 <script setup lang="ts">
 type Mark = 'yes' | 'no' | 'partial'
 const ROWS: [string, Mark, Mark, Mark, Mark, Mark][] = [
-  ['Validation gate at install',        'yes', 'no',      'no',      'partial', 'no'],
-  ['Ed25519 signed provenance',         'yes', 'no',      'no',      'no',      'no'],
-  ['Per-caller transformation',         'yes', 'no',      'no',      'no',      'no'],
-  ['Four-axis permission scoping',      'yes', 'no',      'partial', 'no',      'no'],
-  ['Dedup at submission',               'yes', 'no',      'no',      'no',      'no'],
-  ['Local-first (no required cloud)',   'yes', 'no',      'no',      'yes',     'yes'],
-  ['Self-hostable team mode',           'yes', 'no',      'yes',     'no',      'partial'],
-  ['MCP-native + non-MCP bridge',       'yes', 'partial', 'no',      'yes',     'no'],
-  ['Progressive disclosure (no bloat)', 'yes', 'no',      'no',      'no',      'no'],
+  ['Multi-agent install and sync',      'yes', 'yes',     'partial', 'partial', 'no'],
+  ['Validation gate at admission',      'yes', 'partial', 'partial', 'no',      'no'],
+  ['Ed25519 signed provenance',         'yes', 'no',      'partial', 'no',      'no'],
+  ['Per-caller transformation',         'yes', 'partial', 'partial', 'no',      'no'],
+  ['Four-axis permission scoping',      'yes', 'partial', 'partial', 'no',      'no'],
+  ['Dedup before local use',            'yes', 'partial', 'partial', 'no',      'no'],
+  ['Local-first (no required cloud)',   'yes', 'yes',     'partial', 'yes',     'yes'],
+  ['Self-hostable team mode',           'yes', 'partial', 'partial', 'no',      'partial'],
+  ['Progressive disclosure (no bloat)', 'yes', 'partial', 'partial', 'no',      'no'],
 ]
 function glyph(k: Mark) { return k === 'yes' ? '●' : k === 'partial' ? '◐' : '○' }
 </script>
 
 <template>
   <section class="av-section" id="compare">
-    <div class="av-eyebrow"><span class="dash" /> Why a vault, not a registry</div>
+    <div class="av-eyebrow"><span class="dash" /> Vault vs managers and registries</div>
     <h2 style="margin-top: 16px; max-width: 760px">
       Different shape.<br />
       <span class="ital">Different defaults.</span>
     </h2>
     <p class="av-lede" style="margin-top: 16px">
-      A registry is a place other people publish to and you fetch from. A vault is a folder you own. Most of these capabilities only make sense once that distinction is made — they're consequences of the shape, not feature additions on top of a marketplace.
+      Skillfish is the closest direct neighbor: broad install, update, sync, and team bundle workflows across many agents. AutoVault is narrower on purpose: every skill enters a local vault through a gate, gets signed, scoped, and rendered from one canonical source.
     </p>
 
     <div class="av-compare">
@@ -31,10 +31,10 @@ function glyph(k: Mark) { return k === 'yes' ? '●' : k === 'partial' ? '◐' :
           <tr>
             <th style="width: 34%">Capability</th>
             <th class="us">AutoVault</th>
+            <th>Skillfish</th>
             <th>Tessl</th>
-            <th>ClawdHub</th>
-            <th>agentskills.io</th>
-            <th>TLC registry</th>
+            <th>SkillKit / specs</th>
+            <th>Manual folders</th>
           </tr>
         </thead>
         <tbody>

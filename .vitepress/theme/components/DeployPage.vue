@@ -265,9 +265,9 @@ const remoteStatusLines = [
   "storage       sqlite (3.2 MB · 47 caps)",
   "",
   "recent",
-  "  02:14:08  POST /mcp         200  skill.fetch extract-pdf",
+  "  02:14:08  POST /mcp         200  get_skill extract-pdf",
   "  02:14:01  POST /oauth/token 200  refresh +900s",
-  "  02:11:55  POST /mcp         403  skill.publish (scope)",
+  "  02:11:55  POST /mcp         403  add_skill (scope)",
   "",
   "✓ healthy · uptime 4d 02:11:09"
 ];
@@ -293,12 +293,12 @@ const smokeLines = [
   "",
   "▸ phase 4 · MCP tool calls",
   "  POST /mcp initialize                           200",
-  "  POST /mcp skill.list                           200",
-  "  POST /mcp skill.fetch autoworks-ai/extract-pdf 200",
+  "  POST /mcp list_skills                          200",
+  "  POST /mcp get_skill autoworks-ai/extract-pdf   200",
   "  → ed25519 signature verified                  ✓",
   "",
   "▸ phase 5 · policy enforcement",
-  "  POST /mcp skill.publish (non-owner)            403",
+  "  POST /mcp add_skill (non-owner)                403",
   "  → expected denial: scope:write missing        ✓",
   "",
   "✓ remote smoke complete · 18/18 checks passed · 4.2s"

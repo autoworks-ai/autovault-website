@@ -149,7 +149,7 @@ function resumeCycle() {
             </button>
             <div>├── <span class="dir">signatures/</span></div>
             <div>│   └── <span class="file">trust.toml</span></div>
-            <div>└── <span class="file">vault.toml</span></div>
+            <div>└── <span class="file">config.toml</span></div>
           </div>
         </div>
         <div class="av-folder-side" :key="current.id + readPulse">

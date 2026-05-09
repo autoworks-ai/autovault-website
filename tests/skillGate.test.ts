@@ -26,13 +26,13 @@ describe("skill gate", () => {
     expect(result.installLines.join("\n")).toContain("gate rejected");
   });
 
-  it("passes a valid pasted skill and creates a hub preview", () => {
+  it("passes a valid pasted skill and creates a vault preview", () => {
     const result = evaluateSkillDocument(validSkill, "pasted SKILL.md");
 
     expect(result.passed).toBe(true);
     expect(result.skill?.name).toBe("weather");
     expect(result.signature).toMatch(/^0x[0-9a-f]+…[0-9a-f]{4}$/);
-    expect(result.installLines.join("\n")).toContain("hub preview ready");
+    expect(result.installLines.join("\n")).toContain("vault preview ready");
     expect(result.issues).toEqual([]);
   });
 

@@ -1,7 +1,7 @@
 <template>
   <div class="sd-page reveal-page">
     <nav class="sd-crumb reveal-item" aria-label="Breadcrumb">
-      <a href="/skills-directory">Skills</a>
+      <a href="/skills-directory">Examples</a>
       <span class="sep">/</span>
       <a href="/author-autoworks-ai">autoworks-ai</a>
       <span class="sep">/</span>
@@ -27,12 +27,12 @@
         <p class="desc">Extract structured text from PDF files while preserving heading hierarchy, list structure, and table layout where possible. Wraps a local parsing library — never reaches the network. Pairs naturally with <a href="/skill-detail">ocr-image</a> for scanned documents and <a href="/skill-detail">extract-table</a> for structured data.</p>
       </div>
       <div class="actions">
-        <button class="sd-installbtn" type="button" @click="copyInstall">Install in your vault <UiIcon name="arrow" /></button>
+        <button class="sd-installbtn" type="button" @click="copyInstall">Add to your vault <UiIcon name="arrow" /></button>
         <div class="sd-install">
           <div class="lbl">Or via CLI</div>
           <div class="cmd">
             <span class="pmt">$</span>
-            <span>autovault add extract-pdf</span>
+            <span>autovault add github:autoworks-ai/skills/extract-pdf</span>
             <button class="copy" type="button" @click="copyInstall">{{ copied ? "Copied" : copyFailed ? "Copy failed" : "Copy" }}</button>
           </div>
         </div>
@@ -172,7 +172,7 @@
         </section>
 
         <section v-else class="sd-versions-table">
-          <div class="sd-versions-row head"><span>Version</span><span>Notes</span><span>Date</span><span>Gate</span><span>Installs</span></div>
+          <div class="sd-versions-row head"><span>Version</span><span>Notes</span><span>Date</span><span>Gate</span><span>Refs</span></div>
           <div v-for="version in versions" :key="version.version" class="sd-versions-row">
             <span class="ver">{{ version.version }}<span v-if="version.latest" class="latest">latest</span></span>
             <span class="notes">{{ version.notes }}</span>
@@ -247,7 +247,7 @@ const tabs = [
 ];
 
 const stats = [
-  { label: "Installs", value: "2,840", trend: "+312 this week" },
+  { label: "Reference uses", value: "2,840", trend: "+312 this week" },
   { label: "Active vaults", value: "1,920", trend: "+204 this week" },
   { label: "Gate runs", value: "12", trend: "all passed" },
   { label: "Issues open", value: "3<span class=\"unit\">/ 47 closed</span>", trend: "median 2d", muted: true },
@@ -381,8 +381,8 @@ const provenance = [
   { icon: "check" as const, ok: true, title: "Authored & signed by @autoworks-ai", detail: "commit f4e02c1 · key: 0x9af4…2c81 · 2,847 bytes", when: "2026-04-28 12:14Z" },
   { icon: "check" as const, ok: true, title: "Gate run · v0.2.0 · all 5 stages passed", detail: "repair: 0 fixes · denylist: clean · capabilities: aligned · dedup: unique · sign: ed25519", when: "2026-04-28 12:18Z" },
   { icon: "shield" as const, ok: true, title: "Vault counter-signature", detail: "vault.autoworks-ai · key: vault-2026-04 · isnad link 02", when: "2026-04-28 14:21Z" },
-  { icon: "check" as const, ok: true, title: "Published to public mirror", detail: "cdn.autovault.dev · 3 regional replicas synced", when: "2026-04-28 14:22Z" },
-  { icon: "lock" as const, title: "Available for install", detail: "verify locally with <code>autovault verify autoworks-ai/extract-pdf@1.4.0</code>", when: "on demand" }
+  { icon: "check" as const, ok: true, title: "Mirrored with vault signature", detail: "cdn.autovault.dev · 3 regional replicas synced", when: "2026-04-28 14:22Z" },
+  { icon: "lock" as const, title: "Available for local admission", detail: "verify locally with <code>autovault verify autoworks-ai/extract-pdf@1.4.0</code>", when: "on demand" }
 ];
 
 const versions = [
@@ -392,7 +392,7 @@ const versions = [
   { version: "1.3.0", notes: "Add JSON output format; structured headings/paragraphs/tables", date: "2026-03-19", installs: "1.1k" },
   { version: "1.2.0", notes: "Heading hierarchy preserved as # markers", date: "2026-02-21", installs: "640" },
   { version: "1.1.0", notes: "List structure preservation", date: "2026-01-30", installs: "412" },
-  { version: "1.0.0", notes: "Initial public release", date: "2026-01-08", installs: "201" }
+  { version: "1.0.0", notes: "Initial example release", date: "2026-01-08", installs: "201" }
 ];
 
 const metadata = [
@@ -423,7 +423,7 @@ async function copyInstall() {
   copyFailed.value = false;
   try {
     if (!navigator.clipboard) throw new Error("Clipboard unavailable");
-    await navigator.clipboard.writeText("autovault add extract-pdf");
+    await navigator.clipboard.writeText("autovault add github:autoworks-ai/skills/extract-pdf");
     copied.value = true;
     window.setTimeout(() => {
       copied.value = false;

@@ -100,7 +100,7 @@ export default defineConfig({
       { text: "Overview", link: "/" },
       { text: "Quick start", link: "/quick-start" },
       { text: "Authoring", link: "/authoring" },
-      { text: "Skills", link: "/skills-directory" },
+      { text: "Examples", link: "/skills-directory" },
       { text: "Security", link: "/security" },
       { text: "About", link: "/about" },
       { text: "Changelog", link: "/changelog" }
@@ -121,13 +121,13 @@ export default defineConfig({
           { text: "Anatomy of a SKILL.md", link: "/authoring" },
           { text: "Transformation manifest", link: "/authoring#manifest" },
           { text: "Permissions", link: "/authoring#perms" },
-          { text: "Publishing", link: "/authoring#publish" }
+          { text: "Admission", link: "/authoring#publish" }
         ]
       },
       {
         text: "Reference",
         items: [
-          { text: "Skills directory", link: "/skills-directory" },
+          { text: "Skill examples", link: "/skills-directory" },
           { text: "API reference", link: "/api" },
           { text: "Deploy remote vault", link: "/deploy" },
           { text: "Compare alternatives", link: "/compare" },

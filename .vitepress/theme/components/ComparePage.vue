@@ -12,7 +12,7 @@
         <div class="readtime">~30s read</div>
       </div>
       <div class="body">
-        <p>If you publish skills for <strong>more than one agent</strong> and care about <strong>provenance</strong>, AutoVault is the only option that solves both with a single SKILL.md and a public, reproducible gate. If you only publish for one agent and don't care about signing, <strong>RawHub</strong> is fine and free. If your team has been hand-maintaining <strong>per-agent forks</strong> of the same skill, you're paying the ForkFlow tax — that's the case AutoVault was built to retire.</p>
+        <p><strong>Skillfish</strong> is the closest direct neighbor: it has a strong open-source story for installing, updating, syncing, and bundling skills across many agents. AutoVault is built for a stricter path: admit skills into a local-first vault, validate and sign what passes, scope delivery, and render one canonical SKILL.md for the caller that needs it. If you mainly need public discovery, look at Tessl or SkillKit-style directories first. If you only have a few files, manual folders can still be enough.</p>
       </div>
     </section>
 
@@ -62,7 +62,7 @@
 
       <div class="cm-honest">
         <div class="ttl">Honesty box</div>
-        <p><strong>Where AutoVault is genuinely behind.</strong> RawHub has more skills (3,400 vs. our 241) — community indexes always do. ForkFlow has a richer GUI for browsing per-agent forks; if you live mostly in one agent's tooling and don't care about cross-agent skills, that may matter to you. AutoVault is still intentionally narrow: local-first validation, signing, transforms, remote MCP, and OAuth before the broader team-management surface grows.</p>
+        <p><strong>Where AutoVault is genuinely behind.</strong> Skillfish currently has broader agent/runtime coverage and a clearer skill manager workflow for install, update, sync, and team bundles. Tessl and SkillKit-style ecosystems are better starting points when public discovery or standardization is the main job. Manual folders are still simpler for one person with a handful of trusted skills. AutoVault is intentionally narrower: local-first validation, signing, scoped delivery, transforms, remote MCP, and OAuth before a broader management surface.</p>
       </div>
     </section>
 
@@ -104,7 +104,7 @@
     <section class="cm-section reveal-item">
       <div class="eyebrow"><span class="dash" /> Migrating in</div>
       <h2>Already using one of the others? Here's the path.</h2>
-      <p class="sub">We provide first-class importers for the three common starting points. Migration runs through the same gate as authoring, so what you import is what gets signed.</p>
+      <p class="sub">There is no magic importer for every ecosystem. The practical path is to bring source skills or local folders into the vault and let the same gate decide what gets admitted and signed.</p>
       <article v-for="migration in migrations" :key="migration.title" class="cm-mig">
         <div>
           <h3>{{ migration.title }}</h3>
@@ -128,50 +128,53 @@ type ComparisonRow =
       feature: string;
       detail: string;
       av: ComparisonCell;
-      rh: ComparisonCell;
-      fl: ComparisonCell;
-      ml: ComparisonCell;
+      sf: ComparisonCell;
+      ts: ComparisonCell;
+      sk: ComparisonCell;
+      mn: ComparisonCell;
     };
 
 const players = [
-  { id: "av" as const, name: "AutoVault", desc: "Validating registry. Author once, render per caller. Local CLI; signed; reproducible.", badge: "AV", color: "#5ad6c0", ink: "#062821", us: true, meta: ["v0.2.0", "MIT", "self-hosted"] },
-  { id: "rh" as const, name: "RawHub", desc: "Public skill index. No gate, no signing. Browse and copy-paste from a community wiki.", badge: "RH", color: "#5a9dd6", ink: "#06182a", meta: ["community", "no validation", "browser only"] },
-  { id: "fl" as const, name: "ForkFlow", desc: "Fork-and-edit catalog. Each agent maintains its own format-specific fork of every skill.", badge: "FF", color: "#d6a85a", ink: "#2a1a06", meta: ["per-agent forks", "manual sync"] },
-  { id: "ml" as const, name: "ManualOps", desc: "No tooling. Engineers paste skills directly into CLAUDE.md / .cursorrules / AGENTS.md by hand.", badge: "—", color: "#4a5b6b", ink: "#0a0d11", meta: ["zero tooling", "high drift"] }
+  { id: "av" as const, name: "AutoVault", desc: "Local-first vault. Gate, sign, scope, and render one SKILL.md per caller.", badge: "AV", color: "#5ad6c0", ink: "#062821", us: true, meta: ["v0.2.0", "MIT", "self-hosted"] },
+  { id: "sf" as const, name: "Skillfish", desc: "Open-source skill manager for install, update, sync, and team bundles across many agents.", badge: "SF", color: "#5a9dd6", ink: "#06182a", meta: ["open source", "multi-agent", "team bundles"] },
+  { id: "ts" as const, name: "Tessl", desc: "Package and distribution layer for skills and agents, strongest as a published ecosystem.", badge: "TS", color: "#b48ad6", ink: "#1d0f2a", meta: ["ecosystem", "distribution", "hosted"] },
+  { id: "sk" as const, name: "SkillKit / specs", desc: "Directory and spec-oriented discovery surfaces for reusable skill source material.", badge: "SK", color: "#d6a85a", ink: "#2a1a06", meta: ["discovery", "specs", "source material"] },
+  { id: "mn" as const, name: "Manual folders", desc: "Hand-maintained ~/.claude/skills, ~/.codex/skills, Cursor rules, and repo docs.", badge: "—", color: "#4a5b6b", ink: "#0a0d11", meta: ["zero tooling", "local", "high drift"] }
 ];
 
 const rows: ComparisonRow[] = [
-  { kind: "section", label: "Authoring & format" },
-  row("Single source of truth", "One canonical SKILL.md vs. N agent-specific forks", ["yes", "Single SKILL.md per skill", "Transformations rendered per caller"], ["yes", "One per skill", "Caller copy-pastes raw"], ["no", "N forks per skill", "Separate CLAUDE.md, AGENTS.md, .cursorrules"], ["no", "Per-machine drift", "Each engineer keeps their own version"]),
-  row("Per-caller transformation", "Output adapted to the agent's idiom", ["yes", "Manifest-driven", "Author declares targets; vault renders and signs each"], ["no", "—", "Caller is on their own"], ["partial", "Manual fork", "Each fork is a separate copy"], ["no", "—", "Whatever the engineer pasted is what runs"]),
-  row("Author-once delivery", "Write once and reach every supported agent", ["yes", "4 agents from one source", "Claude Code, Codex, Cursor, AutoHub"], ["partial", "1 format per skill", "Author picks one; rest is copy work"], ["no", "Up to N times", "One write per agent fork"], ["no", "1× per machine × N agents", "Compounding manual work"]),
+  { kind: "section", label: "Install, sync, and source of truth" },
+  row("Single source of truth", "One canonical SKILL.md vs. agent-specific copies", ["yes", "Single SKILL.md per skill", "Transformations rendered per caller"], ["yes", "Managed skill source", "Strong install/update/sync story"], ["partial", "Published artifact", "Best when consuming the ecosystem surface"], ["partial", "Spec source", "Useful upstream material, not a vault"], ["no", "Per-machine drift", "Each engineer keeps their own copy"]),
+  row("Multi-agent sync", "Keep Claude Code, Codex, Cursor, and other hosts aligned", ["yes", "Scoped profile links", "Vault renders only what each profile can load"], ["yes", "Core strength", "Broad agent and IDE coverage"], ["partial", "Distribution surface", "Depends on the consuming agent"], ["partial", "Examples/specs", "Good source shape, sync is external"], ["no", "Manual copy", "Sync depends on memory and discipline"]),
+  row("Team bundles", "Share a set of skills across a team", ["partial", "Remote vault / self-host", "Team mode exists, management surface is still narrow"], ["yes", "Strong fit", "Skillfish is positioned around team bundles and shared installs"], ["yes", "Distribution model", "Good for shared ecosystem packages"], ["partial", "Reference bundles", "Usable as inputs, not policy"], ["bad", "High drift", "Every machine becomes its own bundle"]),
+  row("Local ownership", "Can the team keep the working vault local-first?", ["yes", "~/.autovault", "Plain files, SQLite, signatures, source sidecars"], ["yes", "Local manager", "Works well for local multi-agent setups"], ["partial", "Hosted-first posture", "Useful ecosystem, less vault-owned"], ["yes", "Plain source", "Local after you copy it"], ["yes", "By definition", "Local files with no shared policy"]),
   { kind: "section", label: "Validation & trust" },
-  row("Pre-publish gate", "Programmatic checks before admission", ["yes", "5 stages, reproducible", "Repair → denylist → capability → dedup → sign"], ["no", "—", "Best-effort community moderation"], ["partial", "Per-fork lint", "Inconsistent across forks"], ["no", "—", "Whatever ships, ships"]),
-  row("Cryptographic signing", "Ed25519 sigs bind author + content + gate verdict", ["yes", "Ed25519 chain", "Author → vault → mirror"], ["no", "—", "Trust by URL only"], ["no", "—", "No signing"], ["no", "—", "No signing"]),
-  row("Reproducible verdicts", "Same bytes in = same gate verdict out", ["yes", "Gate v0.2+", "Run locally with autovault verify"], ["no", "n/a", "No verdict to reproduce"], ["partial", "Best-effort", "Depends on fork lint"], ["no", "n/a", "—"]),
-  row("Public denylist", "Auditable bad-pattern bundle", ["yes", `${denyRows.length} active patterns`, "Same artifact format as skills"], ["no", "—", "—"], ["no", "—", "—"], ["no", "—", "—"]),
-  { kind: "section", label: "Operations" },
-  row("Dedup at submission", "Stops duplicate-skill explosion before it starts", ["yes", "Text in V1", "Embedding in V2 preview"], ["no", "Browser ranking only", "Near-duplicates surface"], ["no", "—", "Forks are duplicates by design"], ["no", "—", "—"]),
-  row("Self-hostable", "Run a private vault behind your VPN", ["yes", "Docker / Railway / Render", "Same gate, your keys, your mirror"], ["partial", "Mirrors only", "No gate to self-host"], ["no", "Cloud only", "—"], ["yes", "By definition", "Each machine is the host"]),
-  row("Remote MCP endpoint", "Mobile and sandboxed agents fetch over HTTPS", ["yes", "Bundled MCP server", "One-click deploy, signed responses"], ["no", "—", "Browser-only"], ["partial", "Per-agent", "Format-specific endpoints"], ["no", "—", "—"]),
-  row("License clarity", "SPDX license declared and surfaced", ["yes", "Required field", "Gate-checked"], ["partial", "Optional", "Often blank"], ["partial", "Per-fork inconsistency", "—"], ["no", "Lost in copy-paste", "—"]),
-  { kind: "section", label: "Cost & openness" },
-  row("Pricing", "Cost to author, host, or consume", ["yes", "Free, MIT", "All open. No paid plans."], ["yes", "Free", "Donations"], ["partial", "Free tier + paid", "Private forks behind paywall"], ["yes", "Free", "Labor cost is high"]),
-  row("Vendor lock-in risk", "If the project disappears tomorrow", ["yes", "Plain SKILL.md files", "Markdown + signed JSON"], ["yes", "Plain text", "Caller has copies"], ["partial", "Forks survive", "Formats drift"], ["yes", "Yours already", "—"])
+  row("Admission gate", "Programmatic checks before a skill becomes usable", ["yes", "5 stages", "Repair -> denylist -> capability -> dedup -> sign"], ["partial", "Manager checks", "Not positioned around a reproducible security gate"], ["partial", "Ecosystem policy", "Hosted controls are not the same as local admission"], ["no", "Source only", "Validation belongs elsewhere"], ["no", "No gate", "Whatever gets pasted can run"]),
+  row("Cryptographic signing", "Signatures bind content, source, and gate verdict", ["yes", "Ed25519 chain", "Author -> vault -> mirror"], ["no", "Not central", "No public positioning around signed gate verdicts"], ["partial", "Trust layer", "Treat as ecosystem trust, not AutoVault-style local signatures"], ["no", "Not central", "Specs do not imply a signer"], ["no", "No signing", "Trust is social and local"]),
+  row("Reproducible verdicts", "Same bytes in = same gate verdict out", ["yes", "Gate v0.2+", "Run locally with autovault verify"], ["partial", "Operational checks", "Useful manager behavior, but not a signed verdict model"], ["partial", "Hosted review", "Not equivalent to local byte-for-byte replay"], ["no", "n/a", "No admission verdict"], ["no", "n/a", "No verdict to reproduce"]),
+  row("Public denylist", "Auditable bad-pattern bundle", ["yes", `${denyRows.length} active patterns`, "Same artifact format as skills"], ["partial", "Safety posture", "Not documented as a reusable denylist artifact"], ["partial", "Hosted moderation", "Different layer"], ["no", "n/a", "No gate bundle"], ["no", "n/a", "No shared scanner"]),
+  { kind: "section", label: "Rendering and scope" },
+  row("Per-caller transformation", "Output adapted to the agent's idiom", ["yes", "Manifest-driven", "Author declares targets; vault renders each"], ["partial", "Sync formats", "Strong multi-agent reach, not the same as signed render output"], ["partial", "Agent ecosystem", "Depends on the runtime consuming it"], ["no", "Spec source", "Transformation is left to tooling"], ["no", "Manual edits", "Each target is its own copy"]),
+  row("Scoped delivery", "Filter by agent, project, device, and profile", ["yes", "Four-axis scope", "Skill visibility is a vault policy decision"], ["partial", "Profiles/bundles", "Good grouping, less emphasis on policy gates"], ["partial", "Access model", "Registry access is not per-local-profile scope"], ["no", "n/a", "No local policy model"], ["no", "n/a", "Folders are blunt instruments"]),
+  row("Progressive disclosure", "Agents can search first and fetch full instructions only when needed", ["yes", "MCP-native", "Inventory lookup, exact read, resources on demand"], ["partial", "Manager metadata", "Depends on host integration"], ["partial", "Hosted metadata", "Good browsing surface, different runtime model"], ["partial", "Spec metadata", "Useful if tooling uses it"], ["no", "Full file load", "Everything is just text in a folder"]),
+  { kind: "section", label: "Operations and openness" },
+  row("Dedup before local use", "Stops duplicate-skill sprawl before it reaches profiles", ["yes", "Gate stage", "Exact and near-exact checks before signing"], ["partial", "Manager view", "Can reduce drift, but not positioned as gate-stage dedup"], ["partial", "Discovery ranking", "Catalogs can group similar entries"], ["no", "n/a", "No local inventory"], ["no", "n/a", "Duplicates are easy to create"]),
+  row("Self-hostable remote mode", "Run a private vault behind your VPN", ["yes", "Docker / Railway / Render", "Same gate, your keys, your mirror"], ["partial", "Local/team manager", "Good local story; remote vault is not the central shape"], ["partial", "Hosted ecosystem", "Use when hosted distribution is desired"], ["no", "n/a", "No vault service"], ["partial", "File shares", "Possible, but policy remains manual"]),
+  row("Vendor lock-in risk", "If a project disappears tomorrow", ["yes", "Plain SKILL.md files", "Markdown + signed JSON + source sidecars"], ["yes", "Plain skill files", "Local installs survive"], ["partial", "Published ecosystem", "Artifacts may survive, workflow depends on service"], ["yes", "Plain source", "Spec/examples remain portable"], ["yes", "Your files", "The drift is yours too"])
 ];
 
 const whenCards = [
-  { title: "Pick AutoVault when…", badge: "AV", color: "#5ad6c0", ink: "#062821", us: true, pick: "You ship skills for two or more agents, can't tolerate drift, and need a verifiable provenance chain before anything reaches a developer's machine.", signals: ["We have CLAUDE.md, .cursorrules, and AGENTS.md, and they keep diverging", "Security blocked a registry because there's no signing", "We need to audit which skills loaded last week", "We want a private vault behind our VPN"] },
-  { title: "Pick RawHub when…", badge: "RH", color: "#5a9dd6", ink: "#06182a", pick: "You're a solo developer using one agent, breadth matters more than provenance, and you'd rather copy-paste five skills today than configure anything.", signals: ["Personal projects, not work product", "Single-agent setup", "You're fine reading every skill before pasting", "Discovery matters more than trust"] },
-  { title: "Pick ForkFlow when…", badge: "FF", color: "#d6a85a", ink: "#2a1a06", pick: "You're already deep in one agent's ecosystem, you don't write skills, and per-agent UX matters more than a unified source.", signals: ["You consume skills, never publish them", "Marketplace UI matters more than CLI", "Installing the same skill twice is acceptable"] },
-  { title: "Skip tooling entirely when…", badge: "—", color: "#4a5b6b", ink: "#0a0d11", pick: "You have fewer than five skills total, your team is one or two people, and any registry would be larger than the problem.", signals: ["The whole skill folder fits in one screenshot", "You can name every skill from memory", "Your agents don't support skill autoloading yet"] }
+  { title: "Pick AutoVault when…", badge: "AV", color: "#5ad6c0", ink: "#062821", us: true, pick: "You need skills to pass a local gate, carry provenance, stay scoped to specific profiles, and render cleanly across more than one agent.", signals: ["We have ~/.claude, ~/.codex, and Cursor rules drifting apart", "Security wants signatures before skills reach developer machines", "We need to audit which skills loaded last week", "We want a private vault behind our VPN"] },
+  { title: "Pick Skillfish when…", badge: "SF", color: "#5a9dd6", ink: "#06182a", pick: "You mainly need broad multi-agent install, update, sync, and team bundle workflows, and a signed local admission gate is not the primary requirement.", signals: ["Agent coverage matters most", "Team bundles are the core workflow", "You want a skill manager more than a vault policy layer", "You are comfortable reviewing trust outside the tool"] },
+  { title: "Pick Tessl or SkillKit-style sources when…", badge: "TS", color: "#b48ad6", ink: "#1d0f2a", pick: "You are looking for public ecosystem discovery, reusable specs, or source material before deciding what belongs in your local vault.", signals: ["Discovery matters more than local policy", "You want examples to adapt", "You are evaluating agent-skill standards", "You will still review before local use"] },
+  { title: "Skip tooling entirely when…", badge: "—", color: "#4a5b6b", ink: "#0a0d11", pick: "You have fewer than five trusted skills, your team is one or two people, and manual folders are smaller than the tooling overhead.", signals: ["The whole skill folder fits in one screenshot", "You can name every skill from memory", "Your agents don't support skill autoloading yet"] }
 ];
 
 const bets = [
   { title: "Bet #1 · Skills are infrastructure, not content", subtitle: "Treat them like SBOMs, not Stack Overflow answers", points: [
     { axis: "Implication", body: "A skill that runs in your agent's tool boundary is <strong>code in your trust path</strong>. Distributing it without a signature is the equivalent of curl | bash." },
     { axis: "Bet", body: "In 18 months, unsigned skills will look tolerated for personal use and blocked at the enterprise edge." },
-    { axis: "If wrong", body: "Provenance becomes overhead nobody asked for, and RawHub-shaped indexes win on volume." }
+    { axis: "If wrong", body: "Provenance becomes overhead nobody asked for, and broad skill managers or discovery surfaces win on convenience." }
   ] },
   { title: "Bet #2 · The agent format wars are permanent", subtitle: "There will not be one universal skill format", points: [
     { axis: "Implication", body: "Each agent's idiom reflects how that agent's <strong>controller actually reasons</strong>. Lowest-common-denominator output degrades every agent." },
@@ -181,13 +184,13 @@ const bets = [
 ];
 
 const migrations = [
-  { title: "From RawHub", body: "The CLI walks RawHub's index, downloads each skill, and runs it through the gate before it lands in your vault.", code: "autovault import rawhub --user you\n# found 47 skills · running gate…\n✓ 41 imported · 5 repaired · 1 rejected" },
-  { title: "From ForkFlow (per-agent forks)", body: "Point the importer at all three forks of the same skill. It merges them into one canonical SKILL.md plus a populated transformation manifest.", code: "autovault import forkflow \\\n  --claude ./forks/extract-pdf.cc \\\n  --codex  ./forks/extract-pdf.cx \\\n  --cursor ./forks/extract-pdf.cu\n# merged 3 forks → 1 SKILL.md + 3 transformations" },
-  { title: "From hand-maintained CLAUDE.md / AGENTS.md / .cursorrules", body: "The importer parses each file, identifies skill-shaped sections, and proposes one SKILL.md per section.", code: "autovault import manual ./CLAUDE.md\n# detected 6 skill-shaped sections\n✓ 6 SKILL.md drafts written to ./drafts/\nautovault publish ./drafts/*.md" }
+  { title: "From Skillfish-managed skills", body: "Keep Skillfish where it is useful for broad agent coverage, then admit selected local skill folders into AutoVault when you need signing, scope, and transforms.", code: "autovault add-local ./skills/extract-pdf \\\n  --source skillfish/extract-pdf \\\n  --sync-profiles\n# gate passed · signed · profiles refreshed" },
+  { title: "From Tessl, SkillKit, or spec repos", body: "Treat external ecosystem entries as source material. Pull the SKILL.md or repo locally, review it, then let the AutoVault gate decide whether it belongs in the vault.", code: "autovault add github:owner/skills/extract-pdf\n# fetched source · running gate\n# admitted to ~/.autovault with provenance sidecar" },
+  { title: "From hand-maintained CLAUDE.md / AGENTS.md / .cursorrules", body: "Extract the reusable instructions into one SKILL.md, declare permissions and target agents, then admit that source instead of maintaining separate copies.", code: "mkdir -p ./drafts/extract-pdf\n$EDITOR ./drafts/extract-pdf/SKILL.md\nautovault add-local ./drafts/extract-pdf --sync-profiles" }
 ];
 
-function row(feature: string, detail: string, av: [Verdict, string, string], rh: [Verdict, string, string], fl: [Verdict, string, string], ml: [Verdict, string, string]): ComparisonRow {
-  return { feature, detail, av: cell(av), rh: cell(rh), fl: cell(fl), ml: cell(ml) };
+function row(feature: string, detail: string, av: [Verdict, string, string], sf: [Verdict, string, string], ts: [Verdict, string, string], sk: [Verdict, string, string], mn: [Verdict, string, string]): ComparisonRow {
+  return { feature, detail, av: cell(av), sf: cell(sf), ts: cell(ts), sk: cell(sk), mn: cell(mn) };
 }
 
 function cell(input: [Verdict, string, string]): ComparisonCell {

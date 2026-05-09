@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { filterReleases, countReleaseFilters, releases } from "../.vitepress/theme/data/releases";
 import { filterSkills, skills, sortSkills } from "../.vitepress/theme/data/skills";
 
-describe("skills directory helpers", () => {
+describe("skill examples helpers", () => {
   it("filters by query, agent, category, and org", () => {
     const result = filterSkills(skills, {
       query: "preserves headings",
@@ -14,7 +14,7 @@ describe("skills directory helpers", () => {
     expect(result.map((skill) => skill.name)).toEqual(["extract-pdf"]);
   });
 
-  it("sorts installs without mutating the original input", () => {
+  it("sorts reference counts without mutating the original input", () => {
     const input = skills.slice(0, 4);
     const sorted = sortSkills(input, "installs");
 

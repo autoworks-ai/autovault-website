@@ -219,7 +219,7 @@ const VAULT_TREE: VaultRow[] = [
 
 const VAULT_NOTES: Record<string, { title: string; body: string; tags?: string[] }> = {
   root: { title: "The vault itself", body: "A normal folder. Inspect it, sync it, back it up, or version it the same way you handle dotfiles." },
-  config: { title: "config.toml", body: "Trusted publishers, default scope policy, and render targets live here so the policy diffs cleanly." },
+  config: { title: "config.toml", body: "Trusted sources, default scope policy, and render targets live here so the policy diffs cleanly." },
   keys: { title: "keys/", body: "A local Ed25519 keypair signs admitted skills. The private key stays on the machine.", tags: ["ed25519", "local-only"] },
   skills: { title: "skills/", body: "One subfolder per canonical skill. The source SKILL.md remains the thing humans review." },
   skill: { title: "extract-pdf/", body: "The source, manifest, detached signature, and rendered agent files stay together under the canonical id.", tags: ["canonical", "signed"] },
