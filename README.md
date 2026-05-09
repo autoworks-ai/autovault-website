@@ -5,7 +5,7 @@ This repository contains the public documentation site for AutoVault.
 - Website: [autovault.dev](https://autovault.dev)
 - Installer: [autovault.sh](https://autovault.sh)
 - Source: [autoworks-ai/autovault](https://github.com/autoworks-ai/autovault)
-- Security policy: [SECURITY.md](https://github.com/autoworks-ai/autovault/security/policy)
+- Security policy: [Security policy](https://github.com/autoworks-ai/autovault/security/policy)
 - Current source release: [v0.2.1](https://github.com/autoworks-ai/autovault/releases/tag/v0.2.1)
 
 AutoVault is a local-first vault for agent skills. The website is built with VitePress and is intentionally focused on the current verified install paths: the shell installer and the GHCR container image.
