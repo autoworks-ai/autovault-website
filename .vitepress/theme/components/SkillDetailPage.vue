@@ -3,7 +3,8 @@
     <nav class="sd-crumb reveal-item" aria-label="Breadcrumb">
       <a href="/skills-directory">Examples</a>
       <span class="sep">/</span>
-      <a href="/author-autoworks-ai">{{ currentSkill.org }}</a>
+      <a v-if="authorPath" :href="authorPath">{{ currentSkill.org }}</a>
+      <span v-else>{{ currentSkill.org }}</span>
       <span class="sep">/</span>
       <span class="cur">{{ currentSkill.name }}</span>
     </nav>
@@ -92,43 +93,6 @@
           </div>
         </section>
 
-        <section v-else-if="tab === 'transform'">
-          <p class="sd-intro">This skill declares the agents shown below. The vault renders each admitted skill for the caller's target profile, so this view only shows supported targets from the hosted catalog.</p>
-          <div class="sd-xform-toolbar">
-            <span class="lbl">Render for</span>
-            <div class="sd-target-pills">
-              <button v-for="targetOption in targets" :key="targetOption.id" type="button" :class="{ active: target === targetOption.id }" @click="target = targetOption.id">
-                <span class="sw" :style="{ background: targetOption.color }" />
-                {{ targetOption.label }}
-              </button>
-            </div>
-            <span class="spacer" />
-            <span class="diff-count">{{ activeTarget.added }} added · {{ activeTarget.removed }} removed</span>
-          </div>
-          <div class="sd-diff">
-            <div class="sd-diff-pane">
-              <div class="head"><span class="ttl">SKILL.md (canonical)</span><span class="meta">v{{ currentSkill.v }}</span></div>
-              <div class="body">
-                <div v-for="(line, index) in canonicalLines" :key="index" class="ln"><span class="gut">{{ index + 1 }}</span><span class="text">{{ line }}</span></div>
-              </div>
-            </div>
-            <div class="sd-diff-pane">
-              <div class="head"><span class="ttl">{{ activeTarget.file }}</span><span class="meta" :style="{ color: activeTarget.color }">● {{ activeTarget.label }}</span></div>
-              <div class="body">
-                <div v-for="(line, index) in transformLines[target]" :key="index" :class="['ln', line.kind]">
-                  <span class="gut">{{ index + 1 }}</span><span class="text">{{ line.text }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="sd-xform-summary">
-            <span class="ch">format: markdown</span>
-            <span class="ch">trigger style: {{ target === "cx" ? "task-oriented" : "natural" }}</span>
-            <span class="ch">permissions: explicit</span>
-            <span class="ch">source: hosted SKILL.md</span>
-          </div>
-        </section>
-
         <section v-else-if="tab === 'perms'">
           <p class="sd-intro">This skill's declared capabilities, by axis. These rows are derived from the hosted SKILL.md metadata rather than placeholder marketplace copy.</p>
           <div class="sd-perm-grid">
@@ -148,7 +112,11 @@
             <div :class="['pip', row.ok ? 'ok' : '']"><UiIcon :name="row.icon" /></div>
             <div class="pcontent">
               <div class="ttl">{{ row.title }}</div>
-              <div class="det" v-html="row.detail" />
+              <div class="det">
+                <a v-if="row.detail.kind === 'link'" :href="row.detail.href">{{ row.detail.text }}</a>
+                <code v-else-if="row.detail.kind === 'code'">{{ row.detail.text }}</code>
+                <template v-else>{{ row.detail.text }}</template>
+              </div>
             </div>
             <div class="when">{{ row.when }}</div>
           </div>
@@ -215,16 +183,19 @@ import UiIcon from "./UiIcon.vue";
 import { PRODUCT_VERSION } from "../data/product";
 import { agents as catalogAgents, findSkillByName, skills } from "../data/skills";
 
-type TabId = "overview" | "transform" | "perms" | "prov" | "versions";
-type TargetId = "cc" | "cx" | "aj";
+type TabId = "overview" | "perms" | "prov" | "versions";
 
 const props = defineProps<{ skillName?: string }>();
 const tab = ref<TabId>("overview");
-const target = ref<TargetId>("cc");
 const copied = ref(false);
 const copyFailed = ref(false);
 
 const currentSkill = computed(() => findSkillByName(props.skillName));
+
+const ORG_AUTHOR_PAGES: Record<string, string> = {
+  "autoworks-ai": "/author-autoworks-ai"
+};
+const authorPath = computed(() => ORG_AUTHOR_PAGES[currentSkill.value.org] ?? null);
 
 const tabs = [
   { id: "overview" as const, label: "Overview" },
@@ -246,42 +217,22 @@ const agentRows = computed(() => catalogAgents.map((agent) => ({
   on: currentSkill.value.agents.includes(agent.id)
 })));
 
-const targets = [
-  { id: "cc" as const, label: "Claude Code", color: "#d6a85a", added: 2, removed: 0, file: "SKILL.md" },
-  { id: "cx" as const, label: "Codex", color: "#5a9dd6", added: 2, removed: 0, file: "SKILL.md" },
-  { id: "aj" as const, label: "AutoJack", color: "#5ad6c0", added: 1, removed: 0, file: "SKILL.md" }
-];
-const activeTarget = computed(() => targets.find((item) => item.id === target.value) ?? targets[0]);
-
-const canonicalLines = computed(() => [
-  `## Skill: ${currentSkill.value.name}`,
-  "",
-  currentSkill.value.desc,
-  "",
-  "### Install",
-  currentSkill.value.install,
-  "",
-  "### Source",
-  currentSkill.value.sourceLabel
-]);
-
-const transformLines = computed<Record<TargetId, Array<{ kind?: "add" | "del"; text: string }>>>(() => ({
-  cc: currentSkill.value.overview.map((text) => ({ text })),
-  cx: currentSkill.value.useCases.map((text) => ({ kind: "add", text })),
-  aj: currentSkill.value.frontmatter.map((text) => ({ text }))
-}));
-
 const relatedSkills = computed(() => currentSkill.value.related.map((name) => skills.find((skill) => skill.name === name)).filter((skill): skill is (typeof skills)[number] => Boolean(skill)));
 
 const permissionGroups = computed(() => [
   { title: "Declared capabilities", rows: currentSkill.value.permissions }
 ]);
 
+type ProvenanceDetail =
+  | { kind: "link"; href: string; text: string }
+  | { kind: "code"; text: string }
+  | { kind: "text"; text: string };
+
 const provenance = computed(() => [
-  { icon: "check" as const, ok: true, title: "Hosted raw SKILL.md", detail: `<a href="${currentSkill.value.rawPath}">${currentSkill.value.rawPath}</a>`, when: "current" },
-  { icon: "github" as const, ok: true, title: "Source path", detail: `<a href="${currentSkill.value.sourceUrl}">${currentSkill.value.sourceLabel}</a>`, when: "current" },
-  { icon: "shield" as const, ok: true, title: `Website gate · ${PRODUCT_VERSION}`, detail: "Catalog tests parse the hosted file and verify frontmatter against the listing.", when: "CI" },
-  { icon: "lock" as const, title: "Available for local admission", detail: `<code>${currentSkill.value.install}</code>`, when: "on demand" }
+  { icon: "check" as const, ok: true, title: "Hosted raw SKILL.md", detail: { kind: "link" as const, href: currentSkill.value.rawPath, text: currentSkill.value.rawPath }, when: "current" },
+  { icon: "github" as const, ok: true, title: "Source path", detail: { kind: "link" as const, href: currentSkill.value.sourceUrl, text: currentSkill.value.sourceLabel }, when: "current" },
+  { icon: "shield" as const, ok: true, title: `Website gate · ${PRODUCT_VERSION}`, detail: { kind: "text" as const, text: "Catalog tests parse the hosted file and verify frontmatter against the listing." }, when: "CI" },
+  { icon: "lock" as const, title: "Available for local admission", detail: { kind: "code" as const, text: currentSkill.value.install }, when: "on demand" }
 ]);
 
 const versions = computed(() => [

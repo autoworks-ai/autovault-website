@@ -1,5 +1,6 @@
 ---
 name: autovault-skill
+version: 1.0.0
 description: Understand AutoVault-managed skills. AutoVault syncs skills into the agent's normal skill directory, so loaded skills can be used directly without an AutoVault MCP server.
 license: MIT
 tags:
@@ -11,8 +12,7 @@ agents:
   - codex
   - autojack
 category: meta
-metadata:
-  version: "1.0.0"
+tools_required: [shell.run]
 capabilities:
   network: false
   filesystem: readonly
