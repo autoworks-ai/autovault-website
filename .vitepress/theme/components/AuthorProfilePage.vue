@@ -1,7 +1,7 @@
 <template>
   <div class="au-page reveal-page">
     <nav class="au-crumb reveal-item" aria-label="Breadcrumb">
-      <a href="/skills-directory">Skills</a>
+      <a href="/skills-directory">Examples</a>
       <span class="sep">/</span>
       <span class="cur">autoworks-ai</span>
     </nav>
@@ -15,11 +15,11 @@
           </div>
           <div>
             <h1>autoworks-ai</h1>
-            <div class="handle">@autoworks-ai · publisher</div>
+            <div class="handle">@autoworks-ai · source</div>
             <span class="verify-badge"><UiIcon name="shield" /> Verified author · since 2026-01-08</span>
           </div>
         </div>
-        <p class="au-bio">Authors of <span class="ital">AutoVault</span> and a handful of foundational skills for the agent ecosystem. Every skill we publish goes through the same gate as everyone else's — no special treatment, no skipped stages. The tooling we build for ourselves is the tooling we ship.</p>
+        <p class="au-bio">Authors of <span class="ital">AutoVault</span> and a handful of foundational skill examples for the agent ecosystem. Every skill we admit goes through the same gate as everyone else's — no special treatment, no skipped stages. The tooling we build for ourselves is the tooling we ship.</p>
         <div class="au-meta-row">
           <a class="item" href="https://github.com/autoworks-ai"><UiIcon name="github" /> github.com/autoworks-ai</a>
           <a class="item" href="/">autovault.dev</a>
@@ -43,7 +43,7 @@
       </aside>
     </header>
 
-    <section class="au-stats reveal-item" aria-label="Publisher statistics">
+    <section class="au-stats reveal-item" aria-label="Source statistics">
       <div v-for="stat in stats" :key="stat.label" class="st">
         <div class="lbl">{{ stat.label }}</div>
         <div class="val" v-html="stat.value" />
@@ -53,8 +53,8 @@
 
     <section class="au-section reveal-item">
       <div class="eyebrow"><span class="dash" /> Body of work</div>
-      <h2>Skills published by autoworks-ai</h2>
-      <p class="sub">Every skill listed here has been signed with the certificate above, run through the public gate, and is mirrored to <code>cdn.autovault.dev</code>.</p>
+      <h2>Example skills from autoworks-ai</h2>
+      <p class="sub">Every skill listed here has been signed with the certificate above, run through the gate, and is available as provenance context for local admission.</p>
       <div class="au-skills-toolbar">
         <button v-for="category in categories" :key="category" type="button" :class="['filter-chip', { on: selectedCategory === category }]" @click="selectedCategory = category">{{ category }}</button>
         <span class="ct">{{ filteredSkills.length }} of {{ authorSkills.length }} skills</span>
@@ -68,7 +68,7 @@
           </div>
           <div class="desc">{{ skill.desc }}</div>
           <div class="row3">
-            <span class="install">{{ skill.installs }} installs</span>
+            <span class="install">{{ skill.installs }} refs</span>
             <span class="spacer" />
             <div class="agents">
               <span v-for="agent in agentIds" :key="agent" class="a" :style="agentStyle(skill, agent)">{{ agent }}</span>
@@ -80,8 +80,8 @@
 
     <section class="au-section reveal-item">
       <div class="eyebrow"><span class="dash" /> Trust track record</div>
-      <h2>What the gate has seen from this publisher</h2>
-      <p class="sub">A verified author isn't a free pass. Every submission still runs the same five stages — and we publish the failure rate honestly. No publisher should ever look like 100%.</p>
+      <h2>What the gate has seen from this source</h2>
+      <p class="sub">A verified author isn't a free pass. Every admission still runs the same five stages, including the failures. No source should ever look like 100%.</p>
       <div class="au-track">
         <div class="au-track-grid">
           <div v-for="cell in track" :key="cell.label" class="au-track-cell">
@@ -95,13 +95,13 @@
 
     <section class="au-section reveal-item">
       <div class="eyebrow"><span class="dash" /> Activity</div>
-      <h2>What this publisher has been doing</h2>
-      <p class="sub">A live feed of submissions, publishes, and gate verdicts — including the rejections. Activity is signed and append-only.</p>
+      <h2>What this source has been doing</h2>
+      <p class="sub">A feed of proposals, admissions, updates, and gate verdicts — including the rejections. Activity is signed and append-only.</p>
       <div class="au-activity">
         <div class="au-activity-feed">
           <div class="feed-head">Last 12 weeks · 7 events</div>
           <div v-for="item in activity" :key="`${item.kind}-${item.name}`" class="au-activity-row">
-            <div :class="['pip', item.kind]"><UiIcon :name="item.kind === 'publish' ? 'check' : item.kind === 'update' ? 'arrow' : 'x'" /></div>
+            <div :class="['pip', item.kind]"><UiIcon :name="item.kind === 'admit' ? 'check' : item.kind === 'update' ? 'arrow' : 'x'" /></div>
             <div class="body">
               <div><span>{{ actionLabel(item.kind) }}</span> <span class="name">{{ item.name }}</span></div>
               <div class="det">{{ item.detail }}</div>
@@ -110,7 +110,7 @@
           </div>
         </div>
         <div class="au-cadence">
-          <h4>Publishing cadence</h4>
+          <h4>Admission cadence</h4>
           <div class="h4-sub">last 26 weeks · 130 events</div>
           <div class="au-cadence-grid">
             <div v-for="(value, index) in cadenceData" :key="index" class="au-cadence-cell" :style="{ background: cadenceColor(value) }" />
@@ -176,8 +176,8 @@ const certificate = [
 ];
 
 const stats = [
-  { label: "Skills published", value: "14", trend: "+2 this month" },
-  { label: "Total installs", value: "12.8<span class=\"unit\">k</span>", trend: "+1.6k this week" },
+  { label: "Example skills", value: "14", trend: "+2 this month" },
+  { label: "Reference uses", value: "12.8<span class=\"unit\">k</span>", trend: "+1.6k this week" },
   { label: "Gate pass rate", value: "96.4<span class=\"unit\">%</span>", trend: "81 of 84 submissions" },
   { label: "Median bundle", value: "3.1<span class=\"unit\">KB</span>", trend: "75th: 5.4KB", dim: true },
   { label: "Issue response", value: "14<span class=\"unit\">h</span>", trend: "median, last 90d" }
@@ -211,12 +211,12 @@ const track = [
 ];
 
 const activity = [
-  { kind: "publish", name: "extract-pdf@1.4.0", detail: "+--pages range support · 5/5 gate stages green", when: "2d" },
+  { kind: "admit", name: "extract-pdf@1.4.0", detail: "+--pages range support · 5/5 gate stages green", when: "2d" },
   { kind: "update", name: "extract-pdf@1.3.2", detail: "patch: malformed cross-reference tables", when: "3w" },
-  { kind: "publish", name: "yaml-validate@0.9.0", detail: "initial release · same engine as the gate", when: "5w" },
+  { kind: "admit", name: "yaml-validate@0.9.0", detail: "initial release · same engine as the gate", when: "5w" },
   { kind: "deny", name: "experiment-skill@0.1.0", detail: "rejected by gate stage 03 · capability mismatch", when: "6w" },
   { kind: "update", name: "github-issues@2.1.0", detail: "minor: support enterprise.github.com hosts", when: "7w" },
-  { kind: "publish", name: "extract-table@0.7.0", detail: "initial release · pairs with extract-pdf", when: "9w" },
+  { kind: "admit", name: "extract-table@0.7.0", detail: "initial release · pairs with extract-pdf", when: "9w" },
   { kind: "update", name: "summarize-doc@0.9.2", detail: "patch: token budgeting on long docs", when: "10w" }
 ];
 
@@ -241,7 +241,7 @@ function cadenceColor(value: number) {
 }
 
 function actionLabel(kind: string) {
-  return kind === "publish" ? "Published" : kind === "update" ? "Updated" : "Gate rejected";
+  return kind === "admit" ? "Admitted" : kind === "update" ? "Updated" : "Gate rejected";
 }
 
 function agentStyle(skill: AuthorSkill, agent: AgentId) {

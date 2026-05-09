@@ -2,15 +2,15 @@
   <div class="dir-page">
     <header class="dir-header">
       <div>
-        <div class="eyebrow"><span class="dash" /> Skills directory</div>
-        <h1>Browse signed skills.</h1>
-        <p class="lede">Browse 241 community skills, all signed, all dedup'd, all transformation-mapped to the major agents. Filter by what you run, what you need, who you trust.</p>
+        <div class="eyebrow"><span class="dash" /> Vault examples</div>
+        <h1>Inspect example skills.</h1>
+        <p class="lede">Curated SKILL.md examples that show how a vault admits, signs, scopes, and renders one source for multiple agents. Filter by target, capability, or source to see the gate model in context.</p>
       </div>
       <div class="dir-stats">
-        <div class="stat"><div class="mono-label">Skills</div><div class="val">241</div><div class="arg" style="font-size: 10.5px">+18 this week</div></div>
-        <div class="stat"><div class="mono-label">Orgs</div><div class="val">38</div><div class="arg" style="font-size: 10.5px">verified</div></div>
-        <div class="stat"><div class="mono-label">Installs</div><div class="val">14.2k</div><div class="arg" style="font-size: 10.5px">local-first</div></div>
-        <div class="stat"><div class="mono-label">Rejects</div><div class="val">11.4%</div><div class="arg" style="font-size: 10.5px">caught by gate</div></div>
+        <div class="stat"><div class="mono-label">Examples</div><div class="val">{{ skills.length }}</div><div class="arg" style="font-size: 10.5px">reference set</div></div>
+        <div class="stat"><div class="mono-label">Sources</div><div class="val">{{ orgs.length }}</div><div class="arg" style="font-size: 10.5px">provenance context</div></div>
+        <div class="stat"><div class="mono-label">Targets</div><div class="val">4</div><div class="arg" style="font-size: 10.5px">agent renderers</div></div>
+        <div class="stat"><div class="mono-label">Gate</div><div class="val">5</div><div class="arg" style="font-size: 10.5px">admission stages</div></div>
       </div>
     </header>
 
@@ -23,9 +23,9 @@
 
       <main class="dir-main">
         <div class="toolbar">
-          <label class="dir-search"><UiIcon name="search" /><span class="visually-hidden">Search skills</span><input v-model="query" type="text" placeholder="Search skills, authors, capabilities..." /><span class="chip">⌘K</span></label>
-          <div class="segmented" aria-label="Sort skills">
-            <button class="seg-btn" :class="{ active: sort === 'installs' }" type="button" @click="sort = 'installs'">Most installed</button>
+          <label class="dir-search"><UiIcon name="search" /><span class="visually-hidden">Search examples</span><input v-model="query" type="text" placeholder="Search examples, sources, capabilities..." /><span class="chip">⌘K</span></label>
+          <div class="segmented" aria-label="Sort examples">
+            <button class="seg-btn" :class="{ active: sort === 'installs' }" type="button" @click="sort = 'installs'">Most referenced</button>
             <button class="seg-btn" :class="{ active: sort === 'recent' }" type="button" @click="sort = 'recent'">Recent</button>
             <button class="seg-btn" :class="{ active: sort === 'name' }" type="button" @click="sort = 'name'">Name</button>
           </div>
@@ -40,7 +40,7 @@
           <button class="seg-btn" type="button" @click="clearAll">clear all</button>
         </div>
 
-        <div class="mono-label">{{ filtered.length }} {{ filtered.length === 1 ? "skill" : "skills" }}</div>
+        <div class="mono-label">{{ filtered.length }} {{ filtered.length === 1 ? "example" : "examples" }}</div>
 
         <template v-if="filtered.length">
           <div v-if="view === 'grid'">
@@ -55,9 +55,9 @@
             <SkillListItem v-for="skill in filtered" :key="skill.name" :skill="skill" />
           </div>
         </template>
-        <div v-else class="empty">no skills match — <button class="seg-btn" type="button" @click="clearAll">clear filters</button></div>
+        <div v-else class="empty">no examples match — <button class="seg-btn" type="button" @click="clearAll">clear filters</button></div>
 
-        <div class="footer-row" style="justify-content: space-between"><span>Showing {{ filtered.length }} of 241 skills</span><span>Page 1 / 14</span></div>
+        <div class="footer-row" style="justify-content: space-between"><span>Showing {{ filtered.length }} of {{ skills.length }} examples</span><span>Vault inventory preview</span></div>
       </main>
     </div>
   </div>
@@ -151,7 +151,7 @@ const SkillTile = defineComponent({
         h("p", { class: "stl-desc" }, props.skill.desc),
         h("div", { class: "stl-agents" }, skillAgents(props.skill).map((agent) => h("span", { class: "ag", style: agent.on ? { background: agent.color, color: "#0a0d11", borderColor: agent.color } : undefined }, agent.id)))
       ]),
-      h("div", { class: "stl-meta" }, [h("span", `v${props.skill.v}`), h("span", props.skill.license), h("span", { style: "flex:1" }), h("span", `${props.skill.installs.toLocaleString()} installs`), h("button", { class: "copy-btn", type: "button" }, "Install")])
+      h("div", { class: "stl-meta" }, [h("span", `v${props.skill.v}`), h("span", props.skill.license), h("span", { style: "flex:1" }), h("span", `${props.skill.installs.toLocaleString()} refs`), h("button", { class: "copy-btn", type: "button" }, "Add")])
     ]);
   }
 });
@@ -164,7 +164,7 @@ const SkillListItem = defineComponent({
       h("div", { class: "desc-cell" }, props.skill.desc),
       h("div", { class: "agents-cell" }, skillAgents(props.skill).map((agent) => h("span", { class: "ag", style: agent.on ? { background: agent.color, color: "#0a0d11", borderColor: agent.color } : undefined }, agent.id))),
       h("span", { class: "meta-cell" }, `v${props.skill.v}`),
-      h("span", { class: "meta-cell" }, props.skill.installs.toLocaleString())
+      h("span", { class: "meta-cell" }, `${props.skill.installs.toLocaleString()} refs`)
     ]);
   }
 });

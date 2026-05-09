@@ -7586,7 +7586,7 @@ body {
 
 .cm-players {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 56px;
 }
@@ -7661,8 +7661,8 @@ body {
 
 .cm-row {
   display: grid;
-  grid-template-columns: 280px repeat(4, minmax(180px, 1fr));
-  min-width: 1000px;
+  grid-template-columns: 280px repeat(5, minmax(180px, 1fr));
+  min-width: 1180px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -9073,7 +9073,7 @@ body {
   background: var(--bg);
 }
 
-.au-activity-row .pip.publish {
+.au-activity-row .pip.admit {
   border-color: rgba(90, 214, 192, 0.3);
   background: var(--accent-soft);
   color: var(--accent);

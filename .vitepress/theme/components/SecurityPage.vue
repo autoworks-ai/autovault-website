@@ -130,7 +130,7 @@
     <section class="sec-section">
       <div class="eyebrow"><span class="dash" /> Disclosure</div>
       <h2>Found something? Tell us.</h2>
-      <p class="sub">We treat skill-ecosystem vulnerabilities the way mature infrastructure projects do. Coordinated disclosure, public CVE assignment, advisory published with the patch.</p>
+      <p class="sub">We treat skill-ecosystem vulnerabilities the way mature infrastructure projects do. Coordinated disclosure, public CVE assignment, advisory released with the patch.</p>
 
       <div class="disc-grid">
         <article class="disc-card">
@@ -232,7 +232,7 @@ const severityBreakdown = (Object.keys(severityLabels) as Array<keyof typeof sev
 const provenance = [
   { role: "LINK / 01 · author", id: "@autoworks-ai", when: "2026-04-28 12:14Z" },
   { role: "LINK / 02 · gate", id: "vault.autoworks-ai", when: "2026-04-28 12:18Z" },
-  { role: "LINK / 03 · publish", id: "0x9af4…2c81", when: "2026-04-28 14:21Z" },
+  { role: "LINK / 03 · admit", id: "0x9af4…2c81", when: "2026-04-28 14:21Z" },
   { role: "LINK / 04 · mirror", id: "cdn.autovault.dev", when: "2026-04-28 14:22Z" },
   { role: "LINK / 05 · install", id: "your machine", when: "on demand" }
 ];
@@ -302,7 +302,7 @@ const VerifierDemo = defineComponent({
             step.value >= 5 ? line("gate run", "5/5 stages passed · 2026-04-28 14:21Z", "ok") : null,
             step.value >= 6 && phase.value !== "fail" ? line("isnad chain", "3 links · author → vault → mirror", "ok") : null,
             phase.value === "ok" ? verdict("ok", "Verified.", "Provenance chain intact, signature valid, gate stages all green.") : null,
-            phase.value === "fail" ? verdict("fail", "Rejected.", "Signature does not match the published key for this artifact's signer. Do not install.") : null
+            phase.value === "fail" ? verdict("fail", "Rejected.", "Signature does not match the signing key for this artifact's signer. Do not install.") : null
           ])
     ]);
   }

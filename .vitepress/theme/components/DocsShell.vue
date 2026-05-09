@@ -70,7 +70,7 @@ const sidebarGroups = [
   {
     title: "Reference",
     items: [
-      { label: "Skills", href: "/skills-directory" },
+      { label: "Examples", href: "/skills-directory" },
       { label: "API", href: "/api" },
       { label: "Deploy", href: "/deploy" },
       { label: "Compare", href: "/compare" },
@@ -105,15 +105,15 @@ const configs: Record<PageKey, { active: string; sidebarActive: string; variant:
       { label: "Transformation manifest", id: "manifest" },
       { label: "Scope and permissions", id: "perms" },
       { label: "Try the gate", id: "playground" },
-      { label: "Publishing", id: "publish" }
+      { label: "Admission", id: "publish" }
     ]
   },
-  skills: { active: "Skills", sidebarActive: "Skills", variant: "full", toc: [] },
+  skills: { active: "Examples", sidebarActive: "Examples", variant: "full", toc: [] },
   api: { active: "API", sidebarActive: "API", variant: "full", toc: [] },
   deploy: { active: "Deploy", sidebarActive: "Deploy", variant: "full", toc: [] },
   compare: { active: "Compare", sidebarActive: "Compare", variant: "full", toc: [] },
-  "skill-detail": { active: "Skills", sidebarActive: "Skills", variant: "full", toc: [] },
-  "author-profile": { active: "Skills", sidebarActive: "Skills", variant: "full", toc: [] },
+  "skill-detail": { active: "Examples", sidebarActive: "Examples", variant: "full", toc: [] },
+  "author-profile": { active: "Examples", sidebarActive: "Examples", variant: "full", toc: [] },
   security: { active: "Security", sidebarActive: "Security", variant: "full", toc: [] },
   about: { active: "About", sidebarActive: "About", variant: "full", toc: [] },
   cloud: { active: "Cloud", sidebarActive: "Cloud", variant: "full", toc: [] },
@@ -123,15 +123,15 @@ const configs: Record<PageKey, { active: string; sidebarActive: string; variant:
 const searchResults = [
   { title: "Quick start", section: "Get started", href: "/quick-start", terms: "install local vault doctor first skill scope run vault anatomy add-local autovault_skill_install bootstrap" },
   { title: "Vault anatomy", section: "Get started", href: "/quick-start#vault-anatomy", terms: "vault folder tree anatomy signatures rendered profiles audit access map" },
-  { title: "Authoring skills", section: "Authoring", href: "/authoring", terms: "skill md schema tools_required transformations permissions agents publish gate propose_skill get_skill add_skill update_skill delete_skill include_resources scoping" },
+  { title: "Authoring skills", section: "Authoring", href: "/authoring", terms: "skill md schema tools_required transformations permissions agents admission gate propose_skill get_skill add_skill update_skill delete_skill include_resources scoping" },
   { title: "SKILL.md schema", section: "Authoring", href: "/authoring#schema", terms: "frontmatter fields schema tools_required transformations permissions agents resources" },
   { title: "Verify a skill", section: "Authoring", href: "/authoring#playground", terms: "paste url playground browser gate diagnostics verify check skill" },
-  { title: "Skills directory", section: "Reference", href: "/skills-directory", terms: "skills filters agent category org installs mit license" },
+  { title: "Skill examples", section: "Reference", href: "/skills-directory", terms: "examples vault inventory filters agent category source refs mit license" },
   { title: "API reference", section: "Reference", href: "/api", terms: "cli library http mcp endpoint load render verify resolve add_skill update_skill delete_skill propose_skill get_skill check_updates" },
   { title: "Deploy remote vault", section: "Reference", href: "/deploy", terms: "deploy remote mcp oauth pkce railway docker fly endpoint" },
-  { title: "Compare alternatives", section: "Reference", href: "/compare", terms: "comparison rawhub forkflow manualops alternatives signing provenance" },
-  { title: "extract-pdf", section: "Skills", href: "/skill-detail", terms: "extract pdf skill detail transformations permissions provenance versions" },
-  { title: "autoworks-ai", section: "Skills", href: "/author-autoworks-ai", terms: "publisher author profile certificate maintainers skills" },
+  { title: "Compare alternatives", section: "Reference", href: "/compare", terms: "comparison skillfish tessl skillkit manual folders alternatives signing provenance scoping transforms" },
+  { title: "extract-pdf", section: "Examples", href: "/skill-detail", terms: "extract pdf skill detail transformations permissions provenance versions" },
+  { title: "autoworks-ai", section: "Examples", href: "/author-autoworks-ai", terms: "source author profile certificate maintainers skills examples" },
   { title: "Security & provenance", section: "Reference", href: "/security", terms: "security signature signing provenance denylist gate verifier oauth remote mcp" },
   { title: "About AutoVault", section: "Team", href: "/about", terms: "jack arturo autojack jason coleman flint zack katz daniel iser team credits" },
   { title: "Changelog", section: "Reference", href: "/changelog", terms: "release notes remote mcp oauth add-local transforms resource drift" }

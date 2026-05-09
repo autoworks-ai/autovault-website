@@ -49,7 +49,7 @@ autovault skill list
 
 ## Current MCP surface
 
-- get_skill for exact reads, query-based discovery, rendered agent variants, and optional packaged resources.
+- get_skill for exact reads, vault inventory lookup, rendered agent variants, and optional packaged resources.
 - add_skill for trusted GitHub, agentskills, HTTPS, and local bundle sources.
 - update_skill for refreshing installed skills from their recorded source or replacing them from a new source.
 - delete_skill for removing a skill and refreshing generated profiles.
@@ -167,15 +167,15 @@ Use this skill when the user asks for text, structure, or summaries from a PDF.
 
 Scope is local policy, not a frontmatter substitute. Use it to decide which agents, projects, devices, and profile links can load the signed skill after admission.
 
-## Publishing
+## Admission
 
 Use propose_skill while iterating, add_skill for trusted remote sources or local bundles, and update_skill when replacing an existing skill. All write paths run through the validation and signing gate.`;
 
-const skillsMarkdown = `# AutoVault Skills Directory
+const skillsMarkdown = `# AutoVault Skill Examples
 
-The skills directory is a signed catalog of reusable SKILL.md packages. It is organized for agents and humans: query by name, description, category, agent compatibility, organization, install count, and license.
+The examples page is a compatibility route for curated SKILL.md references. It is not a listings site; it shows how AutoVault admits skills into a local vault, records provenance, signs what passes, renders agent-specific output, and keeps permission signals visible.
 
-## Featured first-party examples
+## Featured examples
 
 - extract-pdf: extract structured text from PDF files.
 - summarize-doc: recursive multi-pass document summarization.
@@ -183,11 +183,11 @@ The skills directory is a signed catalog of reusable SKILL.md packages. It is or
 - parse-csv: parse CSV with dialect and type inference.
 - yaml-validate: validate YAML with AutoVault-style diagnostics.
 
-First-party AutoVault examples are MIT licensed. Community examples keep their submitted license metadata.
+First-party AutoVault examples use MIT metadata. Other example sources keep their submitted license metadata and still run through the same gate before admission.
 
 ## Agent use
 
-Agents should use get_skill with a query for discovery, fetch full content only when needed, and set include_resources when packaged files are required instead of assuming filesystem paths.`;
+Agents should use get_skill for vault inventory lookup, fetch full content only when needed, and set include_resources when packaged files are required instead of assuming filesystem paths.`;
 
 const apiMarkdown = `# AutoVault API Reference
 
@@ -201,7 +201,7 @@ AutoVault exposes the same skill primitives through CLI, library, HTTP, and MCP 
 
 ## Agent guidance
 
-Prefer discovery first, full reads second, and get_skill with include_resources when packaged resources are needed.`;
+Prefer inventory lookup first, full reads second, and get_skill with include_resources when packaged resources are needed.`;
 
 const deployMarkdown = `# Deploy A Remote AutoVault
 
@@ -216,18 +216,18 @@ Deploy AutoVault when a team needs a shared remote vault, OAuth-protected MCP ac
 
 const compareMarkdown = `# AutoVault Comparison
 
-AutoVault is a validating local vault rather than a raw index, marketplace, or pile of per-agent forks.
+AutoVault is a local-first vault, not a browsing destination. It overlaps most closely with Skillfish for multi-agent skill install/update/sync, then differs by making validation, signing, scoped delivery, transforms, and local/remote vault operation the center of the product.
 
-## Where it differs
+## Useful alternatives
 
-- Gate-and-sign instead of publish-and-pray.
-- One canonical SKILL.md rendered per caller.
-- Local-first operation with optional remote MCP.
-- MIT source, portable storage, and reproducible validation.
+- Skillfish: strong open-source manager for installing, updating, syncing, and sharing skill bundles across many agents.
+- Tessl: useful public ecosystem and distribution layer for skills and agents.
+- SkillKit-style directories and Agent Skills spec repos: useful places to find or standardize source material before local admission.
+- Manual per-agent folders: simplest for one person with a few files, but drift grows quickly.
 
 ## Tradeoff
 
-AutoVault is stricter than a raw index. That is useful when provenance, permission signals, transforms, and drift checks matter.`;
+AutoVault is stricter than a sync manager or external discovery surface. That is useful when provenance, permission signals, transforms, drift checks, and scoped delivery matter more than the broadest discovery surface.`;
 
 const skillDetailMarkdown = `# Example Skill Detail
 
@@ -237,13 +237,13 @@ The extract-pdf example shows how AutoVault presents one signed skill: frontmatt
 
 First-party AutoVault example skills use MIT metadata. Community skills keep their submitted license metadata.`;
 
-const authorProfileMarkdown = `# autoworks-ai Publisher Profile
+const authorProfileMarkdown = `# autoworks-ai Source Profile
 
-The autoworks-ai publisher profile groups first-party AutoVault examples and the public identity metadata used by skill detail pages.
+The autoworks-ai source profile groups first-party AutoVault examples and the public identity metadata used by skill detail pages.
 
 ## Use
 
-Agents should treat publisher pages as provenance context, then fetch the exact skill content through get_skill or the markdown skill detail endpoint when they need instructions.`;
+Agents should treat source pages as provenance context, then fetch the exact skill content through get_skill or the markdown skill detail endpoint when they need instructions.`;
 
 const securityMarkdown = `# AutoVault Security And Provenance
 
@@ -358,8 +358,8 @@ export const pageDocs: PageDoc[] = [
   {
     key: "skills-directory",
     file: "skills-directory.md",
-    title: "AutoVault Skills Directory",
-    description: "Browse signed AutoVault skills by agent, category, organization, install count, and license, with first-party examples aligned to MIT.",
+    title: "AutoVault Skill Examples",
+    description: "Review curated AutoVault examples by agent, capability, source, provenance, permissions, transforms, and license.",
     route: "/skills-directory",
     agentPath: "/agents/skills-directory",
     markdown: skillsMarkdown
@@ -368,7 +368,7 @@ export const pageDocs: PageDoc[] = [
     key: "api",
     file: "api.md",
     title: "AutoVault API Reference",
-    description: "Reference AutoVault CLI, library, HTTP, and MCP surfaces for loading, rendering, verifying, installing, transforming, and checking skills.",
+    description: "Reference AutoVault CLI, library, HTTP, and MCP surfaces for loading, rendering, verifying, admitting, transforming, and checking skills.",
     route: "/api",
     agentPath: "/agents/api",
     markdown: apiMarkdown
@@ -386,7 +386,7 @@ export const pageDocs: PageDoc[] = [
     key: "compare",
     file: "compare.md",
     title: "AutoVault vs Alternatives",
-    description: "Compare AutoVault with raw skill registries, per-agent forks, and manual skill management across provenance, transforms, scoping, and portability.",
+    description: "Compare AutoVault with Skillfish, Tessl, SkillKit-style directories, and manual per-agent folders across provenance, transforms, scoping, and portability.",
     route: "/compare",
     agentPath: "/agents/compare",
     markdown: compareMarkdown
@@ -403,8 +403,8 @@ export const pageDocs: PageDoc[] = [
   {
     key: "author-profile",
     file: "author-autoworks-ai.md",
-    title: "autoworks-ai Publisher Profile",
-    description: "Review the autoworks-ai publisher profile for first-party AutoVault example skills, provenance context, and maintainer metadata.",
+    title: "autoworks-ai Source Profile",
+    description: "Review the autoworks-ai source profile for first-party AutoVault example skills, provenance context, and maintainer metadata.",
     route: "/author-autoworks-ai",
     agentPath: "/agents/author-autoworks-ai",
     markdown: authorProfileMarkdown

@@ -18,7 +18,7 @@
       <section class="api-hero reveal-item">
         <div class="eyebrow"><span class="dash" /> Reference · v0.2.0 · 2026-05</div>
         <h1>Three surfaces. <span class="ital">One vocabulary.</span></h1>
-        <p class="lede">AutoVault exposes the same primitives — load, render, verify — through three interfaces: a CLI for humans, a library for programs, and an HTTP/MCP endpoint for remote agents. They're versioned together; if a name appears here, it works the same way in all three.</p>
+        <p class="lede">AutoVault exposes the same primitives — admit, load, render, verify — through three interfaces: a CLI for humans, a library for programs, and an HTTP/MCP endpoint for remote agents. They're versioned together; if a name appears here, it works the same way in all three.</p>
         <div class="api-versions">
           <div class="v"><div class="lbl">CLI</div><div class="val">autovault@0.2.0 <span class="meta">npm · brew · cargo</span></div></div>
           <div class="v"><div class="lbl">Library</div><div class="val">@autovault/sdk@0.2.0 <span class="meta">node, deno, bun</span></div></div>
@@ -96,9 +96,9 @@ const nav: NavItem[] = [
   { kind: "item", id: "cli-init", method: "cli", label: "init" },
   { kind: "item", id: "cli-add", method: "cli", label: "add" },
   { kind: "item", id: "cli-list", method: "cli", label: "list" },
-  { kind: "item", id: "cli-publish", method: "cli", label: "publish" },
+  { kind: "item", id: "cli-add-local", method: "cli", label: "add-local" },
   { kind: "item", id: "cli-verify", method: "cli", label: "verify" },
-  { kind: "item", id: "cli-import", method: "cli", label: "import" },
+  { kind: "item", id: "cli-check-updates", method: "cli", label: "check-updates" },
   { kind: "section", label: "Library", color: "#b48ad6" },
   { kind: "item", id: "lib-load", method: "fn", label: "loadSkill()" },
   { kind: "item", id: "lib-render", method: "fn", label: "renderForTarget()" },
@@ -122,17 +122,17 @@ const sections: ApiSection[] = [
         title: "autovault init",
         status: "stable",
         since: "0.1.0",
-        description: "Scaffold a new vault in the current directory. Generates a signing key, creates the <code>.autovault/</code> directory, and writes a starter <code>vault.toml</code>.",
+        description: "Scaffold a local vault. Generates a signing key, creates the <code>~/.autovault</code> folder when needed, and writes a starter <code>config.toml</code>.",
         signature: ["<span class=\"pmt\">$</span> autovault init <span class=\"opt\">[--key &lt;path&gt;] [--anchor &lt;url&gt;] [--no-key]</span>"],
         copy: "autovault init",
         argsLabel: "Flag",
         args: [
-          { name: "--key", type: "path", description: "Existing Ed25519 private key to import. If omitted, a new key is generated and written to <code>.autovault/key.pem</code>." },
+          { name: "--key", type: "path", description: "Existing Ed25519 private key to import. If omitted, a new key is generated and written under <code>~/.autovault</code>." },
           { name: "--anchor", type: "url <span class=\"def\">= autovault.dev</span>", description: "Trust anchor URL. Override to point at a private vault for self-hosted deployments." },
-          { name: "--no-key", type: "flag", description: "Skip key generation. Use this if you only intend to consume skills, not publish them." }
+          { name: "--no-key", type: "flag", description: "Skip key generation. Use this if you only intend to read skills from an existing vault." }
         ],
         examples: [
-          { label: "Bash", body: "<div><span class=\"com\"># in a fresh repo</span></div><div><span class=\"pmt\">$</span> autovault init</div><div><span class=\"ok\">  ✓</span> generated key:0x9af4…2c81</div><div><span class=\"ok\">  ✓</span> .autovault/ created</div><div><span class=\"ok\">  ✓</span> anchored to autovault.dev (root)</div>" },
+          { label: "Bash", body: "<div><span class=\"com\"># first local vault</span></div><div><span class=\"pmt\">$</span> autovault init</div><div><span class=\"ok\">  ✓</span> generated key:0x9af4…2c81</div><div><span class=\"ok\">  ✓</span> ~/.autovault created</div><div><span class=\"ok\">  ✓</span> anchored to autovault.dev (root)</div>" },
           { label: "Self-hosted", body: "<div><span class=\"pmt\">$</span> autovault init \\</div><div>    --anchor https://vault.internal.acme.com</div><div><span class=\"ok\">  ✓</span> anchored to vault.internal.acme.com</div>" },
           { label: "Import key", body: "<div><span class=\"pmt\">$</span> autovault init --key ./signing.pem</div><div><span class=\"ok\">  ✓</span> imported key:0xD6A8…5AB4</div>" }
         ]
@@ -159,9 +159,9 @@ const sections: ApiSection[] = [
         ]
       },
       endpoint("cli-list", "list", "autovault list", "Print the installed skills in this vault, their versions, and the last verification timestamp. Adds <code>--json</code> for machine output.", "$ autovault list [--json] [--stale]", "autovault list"),
-      endpoint("cli-publish", "publish", "autovault publish <path>", "Submit a SKILL.md to the configured anchor. Runs the gate locally first; the server re-runs it independently and only signs if both verdicts match.", "$ autovault publish <path> [--draft] [--reason <str>]", "autovault publish ./SKILL.md", "0.2.0"),
+      endpoint("cli-add-local", "add-local", "autovault add-local <path>", "Admit a local SKILL.md bundle into the vault. Runs the same gate as remote sources, writes provenance, signs what passes, and can refresh generated profiles.", "$ autovault add-local <path> [--source <id>] [--sync-profiles]", "autovault add-local ./skills/extract-pdf --sync-profiles", "0.2.0"),
       endpoint("cli-verify", "verify", "autovault verify", "Walk the provenance chain for a skill. Resolves the latest version, fetches the signature bundle, and verifies every link from author through mirror.", "$ autovault verify <skill> [--chain] [--offline]", "autovault verify autoworks-ai/extract-pdf", "0.3.0"),
-      endpoint("cli-import", "import", "autovault import", "Migrate skills from RawHub, ForkFlow, or hand-maintained CLAUDE.md / AGENTS.md / .cursorrules. Each importer parses, normalizes, and runs the gate before anything lands.", "$ autovault import <rawhub | forkflow | manual> [options]", "autovault import manual ./CLAUDE.md", "0.4.0", "beta")
+      endpoint("cli-check-updates", "check-updates", "autovault check-updates", "Compare admitted skills against their recorded source sidecars and report upstream drift, including transform review state when applicable.", "$ autovault check-updates [--json]", "autovault check-updates", "0.2.0")
     ]
   },
   {
