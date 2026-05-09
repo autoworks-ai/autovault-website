@@ -1,47 +1,143 @@
 <template>
-  <div class="docs-rich">
-    <section class="qs-hero">
+  <div class="docs-rich docs-final quickstart-final">
+    <section class="docs-hero qs-hero qs-final-hero">
       <div>
-        <div class="eyebrow"><span class="dash" /> Get started · 5 minutes</div>
-        <h1>Run one skill across <span class="ital">two agents.</span></h1>
-        <p class="lede">By the end of this page you'll have a local vault, bundled skills, a validated install path, and the same skill available from Claude Code and Codex with zero forks.</p>
-        <div class="stats-grid">
-          <div class="stat"><div class="mono-label">Time</div><div class="val">5<span class="muted" style="font-size: 12px"> min</span></div></div>
-          <div class="stat"><div class="mono-label">Disk</div><div class="val">12<span class="muted" style="font-size: 12px"> MB</span></div></div>
-          <div class="stat"><div class="mono-label">Required</div><div class="val">node <span class="muted" style="font-size: 12px">≥ 20</span></div></div>
+        <AvDocBreadcrumb section="Get started" page="Quick start" />
+        <div class="eyebrow"><span class="dash" /> Install · 5 minutes</div>
+        <h1>Install AutoVault.<br><span class="ital">One command. No daemon.</span></h1>
+        <p class="lede">Create the local vault, admit a signed skill, scope it to the agents that need it, and run the same capability from Claude Code, Codex, or Cursor without maintaining forks.</p>
+
+        <div class="install-final-card" aria-label="Install command">
+          <div class="install-tabs" role="tablist" aria-label="Install method">
+            <button
+              v-for="method in INSTALL_METHODS"
+              :key="method"
+              :class="{ active: selectedMethod === method }"
+              type="button"
+              role="tab"
+              :aria-selected="selectedMethod === method"
+              @click="selectedMethod = method"
+            >
+              {{ method }}
+            </button>
+            <span class="tabs-sep" />
+            <span class="tabs-meta">v0.2.0 · Unreleased May 2026 · MIT</span>
+          </div>
+          <div class="install-cmd">
+            <span class="prompt">$</span>
+            <code>{{ INSTALL_COMMANDS[selectedMethod] }}</code>
+            <button class="copy-btn" :class="{ copied }" type="button" @click="copyInstall">{{ copied ? "copied" : "copy" }}</button>
+          </div>
+          <div class="install-foot">
+            <span class="dot live" />
+            <span>Installer endpoint: <code>autovault.sh</code></span>
+            <a href="https://github.com/autoworks-ai/autovault">view source</a>
+          </div>
+        </div>
+
+        <div class="prereqs" aria-label="Requirements">
+          <span class="prereq-label">requires</span>
+          <span v-for="item in PREREQS" :key="item.label" class="prereq">
+            <span class="lbl">{{ item.label }}</span>
+            <span class="sub">{{ item.detail }}</span>
+          </span>
         </div>
       </div>
+
       <TerminalDemo />
     </section>
 
     <h2 id="install">Step 1 — Install the local vault</h2>
-    <p>The installer builds the Node app under <code>~/.autovault/app</code>, drops the shim at <code>~/.autovault/bin/autovault</code>, preserves <code>~/.autovault</code> as storage, and bootstraps bundled skills unless <code>AUTOVAULT_NO_BOOTSTRAP=1</code> is set. Nothing runs as a daemon; local MCP hosts spawn stdio on demand.</p>
-    <CodeBlock lang="bash"><span class="pmt">$</span> curl <span class="arg">-fsSL</span> autovault.sh <span class="muted">|</span> sh<br />
-<span class="yaml-comment"># macOS: also available via brew</span><br />
+    <p>The installer writes <code>~/.autovault</code>, installs the local CLI shim, preserves the folder as user-owned storage, and bootstraps bundled skills unless <code>AUTOVAULT_NO_BOOTSTRAP=1</code> is set. Nothing runs as a background daemon; local MCP hosts spawn stdio on demand.</p>
+    <CodeBlock lang="bash"><span class="pmt">$</span> curl <span class="arg">-fsSL</span> https://autovault.sh <span class="muted">|</span> sh<br />
+<span class="yaml-comment"># macOS: also available through the tap</span><br />
 <span class="pmt">$</span> brew install autoworks-ai/tap/autovault<br />
 <span class="pmt">$</span> autovault skill list</CodeBlock>
-    <div class="callout tip"><UiIcon name="tip" class="arg" /><div><strong>Bundled skills.</strong> The installer seeds every bundled skill (<code>skills/*/SKILL.md</code>) through the same validation path used by remote installs and proposals, then refreshes discovered host profiles.</div></div>
+    <div class="callout tip"><div class="callout-dot" /><div><strong>Bundled skills.</strong> The installer seeds first-party bundled skills through the same validation path used by remote installs and proposals, then refreshes discovered host profiles.</div></div>
 
-    <h2 id="first">Step 2 — Add your first skill</h2>
-    <p>Skills enter the vault through a <strong>source adapter</strong>. Each adapter knows how to fetch from one origin (GitHub repo, agentskills slug, HTTPS bundle, or local directory) and hand the raw skill to the validation gate. Whatever the source, the gate runs the same checks before admission.</p>
+    <h2 id="verify">Step 2 — Verify the install</h2>
+    <p>One command confirms the binary, local vault folder, profile discovery, and signing key are ready before any skill enters the vault.</p>
+    <div class="terminal static-terminal">
+      <div class="terminal-head"><span class="dot live" /><span class="dot" /><span class="dot" /><span class="ttl">autovault doctor</span></div>
+      <div class="terminal-body compact">
+        <div class="line"><span class="pmt">$</span><span>autovault doctor</span></div>
+        <div class="ok">  ✓ binary signed · v0.2.0</div>
+        <div class="ok">  ✓ ~/.autovault initialized · bundled skills indexed</div>
+        <div class="ok">  ✓ local keypair available · ed25519</div>
+        <div class="ok">  ✓ detected agents · claude-code, codex, cursor</div>
+        <div class="out">  ↳ next: autovault add &lt;source&gt;</div>
+      </div>
+    </div>
+
+    <h2 id="first">Step 3 — Add your first skill</h2>
+    <p>Skills enter through a source adapter. Each adapter fetches from one origin and hands the raw skill to the validation gate. Whatever the source, the gate runs the same checks before admission.</p>
     <CodeBlock lang="bash"><span class="pmt">$</span> autovault <span class="arg">add</span> github:autoworks-ai/skills/extract-pdf</CodeBlock>
-    <p>You'll see the gate run live in your terminal — yaml-repair, denylist, capability/behavior, dedup, sign. If any step fails, the skill is rejected and never touches your vault.</p>
-    <div class="callout warn"><UiIcon name="tip" class="warn" /><div><strong>Local bundles.</strong> Third-party installers should use <code>autovault add-local ./skill-dir --source vendor/name --sync-profiles</code> instead of copying the same SKILL.md into every native host directory. <code>AUTOVAULT_SKILL_INSTALL</code> controls AutoVault-first, native-first, both, native-only, and off modes.</div></div>
+    <div class="terminal static-terminal">
+      <div class="terminal-head"><span class="dot live" /><span class="dot" /><span class="dot" /><span class="ttl">gate run · extract-pdf</span></div>
+      <div class="terminal-body compact">
+        <div class="out">  ↳ fetching extract-pdf@1.4.0</div>
+        <div class="ok">  ✓ yaml-repair · frontmatter clean</div>
+        <div class="ok">  ✓ denylist · no known bad patterns</div>
+        <div class="ok">  ✓ capability/behavior · declared matches observed</div>
+        <div class="ok">  ✓ dedup · no near match in vault</div>
+        <div class="ok">  ✓ sign · ed25519 provenance recorded</div>
+      </div>
+    </div>
 
-    <h2 id="scope">Step 3 — Scope it to your context</h2>
-    <p>By default a freshly-added skill is unscoped: admitted to the vault, but not visible to any caller. Scope it explicitly to the agents and projects that should see it. The four-axis permission system means dev-machine skills don't leak into prod, and client work doesn't bleed across project boundaries.</p>
+    <h2 id="vault-anatomy">The vault is a folder</h2>
+    <p>The final model is intentionally boring: a regular folder on disk, with source skills, manifests, detached signatures, rendered agent profiles, and an audit trail. Select a row to inspect how the folder is read.</p>
+    <div class="vault-anatomy">
+      <div class="vault-tree" aria-label="Vault folder tree">
+        <button
+          v-for="row in VAULT_TREE"
+          :key="`${row.depth}-${row.label}`"
+          class="vault-tree-row"
+          :class="[row.kind, { active: selectedVaultRow === row.id }]"
+          :disabled="!row.id"
+          :style="depthStyle(row.depth)"
+          type="button"
+          @mouseenter="selectVaultRow(row.id)"
+          @focus="selectVaultRow(row.id)"
+          @click="selectVaultRow(row.id)"
+        >
+          <span class="tree-indent" aria-hidden="true" />
+          <span class="tree-label">{{ row.label }}</span>
+        </button>
+      </div>
+      <aside class="vault-note">
+        <div class="side-eyebrow">↳ {{ activeVaultNote.title }}</div>
+        <p>{{ activeVaultNote.body }}</p>
+        <div v-if="activeVaultNote.tags?.length" class="side-tags">
+          <span v-for="tag in activeVaultNote.tags" :key="tag" class="tag">{{ tag }}</span>
+        </div>
+      </aside>
+    </div>
+
+    <h2 id="scope">Step 4 — Scope it to your context</h2>
+    <p>By default a freshly added skill is visible only after you scope it. A caller sees a skill when it matches the agents and projects you approved, so dev-machine skills do not leak into prod and client work does not bleed across projects.</p>
     <CodeBlock lang="bash"><span class="pmt">$</span> autovault <span class="arg">scope</span> extract-pdf \<br />
-    <span class="arg">--agent</span> claude-code,codex \<br />
+    <span class="arg">--agent</span> claude-code,codex,cursor \<br />
     <span class="arg">--project</span> autovault-website \<br />
-    <span class="arg">--device</span> $(hostname)</CodeBlock>
-    <p>Each scope rule is additive. A caller sees a skill only if it matches at least one rule on every axis it requests. Unspecified axes default to "any."</p>
-    <CodeBlock lang="bash"><span class="pmt">$</span> autovault sync-profiles <span class="arg">--discover</span></CodeBlock>
-    <p>Profile discovery checks native roots such as <code>~/.claude/skills</code>, <code>~/.codex/skills</code>, and <code>~/.cursor/skills</code>. Set <code>AUTOVAULT_PROFILE_LINKS</code> when you want installs, proposals, updates, deletes, or transform changes to refresh managed links automatically.</p>
+    <span class="arg">--device</span> $(hostname)<br />
+<span class="pmt">$</span> autovault sync-profiles <span class="arg">--discover</span></CodeBlock>
 
-    <h2 id="run">Step 4 — Run it from your agent</h2>
-    <p>The skill is now installed, validated, scoped, and rendered for each target agent. Open whichever agent you use most — the same skill name works in all of them, but the underlying tool calls have been transformed to match each agent's vocabulary.</p>
-    <div class="agent-tabs" style="margin: 8px 0 0" role="tablist" aria-label="Agent">
-      <button v-for="item in agentOptions" :key="item.id" :class="{ active: agent === item.id }" type="button" @click="agent = item.id"><span class="agent-dot" :style="{ background: item.color }" />{{ item.label }}</button>
+    <div class="access-table" aria-label="How agents read from the vault">
+      <div class="access-row head">
+        <span>Agent</span>
+        <span>Reads from</span>
+        <span>How</span>
+      </div>
+      <div v-for="row in ACCESS_ROWS" :key="row.agent" class="access-row">
+        <span class="agent">{{ row.agent }}</span>
+        <span class="path">{{ row.path }}</span>
+        <span class="via">{{ row.via }}</span>
+      </div>
+    </div>
+
+    <h2 id="run">Step 5 — Run it from your agent</h2>
+    <p>The same skill is now validated, scoped, and rendered for each target agent. The skill name stays stable, while tool names are transformed to match the caller.</p>
+    <div class="agent-tabs" role="tablist" aria-label="Agent">
+      <button v-for="item in agentOptions" :key="item.id" :class="{ active: agent === item.id }" type="button" role="tab" :aria-selected="agent === item.id" @click="agent = item.id"><span class="agent-dot" :style="{ background: item.color }" />{{ item.label }}</button>
     </div>
     <CodeBlock :lang="activeAgent.label.toLowerCase()" :file="`# in ${activeAgent.label}`"><span class="pmt">&gt;</span> {{ activeAgent.cmd }}<br />
 <span class="yaml-comment">{{ activeAgent.out }}</span><br />
@@ -49,28 +145,110 @@
 "This 24-page report covers Q1 platform metrics, with three..."</CodeBlock>
 
     <h2 id="next">Where to next</h2>
-    <p>You've completed the install + add + scope + run loop. From here, most people branch into one of three places:</p>
-    <div class="cmd-grid">
-      <a class="cmd-card" href="/authoring"><div class="cmd-name">→ Author your own</div><div class="cmd-desc">Write a SKILL.md, attach a transformation manifest, propose it through the gate.</div></a>
-      <a class="cmd-card" href="/skills-directory"><div class="cmd-name">→ Browse skills</div><div class="cmd-desc">First-party and community skills, all signed and gated.</div></a>
-      <a class="cmd-card" href="/security"><div class="cmd-name">→ Security model</div><div class="cmd-desc">Provenance chain, denylist sources, remote OAuth, what we sign and why.</div></a>
-      <a class="cmd-card" href="/#concepts"><div class="cmd-name">→ Concepts</div><div class="cmd-desc">The five-step gate, four-axis scoping, transformation manifest in depth.</div></a>
+    <div class="next-grid">
+      <a class="next-card" href="/authoring">
+        <div class="next-num">01</div>
+        <div class="next-title">Author a SKILL.md</div>
+        <div class="next-body">Write one canonical skill, declare tools and scope, then run it through the browser gate.</div>
+        <div class="next-cta">Read →</div>
+      </a>
+      <a class="next-card" href="/security">
+        <div class="next-num">02</div>
+        <div class="next-title">Security model</div>
+        <div class="next-body">Understand signing, provenance, denylist scans, and where runtime enforcement lives.</div>
+        <div class="next-cta">Read →</div>
+      </a>
+      <a class="next-card" href="/deploy">
+        <div class="next-num">03</div>
+        <div class="next-title">Self-host team mode</div>
+        <div class="next-body">Deploy the remote MCP surface for teams without changing the local-first source of truth.</div>
+        <div class="next-cta">Read →</div>
+      </a>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, defineComponent, h, ref } from "vue";
+import AvDocBreadcrumb from "./AvDocBreadcrumb.vue";
 import CodeBlock from "./CodeBlock.vue";
-import UiIcon from "./UiIcon.vue";
 import { useTerminalReplay, type TerminalReplayLine } from "../composables/useTerminalReplay";
+import { copyText } from "../utils/clipboard";
 
-const agentOptions = [
-  { id: "claude-code", label: "Claude Code", color: "#d6a85a", cmd: "use extract-pdf to summarize report.pdf", out: "✓ tool resolved: chrome-devtools, read" },
-  { id: "codex", label: "Codex", color: "#5a9dd6", cmd: "use extract-pdf to summarize report.pdf", out: "✓ tool resolved: browser_form, file_read" },
-  { id: "cursor", label: "Cursor", color: "#b48ad6", cmd: "@extract-pdf summarize report.pdf", out: "✓ tool resolved: playwright_fill_form, fs_read" }
+type Method = "curl" | "brew";
+type VaultRow = { depth: number; label: string; kind: "dir" | "file" | "sig"; id?: string };
+
+const INSTALL_METHODS: Method[] = ["curl", "brew"];
+const INSTALL_COMMANDS: Record<Method, string> = {
+  curl: "curl -fsSL https://autovault.sh | sh",
+  brew: "brew install autoworks-ai/tap/autovault"
+};
+const selectedMethod = ref<Method>("curl");
+const copied = ref(false);
+
+async function copyInstall() {
+  copied.value = await copyText(INSTALL_COMMANDS[selectedMethod.value]);
+  if (copied.value) window.setTimeout(() => (copied.value = false), 1400);
+}
+
+const PREREQS = [
+  { label: "macOS", detail: "13+" },
+  { label: "Linux", detail: "x64 / arm64" },
+  { label: "Windows", detail: "WSL2" },
+  { label: "Node", detail: "20+" },
+  { label: "Disk", detail: "< 40 MB" }
 ];
 
+const VAULT_TREE: VaultRow[] = [
+  { depth: 0, label: "~/.autovault", kind: "dir", id: "root" },
+  { depth: 1, label: "config.toml", kind: "file", id: "config" },
+  { depth: 1, label: "keys/", kind: "dir", id: "keys" },
+  { depth: 2, label: "ed25519.priv", kind: "file" },
+  { depth: 2, label: "ed25519.pub", kind: "file" },
+  { depth: 1, label: "skills/", kind: "dir", id: "skills" },
+  { depth: 2, label: "extract-pdf/", kind: "dir", id: "skill" },
+  { depth: 3, label: "SKILL.md", kind: "file" },
+  { depth: 3, label: "manifest.json", kind: "file" },
+  { depth: 3, label: "SKILL.md.sig", kind: "sig" },
+  { depth: 3, label: "rendered/", kind: "dir", id: "rendered" },
+  { depth: 4, label: "claude-code.md", kind: "file" },
+  { depth: 4, label: "codex.md", kind: "file" },
+  { depth: 4, label: "cursor.mdc", kind: "file" },
+  { depth: 1, label: "cache/", kind: "dir", id: "cache" },
+  { depth: 1, label: "audit.log", kind: "file", id: "audit" }
+];
+
+const VAULT_NOTES: Record<string, { title: string; body: string; tags?: string[] }> = {
+  root: { title: "The vault itself", body: "A normal folder. Inspect it, sync it, back it up, or version it the same way you handle dotfiles." },
+  config: { title: "config.toml", body: "Trusted publishers, default scope policy, and render targets live here so the policy diffs cleanly." },
+  keys: { title: "keys/", body: "A local Ed25519 keypair signs admitted skills. The private key stays on the machine.", tags: ["ed25519", "local-only"] },
+  skills: { title: "skills/", body: "One subfolder per canonical skill. The source SKILL.md remains the thing humans review." },
+  skill: { title: "extract-pdf/", body: "The source, manifest, detached signature, and rendered agent files stay together under the canonical id.", tags: ["canonical", "signed"] },
+  rendered: { title: "rendered/", body: "Generated files for each agent profile. Regenerate these from source rather than hand-editing forks." },
+  cache: { title: "cache/", body: "Fetch and token-budget cache. Safe to delete; excluded from sync by default." },
+  audit: { title: "audit.log", body: "Append-only admission and scope-change events used for provenance and troubleshooting.", tags: ["provenance"] }
+};
+const selectedVaultRow = ref("root");
+const activeVaultNote = computed(() => VAULT_NOTES[selectedVaultRow.value]);
+function depthStyle(depth: number) {
+  return { "--depth": String(depth) };
+}
+function selectVaultRow(id: string | undefined) {
+  if (id) selectedVaultRow.value = id;
+}
+
+const ACCESS_ROWS = [
+  { agent: "Claude Code", path: "~/.autovault/skills/extract-pdf/rendered/claude-code.md", via: "symlink to ~/.claude/skills" },
+  { agent: "Codex", path: "~/.autovault/skills/extract-pdf/rendered/codex.md", via: "symlink to ~/.codex/skills" },
+  { agent: "Cursor", path: "~/.autovault/skills/extract-pdf/rendered/cursor.mdc", via: "project rule or profile link" },
+  { agent: "AutoHub", path: "~/.autovault/skills/extract-pdf/SKILL.md", via: "native read of canonical source" }
+];
+
+const agentOptions = [
+  { id: "claude-code", label: "Claude Code", color: "#d6a85a", cmd: "use extract-pdf to summarize report.pdf", out: "✓ tool resolved: read, write" },
+  { id: "codex", label: "Codex", color: "#5a9dd6", cmd: "use extract-pdf to summarize report.pdf", out: "✓ tool resolved: file_read, file_write" },
+  { id: "cursor", label: "Cursor", color: "#b48ad6", cmd: "@extract-pdf summarize report.pdf", out: "✓ tool resolved: fs_read, fs_write" }
+];
 const agent = ref(agentOptions[0].id);
 const activeAgent = computed(() => agentOptions.find((item) => item.id === agent.value) ?? agentOptions[0]);
 
@@ -78,10 +256,10 @@ const TerminalDemo = defineComponent({
   setup() {
     const bodyRef = ref<HTMLElement | null>(null);
     const lines: TerminalReplayLine[] = [
-      { type: "cmd", text: "curl -fsSL autovault.sh | sh" },
-      { type: "out", text: "↳ downloading autovault-installer (1.2 MB)…" },
-      { type: "out", text: "↳ verifying ed25519 signature…" },
-      { type: "ok", text: "✓ signature ok · key:0xC4F9…E10A" },
+      { type: "cmd", text: "curl -fsSL https://autovault.sh | sh" },
+      { type: "out", text: "↳ downloading autovault-installer" },
+      { type: "out", text: "↳ verifying installer signature" },
+      { type: "ok", text: "✓ signature ok · v0.2.0" },
       { type: "out", text: "↳ installed to ~/.autovault" },
       { type: "out", text: "↳ refreshing managed profile links:" },
       { type: "out", text: "    ~/.claude/skills/autovault-skill → ~/.autovault/profiles/claude-code/autovault-skill" },
@@ -90,13 +268,13 @@ const TerminalDemo = defineComponent({
       { type: "ok", text: "✓ vault ready · bundled skills bootstrapped · profiles synced" },
       { type: "blank", text: "" },
       { type: "cmd", text: "autovault add github:autoworks-ai/skills/extract-pdf" },
-      { type: "out", text: "↳ fetching extract-pdf@1.4.0… 1.4kb" },
-      { type: "out", text: "↳ [1/5] yaml-repair    : ok (frontmatter clean)" },
-      { type: "out", text: "↳ [2/5] denylist       : ok (no known bad patterns)" },
-      { type: "out", text: "↳ [3/5] cap/behavior   : ok (declared = observed)" },
-      { type: "out", text: "↳ [4/5] dedup          : ok (no near matches in vault)" },
-      { type: "out", text: "↳ [5/5] sign           : 0x9af4…2c81" },
-      { type: "ok", text: "✓ admitted to vault · scoped to: claude-code, codex" }
+      { type: "out", text: "↳ fetching extract-pdf@1.4.0" },
+      { type: "out", text: "↳ [1/5] yaml-repair    : ok" },
+      { type: "out", text: "↳ [2/5] denylist       : ok" },
+      { type: "out", text: "↳ [3/5] cap/behavior   : ok" },
+      { type: "out", text: "↳ [4/5] dedup          : ok" },
+      { type: "out", text: "↳ [5/5] sign           : ed25519" },
+      { type: "ok", text: "✓ admitted to vault · scoped to: claude-code, codex, cursor" }
     ];
     const replay = useTerminalReplay(lines, { autoStart: true, scrollTarget: () => bodyRef.value });
 

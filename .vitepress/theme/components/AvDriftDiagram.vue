@@ -350,7 +350,7 @@ const chips = chipLabels.map((label) => {
 .canonical {
   font-family: var(--mono); font-size: 13px; color: var(--ink);
 }
-.dot { color: var(--ink-5); }
+.dot { color: var(--ink-4); }
 .r-pill {
   font-family: var(--mono); font-size: 11px;
   padding: 3px 8px; border-radius: 999px;

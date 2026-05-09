@@ -99,6 +99,8 @@ const sidebarGroups = [
     title: "Start",
     items: [
       { label: "Quick start", href: "/quick-start", badge: "5 min" },
+      { label: "Install", href: "/quick-start#install" },
+      { label: "Vault anatomy", href: "/quick-start#vault-anatomy" },
       { label: "Verify a skill", href: "/authoring#playground" }
     ]
   },
@@ -106,8 +108,9 @@ const sidebarGroups = [
     title: "Build",
     items: [
       { label: "Authoring", href: "/authoring" },
-      { label: "Manifest", href: "/authoring#manifest" },
-      { label: "Permissions", href: "/authoring#perms" }
+      { label: "SKILL.md anatomy", href: "/authoring#anatomy" },
+      { label: "Schema", href: "/authoring#schema" },
+      { label: "Scoping", href: "/authoring#perms" }
     ]
   },
   {
@@ -130,7 +133,9 @@ const configs: Record<PageKey, { active: string; sidebarActive: string; variant:
     variant: "docs",
     toc: [
       { label: "Install the local vault", id: "install" },
+      { label: "Verify the install", id: "verify" },
       { label: "Add your first skill", id: "first" },
+      { label: "Vault anatomy", id: "vault-anatomy" },
       { label: "Scope it", id: "scope" },
       { label: "Run it", id: "run" },
       { label: "Where next", id: "next" }
@@ -142,8 +147,9 @@ const configs: Record<PageKey, { active: string; sidebarActive: string; variant:
     variant: "docs",
     toc: [
       { label: "Anatomy of a SKILL.md", id: "anatomy" },
+      { label: "Frontmatter schema", id: "schema" },
       { label: "Transformation manifest", id: "manifest" },
-      { label: "Permissions", id: "perms" },
+      { label: "Scope and permissions", id: "perms" },
       { label: "Try the gate", id: "playground" },
       { label: "Publishing", id: "publish" }
     ]
@@ -161,8 +167,10 @@ const configs: Record<PageKey, { active: string; sidebarActive: string; variant:
 };
 
 const searchResults = [
-  { title: "Quick start", section: "Get started", href: "/quick-start", terms: "install local vault first skill scope run add-local autovault_skill_install bootstrap" },
-  { title: "Authoring skills", section: "Authoring", href: "/authoring", terms: "skill md transformation manifest permissions publish gate propose_skill get_skill add_skill update_skill delete_skill include_resources" },
+  { title: "Quick start", section: "Get started", href: "/quick-start", terms: "install local vault doctor first skill scope run vault anatomy add-local autovault_skill_install bootstrap" },
+  { title: "Vault anatomy", section: "Get started", href: "/quick-start#vault-anatomy", terms: "vault folder tree anatomy signatures rendered profiles audit access map" },
+  { title: "Authoring skills", section: "Authoring", href: "/authoring", terms: "skill md schema tools_required transformations permissions agents publish gate propose_skill get_skill add_skill update_skill delete_skill include_resources scoping" },
+  { title: "SKILL.md schema", section: "Authoring", href: "/authoring#schema", terms: "frontmatter fields schema tools_required transformations permissions agents resources" },
   { title: "Verify a skill", section: "Authoring", href: "/authoring#playground", terms: "paste url playground browser gate diagnostics verify check skill" },
   { title: "Skills directory", section: "Reference", href: "/skills-directory", terms: "skills filters agent category org installs mit license" },
   { title: "API reference", section: "Reference", href: "/api", terms: "cli library http mcp endpoint load render verify resolve add_skill update_skill delete_skill propose_skill get_skill check_updates" },
@@ -188,7 +196,11 @@ const filteredResults = computed(() => {
   return searchResults.filter((result) => `${result.title} ${result.section} ${result.terms}`.toLowerCase().includes(q)).slice(0, 5);
 });
 const activeSidebarLabel = computed(() => {
+  if (props.page === "quick-start" && currentHash.value === "#install") return "Install";
+  if (props.page === "quick-start" && currentHash.value === "#vault-anatomy") return "Vault anatomy";
   if (props.page === "authoring" && currentHash.value === "#playground") return "Verify a skill";
+  if (props.page === "authoring" && currentHash.value === "#schema") return "Schema";
+  if (props.page === "authoring" && currentHash.value === "#perms") return "Scoping";
   return config.value.sidebarActive;
 });
 
