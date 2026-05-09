@@ -25,7 +25,7 @@
         <div class="toolbar">
           <label class="dir-search"><UiIcon name="search" /><span class="visually-hidden">Search examples</span><input v-model="query" type="text" placeholder="Search examples, sources, capabilities..." /><span class="chip">⌘K</span></label>
           <div class="segmented" aria-label="Sort examples">
-            <button class="seg-btn" :class="{ active: sort === 'installs' }" type="button" @click="sort = 'installs'">Most referenced</button>
+            <button class="seg-btn" :class="{ active: sort === 'references' }" type="button" @click="sort = 'references'">Most referenced</button>
             <button class="seg-btn" :class="{ active: sort === 'recent' }" type="button" @click="sort = 'recent'">Recent</button>
             <button class="seg-btn" :class="{ active: sort === 'name' }" type="button" @click="sort = 'name'">Name</button>
           </div>
@@ -69,7 +69,7 @@ import UiIcon from "./UiIcon.vue";
 import { agents, categories, filterSkills, orgs, skills, sortSkills, type AgentId, type Skill, type SkillCategory, type SkillSort } from "../data/skills";
 
 const query = ref("");
-const sort = ref<SkillSort>("installs");
+const sort = ref<SkillSort>("references");
 const view = ref<"grid" | "list">("grid");
 const selectedAgents = reactive(new Set<AgentId>());
 const selectedCategories = reactive(new Set<SkillCategory>());
@@ -151,7 +151,7 @@ const SkillTile = defineComponent({
         h("p", { class: "stl-desc" }, props.skill.desc),
         h("div", { class: "stl-agents" }, skillAgents(props.skill).map((agent) => h("span", { class: "ag", style: agent.on ? { background: agent.color, color: "#0a0d11", borderColor: agent.color } : undefined }, agent.id)))
       ]),
-      h("div", { class: "stl-meta" }, [h("span", `v${props.skill.v}`), h("span", props.skill.license), h("span", { style: "flex:1" }), h("span", `${props.skill.installs.toLocaleString()} refs`), h("button", { class: "copy-btn", type: "button" }, "Add")])
+      h("div", { class: "stl-meta" }, [h("span", `v${props.skill.v}`), h("span", props.skill.license), h("span", { style: "flex:1" }), h("span", `${props.skill.references.toLocaleString()} refs`), h("button", { class: "copy-btn", type: "button" }, "Add")])
     ]);
   }
 });
@@ -164,7 +164,7 @@ const SkillListItem = defineComponent({
       h("div", { class: "desc-cell" }, props.skill.desc),
       h("div", { class: "agents-cell" }, skillAgents(props.skill).map((agent) => h("span", { class: "ag", style: agent.on ? { background: agent.color, color: "#0a0d11", borderColor: agent.color } : undefined }, agent.id))),
       h("span", { class: "meta-cell" }, `v${props.skill.v}`),
-      h("span", { class: "meta-cell" }, `${props.skill.installs.toLocaleString()} refs`)
+      h("span", { class: "meta-cell" }, `${props.skill.references.toLocaleString()} refs`)
     ]);
   }
 });

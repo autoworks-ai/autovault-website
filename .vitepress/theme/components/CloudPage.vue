@@ -5,7 +5,7 @@
         <div class="eyebrow"><span class="dash" /> Hosted launch</div>
         <h1>Reserve a paid hosted AutoVault namespace.</h1>
         <p class="lede">
-          Use the hosted path when you want an account, Stripe-backed access, and a reserved vault URL while cloud sync is being built.
+          Use the hosted path when you want an account, Stripe-backed access, and a reserved vault URL. Cloud sync is not enabled yet.
         </p>
         <div class="about-actions">
           <a class="pill-btn primary" href="#launch-path">Start hosted launch <UiIcon name="arrow" /></a>

@@ -16,9 +16,9 @@ describe("skill examples helpers", () => {
 
   it("sorts reference counts without mutating the original input", () => {
     const input = skills.slice(0, 4);
-    const sorted = sortSkills(input, "installs");
+    const sorted = sortSkills(input, "references");
 
-    expect(sorted[0].installs).toBeGreaterThanOrEqual(sorted[1].installs);
+    expect(sorted[0].references).toBeGreaterThanOrEqual(sorted[1].references);
     expect(input.map((skill) => skill.name)).toEqual(skills.slice(0, 4).map((skill) => skill.name));
   });
 

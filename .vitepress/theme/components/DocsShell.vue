@@ -40,6 +40,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import AvTopbar from "./AvTopbar.vue";
 import AvFooter from "./AvFooter.vue";
 import MarkdownActions from "./MarkdownActions.vue";
+import { PRODUCT_VERSION } from "../data/product";
 import type { PageDocKey } from "../../shared/pageDocs";
 
 type PageKey = "quick-start" | "authoring" | "skills" | "api" | "deploy" | "compare" | "skill-detail" | "author-profile" | "security" | "about" | "cloud" | "changelog";
@@ -75,7 +76,7 @@ const sidebarGroups = [
       { label: "Deploy", href: "/deploy" },
       { label: "Compare", href: "/compare" },
       { label: "Security", href: "/security" },
-      { label: "Changelog", href: "/changelog", badge: "v0.2.0" }
+      { label: "Changelog", href: "/changelog", badge: PRODUCT_VERSION }
     ]
   }
 ];

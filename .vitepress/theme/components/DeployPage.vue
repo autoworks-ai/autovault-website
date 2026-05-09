@@ -50,7 +50,7 @@
 
     <section id="hosts" class="providers-section reveal-item">
       <h2>Pick a host</h2>
-      <p class="lede">Self-host the remote MCP service on one of four officially-tested targets. Local installs remain the source of truth; remote mode adds OAuth-protected HTTPS access for agents that cannot read your local filesystem.</p>
+      <p class="lede">Self-host the remote MCP service with the documented Docker or Railway paths. Local installs remain the source of truth; remote mode adds OAuth-protected HTTPS access for agents that cannot read your local filesystem.</p>
       <div class="providers">
         <button v-for="provider in providers" :key="provider.id" type="button" :class="['provider', { active: active === provider.id }]" @click="active = provider.id">
           <span class="head">
@@ -160,6 +160,7 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, h, ref } from "vue";
+import { PRODUCT_VERSION_SHORT } from "../data/product";
 import UiIcon from "./UiIcon.vue";
 
 type Provider = {
@@ -195,22 +196,6 @@ const providers: Provider[] = [
     ]
   },
   {
-    id: "render",
-    name: "Render",
-    short: "RND",
-    logoBg: "#46E3B7",
-    logoFg: "#000",
-    time: "~3 min",
-    desc: "render.yaml blueprint. Auto-detects, provisions web service + Postgres, manages cert renewal.",
-    feat: ["blueprint", "Postgres", "auto-renew TLS", "preview envs"],
-    steps: [
-      { title: "Connect repo", body: "Point Render at your fork of the autovault repo. The render.yaml declares the web service and Postgres add-on." },
-      { title: "Set environment group", body: "Render's secret manager handles the admin seed. The ADMIN_PASSWORD must be at least 24 chars.", command: "AUTOVAULT_ADMIN_EMAIL=admin@yourco.com\nAUTOVAULT_ADMIN_PASSWORD=<24+ chars>" },
-      { title: "Deploy blueprint", body: "Render reads render.yaml, builds the image, runs migrations, starts on port 8080.", command: "→ Detected blueprint: render.yaml\n→ Building autovault-web...\n→ Starting service on :8080" },
-      { title: "Verify with smoke script", body: "Run the bundled remote smoke script against your live deployment.", command: "AUTOVAULT_REMOTE_URL=https://you.onrender.com npm run smoke:remote" }
-    ]
-  },
-  {
     id: "docker",
     name: "Docker",
     short: "DKR",
@@ -220,26 +205,10 @@ const providers: Provider[] = [
     desc: "Self-host with Compose. Brings up the remote MCP service, SQLite volume, and reverse proxy.",
     feat: ["self-hosted", "SQLite", "Compose", "BYO TLS"],
     steps: [
-      { title: "Pull image and seed env", body: "The container defaults to remote mode. Compose now requires explicit admin credentials.", command: "docker pull autoworks/autovault:0.2.0\ncp .env.example .env\n$EDITOR .env" },
+      { title: "Pull image and seed env", body: "The container defaults to remote mode. Compose now requires explicit admin credentials.", command: `docker pull autoworks/autovault:${PRODUCT_VERSION_SHORT}\ncp .env.example .env\n$EDITOR .env` },
       { title: "Validate compose", body: "Compose hard-fails if the admin vars are unset.", command: "docker compose config\n✓ AUTOVAULT_ADMIN_EMAIL set\n✓ AUTOVAULT_ADMIN_PASSWORD set" },
       { title: "Bring it up", body: "Service binds to 8080 inside the container. Put Caddy, Traefik, or nginx in front for TLS.", command: "docker compose up -d\n✓ autovault-remote running on :8080" },
       { title: "Test the MCP endpoint", body: "POST a discovery request to /mcp to confirm transport, auth middleware, and CORS.", command: "curl -X POST https://your.vault/mcp \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"method\":\"initialize\"}'" }
-    ]
-  },
-  {
-    id: "fly",
-    name: "Fly.io",
-    short: "FLY",
-    logoBg: "#7B16FF",
-    logoFg: "#fff",
-    time: "~4 min",
-    desc: "fly.toml + LiteFS. Multi-region replication of the SQLite vault, edge-deployed close to agents.",
-    feat: ["multi-region", "LiteFS", "anycast", "TLS edge"],
-    steps: [
-      { title: "Launch from repo", body: "fly launch detects fly.toml and provisions a LiteFS-backed volume.", command: "fly launch --config fly.toml" },
-      { title: "Set secrets", body: "Secrets are injected as env vars at boot and rotated without a rebuild.", command: "fly secrets set \\\n  AUTOVAULT_ADMIN_EMAIL=admin@you.com \\\n  AUTOVAULT_ADMIN_PASSWORD=$(openssl rand -hex 24)" },
-      { title: "Scale across regions", body: "LiteFS replicates the SQLite vault to every region.", command: "fly scale count 3 --region iad,fra,nrt" },
-      { title: "Anycast endpoint", body: "Single hostname routes to nearest region. OAuth state lives in SQLite.", command: "fly status\n✓ autovault.fly.dev → 3 machines healthy" }
     ]
   }
 ];
@@ -259,7 +228,7 @@ const remoteStatusLines = [
   "",
   "endpoint      https://your.vault/mcp",
   "issuer        https://your.vault",
-  "version       0.2.0",
+  `version       ${PRODUCT_VERSION_SHORT}`,
   "transport     streamable-http",
   "auth          oauth2.1 · pkce required",
   "storage       sqlite (3.2 MB · 47 caps)",
@@ -307,7 +276,7 @@ const smokeLines = [
 const envGroups = [
   { title: "Admin seed", required: true, rows: [
     { key: "AUTOVAULT_ADMIN_EMAIL", value: "Email address for the bootstrap owner. Created on first boot only." },
-    { key: "AUTOVAULT_ADMIN_PASSWORD", value: "Min 24 chars. Compose / Railway / Render templates refuse to start without this." }
+    { key: "AUTOVAULT_ADMIN_PASSWORD", value: "Min 12 chars. Compose and Railway templates refuse to start without this." }
   ] },
   { title: "Public surface", required: true, rows: [
     { key: "AUTOVAULT_PUBLIC_URL", value: "Public HTTPS origin. Used as the OAuth issuer and embedded in <code>/.well-known</code> docs." },

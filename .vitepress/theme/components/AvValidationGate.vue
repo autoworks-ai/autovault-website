@@ -146,7 +146,7 @@ function stepStatus(i: number) {
           <div>
             <div style="font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); letter-spacing: 0.06em; text-transform: uppercase">Reject rate</div>
             <div style="font-size: 28px; font-weight: 500; margin-top: 4px; letter-spacing: -0.02em">11.4%</div>
-            <div style="font-size: 12px; color: var(--ink-3)">of submissions in private beta</div>
+            <div style="font-size: 12px; color: var(--ink-3)">example fixture signal</div>
           </div>
           <div>
             <div style="font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); letter-spacing: 0.06em; text-transform: uppercase">Avg. gate latency</div>
