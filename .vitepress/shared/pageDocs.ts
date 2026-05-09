@@ -49,6 +49,8 @@ autovault skill list
 
 ## Current MCP surface
 
+Remote MCP uses the same underscore tool names shown here.
+
 - get_skill for exact reads, vault inventory lookup, rendered agent variants, and optional packaged resources.
 - add_skill for trusted GitHub, agentskills, HTTPS, and local bundle sources.
 - update_skill for refreshing installed skills from their recorded source or replacing them from a new source.

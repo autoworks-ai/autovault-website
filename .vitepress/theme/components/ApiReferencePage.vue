@@ -143,7 +143,7 @@ const sections: ApiSection[] = [
         title: "autovault add <skill>",
         status: "stable",
         since: "0.1.0",
-        description: "Resolve, fetch, verify, and install a skill into the current vault. Renders the appropriate transformation for each agent declared in <code>vault.toml</code>'s <code>[targets]</code>.",
+        description: "Resolve, fetch, verify, and install a skill into the current vault. Renders the appropriate transformation for each agent declared in <code>config.toml</code>'s <code>[targets]</code>.",
         signature: ["<span class=\"pmt\">$</span> autovault add <span class=\"key\">&lt;skill&gt;</span> <span class=\"opt\">[@&lt;version&gt;] [--target &lt;agent&gt;] [--dry-run]</span>"],
         copy: "autovault add autoworks-ai/extract-pdf",
         argsLabel: "Argument",
@@ -217,7 +217,7 @@ const sections: ApiSection[] = [
         ],
         examples: [
           { label: "curl", body: "<div><span class=\"pmt\">$</span> curl https://vault.autovault.dev/api/v1/skill/autoworks-ai/extract-pdf</div><div></div><div><span class=\"key\">{</span></div><div>  <span class=\"str\">\"name\"</span>: <span class=\"str\">\"extract-pdf\"</span>,</div><div>  <span class=\"str\">\"version\"</span>: <span class=\"str\">\"1.4.0\"</span>,</div><div>  <span class=\"str\">\"signature\"</span>: <span class=\"str\">\"ed25519:9af42c81…7e7e\"</span></div><div><span class=\"key\">}</span></div>" },
-          { label: "MCP", body: "<div><span class=\"com\">// MCP tool call</span></div><div><span class=\"key\">{</span></div><div>  <span class=\"str\">\"method\"</span>: <span class=\"str\">\"skill.fetch\"</span>,</div><div>  <span class=\"str\">\"params\"</span>: { <span class=\"str\">\"org\"</span>: <span class=\"str\">\"autoworks-ai\"</span>, <span class=\"str\">\"name\"</span>: <span class=\"str\">\"extract-pdf\"</span> }</div><div><span class=\"key\">}</span></div>" }
+          { label: "MCP", body: "<div><span class=\"com\">// MCP tool call</span></div><div><span class=\"key\">{</span></div><div>  <span class=\"str\">\"method\"</span>: <span class=\"str\">\"get_skill\"</span>,</div><div>  <span class=\"str\">\"params\"</span>: { <span class=\"str\">\"name\"</span>: <span class=\"str\">\"autoworks-ai/extract-pdf\"</span> }</div><div><span class=\"key\">}</span></div>" }
         ]
       },
       endpoint("http-resolve", "POST /resolve", "POST /api/v1/resolve", "Batch-resolve a list of skill specs to their latest signed versions. Useful for vaults that want to refresh many skills in one round-trip.", "POST /api/v1/resolve\n\n{ \"specs\": [\"autoworks-ai/extract-pdf\"], \"target\": \"claude-code\" }", "POST /api/v1/resolve", "0.3.0"),
