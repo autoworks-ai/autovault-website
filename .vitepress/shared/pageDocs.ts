@@ -1,5 +1,7 @@
 import { PRODUCT_VERSION } from "../theme/data/product";
 
+const CURRENT_VERSION_LABEL = `v${PRODUCT_VERSION}`;
+
 export const SITE_URL = "https://autovault.dev";
 
 export type PageDocKey =
