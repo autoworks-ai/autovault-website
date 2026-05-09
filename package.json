@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "ci": "npm run typecheck && npm test && npm run pages:functions:build && npm run docs:build",
+    "dev": "npm run docs:dev",
     "docs:dev": "vitepress dev --host 0.0.0.0",
     "docs:build": "vitepress build",
     "docs:preview": "vitepress preview --host 0.0.0.0",

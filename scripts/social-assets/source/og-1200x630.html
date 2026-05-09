@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AutoVault · OG 1200×630</title>
+<link rel="stylesheet" href="_shared.css">
+<style>
+  body { display: flex; align-items: center; justify-content: center; }
+  .canvas { width: 1200px; height: 630px; }
+  .frame {
+    position: absolute; inset: 0;
+    padding: 64px 72px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    z-index: 2;
+  }
+  .top { display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 18px; }
+  .brand .mark { width: 56px; height: 56px; }
+  .brand .name {
+    font-family: var(--sans); font-weight: 500;
+    font-size: 34px; letter-spacing: -0.03em; color: var(--ink);
+  }
+
+  .core { max-width: 920px; }
+  .h {
+    font-family: var(--sans); font-weight: 500;
+    font-size: 76px; line-height: 1.02; letter-spacing: -0.04em;
+    color: var(--ink); text-wrap: pretty;
+  }
+  .h .ital { font-size: 80px; }
+  .lede {
+    margin-top: 22px;
+    font-size: 22px; line-height: 1.5;
+    color: var(--ink-2); max-width: 760px;
+  }
+  .lede code { font-size: 0.92em; }
+
+  .bottom { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+  .pills { display: flex; gap: 10px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="grid-backdrop center"></div>
+  <div class="mint-halo center"></div>
+  <div class="hair-top"></div>
+  <div class="hair-bottom"></div>
+
+  <div class="frame">
+    <div class="top">
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 24 24" fill="none">
+          <rect x="2.4" y="2.4" width="19.2" height="16.8" rx="3.84" stroke-width="1.4" stroke-linejoin="round"/>
+          <path d="M7.2 19.2v1.9" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M16.8 19.2v1.9" stroke-width="1.4" stroke-linecap="round"/>
+          <circle cx="12" cy="10.8" r="2.9" stroke-width="1.2"/>
+          <path d="M12 7.9v1.45" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+        <div class="name">AutoVault</div>
+      </div>
+      <div class="mono-label"><span class="dot-live"></span>Local-first · MIT</div>
+    </div>
+
+    <div class="core">
+      <div class="mono-label" style="margin-bottom:22px;"><span class="dash"></span>Local-first skill vault</div>
+      <h1 class="h">A local vault<br>for agent <span class="ital">skills.</span></h1>
+      <p class="lede">
+        Skills get validated, signed, and scoped before they enter the vault — then shared
+        safely across Claude&nbsp;Code, Codex, Cursor, and AutoHub without drift.
+      </p>
+    </div>
+
+    <div class="bottom">
+      <div class="pills">
+        <span class="tag solid">✓ VALIDATED</span>
+        <span class="tag mint">SIGNED</span>
+        <span class="tag">SCOPED</span>
+        <span class="tag ghost">UNTRUSTED → ADMITTED</span>
+      </div>
+      <div class="mono-label">autovault.dev</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

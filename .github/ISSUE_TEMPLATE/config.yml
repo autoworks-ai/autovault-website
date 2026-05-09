@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security issue
+    url: https://github.com/autoworks-ai/autovault/security/policy
+    about: Please report vulnerabilities through the source repository security policy.
+  - name: AutoVault source repository
+    url: https://github.com/autoworks-ai/autovault
+    about: Runtime bugs and feature requests belong in the source repository.

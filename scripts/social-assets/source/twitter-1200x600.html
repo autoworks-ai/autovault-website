@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AutoVault · X / Twitter 1200×600</title>
+<link rel="stylesheet" href="_shared.css">
+<style>
+  body { display: flex; align-items: center; justify-content: center; }
+  .canvas { width: 1200px; height: 600px; }
+  .frame {
+    position: absolute; inset: 0;
+    padding: 56px 80px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto 1fr auto;
+    gap: 24px 48px;
+    z-index: 2;
+    align-items: center;
+  }
+  .row1 { grid-column: 1 / -1; display:flex; align-items:center; justify-content:space-between; }
+  .brand { display: flex; align-items: center; gap: 16px; }
+  .brand .mark { width: 48px; height: 48px; }
+  .brand .name { font-family: var(--sans); font-weight: 500; font-size: 28px; letter-spacing: -0.03em; color: var(--ink); }
+
+  .h {
+    font-family: var(--sans); font-weight: 500;
+    font-size: 84px; line-height: 1.0; letter-spacing: -0.04em;
+    color: var(--ink); max-width: 680px;
+  }
+  .h .ital { font-size: 88px; }
+
+  /* right column: terminal-style chip with single command */
+  .chip {
+    border: 1px solid var(--line);
+    border-radius: var(--r-2xl);
+    background: var(--panel);
+    padding: 0;
+    width: 360px;
+    overflow: hidden;
+  }
+  .chip .head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--line);
+    font-family: var(--mono); font-size: 10.5px;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3);
+  }
+  .chip .head .d { width:7px; height:7px; border-radius:50%; background: var(--line-2); }
+  .chip .head .d.live { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .chip .head .ttl { margin-left: auto; }
+  .chip .body {
+    padding: 16px 18px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.7;
+    color: var(--ink);
+  }
+  .chip .pmt { color: var(--ink-3); margin-right: 6px; }
+  .chip .arg { color: var(--accent); }
+  .chip .mut { color: var(--ink-3); }
+
+  .row3 { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="grid-backdrop"></div>
+  <div class="mint-halo"></div>
+  <div class="hair-top"></div>
+  <div class="hair-bottom"></div>
+
+  <div class="frame">
+    <div class="row1">
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 24 24" fill="none">
+          <rect x="2.4" y="2.4" width="19.2" height="16.8" rx="3.84" stroke-width="1.4" stroke-linejoin="round"/>
+          <path d="M7.2 19.2v1.9" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M16.8 19.2v1.9" stroke-width="1.4" stroke-linecap="round"/>
+          <circle cx="12" cy="10.8" r="2.9" stroke-width="1.2"/>
+          <path d="M12 7.9v1.45" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+        <div class="name">AutoVault</div>
+      </div>
+      <div class="mono-label"><span class="dash"></span>For AI agent skills</div>
+    </div>
+
+    <h1 class="h">Skills enter dirty.<br>They leave <span class="ital">signed.</span></h1>
+
+    <div class="chip">
+      <div class="head"><span class="d live"></span><span class="d"></span><span class="d"></span><span class="ttl">~ &nbsp;bash</span></div>
+      <div class="body">
+        <div><span class="pmt">$</span> autovault add url:https://example.com/skills/extract-pdf/SKILL.md</div>
+        <div class="mut">↳ [1/5] yaml-repair · ok</div>
+        <div class="mut">↳ [3/5] permissions · scoped</div>
+        <div class="mut">↳ [5/5] sign · 0x9af4…2c81</div>
+        <div class="arg">✓ admitted to vault</div>
+      </div>
+    </div>
+
+    <div class="row3">
+      <div class="mono-label"><span class="dot-live"></span>local validation fixture · scoped output</div>
+      <div class="mono-label">autovault.dev</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

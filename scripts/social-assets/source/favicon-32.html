@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AutoVault · favicon 32×32</title>
+<link rel="stylesheet" href="_shared.css">
+<style>
+  body { display: flex; align-items: center; justify-content: center; }
+  .canvas { width: 32px; height: 32px; border-radius: 6px; }
+  .frame { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .mark { width: 26px; height: 26px; }
+  /* simplified geometry for 32px — drop the dial-notch line, fatten strokes */
+  .mark rect { stroke-width: 1.6; stroke: var(--accent); }
+  .mark circle { stroke-width: 1.5; stroke: var(--accent); fill: var(--accent); fill-opacity: 0.15; }
+  .mark path { stroke-width: 1.6; stroke: var(--accent); }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="frame">
+    <svg class="mark" viewBox="0 0 24 24" fill="none">
+      <rect x="2.4" y="2.4" width="19.2" height="16.8" rx="3.84" stroke-linejoin="round"/>
+      <path d="M7.2 19.2v1.9" stroke-linecap="round"/>
+      <path d="M16.8 19.2v1.9" stroke-linecap="round"/>
+      <circle cx="12" cy="10.8" r="2.9"/>
+    </svg>
+  </div>
+</div>
+</body>
+</html>

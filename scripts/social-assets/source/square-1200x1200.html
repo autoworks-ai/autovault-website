@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AutoVault · Square 1200×1200</title>
+<link rel="stylesheet" href="_shared.css">
+<style>
+  body { display: flex; align-items: center; justify-content: center; }
+  .canvas { width: 1200px; height: 1200px; }
+  .frame {
+    position: absolute; inset: 0;
+    padding: 88px 88px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    z-index: 2;
+  }
+  .top { display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 22px; }
+  .brand .mark { width: 64px; height: 64px; }
+  .brand .name { font-family: var(--sans); font-weight: 500; font-size: 40px; letter-spacing: -0.03em; }
+
+  .core { display: flex; flex-direction: column; gap: 36px; }
+  .h {
+    font-family: var(--sans); font-weight: 500;
+    font-size: 110px; line-height: 0.98; letter-spacing: -0.04em;
+    color: var(--ink); text-wrap: pretty;
+  }
+  .h .ital { font-size: 116px; }
+  .lede {
+    font-size: 26px; line-height: 1.5; color: var(--ink-2); max-width: 880px;
+  }
+
+  /* mid panel — three-step gate diagram in mono row */
+  .gate-strip {
+    display: grid;
+    grid-template-columns: 1fr 24px 1fr 24px 1fr;
+    align-items: stretch;
+    gap: 0;
+    margin-top: 12px;
+  }
+  .gate-strip .step {
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    background: var(--panel);
+    padding: 18px 20px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .gate-strip .step .ix {
+    font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .gate-strip .step .lbl {
+    font-family: var(--sans); font-weight: 500;
+    font-size: 26px; letter-spacing: -0.02em; color: var(--ink);
+  }
+  .gate-strip .step .sub {
+    font-family: var(--mono); font-size: 13px; color: var(--ink-3);
+  }
+  .gate-strip .step.active {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    box-shadow: 0 0 28px rgba(90,214,192,0.12);
+  }
+  .gate-strip .step.active .lbl,
+  .gate-strip .step.active .sub { color: var(--accent); }
+  .gate-strip .arrow {
+    align-self: center;
+    color: var(--ink-3);
+    font-family: var(--mono);
+    font-size: 18px;
+    text-align: center;
+  }
+
+  .bottom { display: flex; align-items: center; justify-content: space-between; }
+  .pills { display: flex; gap: 12px; flex-wrap: wrap; }
+  .pills .tag { font-size: 12px; padding: 6px 14px; }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="grid-backdrop center"></div>
+  <div class="mint-halo center"></div>
+  <div class="hair-top"></div>
+  <div class="hair-bottom"></div>
+
+  <div class="frame">
+    <div class="top">
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 24 24" fill="none">
+          <rect x="2.4" y="2.4" width="19.2" height="16.8" rx="3.84" stroke-width="1.4" stroke-linejoin="round"/>
+          <path d="M7.2 19.2v1.9" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M16.8 19.2v1.9" stroke-width="1.4" stroke-linecap="round"/>
+          <circle cx="12" cy="10.8" r="2.9" stroke-width="1.2"/>
+          <path d="M12 7.9v1.45" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+        <div class="name">AutoVault</div>
+      </div>
+      <div class="mono-label"><span class="dot-live"></span>pre-1.0 · MIT</div>
+    </div>
+
+    <div class="core">
+      <div class="mono-label"><span class="dash"></span>Local-first vault for agent skills</div>
+      <h1 class="h">Skills enter<br>dirty.<br>They leave<br><span class="ital">signed.</span></h1>
+    </div>
+
+    <div class="gate-strip">
+      <div class="step">
+        <div class="ix">STEP / 01</div>
+        <div class="lbl">Untrusted</div>
+        <div class="sub">yaml · perms · prov</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step active">
+        <div class="ix">STEP / 02</div>
+        <div class="lbl">Gated</div>
+        <div class="sub">fixture · scoped</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step">
+        <div class="ix">STEP / 03</div>
+        <div class="lbl">Signed</div>
+        <div class="sub">scoped · sealed</div>
+      </div>
+    </div>
+
+    <div class="bottom">
+      <div class="pills">
+        <span class="tag mint">✓ VALIDATED</span>
+        <span class="tag">SIGNED</span>
+        <span class="tag">SCOPED</span>
+      </div>
+      <div class="mono-label">autovault.dev</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

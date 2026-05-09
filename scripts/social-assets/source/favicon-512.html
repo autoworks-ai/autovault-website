@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AutoVault · Favicon master 512×512</title>
+<link rel="stylesheet" href="_shared.css">
+<style>
+  body { display: flex; align-items: center; justify-content: center; }
+  .canvas { width: 512px; height: 512px; border-radius: 96px; }
+  .frame { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .mark { width: 320px; height: 320px; }
+  .mark rect, .mark path, .mark circle { stroke: var(--accent); }
+  .mark rect { stroke-width: 1.6; }
+  .mark circle, .mark path.dial { stroke-width: 1.4; }
+  .ring {
+    position: absolute;
+    inset: 56px;
+    border-radius: 60px;
+    border: 1px solid var(--line);
+  }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="grid-backdrop center"></div>
+  <div class="mint-halo center"></div>
+  <div class="ring"></div>
+  <div class="frame">
+    <svg class="mark" viewBox="0 0 24 24" fill="none">
+      <rect x="2.4" y="2.4" width="19.2" height="16.8" rx="3.84" stroke-linejoin="round"/>
+      <path d="M7.2 19.2v1.9" stroke-linecap="round"/>
+      <path d="M16.8 19.2v1.9" stroke-linecap="round"/>
+      <circle cx="12" cy="10.8" r="2.9"/>
+      <path class="dial" d="M12 7.9v1.45" stroke-linecap="round"/>
+    </svg>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">AutoVault local-first skill vault social card</title>
+  <desc id="desc">A local vault for agent skills that validates, signs, and scopes skills before admission.</desc>
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#253341" stroke-width="1" opacity="0.42"/>
+    </pattern>
+    <radialGradient id="halo" cx="50%" cy="48%" r="65%">
+      <stop offset="0" stop-color="#5AD6C0" stop-opacity="0.12"/>
+      <stop offset="0.62" stop-color="#5AD6C0" stop-opacity="0.04"/>
+      <stop offset="1" stop-color="#050A0F" stop-opacity="0"/>
+    </radialGradient>
+    <style>
+      .sans { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .serif { font-family: "Instrument Serif", Georgia, serif; font-style: italic; }
+    </style>
+  </defs>
+  <rect width="1200" height="630" fill="#050A0F"/>
+  <rect width="1200" height="630" fill="url(#grid)" opacity="0.72"/>
+  <rect width="1200" height="630" fill="url(#halo)"/>
+  <path d="M0 1H1200M0 629H1200" stroke="#1C2732" stroke-width="1"/>
+
+  <g transform="translate(72 70)">
+    <g transform="translate(4 0)" fill="none" stroke="#5AD6C0" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="0" y="0" width="48" height="40" rx="10" stroke-width="3"/>
+      <path d="M12 40v5M36 40v5" stroke-width="3"/>
+      <circle cx="24" cy="20" r="7" stroke-width="2.5"/>
+      <path d="M24 13v4" stroke-width="2.5"/>
+    </g>
+    <text x="74" y="35" class="sans" fill="#E9EEF5" font-size="34" font-weight="500">AutoVault</text>
+  </g>
+
+  <text x="72" y="145" class="mono" fill="#8794A6" font-size="12" letter-spacing="2">- LOCAL-FIRST SKILL VAULT</text>
+  <text x="72" y="262" class="sans" fill="#E9EEF5" font-size="76" font-weight="500">A local vault</text>
+  <text x="72" y="342" class="sans" fill="#E9EEF5" font-size="76" font-weight="500">for agent <tspan class="serif" font-size="82">skills.</tspan></text>
+  <text x="72" y="433" class="sans" fill="#B6C0CC" font-size="24">
+    <tspan x="72">Skills get validated, signed, and scoped before they enter the vault -</tspan>
+    <tspan x="72" dy="36">then shared safely across Claude Code, Codex, Cursor, and AutoHub.</tspan>
+  </text>
+
+  <g class="mono" font-size="11" letter-spacing="1.4" transform="translate(72 542)">
+    <rect x="0" y="0" width="102" height="24" rx="12" fill="#5AD6C0"/>
+    <text x="26" y="16" fill="#05211E">VALIDATED</text>
+    <rect x="112" y="0" width="68" height="24" rx="12" fill="#0D201F" stroke="#2F786E"/>
+    <text x="126" y="16" fill="#5AD6C0">SIGNED</text>
+    <rect x="190" y="0" width="68" height="24" rx="12" fill="#101820" stroke="#1F2C38"/>
+    <text x="204" y="16" fill="#8794A6">SCOPED</text>
+  </g>
+
+  <g class="mono" font-size="11" letter-spacing="1.5" fill="#8794A6">
+    <circle cx="990" cy="92" r="4" fill="#5AD6C0"/>
+    <text x="1002" y="96">LOCAL-FIRST - MIT</text>
+    <text x="1030" y="558">AUTOVAULT.DEV</text>
+  </g>
+</svg>

@@ -2,6 +2,9 @@ import { defineConfig, type HeadConfig } from "vitepress";
 import { writeAgentArtifacts } from "./build/agentArtifacts";
 import { canonicalUrl, findPageDocByFile, SITE_URL, type PageDoc } from "./shared/pageDocs";
 
+const OG_IMAGE = `${SITE_URL}/og-1200x630.png`;
+const TWITTER_IMAGE = `${SITE_URL}/twitter-1200x600.png`;
+
 function pageHead(doc: PageDoc): HeadConfig[] {
   const url = canonicalUrl(doc);
   const schema = {
@@ -31,9 +34,15 @@ function pageHead(doc: PageDoc): HeadConfig[] {
     ["meta", { property: "og:title", content: doc.title }],
     ["meta", { property: "og:description", content: doc.description }],
     ["meta", { property: "og:url", content: url }],
+    ["meta", { property: "og:image", content: OG_IMAGE }],
+    ["meta", { property: "og:image:width", content: "1200" }],
+    ["meta", { property: "og:image:height", content: "630" }],
+    ["meta", { property: "og:image:alt", content: "AutoVault local-first skill vault social card" }],
     ["meta", { name: "twitter:card", content: "summary_large_image" }],
     ["meta", { name: "twitter:title", content: doc.title }],
     ["meta", { name: "twitter:description", content: doc.description }],
+    ["meta", { name: "twitter:image", content: TWITTER_IMAGE }],
+    ["meta", { name: "twitter:image:alt", content: "AutoVault local-first skill vault social card" }],
     ["script", { type: "application/ld+json" }, JSON.stringify(schema)]
   ];
 
@@ -71,6 +80,9 @@ export default defineConfig({
     }
   },
   head: [
+    ["link", { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon-32.png" }],
+    ["link", { rel: "icon", type: "image/png", sizes: "512x512", href: "/favicon-512.png" }],
+    ["link", { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" }],
     ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
     ["link", { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" }],
     [
