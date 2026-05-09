@@ -1,4 +1,5 @@
 name: Docs Drift
+run-name: Docs Drift - ${{ github.event.client_payload.source_sha || inputs.source_sha || 'manual' }}
 
 on:
   repository_dispatch:
@@ -70,6 +71,7 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.DOCS_DRIFT_TOKEN || github.token }}
+          branch_prefix: docs/audit-
           prompt: |
             Read .github/prompts/update-docs.md for full instructions.
 
@@ -84,13 +86,18 @@ jobs:
             The source repo is checked out at .source-repo/.
           claude_args: >-
             --model claude-sonnet-4-6
-            --max-turns 50
+            --max-turns 100
             --allowedTools 'Read'
             --allowedTools 'MultiEdit'
             --allowedTools 'Edit'
             --allowedTools 'Write'
             --allowedTools 'Glob'
             --allowedTools 'Grep'
+            --allowedTools 'Bash(git status:*)'
+            --allowedTools 'Bash(git diff:*)'
+            --allowedTools 'Bash(git log:*)'
+            --allowedTools 'Bash(git show:*)'
+            --allowedTools 'Bash(git rev-parse:*)'
             --allowedTools 'Bash(npm run typecheck)'
             --allowedTools 'Bash(npm test)'
             --allowedTools 'Bash(npm run docs:build)'
