@@ -126,7 +126,7 @@ Doctor confirms the binary, vault folder, signing key, bundled skill index, and 
 ## Add a skill
 
 \`\`\`bash
-autovault add github:autoworks-ai/skills/extract-pdf
+autovault add url:https://autovault.dev/skills/skill-author/SKILL.md
 \`\`\`
 
 Every source adapter hands raw skill content to the same gate: frontmatter repair, schema validation, denylist scan, capability/behavior check, deduplication, and Ed25519 signing.
@@ -138,7 +138,7 @@ The vault is a normal ~/.autovault folder with config.toml, keys, source skills,
 ## Scope and run
 
 \`\`\`bash
-autovault scope extract-pdf --agent claude-code,codex,cursor --project autovault-website --device $(hostname)
+autovault scope skill-author --agent claude-code,codex --project autovault-website --device $(hostname)
 autovault sync-profiles --discover
 \`\`\`
 
@@ -168,9 +168,9 @@ A skill is one SKILL.md file: YAML frontmatter plus a markdown body. AutoVault v
 
 \`\`\`yaml
 ---
-name: extract-pdf
-version: 1.4.0
-description: "Extract structured text from PDF files."
+name: skill-author
+version: 1.0.0
+description: "Author a well-formed SKILL.md with valid AutoVault frontmatter."
 license: MIT
 tools_required:
   - fs.read
@@ -191,9 +191,9 @@ agents:
   - codex
 ---
 
-# Extract PDF
+# Skill Author
 
-Use this skill when the user asks for text, structure, or summaries from a PDF.
+Use this skill when the user wants to create or repair a SKILL.md file.
 \`\`\`
 
 ## Schema and validation
@@ -218,11 +218,9 @@ The examples page is a compatibility route for curated SKILL.md references. It i
 
 ## Featured examples
 
-- extract-pdf: extract structured text from PDF files.
-- summarize-doc: recursive multi-pass document summarization.
-- github-issues: work with GitHub issues through authorized CLI context.
-- parse-csv: parse CSV with dialect and type inference.
-- yaml-validate: validate YAML with AutoVault-style diagnostics.
+- autovault-bootstrap: audit, install, verify, and sync AutoVault for an agent profile.
+- skill-author: author a well-formed SKILL.md with valid frontmatter and capability declarations.
+- autovault-skill: understand AutoVault-managed filesystem-synced skills.
 
 First-party AutoVault examples use MIT metadata. Other example sources keep their submitted license metadata and still run through the same gate before admission.
 
@@ -272,7 +270,7 @@ AutoVault is stricter than a sync manager or external discovery surface. That is
 
 const skillDetailMarkdown = `# Example Skill Detail
 
-The extract-pdf example shows how AutoVault presents one signed skill: frontmatter, declared permissions, resources, provenance, compatible agents, and install instructions.
+The skill detail page shows one hosted SKILL.md example at a time: frontmatter, declared permissions, source path, compatible agents, and install instructions.
 
 ## License
 

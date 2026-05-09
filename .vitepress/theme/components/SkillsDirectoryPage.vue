@@ -9,7 +9,7 @@
       <div class="dir-stats">
         <div class="stat"><div class="mono-label">Examples</div><div class="val">{{ skills.length }}</div><div class="arg" style="font-size: 10.5px">reference set</div></div>
         <div class="stat"><div class="mono-label">Sources</div><div class="val">{{ orgs.length }}</div><div class="arg" style="font-size: 10.5px">provenance context</div></div>
-        <div class="stat"><div class="mono-label">Targets</div><div class="val">4</div><div class="arg" style="font-size: 10.5px">agent renderers</div></div>
+        <div class="stat"><div class="mono-label">Targets</div><div class="val">{{ agents.length }}</div><div class="arg" style="font-size: 10.5px">agent renderers</div></div>
         <div class="stat"><div class="mono-label">Gate</div><div class="val">5</div><div class="arg" style="font-size: 10.5px">admission stages</div></div>
       </div>
     </header>
@@ -138,20 +138,34 @@ function skillAgents(skill: Skill) {
   return agents.map((agent) => ({ ...agent, on: skill.agents.includes(agent.id) }));
 }
 
+async function copyInstall(command: string) {
+  try {
+    await navigator.clipboard?.writeText(command);
+  } catch {
+    // Clipboard is progressive enhancement; the detail page also shows the command.
+  }
+}
+
 const SkillTile = defineComponent({
   props: { skill: { type: Object as () => Skill, required: true }, big: Boolean },
   setup(props) {
     return () => h("article", { class: ["skill-tile", props.skill.featured ? "featured" : "", props.big ? "big" : ""] }, [
-      h("a", { class: "stl-main", href: "/skill-detail.html" }, [
+      h("a", { class: "stl-main", href: props.skill.detailPath }, [
         h("div", { class: "stl-head" }, [
           h("span", { class: "stl-icon" }, props.skill.icon),
           h("div", { class: "stl-name" }, [h("span", { class: "name" }, props.skill.name), h("span", { class: "org" }, props.skill.org)]),
-          h("span", { class: "verified" }, "SIGNED")
+          h("span", { class: "verified" }, "REAL")
         ]),
         h("p", { class: "stl-desc" }, props.skill.desc),
         h("div", { class: "stl-agents" }, skillAgents(props.skill).map((agent) => h("span", { class: "ag", style: agent.on ? { background: agent.color, color: "#0a0d11", borderColor: agent.color } : undefined }, agent.id)))
       ]),
-      h("div", { class: "stl-meta" }, [h("span", `v${props.skill.v}`), h("span", props.skill.license), h("span", { style: "flex:1" }), h("span", `${props.skill.references.toLocaleString()} refs`), h("button", { class: "copy-btn", type: "button" }, "Add")])
+      h("div", { class: "stl-meta" }, [
+        h("span", `v${props.skill.v}`),
+        h("span", props.skill.license),
+        h("span", { style: "flex:1" }),
+        h("a", { href: props.skill.rawPath }, "Raw"),
+        h("button", { class: "copy-btn", type: "button", onClick: () => copyInstall(props.skill.install) }, "Copy add")
+      ])
     ]);
   }
 });
@@ -159,7 +173,7 @@ const SkillTile = defineComponent({
 const SkillListItem = defineComponent({
   props: { skill: { type: Object as () => Skill, required: true } },
   setup(props) {
-    return () => h("a", { class: "dir-list-item", href: "/skill-detail.html" }, [
+    return () => h("a", { class: "dir-list-item", href: props.skill.detailPath }, [
       h("div", { class: "stl-head" }, [h("span", { class: "stl-icon" }, props.skill.icon), h("div", { class: "stl-name" }, [h("span", { class: "name" }, props.skill.name), h("span", { class: "org" }, props.skill.org)])]),
       h("div", { class: "desc-cell" }, props.skill.desc),
       h("div", { class: "agents-cell" }, skillAgents(props.skill).map((agent) => h("span", { class: "ag", style: agent.on ? { background: agent.color, color: "#0a0d11", borderColor: agent.color } : undefined }, agent.id))),

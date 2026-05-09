@@ -192,7 +192,7 @@ const providers: Provider[] = [
       { title: "Click 'Deploy on Railway'", body: "Forks the autovault template into your account. You'll be asked to fill three required env vars before the build starts." },
       { title: "Set required environment", body: "Railway prompts for these at template time. They go straight into the deployment config — never committed to git.", command: "AUTOVAULT_ADMIN_EMAIL=admin@example.com\nAUTOVAULT_ADMIN_PASSWORD=<long-random-string>\nAUTOVAULT_PUBLIC_URL=https://your-vault.up.railway.app" },
       { title: "Wait for build", body: "Build runs npm run build, copies bundled skills, starts the remote service on $PORT. Health check at /healthz.", command: "→ npm ci\n→ npm run build\n→ node dist/remote.js" },
-      { title: "Connect from your agent", body: "Add the MCP endpoint to your agent's config. The first call kicks off the OAuth dance.", command: "autovault add autoworks-ai/extract-pdf \\\n  --remote https://your-vault.up.railway.app/mcp" }
+      { title: "Connect from your agent", body: "Add the MCP endpoint to your agent's config. The first call kicks off the OAuth dance.", command: "autovault add autoworks-ai/skill-author \\\n  --remote https://your-vault.up.railway.app/mcp" }
     ]
   },
   {
@@ -234,7 +234,7 @@ const remoteStatusLines = [
   "storage       sqlite (3.2 MB · 47 caps)",
   "",
   "recent",
-  "  02:14:08  POST /mcp         200  get_skill extract-pdf",
+  "  02:14:08  POST /mcp         200  get_skill skill-author",
   "  02:14:01  POST /oauth/token 200  refresh +900s",
   "  02:11:55  POST /mcp         403  add_skill (scope)",
   "",
@@ -263,7 +263,7 @@ const smokeLines = [
   "▸ phase 4 · MCP tool calls",
   "  POST /mcp initialize                           200",
   "  POST /mcp list_skills                          200",
-  "  POST /mcp get_skill autoworks-ai/extract-pdf   200",
+  "  POST /mcp get_skill autoworks-ai/skill-author   200",
   "  → ed25519 signature verified                  ✓",
   "",
   "▸ phase 5 · policy enforcement",

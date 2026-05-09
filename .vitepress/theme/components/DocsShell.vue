@@ -131,7 +131,7 @@ const searchResults = [
   { title: "API reference", section: "Reference", href: "/api", terms: "cli library http mcp endpoint load render verify resolve add_skill update_skill delete_skill propose_skill get_skill check_updates" },
   { title: "Deploy remote vault", section: "Reference", href: "/deploy", terms: "deploy remote mcp oauth pkce railway docker fly endpoint" },
   { title: "Compare alternatives", section: "Reference", href: "/compare", terms: "comparison skillfish tessl skillkit manual folders alternatives signing provenance scoping transforms" },
-  { title: "extract-pdf", section: "Examples", href: "/skill-detail", terms: "extract pdf skill detail transformations permissions provenance versions" },
+  { title: "skill-author", section: "Examples", href: "/skill/skill-author", terms: "skill author detail permissions provenance source" },
   { title: "autoworks-ai", section: "Examples", href: "/author-autoworks-ai", terms: "source author profile certificate maintainers skills examples" },
   { title: "Security & provenance", section: "Reference", href: "/security", terms: "security signature signing provenance denylist gate verifier oauth remote mcp" },
   { title: "About AutoVault", section: "Team", href: "/about", terms: "jack arturo autojack jason coleman flint zack katz daniel iser team credits" },
@@ -140,7 +140,7 @@ const searchResults = [
 
 const config = computed(() => configs[props.page]);
 const markdownPage = computed<PageDocKey>(() => (props.page === "skills" ? "skills-directory" : props.page));
-const showMarkdownActions = computed(() => !["about", "cloud"].includes(props.page));
+const showMarkdownActions = computed(() => !["about", "cloud", "skill-detail"].includes(props.page));
 const currentHash = ref("");
 const activeSidebarLabel = computed(() => {
   if (props.page === "quick-start" && currentHash.value === "#install") return "Install";

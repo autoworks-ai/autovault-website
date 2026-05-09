@@ -3,28 +3,27 @@
     <nav class="sd-crumb reveal-item" aria-label="Breadcrumb">
       <a href="/skills-directory">Examples</a>
       <span class="sep">/</span>
-      <a href="/author-autoworks-ai">autoworks-ai</a>
+      <a href="/author-autoworks-ai">{{ currentSkill.org }}</a>
       <span class="sep">/</span>
-      <span class="cur">extract-pdf</span>
+      <span class="cur">{{ currentSkill.name }}</span>
     </nav>
 
     <header class="sd-head reveal-item">
       <div>
         <div class="ttl-row">
-          <div class="icon-tile">PD</div>
+          <div class="icon-tile">{{ currentSkill.icon }}</div>
           <div>
-            <h1><span class="org">autoworks-ai / </span>extract-pdf</h1>
+            <h1><span class="org">{{ currentSkill.org }} / </span>{{ currentSkill.name }}</h1>
             <div class="sub-row">
-              <span class="verified"><UiIcon name="check" /> Signed</span>
-              <span>v1.4.0</span><span class="dot" />
-              <span>MIT</span><span class="dot" />
-              <span>2,847 bytes</span><span class="dot" />
-              <span>reference fixture</span><span class="dot" />
-              <span>curated by autoworks-ai</span>
+              <span class="verified"><UiIcon name="check" /> Hosted SKILL.md</span>
+              <span>v{{ currentSkill.v }}</span><span class="dot" />
+              <span>{{ currentSkill.license }}</span><span class="dot" />
+              <span>{{ currentSkill.size }}</span><span class="dot" />
+              <span>{{ currentSkill.sourceLabel }}</span>
             </div>
           </div>
         </div>
-        <p class="desc">Extract structured text from PDF files while preserving heading hierarchy, list structure, and table layout where possible. Wraps a local parsing library — never reaches the network. Pairs naturally with <a href="/skill-detail">ocr-image</a> for scanned documents and <a href="/skill-detail">extract-table</a> for structured data.</p>
+        <p class="desc">{{ currentSkill.desc }}</p>
       </div>
       <div class="actions">
         <button class="sd-installbtn" type="button" @click="copyInstall">Add to your vault <UiIcon name="arrow" /></button>
@@ -32,12 +31,12 @@
           <div class="lbl">Or via CLI</div>
           <div class="cmd">
             <span class="pmt">$</span>
-            <span>autovault add github:autoworks-ai/skills/extract-pdf</span>
+            <span>{{ currentSkill.install }}</span>
             <button class="copy" type="button" @click="copyInstall">{{ copied ? "Copied" : copyFailed ? "Copy failed" : "Copy" }}</button>
           </div>
         </div>
         <div class="sd-secondary-actions">
-          <a class="sd-sbtn" href="https://github.com/autoworks-ai/autovault"><UiIcon name="github" /> Source</a>
+          <a class="sd-sbtn" :href="currentSkill.sourceUrl"><UiIcon name="github" /> Source</a>
           <button class="sd-sbtn" type="button" @click="tab = 'prov'"><UiIcon name="shield" /> Verify</button>
         </div>
       </div>
@@ -64,44 +63,28 @@
             <div class="sd-md-head">
               <span class="lights"><span /><span /><span /></span>
               <span class="filename">SKILL.md</span>
-              <a class="raw" href="https://github.com/autoworks-ai/autovault">view raw →</a>
+              <a class="raw" :href="currentSkill.rawPath">view raw →</a>
             </div>
             <div class="sd-md-body">
               <div class="sd-frontmatter">
-                <div v-for="line in frontmatterLines" :key="line" v-html="line" />
+                <div class="marker">---</div>
+                <div v-for="line in currentSkill.frontmatter" :key="line">{{ line }}</div>
+                <div class="marker">---</div>
               </div>
-              <h2>Extract PDF</h2>
-              <p>Extract structured text from PDF files while preserving heading hierarchy, list structure, and table layout where possible. Wraps a local pdf-parsing library — never sends bytes off-device.</p>
+              <h2>{{ currentSkill.name }}</h2>
+              <p v-for="paragraph in currentSkill.overview" :key="paragraph">{{ paragraph }}</p>
               <h2>When to use this skill</h2>
-              <p>Reach for <code>extract-pdf</code> when the user asks you to read, summarize, or extract content from a PDF file. Don't use this skill for structured data extraction — pair with <code>extract-table</code> downstream for that.</p>
-              <h2>Inputs</h2>
               <ul>
-                <li>A path to a .pdf file under the user's working directory</li>
-                <li>Optional: <code>--format=json</code> to emit structured output</li>
-                <li>Optional: <code>--pages=1-5</code> to scope extraction to a page range</li>
+                <li v-for="useCase in currentSkill.useCases" :key="useCase">{{ useCase }}</li>
               </ul>
-              <h2>Outputs</h2>
-              <ul>
-                <li>Plain text by default. Headings preserved as <code>#</code> markers, lists as <code>-</code> bullets</li>
-                <li>JSON when <code>--format=json</code> — includes pages, headings, paragraphs, and tables</li>
-              </ul>
-              <h2>Examples</h2>
-              <h3>Basic extraction</h3>
-              <p>User: <em>"What's in spec-v2.pdf?"</em> → run <code>extract-pdf ./spec-v2.pdf</code>, then summarize the result.</p>
-              <h3>Page range</h3>
-              <p>User: <em>"Read the first chapter of book.pdf"</em> → estimate page range from the table of contents, run <code>extract-pdf ./book.pdf --pages=1-22</code>.</p>
-              <h2>Caveats</h2>
-              <ul>
-                <li>Scanned PDFs without an embedded text layer return empty. Pair with <code>ocr-image</code> for image-based PDFs.</li>
-                <li>Tables in irregular layouts may extract as flat text.</li>
-                <li>Encrypted PDFs require the password as a third positional argument.</li>
-              </ul>
+              <h2>Install</h2>
+              <p><code>{{ currentSkill.install }}</code></p>
             </div>
           </div>
           <div class="sd-related-wrap">
             <div class="mono-label">Related skills</div>
             <div class="sd-related">
-              <a v-for="skill in relatedSkills" :key="skill.name" class="sd-rel-tile" href="/skill-detail">
+              <a v-for="skill in relatedSkills" :key="skill.name" class="sd-rel-tile" :href="skill.detailPath">
                 <div class="name">{{ skill.name }}</div>
                 <div class="desc">{{ skill.desc }}</div>
               </a>
@@ -110,7 +93,7 @@
         </section>
 
         <section v-else-if="tab === 'transform'">
-          <p class="sd-intro">This skill ships with three transformations — one per supported agent. The vault renders them at install time, so each caller receives only the format and idiom it actually understands.</p>
+          <p class="sd-intro">This skill declares the agents shown below. The vault renders each admitted skill for the caller's target profile, so this view only shows supported targets from the hosted catalog.</p>
           <div class="sd-xform-toolbar">
             <span class="lbl">Render for</span>
             <div class="sd-target-pills">
@@ -124,7 +107,7 @@
           </div>
           <div class="sd-diff">
             <div class="sd-diff-pane">
-              <div class="head"><span class="ttl">SKILL.md (canonical)</span><span class="meta">v1.4.0</span></div>
+              <div class="head"><span class="ttl">SKILL.md (canonical)</span><span class="meta">v{{ currentSkill.v }}</span></div>
               <div class="body">
                 <div v-for="(line, index) in canonicalLines" :key="index" class="ln"><span class="gut">{{ index + 1 }}</span><span class="text">{{ line }}</span></div>
               </div>
@@ -139,15 +122,15 @@
             </div>
           </div>
           <div class="sd-xform-summary">
-            <span class="ch">format: {{ target === "cu" ? "rules" : "markdown" }}</span>
-            <span class="ch">trigger style: {{ target === "cx" ? "WHEN/DO/THEN" : "natural" }}</span>
-            <span class="ch">permissions: {{ target === "cu" ? "elided" : "explicit" }}</span>
-            <span class="ch">examples: {{ target === "cu" ? "inline" : "section" }}</span>
+            <span class="ch">format: markdown</span>
+            <span class="ch">trigger style: {{ target === "cx" ? "task-oriented" : "natural" }}</span>
+            <span class="ch">permissions: explicit</span>
+            <span class="ch">source: hosted SKILL.md</span>
           </div>
         </section>
 
         <section v-else-if="tab === 'perms'">
-          <p class="sd-intro">This skill's declared capabilities, by axis. The gate verified that the implementation matches what's declared here — no over-claim, no hidden behavior.</p>
+          <p class="sd-intro">This skill's declared capabilities, by axis. These rows are derived from the hosted SKILL.md metadata rather than placeholder marketplace copy.</p>
           <div class="sd-perm-grid">
             <div v-for="group in permissionGroups" :key="group.title" class="sd-card">
               <h4>{{ group.title }}</h4>
@@ -187,10 +170,10 @@
         <div class="sd-card">
           <h4>Compatibility</h4>
           <div class="sd-agent-list">
-            <div v-for="agent in agents" :key="agent.id" class="sd-agent-row">
+            <div v-for="agent in agentRows" :key="agent.id" class="sd-agent-row">
               <span class="swatch" :style="{ background: agent.color }" />
               <span class="lbl">{{ agent.label }}</span>
-              <span class="stat">✓ tested</span>
+              <span class="stat">{{ agent.on ? "declared" : "not declared" }}</span>
             </div>
           </div>
         </div>
@@ -230,201 +213,102 @@
 import { computed, ref } from "vue";
 import UiIcon from "./UiIcon.vue";
 import { PRODUCT_VERSION } from "../data/product";
+import { agents as catalogAgents, findSkillByName, skills } from "../data/skills";
 
 type TabId = "overview" | "transform" | "perms" | "prov" | "versions";
-type TargetId = "cc" | "cx" | "cu";
+type TargetId = "cc" | "cx" | "aj";
 
+const props = defineProps<{ skillName?: string }>();
 const tab = ref<TabId>("overview");
 const target = ref<TargetId>("cc");
 const copied = ref(false);
 const copyFailed = ref(false);
 
+const currentSkill = computed(() => findSkillByName(props.skillName));
+
 const tabs = [
   { id: "overview" as const, label: "Overview" },
-  { id: "transform" as const, label: "Transformations", count: 3 },
   { id: "perms" as const, label: "Permissions" },
   { id: "prov" as const, label: "Provenance" },
-  { id: "versions" as const, label: "Versions", count: 12 }
+  { id: "versions" as const, label: "Source", count: 1 }
 ];
 
-const stats = [
-  { label: "Example type", value: "skill", trend: "reference fixture" },
-  { label: "Render targets", value: "4<span class=\"unit\">/ 4 agents</span>", trend: "demonstrates transforms" },
-  { label: "Gate stages", value: "5", trend: "all shown" },
-  { label: "Permission model", value: "local", trend: "no network", muted: true },
-  { label: "Resources", value: "0", trend: "body-only example" }
-];
+const stats = computed(() => [
+  { label: "Example type", value: "skill", trend: "hosted SKILL.md" },
+  { label: "Declared agents", value: String(currentSkill.value.agents.length), trend: "from frontmatter" },
+  { label: "Gate stages", value: "5", trend: "covered by tests" },
+  { label: "Permission rows", value: String(currentSkill.value.permissions.length), trend: "declared metadata", muted: true },
+  { label: "Source", value: currentSkill.value.org, trend: "real source link" }
+]);
 
-const agents = [
-  { id: "cc", label: "Claude Code", color: "#d6a85a" },
-  { id: "cx", label: "Codex", color: "#5a9dd6" },
-  { id: "cu", label: "Cursor", color: "#b48ad6" },
-  { id: "ah", label: "AutoHub", color: "#5ad6c0" }
-];
+const agentRows = computed(() => catalogAgents.map((agent) => ({
+  ...agent,
+  on: currentSkill.value.agents.includes(agent.id)
+})));
 
 const targets = [
-  { id: "cc" as const, label: "Claude Code", color: "#d6a85a", added: 4, removed: 2, file: "CLAUDE.md" },
-  { id: "cx" as const, label: "Codex", color: "#5a9dd6", added: 6, removed: 1, file: "AGENTS.md" },
-  { id: "cu" as const, label: "Cursor", color: "#b48ad6", added: 3, removed: 4, file: ".cursorrules" }
+  { id: "cc" as const, label: "Claude Code", color: "#d6a85a", added: 2, removed: 0, file: "SKILL.md" },
+  { id: "cx" as const, label: "Codex", color: "#5a9dd6", added: 2, removed: 0, file: "SKILL.md" },
+  { id: "aj" as const, label: "AutoJack", color: "#5ad6c0", added: 1, removed: 0, file: "SKILL.md" }
 ];
 const activeTarget = computed(() => targets.find((item) => item.id === target.value) ?? targets[0]);
 
-const frontmatterLines = [
-  "<span class=\"marker\">---</span>",
-  "<span class=\"key\">name</span>: <span class=\"str\">extract-pdf</span>",
-  "<span class=\"key\">version</span>: <span class=\"str\">1.4.0</span>",
-  "<span class=\"key\">description</span>: <span class=\"str\">Extract structured text from PDF files. Preserves headings, lists, tables.</span>",
-  "<span class=\"key\">author</span>: <span class=\"str\">autoworks-ai</span>",
-  "<span class=\"key\">license</span>: <span class=\"str\">MIT</span>",
-  "<span class=\"key\">tools_required</span>:",
-  "  - <span class=\"str\">read</span>     <span class=\"com\"># reads .pdf bytes from disk</span>",
-  "  - <span class=\"str\">write</span>    <span class=\"com\"># writes .txt or .json sidecar</span>",
-  "<span class=\"key\">network</span>: <span class=\"str\">none</span>",
-  "<span class=\"key\">scope</span>:",
-  "  <span class=\"key\">paths</span>: [<span class=\"str\">\"./*.pdf\"</span>, <span class=\"str\">\"./docs/**/*.pdf\"</span>]",
-  "<span class=\"key\">transformations</span>:",
-  "  <span class=\"key\">claude-code</span>: <span class=\"str\">CLAUDE.md</span>",
-  "  <span class=\"key\">codex</span>:       <span class=\"str\">AGENTS.md</span>",
-  "  <span class=\"key\">cursor</span>:      <span class=\"str\">.cursorrules</span>",
-  "<span class=\"marker\">---</span>"
-];
-
-const canonicalLines = [
-  "## Skill: extract-pdf",
+const canonicalLines = computed(() => [
+  `## Skill: ${currentSkill.value.name}`,
   "",
-  "When the user mentions a PDF, run this skill.",
+  currentSkill.value.desc,
   "",
-  "### Inputs",
-  "- path to .pdf file",
-  "- optional --format=json",
-  "- optional --pages=N-M",
+  "### Install",
+  currentSkill.value.install,
   "",
-  "### Permissions",
-  "- read, write",
-  "- network: none",
-  "",
-  "### Pairs with",
-  "- ocr-image (scanned PDFs)",
-  "- extract-table (structured data)"
-];
+  "### Source",
+  currentSkill.value.sourceLabel
+]);
 
-const transformLines: Record<TargetId, Array<{ kind?: "add" | "del"; text: string }>> = {
-  cc: [
-    { text: "## Skill: extract-pdf" },
-    { text: "" },
-    { text: "When the user asks about a PDF file, use the extract-pdf skill." },
-    { kind: "add", text: "- \"read this PDF\"" },
-    { kind: "add", text: "- \"what's in <file>.pdf\"" },
-    { kind: "add", text: "- \"summarize <file>.pdf\"" },
-    { text: "Call: extract-pdf <path> [--format=json] [--pages=N-M]" },
-    { kind: "del", text: "- requires `read`, `write`, `network`" },
-    { kind: "add", text: "- requires `read`, `write` (no network)" },
-    { text: "- pair with `ocr-image` for scanned PDFs" }
-  ],
-  cx: [
-    { text: "## extract-pdf" },
-    { text: "" },
-    { text: "Codex behavioral rule for PDF extraction." },
-    { kind: "add", text: "WHEN: user mentions a .pdf file" },
-    { kind: "add", text: "DO: run extract-pdf with the resolved path" },
-    { kind: "add", text: "THEN: summarize or quote based on user intent" },
-    { kind: "add", text: "ALLOWED-TOOLS: read, write" },
-    { kind: "add", text: "FORBIDDEN-TOOLS: network, exec" },
-    { text: "FALLBACK: if PDF is scanned, hand off to ocr-image." },
-    { kind: "del", text: "PERMISSIONS: see frontmatter" },
-    { kind: "add", text: "PERMISSIONS: read+write under user cwd only" }
-  ],
-  cu: [
-    { text: "# Cursor rule: extract-pdf" },
-    { text: "" },
-    { kind: "add", text: "When you need PDF content, invoke extract-pdf." },
-    { kind: "del", text: "Always extract the entire PDF for full context." },
-    { kind: "del", text: "Use --format=json by default." },
-    { kind: "del", text: "Run network probes if extraction fails." },
-    { text: "" },
-    { kind: "add", text: "Examples:" },
-    { kind: "add", text: "  extract-pdf ./spec.pdf" },
-    { kind: "add", text: "  extract-pdf ./book.pdf --pages=1-22" }
-  ]
-};
+const transformLines = computed<Record<TargetId, Array<{ kind?: "add" | "del"; text: string }>>>(() => ({
+  cc: currentSkill.value.overview.map((text) => ({ text })),
+  cx: currentSkill.value.useCases.map((text) => ({ kind: "add", text })),
+  aj: currentSkill.value.frontmatter.map((text) => ({ text }))
+}));
 
-const relatedSkills = [
-  { name: "autoworks-ai/ocr-image", desc: "OCR a scanned image to text. Use after extract-pdf returns empty." },
-  { name: "autoworks-ai/extract-table", desc: "Pull structured tables from extracted PDF text into normalized rows." },
-  { name: "autoworks-ai/summarize-doc", desc: "Recursive multi-pass summarization for long documents." }
-];
+const relatedSkills = computed(() => currentSkill.value.related.map((name) => skills.find((skill) => skill.name === name)).filter((skill): skill is (typeof skills)[number] => Boolean(skill)));
 
-const permissionGroups = [
-  { title: "File system", rows: [
-    { kind: "ok", label: "read .pdf files", scope: "./*.pdf, ./docs/**" },
-    { kind: "ok", label: "write .txt sidecar", scope: "same dir as input" },
-    { kind: "no", label: "read other paths", scope: "denied" },
-    { kind: "no", label: "delete files", scope: "denied" }
-  ] },
-  { title: "Network", rows: [
-    { kind: "no", label: "outbound HTTP", scope: "none" },
-    { kind: "no", label: "DNS lookup", scope: "none" },
-    { kind: "no", label: "local socket", scope: "none" }
-  ] },
-  { title: "Tool calls", rows: [
-    { kind: "ok", label: "read", scope: "scoped paths only" },
-    { kind: "ok", label: "write", scope: "scoped paths only" },
-    { kind: "no", label: "exec / shell", scope: "denied" },
-    { kind: "no", label: "fetch", scope: "denied" }
-  ] },
-  { title: "Activation", rows: [
-    { kind: "ok", label: "auto-load", scope: "in-context" },
-    { kind: "warn", label: "user approval per call", scope: "not required" }
-  ] }
-];
+const permissionGroups = computed(() => [
+  { title: "Declared capabilities", rows: currentSkill.value.permissions }
+]);
 
-const provenance = [
-  { icon: "check" as const, ok: true, title: "Authored & signed by @autoworks-ai", detail: "commit f4e02c1 · key: 0x9af4…2c81 · 2,847 bytes", when: "2026-04-28 12:14Z" },
-  { icon: "check" as const, ok: true, title: `Gate run · ${PRODUCT_VERSION} · all 5 stages passed`, detail: "repair: 0 fixes · denylist: clean · capabilities: aligned · dedup: unique · sign: ed25519", when: "example" },
-  { icon: "shield" as const, ok: true, title: "Vault counter-signature", detail: "local vault key · source sidecar · signed manifest", when: "example" },
-  { icon: "check" as const, ok: true, title: "Rendered profile outputs", detail: "Claude Code, Codex, Cursor, and AutoHub variants generated from the same source", when: "example" },
-  { icon: "lock" as const, title: "Available for local admission", detail: "verify locally with <code>autovault verify autoworks-ai/extract-pdf@1.4.0</code>", when: "on demand" }
-];
+const provenance = computed(() => [
+  { icon: "check" as const, ok: true, title: "Hosted raw SKILL.md", detail: `<a href="${currentSkill.value.rawPath}">${currentSkill.value.rawPath}</a>`, when: "current" },
+  { icon: "github" as const, ok: true, title: "Source path", detail: `<a href="${currentSkill.value.sourceUrl}">${currentSkill.value.sourceLabel}</a>`, when: "current" },
+  { icon: "shield" as const, ok: true, title: `Website gate · ${PRODUCT_VERSION}`, detail: "Catalog tests parse the hosted file and verify frontmatter against the listing.", when: "CI" },
+  { icon: "lock" as const, title: "Available for local admission", detail: `<code>${currentSkill.value.install}</code>`, when: "on demand" }
+]);
 
-const versions = [
-  { version: "1.4.0", latest: true, notes: "Add --pages range support; fix table extraction on rotated layouts", date: "2026-04-28", example: "current" },
-  { version: "1.3.2", notes: "Patch: handle malformed cross-reference tables", date: "2026-04-12", example: "prior" },
-  { version: "1.3.1", notes: "Patch: heading detection regression on 3-column layouts", date: "2026-04-02", example: "prior" },
-  { version: "1.3.0", notes: "Add JSON output format; structured headings/paragraphs/tables", date: "2026-03-19", example: "prior" },
-  { version: "1.2.0", notes: "Heading hierarchy preserved as # markers", date: "2026-02-21", example: "prior" },
-  { version: "1.1.0", notes: "List structure preservation", date: "2026-01-30", example: "prior" },
-  { version: "1.0.0", notes: "Initial example release", date: "2026-01-08", example: "initial" }
-];
+const versions = computed(() => [
+  { version: currentSkill.value.v, latest: true, notes: "Current hosted SKILL.md", date: "source", example: currentSkill.value.rawPath }
+]);
 
-const metadata = [
-  { key: "version", value: "1.4.0", mono: true },
-  { key: "size", value: "2,847 B", mono: true },
-  { key: "license", value: "MIT" },
-  { key: "author", value: "autoworks-ai", accent: true },
-  { key: "signed", value: "ed25519", mono: true },
-  { key: "key", value: "0x9af4…2c81", mono: true },
-  { key: "first seen", value: "2026-01-08", mono: true },
-  { key: "updated", value: "2 days ago", mono: true }
-];
+const metadata = computed(() => [
+  { key: "version", value: currentSkill.value.v, mono: true },
+  { key: "size", value: currentSkill.value.size, mono: true },
+  { key: "license", value: currentSkill.value.license },
+  { key: "source", value: currentSkill.value.org, accent: true },
+  { key: "raw", value: currentSkill.value.rawPath, mono: true }
+]);
 
-const summaryPermissions = [
-  { kind: "ok", label: "read", scope: "scoped" },
-  { kind: "ok", label: "write", scope: "scoped" },
-  { kind: "no", label: "network", scope: "none" },
-  { kind: "no", label: "exec", scope: "none" }
-];
+const summaryPermissions = computed(() => currentSkill.value.permissions);
 
-const maintainers = [
-  { name: "autoworks-ai", meta: "source owner", bg: "linear-gradient(135deg, #5ad6c0, #5a9dd6)" },
-  { name: "local vault", meta: "signs after admission", bg: "linear-gradient(135deg, #d6a85a, #b48ad6)" }
-];
+const maintainers = computed(() => [
+  { name: currentSkill.value.org, meta: "source owner", bg: "linear-gradient(135deg, #5ad6c0, #5a9dd6)" },
+  { name: "AutoVault gate", meta: "validates before local admission", bg: "linear-gradient(135deg, #d6a85a, #b48ad6)" }
+]);
 
 async function copyInstall() {
   copied.value = false;
   copyFailed.value = false;
   try {
     if (!navigator.clipboard) throw new Error("Clipboard unavailable");
-    await navigator.clipboard.writeText("autovault add github:autoworks-ai/skills/extract-pdf");
+    await navigator.clipboard.writeText(currentSkill.value.install);
     copied.value = true;
     window.setTimeout(() => {
       copied.value = false;

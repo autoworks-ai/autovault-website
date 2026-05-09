@@ -2,6 +2,7 @@
 name: autovault-bootstrap
 version: 0.1.0
 description: "Audit, install, verify, and sync AutoVault for the current agent profile."
+license: MIT
 disable-model-invocation: true
 allowed-tools:
   - "Bash(uname:*)"

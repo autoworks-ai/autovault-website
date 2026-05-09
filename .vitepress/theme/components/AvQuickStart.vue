@@ -63,8 +63,8 @@ onBeforeUnmount(stop)
           <span class="av-qs-step-title">Add a validated skill</span>
         </div>
         <div class="av-qs-step-body">
-          <div class="row"><span class="pmt">$</span><span>autovault add github:autoworks-ai/skills/extract-pdf</span></div>
-          <div class="out" style="margin-top: 6px">↳ fetching… 1.4kb</div>
+          <div class="row"><span class="pmt">$</span><span>autovault add url:https://autovault.dev/skills/skill-author/SKILL.md</span></div>
+          <div class="out" style="margin-top: 6px">↳ fetching… 9.4kb</div>
           <div class="out">↳ <span class="ok">[1/5]</span> yaml-repair: ok</div>
           <div class="out">↳ <span class="ok">[2/5]</span> denylist: ok</div>
           <div class="out">↳ <span class="ok">[3/5]</span> capability/behavior: ok</div>
@@ -80,7 +80,7 @@ onBeforeUnmount(stop)
           <span class="av-qs-step-title">Scope to a project</span>
         </div>
         <div class="av-qs-step-body">
-          <div class="row"><span class="pmt">$</span><span>autovault scope extract-pdf --project autovault-website --agent claude-code,codex</span></div>
+          <div class="row"><span class="pmt">$</span><span>autovault scope skill-author --project autovault-website --agent claude-code,codex</span></div>
           <div class="out" style="margin-top: 6px">↳ scoped: 2 agents × 1 project</div>
           <div class="out">↳ rendering for claude-code → fs.read → read</div>
           <div class="out">↳ rendering for codex → fs.read → file_read</div>
@@ -95,11 +95,11 @@ onBeforeUnmount(stop)
         </div>
         <div class="av-qs-step-body">
           <div style="color: var(--ink-3)"># in claude-code</div>
-          <div>&gt; use extract-pdf to summarize report.pdf</div>
-          <div class="ok" style="margin-top: 4px">✓ tool resolved: chrome-devtools, read</div>
+          <div>&gt; use skill-author to draft a new SKILL.md</div>
+          <div class="ok" style="margin-top: 4px">✓ tool resolved: Read, Edit, Write</div>
           <div style="color: var(--ink-3); margin-top: 12px"># in codex</div>
-          <div>&gt; use extract-pdf to summarize report.pdf</div>
-          <div class="ok" style="margin-top: 4px">✓ tool resolved: browser_form, file_read</div>
+          <div>&gt; use skill-author to review this SKILL.md</div>
+          <div class="ok" style="margin-top: 4px">✓ canonical SKILL.md loaded</div>
         </div>
       </button>
     </div>

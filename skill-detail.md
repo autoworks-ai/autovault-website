@@ -1,6 +1,6 @@
 ---
-title: extract-pdf
-description: Skill detail page for autoworks-ai/extract-pdf.
+title: Skill detail
+description: Skill detail page for hosted AutoVault SKILL.md examples.
 layout: false
 ---
 

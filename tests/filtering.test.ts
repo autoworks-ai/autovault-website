@@ -5,13 +5,13 @@ import { filterSkills, skills, sortSkills } from "../.vitepress/theme/data/skill
 describe("skill examples helpers", () => {
   it("filters by query, agent, category, and org", () => {
     const result = filterSkills(skills, {
-      query: "preserves headings",
+      query: "frontmatter",
       agents: ["cx"],
-      categories: ["files"],
+      categories: ["authoring"],
       orgs: ["autoworks-ai"]
     });
 
-    expect(result.map((skill) => skill.name)).toEqual(["extract-pdf"]);
+    expect(result.map((skill) => skill.name)).toEqual(["skill-author"]);
   });
 
   it("sorts reference counts without mutating the original input", () => {

@@ -146,7 +146,7 @@ const sections: ApiSection[] = [
         since: "0.1.0",
         description: "Resolve, fetch, verify, and install a skill into the current vault. Renders the appropriate transformation for each agent declared in <code>config.toml</code>'s <code>[targets]</code>.",
         signature: ["<span class=\"pmt\">$</span> autovault add <span class=\"key\">&lt;skill&gt;</span> <span class=\"opt\">[@&lt;version&gt;] [--target &lt;agent&gt;] [--dry-run]</span>"],
-        copy: "autovault add autoworks-ai/extract-pdf",
+        copy: "autovault add autoworks-ai/skill-author",
         argsLabel: "Argument",
         args: [
           { name: "skill", required: true, type: "string", description: "Fully-qualified name: <code>org/name</code>. Can include <code>@version</code> suffix; otherwise resolves to latest signed version." },
@@ -154,14 +154,14 @@ const sections: ApiSection[] = [
           { name: "--dry-run", type: "flag", description: "Verify and render without writing any files. Useful in CI gates." }
         ],
         examples: [
-          { label: "Bash", body: "<div><span class=\"pmt\">$</span> autovault add autoworks-ai/extract-pdf</div><div><span class=\"ok\">  ✓</span> resolved @1.4.0</div><div><span class=\"ok\">  ✓</span> verified ed25519 sig</div><div><span class=\"ok\">  ✓</span> rendered → CLAUDE.md, AGENTS.md, .cursorrules</div>" },
-          { label: "Pinned", body: "<div><span class=\"pmt\">$</span> autovault add autoworks-ai/extract-pdf@1.3.2</div><div><span class=\"ok\">  ✓</span> resolved @1.3.2 (pinned)</div>" },
-          { label: "Single target", body: "<div><span class=\"pmt\">$</span> autovault add autoworks-ai/extract-pdf \\</div><div>    --target claude-code</div><div><span class=\"ok\">  ✓</span> rendered → CLAUDE.md only</div>" }
+          { label: "Bash", body: "<div><span class=\"pmt\">$</span> autovault add autoworks-ai/skill-author</div><div><span class=\"ok\">  ✓</span> resolved @1.0.0</div><div><span class=\"ok\">  ✓</span> verified ed25519 sig</div><div><span class=\"ok\">  ✓</span> rendered → CLAUDE.md, AGENTS.md, AutoJack profile</div>" },
+          { label: "Pinned", body: "<div><span class=\"pmt\">$</span> autovault add autoworks-ai/skill-author@1.0.0</div><div><span class=\"ok\">  ✓</span> resolved @1.0.0 (pinned)</div>" },
+          { label: "Single target", body: "<div><span class=\"pmt\">$</span> autovault add autoworks-ai/skill-author \\</div><div>    --target claude-code</div><div><span class=\"ok\">  ✓</span> rendered → CLAUDE.md only</div>" }
         ]
       },
       endpoint("cli-list", "list", "autovault list", "Print the installed skills in this vault, their versions, and the last verification timestamp. Adds <code>--json</code> for machine output.", "$ autovault list [--json] [--stale]", "autovault list"),
-      endpoint("cli-add-local", "add-local", "autovault add-local <path>", "Admit a local SKILL.md bundle into the vault. Runs the same gate as remote sources, writes provenance, signs what passes, and can refresh generated profiles.", "$ autovault add-local <path> [--source <id>] [--sync-profiles]", "autovault add-local ./skills/extract-pdf --sync-profiles", "0.2.0"),
-      endpoint("cli-verify", "verify", "autovault verify", "Walk the provenance chain for a skill. Resolves the latest version, fetches the signature bundle, and verifies every link from author through mirror.", "$ autovault verify <skill> [--chain] [--offline]", "autovault verify autoworks-ai/extract-pdf", "0.3.0"),
+      endpoint("cli-add-local", "add-local", "autovault add-local <path>", "Admit a local SKILL.md bundle into the vault. Runs the same gate as remote sources, writes provenance, signs what passes, and can refresh generated profiles.", "$ autovault add-local <path> [--source <id>] [--sync-profiles]", "autovault add-local ./skills/skill-author --sync-profiles", "0.2.0"),
+      endpoint("cli-verify", "verify", "autovault verify", "Walk the provenance chain for a skill. Resolves the latest version, fetches the signature bundle, and verifies every link from author through mirror.", "$ autovault verify <skill> [--chain] [--offline]", "autovault verify autoworks-ai/skill-author", "0.3.0"),
       endpoint("cli-check-updates", "check-updates", "autovault check-updates", "Compare admitted skills against their recorded source sidecars and report upstream drift, including transform review state when applicable.", "$ autovault check-updates [--json]", "autovault check-updates", "0.2.0")
     ]
   },
@@ -179,15 +179,15 @@ const sections: ApiSection[] = [
         since: "0.2.0",
         description: "Resolve and verify a signed skill bundle. Returns the canonical SKILL.md plus its frontmatter, transformations, and provenance chain.",
         signature: ["<span class=\"key\">async function</span> <span class=\"num\">loadSkill</span>(", "  <span class=\"key\">spec</span>: <span class=\"str\">string</span>, <span class=\"com\">// \"org/name@version\" or \"org/name\"</span>", "  <span class=\"key\">options</span>?: <span class=\"str\">LoadOptions</span>", "): <span class=\"key\">Promise</span>&lt;<span class=\"str\">SignedSkill</span>&gt;"],
-        copy: "loadSkill(\"autoworks-ai/extract-pdf\")",
+        copy: "loadSkill(\"autoworks-ai/skill-author\")",
         args: [
           { name: "options.anchor", type: "string <span class=\"def\">= \"autovault.dev\"</span>", description: "Trust anchor URL. Skill must chain to a key trusted by this anchor." },
           { name: "options.cache", type: "\"prefer\" | \"none\"", description: "Whether to use the local cache. <code>\"none\"</code> forces a network round-trip." },
           { name: "options.signal", type: "AbortSignal", description: "Standard cancellation signal." }
         ],
         examples: [
-          { label: "TypeScript", body: "<div><span class=\"key\">import</span> { loadSkill } <span class=\"key\">from</span> <span class=\"str\">\"@autovault/sdk\"</span>;</div><div></div><div><span class=\"key\">const</span> skill = <span class=\"key\">await</span> loadSkill(<span class=\"str\">\"autoworks-ai/extract-pdf\"</span>);</div><div><span class=\"com\">// skill.frontmatter.version === \"1.4.0\"</span></div>" },
-          { label: "Pinned + offline", body: "<div><span class=\"key\">const</span> skill = <span class=\"key\">await</span> loadSkill(</div><div>  <span class=\"str\">\"autoworks-ai/extract-pdf@1.4.0\"</span>,</div><div>  { cache: <span class=\"str\">\"prefer\"</span> }</div><div>);</div>" }
+          { label: "TypeScript", body: "<div><span class=\"key\">import</span> { loadSkill } <span class=\"key\">from</span> <span class=\"str\">\"@autovault/sdk\"</span>;</div><div></div><div><span class=\"key\">const</span> skill = <span class=\"key\">await</span> loadSkill(<span class=\"str\">\"autoworks-ai/skill-author\"</span>);</div><div><span class=\"com\">// skill.frontmatter.version === \"1.0.0\"</span></div>" },
+          { label: "Pinned + offline", body: "<div><span class=\"key\">const</span> skill = <span class=\"key\">await</span> loadSkill(</div><div>  <span class=\"str\">\"autoworks-ai/skill-author@1.0.0\"</span>,</div><div>  { cache: <span class=\"str\">\"prefer\"</span> }</div><div>);</div>" }
         ]
       },
       endpoint("lib-render", "renderForTarget", "renderForTarget(skill, target)", "Pure function. Takes a verified skill and a target identifier; returns the agent-specific output string.", "function renderForTarget(skill: SignedSkill, target: \"claude-code\" | \"codex\" | \"cursor\" | \"autohub\"): string", "renderForTarget(skill, \"codex\")", "0.2.0"),
@@ -207,8 +207,8 @@ const sections: ApiSection[] = [
         status: "stable",
         since: "0.3.0",
         description: "Fetch a signed skill bundle. Response is signed JSON; clients should verify the signature with the public key from the trust anchor before consuming the body.",
-        signature: ["GET /api/v1/skill/<span class=\"key\">{org}</span>/<span class=\"key\">{name}</span><span class=\"opt\">?version=1.4.0&target=claude-code</span>"],
-        copy: "curl https://vault.autovault.dev/api/v1/skill/autoworks-ai/extract-pdf",
+        signature: ["GET /api/v1/skill/<span class=\"key\">{org}</span>/<span class=\"key\">{name}</span><span class=\"opt\">?version=1.0.0&target=claude-code</span>"],
+        copy: "curl https://vault.autovault.dev/api/v1/skill/autoworks-ai/skill-author",
         argsLabel: "Param",
         args: [
           { name: "org", required: true, type: "path", description: "Publisher org, e.g. <code>autoworks-ai</code>." },
@@ -217,11 +217,11 @@ const sections: ApiSection[] = [
           { name: "target", type: "query", description: "Pre-render the transformation for this target. Reduces caller-side work." }
         ],
         examples: [
-          { label: "curl", body: "<div><span class=\"pmt\">$</span> curl https://vault.autovault.dev/api/v1/skill/autoworks-ai/extract-pdf</div><div></div><div><span class=\"key\">{</span></div><div>  <span class=\"str\">\"name\"</span>: <span class=\"str\">\"extract-pdf\"</span>,</div><div>  <span class=\"str\">\"version\"</span>: <span class=\"str\">\"1.4.0\"</span>,</div><div>  <span class=\"str\">\"signature\"</span>: <span class=\"str\">\"ed25519:9af42c81…7e7e\"</span></div><div><span class=\"key\">}</span></div>" },
-          { label: "MCP", body: "<div><span class=\"com\">// MCP tool call</span></div><div><span class=\"key\">{</span></div><div>  <span class=\"str\">\"method\"</span>: <span class=\"str\">\"get_skill\"</span>,</div><div>  <span class=\"str\">\"params\"</span>: { <span class=\"str\">\"name\"</span>: <span class=\"str\">\"autoworks-ai/extract-pdf\"</span> }</div><div><span class=\"key\">}</span></div>" }
+          { label: "curl", body: "<div><span class=\"pmt\">$</span> curl https://vault.autovault.dev/api/v1/skill/autoworks-ai/skill-author</div><div></div><div><span class=\"key\">{</span></div><div>  <span class=\"str\">\"name\"</span>: <span class=\"str\">\"skill-author\"</span>,</div><div>  <span class=\"str\">\"version\"</span>: <span class=\"str\">\"1.0.0\"</span>,</div><div>  <span class=\"str\">\"signature\"</span>: <span class=\"str\">\"ed25519:9af42c81…7e7e\"</span></div><div><span class=\"key\">}</span></div>" },
+          { label: "MCP", body: "<div><span class=\"com\">// MCP tool call</span></div><div><span class=\"key\">{</span></div><div>  <span class=\"str\">\"method\"</span>: <span class=\"str\">\"get_skill\"</span>,</div><div>  <span class=\"str\">\"params\"</span>: { <span class=\"str\">\"name\"</span>: <span class=\"str\">\"autoworks-ai/skill-author\"</span> }</div><div><span class=\"key\">}</span></div>" }
         ]
       },
-      endpoint("http-resolve", "POST /resolve", "POST /api/v1/resolve", "Batch-resolve a list of skill specs to their latest signed versions. Useful for vaults that want to refresh many skills in one round-trip.", "POST /api/v1/resolve\n\n{ \"specs\": [\"autoworks-ai/extract-pdf\"], \"target\": \"claude-code\" }", "POST /api/v1/resolve", "0.3.0"),
+      endpoint("http-resolve", "POST /resolve", "POST /api/v1/resolve", "Batch-resolve a list of skill specs to their latest signed versions. Useful for vaults that want to refresh many skills in one round-trip.", "POST /api/v1/resolve\n\n{ \"specs\": [\"autoworks-ai/skill-author\"], \"target\": \"claude-code\" }", "POST /api/v1/resolve", "0.3.0"),
       endpoint("http-verify", "POST /verify", "POST /api/v1/verify", "Server-side reproducible verification. Send a bundle; the vault re-runs the gate and returns whether its verdict matches what the bundle claims.", "POST /api/v1/verify\n\n// body: a SignedSkill bundle", "POST /api/v1/verify", "0.4.0", "beta")
     ]
   }
