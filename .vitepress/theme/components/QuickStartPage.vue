@@ -8,14 +8,13 @@
         <p class="lede">Create the local vault, admit a signed skill, scope it to the agents that need it, and run the same capability from Claude Code, Codex, or Cursor without maintaining forks.</p>
 
         <div class="install-final-card" aria-label="Install command">
-          <div class="install-tabs" role="tablist" aria-label="Install method">
+          <div class="install-tabs" aria-label="Install method">
             <button
               v-for="method in INSTALL_METHODS"
               :key="method"
               :class="{ active: selectedMethod === method }"
               type="button"
-              role="tab"
-              :aria-selected="selectedMethod === method"
+              :aria-pressed="selectedMethod === method"
               @click="selectedMethod = method"
             >
               {{ method }}
@@ -136,8 +135,8 @@
 
     <h2 id="run">Step 5 — Run it from your agent</h2>
     <p>The same skill is now validated, scoped, and rendered for each target agent. The skill name stays stable, while tool names are transformed to match the caller.</p>
-    <div class="agent-tabs" role="tablist" aria-label="Agent">
-      <button v-for="item in agentOptions" :key="item.id" :class="{ active: agent === item.id }" type="button" role="tab" :aria-selected="agent === item.id" @click="agent = item.id"><span class="agent-dot" :style="{ background: item.color }" />{{ item.label }}</button>
+    <div class="agent-tabs" aria-label="Agent">
+      <button v-for="item in agentOptions" :key="item.id" :class="{ active: agent === item.id }" type="button" :aria-pressed="agent === item.id" @click="agent = item.id"><span class="agent-dot" :style="{ background: item.color }" />{{ item.label }}</button>
     </div>
     <CodeBlock :lang="activeAgent.label.toLowerCase()" :file="`# in ${activeAgent.label}`"><span class="pmt">&gt;</span> {{ activeAgent.cmd }}<br />
 <span class="yaml-comment">{{ activeAgent.out }}</span><br />

@@ -2,11 +2,11 @@ export async function copyText(text: string): Promise<boolean> {
   if (copyViaTextarea(text)) return true;
 
   try {
-    window.focus();
-    if (navigator.clipboard?.writeText) {
+    if (typeof window !== "undefined") window.focus();
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
       const copied = await Promise.race([
         navigator.clipboard.writeText(text).then(() => true).catch(() => false),
-        new Promise<boolean>((resolve) => window.setTimeout(() => resolve(false), 650))
+        new Promise<boolean>((resolve) => globalThis.setTimeout(() => resolve(false), 650))
       ]);
       if (copied) return true;
     }
@@ -18,6 +18,8 @@ export async function copyText(text: string): Promise<boolean> {
 }
 
 function copyViaTextarea(text: string): boolean {
+  if (typeof document === "undefined" || !document.body) return false;
+
   const textarea = document.createElement("textarea");
   textarea.value = text;
   textarea.setAttribute("readonly", "");

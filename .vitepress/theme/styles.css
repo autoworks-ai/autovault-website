@@ -11056,15 +11056,32 @@ body {
 
 /* Docs finals primitives */
 .av-doc-breadcrumb {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
   margin-bottom: 28px;
   color: var(--ink-3);
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.04em;
+}
+
+.av-doc-breadcrumb ol {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.av-doc-breadcrumb li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.av-doc-breadcrumb li + li::before {
+  content: "/";
+  color: var(--ink-4);
 }
 
 .av-doc-breadcrumb .crumb,
@@ -11080,10 +11097,6 @@ body {
 
 .av-doc-breadcrumb .home-crumb svg {
   color: var(--accent);
-}
-
-.av-doc-breadcrumb .sep {
-  color: var(--ink-4);
 }
 
 .av-doc-breadcrumb .current {
