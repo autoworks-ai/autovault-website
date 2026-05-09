@@ -5,14 +5,14 @@
         <div class="eyebrow">
           <span class="dash" />
           Deploy a remote vault
-          <span class="pr">PR #11 · merging</span>
+          <span class="pr">v0.2.1 · current</span>
         </div>
         <h1>From a local CLI to <span class="ital">a network service</span> in two minutes.</h1>
         <p class="lede">In remote mode, the same vault binary speaks Streamable HTTP MCP with OAuth auth-code + PKCE. Stand it up on a real host so your agents — wherever they run, sandboxed or not — can resolve, verify, and install signed skills without ever touching a local filesystem.</p>
         <div class="hero-meta">
           <div class="m">Transport: <strong>Streamable HTTP MCP</strong></div>
           <div class="m">Auth: <strong>OAuth 2.1 + PKCE</strong></div>
-          <div class="m">Storage: <strong>SQLite or Postgres</strong></div>
+          <div class="m">Storage: <strong>SQLite on a persistent volume</strong></div>
         </div>
       </div>
       <div class="topology">
@@ -185,14 +185,14 @@ const providers: Provider[] = [
     short: "RWY",
     logoBg: "#0B0D0E",
     logoFg: "#fff",
-    time: "~2 min",
-    desc: "One-click template. Provisions Postgres + persistent volume, sets env vars, exposes HTTPS endpoint.",
-    feat: ["one-click", "Postgres", "managed TLS", "auto-deploy"],
+    time: "~3 min",
+    desc: "Pulls the published GHCR image, attaches a persistent volume at /data/autovault, sets env vars, exposes managed HTTPS.",
+    feat: ["GHCR image", "persistent volume", "managed TLS", "version-pinned"],
     steps: [
-      { title: "Click 'Deploy on Railway'", body: "Forks the autovault template into your account. You'll be asked to fill three required env vars before the build starts." },
-      { title: "Set required environment", body: "Railway prompts for these at template time. They go straight into the deployment config — never committed to git.", command: "AUTOVAULT_ADMIN_EMAIL=admin@example.com\nAUTOVAULT_ADMIN_PASSWORD=<long-random-string>\nAUTOVAULT_PUBLIC_URL=https://your-vault.up.railway.app" },
-      { title: "Wait for build", body: "Build runs npm run build, copies bundled skills, starts the remote service on $PORT. Health check at /healthz.", command: "→ npm ci\n→ npm run build\n→ node dist/remote.js" },
-      { title: "Connect from your agent", body: "Add the MCP endpoint to your agent's config. The first call kicks off the OAuth dance.", command: "autovault add autoworks-ai/skill-author \\\n  --remote https://your-vault.up.railway.app/mcp" }
+      { title: "Create the service from the image", body: "Use Railway's 'Deploy from Docker image' option. Pin a version for reproducibility (or use :latest if you want auto-update). The package is public, so no registry credentials are required.", command: `ghcr.io/autoworks-ai/autovault:${PRODUCT_VERSION_SHORT}` },
+      { title: "Mount the volume before the first deploy", body: "First boot seeds owner credentials, signing keys, and skills onto the storage path. If the volume isn't attached first, that state lands on ephemeral disk and disappears on the next deploy.", command: "mount path: /data/autovault\nsize: 1 GB (room to grow)" },
+      { title: "Generate the public domain, then set env", body: "Railway injects PORT — do not override it. AUTOVAULT_PUBLIC_URL must match the *.up.railway.app domain because it's used as the OAuth issuer.", command: "AUTOVAULT_MODE=remote\nAUTOVAULT_STORAGE_PATH=/data/autovault\nAUTOVAULT_PUBLIC_URL=https://<your-service>.up.railway.app\nAUTOVAULT_ADMIN_EMAIL=admin@example.com\nAUTOVAULT_ADMIN_PASSWORD=<long random string>\nAUTOVAULT_SECURITY_STRICT=true\nAUTOVAULT_LOG_LEVEL=info" },
+      { title: "Verify with smoke probes", body: "Healthz returns 200, OAuth discovery exposes the issuer, an unauthenticated MCP probe returns 401 with a WWW-Authenticate hint pointing at the OAuth metadata.", command: "URL=https://<your-service>.up.railway.app\ncurl -fsS \"$URL/healthz\" | jq\ncurl -fsS \"$URL/.well-known/oauth-authorization-server\" | jq\nAUTOVAULT_REMOTE_URL=$URL \\\n  AUTOVAULT_ADMIN_EMAIL=... AUTOVAULT_ADMIN_PASSWORD=... \\\n  npm run smoke:remote" }
     ]
   },
   {
@@ -205,10 +205,10 @@ const providers: Provider[] = [
     desc: "Self-host with Compose. Brings up the remote MCP service, SQLite volume, and reverse proxy.",
     feat: ["self-hosted", "SQLite", "Compose", "BYO TLS"],
     steps: [
-      { title: "Pull image and seed env", body: "The container defaults to remote mode. Compose now requires explicit admin credentials.", command: `docker pull autoworks/autovault:${PRODUCT_VERSION_SHORT}\ncp .env.example .env\n$EDITOR .env` },
+      { title: "Pull image and seed env", body: "The container defaults to remote mode. Compose now requires explicit admin credentials.", command: `docker pull ghcr.io/autoworks-ai/autovault:${PRODUCT_VERSION_SHORT}\ncp .env.example .env\n$EDITOR .env` },
       { title: "Validate compose", body: "Compose hard-fails if the admin vars are unset.", command: "docker compose config\n✓ AUTOVAULT_ADMIN_EMAIL set\n✓ AUTOVAULT_ADMIN_PASSWORD set" },
-      { title: "Bring it up", body: "Service binds to 8080 inside the container. Put Caddy, Traefik, or nginx in front for TLS.", command: "docker compose up -d\n✓ autovault-remote running on :8080" },
-      { title: "Test the MCP endpoint", body: "POST a discovery request to /mcp to confirm transport, auth middleware, and CORS.", command: "curl -X POST https://your.vault/mcp \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"method\":\"initialize\"}'" }
+      { title: "Bring it up", body: "Service binds to 0.0.0.0:3000 inside the container (the bundled compose file publishes 3000:3000). Put Caddy, Traefik, or nginx in front for TLS.", command: "docker compose up -d\n✓ autovault running on :3000" },
+      { title: "Test the MCP endpoint", body: "Unauthenticated POST /mcp returns 401 with a WWW-Authenticate header pointing at /.well-known/oauth-protected-resource/mcp. That confirms transport, auth middleware, and CORS in one call.", command: "curl -i -X POST http://localhost:3000/mcp \\\n  -H 'Content-Type: application/json' \\\n  -H 'Accept: application/json, text/event-stream' \\\n  -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}'" }
     ]
   }
 ];
@@ -217,109 +217,118 @@ const activeProvider = computed(() => providers.find((provider) => provider.id =
 
 const topoRoutes = [
   { y: 50, label: "/mcp", desc: "Streamable HTTP" },
-  { y: 98, label: "/oauth/*", desc: "auth-code · PKCE · refresh" },
-  { y: 146, label: "/admin/*", desc: "owner routes" },
+  { y: 98, label: "/authorize · /token", desc: "auth-code · PKCE · refresh" },
+  { y: 146, label: "/admin/users", desc: "owner routes" },
   { y: 194, label: "policy layer", desc: "scopes · roles · filter" },
   { y: 236, label: "CORS · origin guard", desc: "allowed origins" }
 ];
 
 const remoteStatusLines = [
-  "$ autovault status --remote https://your.vault",
+  "$ curl -fsS https://your.vault/healthz | jq",
   "",
-  "endpoint      https://your.vault/mcp",
-  "issuer        https://your.vault",
-  `version       ${PRODUCT_VERSION_SHORT}`,
-  "transport     streamable-http",
-  "auth          oauth2.1 · pkce required",
-  "storage       sqlite (3.2 MB · 47 caps)",
+  "{",
+  "  \"ok\": true,",
+  "  \"name\": \"autovault\",",
+  "  \"mode\": \"remote\"",
+  "}",
   "",
-  "recent",
-  "  02:14:08  POST /mcp         200  get_skill skill-author",
-  "  02:14:01  POST /oauth/token 200  refresh +900s",
-  "  02:11:55  POST /mcp         403  add_skill (scope)",
+  "$ curl -fsS https://your.vault/.well-known/oauth-authorization-server | jq",
   "",
-  "✓ healthy · uptime 4d 02:11:09"
+  "{",
+  "  \"issuer\": \"https://your.vault/\",",
+  "  \"authorization_endpoint\": \"https://your.vault/authorize\",",
+  "  \"token_endpoint\": \"https://your.vault/token\",",
+  "  \"registration_endpoint\": \"https://your.vault/register\",",
+  "  \"code_challenge_methods_supported\": [\"S256\"],",
+  "  \"grant_types_supported\": [\"authorization_code\", \"refresh_token\"],",
+  "  \"scopes_supported\": [\"mcp:tools\", \"autovault:read\", \"autovault:write\", \"autovault:admin\"]",
+  "}",
+  "",
+  "✓ remote vault healthy"
 ];
 
 const statusLines = computed(() => remoteStatusLines);
 
 const smokeLines = [
-  "$ AUTOVAULT_REMOTE_URL=https://vault.acme.dev npm run smoke:remote",
+  "$ AUTOVAULT_REMOTE_URL=https://vault.acme.dev \\",
+  "    AUTOVAULT_ADMIN_EMAIL=admin@example.com \\",
+  "    AUTOVAULT_ADMIN_PASSWORD=… \\",
+  "    npm run smoke:remote",
   "",
-  "▸ phase 1 · discovery",
-  "  GET  /.well-known/oauth-authorization-server   200",
-  "  GET  /.well-known/openid-configuration         200",
-  "  → issuer matches AUTOVAULT_PUBLIC_URL          ✓",
+  "=== Targeting deployed server: https://vault.acme.dev ===",
+  "{ \"ok\": true, \"name\": \"autovault\", \"mode\": \"remote\" }",
   "",
-  "▸ phase 2 · dynamic registration",
-  "  POST /oauth/register                           201",
-  "  → client_id: smk_8f3c…21a4                    ✓",
+  "▸ register dynamic client          → 201",
+  "▸ POST /authorize → /login → code  → 302",
+  "▸ POST /token (auth code + PKCE)   → 200",
+  "▸ MCP initialize over Streamable   → 200",
   "",
-  "▸ phase 3 · auth-code + PKCE",
-  "  GET  /oauth/authorize                          302",
-  "  POST /oauth/token                              200",
-  "  POST /oauth/token refresh                      200",
+  "=== propose_skill ===",
+  "  success: true",
+  "  name:    remote-smoke-skill",
+  "  dedup:   { tier: \"novel\" }",
   "",
-  "▸ phase 4 · MCP tool calls",
-  "  POST /mcp initialize                           200",
-  "  POST /mcp list_skills                          200",
-  "  POST /mcp get_skill autoworks-ai/skill-author   200",
-  "  → ed25519 signature verified                  ✓",
+  "=== get_skill query ===",
+  "  matches: [ { name: \"remote-smoke-skill\", score: 4.31 } ]",
+  "  skill.skill_md: <277 chars>",
   "",
-  "▸ phase 5 · policy enforcement",
-  "  POST /mcp add_skill (non-owner)                403",
-  "  → expected denial: scope:write missing        ✓",
-  "",
-  "✓ remote smoke complete · 18/18 checks passed · 4.2s"
+  "=== Remote smoke test completed ==="
 ];
 
 const envGroups = [
   { title: "Admin seed", required: true, rows: [
-    { key: "AUTOVAULT_ADMIN_EMAIL", value: "Email address for the bootstrap owner. Created on first boot only." },
-    { key: "AUTOVAULT_ADMIN_PASSWORD", value: "Min 12 chars. Compose and Railway templates refuse to start without this." }
+    { key: "AUTOVAULT_ADMIN_EMAIL", value: "Email address for the bootstrap owner. Created on first boot only; subsequent boots ignore it." },
+    { key: "AUTOVAULT_ADMIN_PASSWORD", value: "Min 12 chars. Hashed at rest; the plaintext is not logged or recoverable. Compose and Railway refuse to start without it." }
   ] },
   { title: "Public surface", required: true, rows: [
-    { key: "AUTOVAULT_PUBLIC_URL", value: "Public HTTPS origin. Used as the OAuth issuer and embedded in <code>/.well-known</code> docs." },
-    { key: "AUTOVAULT_PORT", value: "Bind port. Default <code>8080</code>. PaaS providers usually inject <code>$PORT</code>." }
+    { key: "AUTOVAULT_MODE", value: "Set to <code>remote</code> to enable the HTTP MCP service. <code>local</code> (default) is stdio-only." },
+    { key: "AUTOVAULT_PUBLIC_URL", value: "Public HTTPS origin (no path). Used as the OAuth issuer and embedded in <code>/.well-known</code> metadata. Required in remote mode." },
+    { key: "AUTOVAULT_HTTP_PORT", value: "Bind port. Default <code>3000</code>. On Railway, leave it unset because Railway injects <code>PORT</code> and the server reads that automatically." }
   ] },
-  { title: "CORS & origin guard", required: false, rows: [
-    { key: "AUTOVAULT_ALLOWED_ORIGINS", value: "Comma-separated origin list. Browsers calling <code>/mcp</code> must come from one of these." },
-    { key: "AUTOVAULT_TRUSTED_PROXIES", value: "CIDR list for X-Forwarded-* trust behind Caddy, Cloudflare, or fly-proxy." }
+  { title: "Storage", required: true, rows: [
+    { key: "AUTOVAULT_STORAGE_PATH", value: "Filesystem root for skills, signing keys, and SQLite. On Railway this should be the volume mount, e.g. <code>/data/autovault</code>." },
+    { key: "AUTOVAULT_DB_PATH", value: "Optional override for the SQLite path. Defaults to <code>$AUTOVAULT_STORAGE_PATH/autovault.sqlite</code>." }
   ] },
-  { title: "Storage & tokens", required: false, rows: [
-    { key: "AUTOVAULT_DATABASE_URL", value: "SQLite path or Postgres URL. Default: <code>./data/vault.db</code>." },
-    { key: "AUTOVAULT_TOKEN_TTL", value: "Access token lifetime in seconds. Default <code>900</code>; refresh tokens rotate on use." }
+  { title: "Hardening", required: false, rows: [
+    { key: "AUTOVAULT_SECURITY_STRICT", value: "Default <code>true</code>. When true, security-scanner flags block writes; when false, they become warnings. Leave on in production." },
+    { key: "AUTOVAULT_ALLOWED_ORIGINS", value: "Comma-separated origin list for the CORS allowlist. Server-to-server MCP calls don't need it; browsers do." },
+    { key: "AUTOVAULT_LOG_LEVEL", value: "<code>debug</code> · <code>info</code> · <code>warn</code> · <code>error</code>. JSON lines emitted to stderr." }
   ] }
 ];
 
 const oauthActors = [
   { x: 80, label: "Agent CLI", accent: false },
   { x: 220, label: "Browser", accent: false },
-  { x: 380, label: "/oauth/*", accent: true },
+  { x: 380, label: "/authorize", accent: true },
   { x: 540, label: "/mcp", accent: true }
 ];
 const oauthSteps = [
   { from: 0, to: 1, n: "1", label: "open authorize URL", meta: "PKCE challenge", y: 80 },
-  { from: 1, to: 2, n: "2", label: "GET /oauth/authorize", meta: "code_challenge + redirect_uri", y: 130 },
-  { from: 2, to: 1, n: "3", label: "consent screen", meta: "session cookie set", y: 180, back: true },
+  { from: 1, to: 2, n: "2", label: "GET /authorize", meta: "code_challenge + redirect_uri", y: 130 },
+  { from: 2, to: 1, n: "3", label: "/login form", meta: "session cookie set", y: 180, back: true },
   { from: 1, to: 0, n: "4", label: "redirect with code", meta: "?code=...&state=...", y: 230, back: true },
-  { from: 0, to: 2, n: "5", label: "POST /oauth/token", meta: "code + verifier", y: 290 },
+  { from: 0, to: 2, n: "5", label: "POST /token", meta: "code + verifier", y: 290 },
   { from: 2, to: 0, n: "6", label: "access + refresh tokens", meta: "scopes: read write", y: 340, back: true },
   { from: 0, to: 3, n: "7", label: "POST /mcp", meta: "Authorization: Bearer …", y: 400 },
   { from: 3, to: 0, n: "8", label: "tool result", meta: "policy-filtered by scope", y: 440, back: true }
 ];
 
 const routes = [
+  { method: "GET", path: "/healthz", desc: "Liveness probe. Returns <code>{ ok, name, mode }</code>.", auth: "public" },
   { method: "GET", path: "/.well-known/oauth-authorization-server", desc: "RFC 8414 metadata. Issuer, endpoints, supported flows.", auth: "public" },
-  { method: "POST", path: "/oauth/register", desc: "Dynamic client registration. Returns client_id.", auth: "public" },
-  { method: "GET", path: "/oauth/authorize", desc: "Auth-code endpoint. Requires PKCE challenge.", auth: "public" },
-  { method: "POST", path: "/oauth/token", desc: "Code → token, refresh → token. Rotates refresh on use.", auth: "public" },
-  { method: "POST", path: "/oauth/revoke", desc: "Revoke an access or refresh token.", auth: "bearer" },
+  { method: "GET", path: "/.well-known/oauth-protected-resource/mcp", desc: "Resource metadata for the /mcp endpoint. Referenced from the WWW-Authenticate header.", auth: "public" },
+  { method: "POST", path: "/register", desc: "Dynamic client registration. Returns client_id.", auth: "public" },
+  { method: "GET", path: "/authorize", desc: "Auth-code endpoint. Requires PKCE challenge.", auth: "public" },
+  { method: "POST", path: "/token", desc: "Code → access+refresh tokens. Refresh tokens rotate on use.", auth: "public" },
+  { method: "POST", path: "/revoke", desc: "Revoke an access or refresh token.", auth: "public" },
+  { method: "GET", path: "/login", desc: "HTML login form, used by the authorize redirect for first-party owner login.", auth: "public" },
+  { method: "POST", path: "/login", desc: "Submit credentials, set session cookie, continue the OAuth flow.", auth: "public" },
+  { method: "POST", path: "/logout", desc: "Clear the session cookie.", auth: "public" },
   { method: "POST", path: "/mcp", desc: "Streamable HTTP MCP transport. All tool calls land here.", auth: "bearer" },
+  { method: "GET", path: "/mcp", desc: "Server-sent event stream for MCP sessions.", auth: "bearer" },
+  { method: "DELETE", path: "/mcp", desc: "Terminate an MCP session.", auth: "bearer" },
   { method: "GET", path: "/admin/users", desc: "List users with roles and last-seen timestamps.", auth: "owner" },
-  { method: "POST", path: "/admin/users/:id/scopes", desc: "Grant or revoke scopes. Audit-logged.", auth: "owner" },
-  { method: "DELETE", path: "/admin/clients/:id", desc: "Force-revoke a client and all tokens.", auth: "owner" },
-  { method: "GET", path: "/healthz", desc: "Liveness probe. Returns boot time and DB ping.", auth: "public" }
+  { method: "POST", path: "/admin/users", desc: "Create a non-owner user with scoped grants.", auth: "owner" }
 ];
 
 const securityCards = [
