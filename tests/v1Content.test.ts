@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { MANUAL_GHCR_IMAGE, RAILWAY_TEMPLATE_URL } from "../.vitepress/shared/deploy";
+import { pageDocs } from "../.vitepress/shared/pageDocs";
 import { comparisonPlayers, comparisonSources, homepageComparisonRows, homepageGateMetrics } from "../.vitepress/theme/data/marketing";
 import { PRODUCT_STATUS, PRODUCT_VERSION, PRODUCT_VERSION_BADGE, PRODUCT_VERSION_SHORT } from "../.vitepress/theme/data/product";
 
@@ -10,6 +12,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 describe("v1 content guardrails", () => {
   it("keeps primary product version copy centralized", () => {
     expect(PRODUCT_VERSION).toBe(`v${PRODUCT_VERSION_SHORT}`);
+    expect(PRODUCT_VERSION).toBe("v0.2.1");
     expect(PRODUCT_STATUS).toBe("pre-1.0");
     expect(PRODUCT_VERSION_BADGE).toContain(PRODUCT_VERSION);
     expect(PRODUCT_VERSION_BADGE).not.toContain("Unreleased May 2026");
@@ -45,9 +48,15 @@ describe("v1 content guardrails", () => {
 
   it("keeps deploy claims limited to verified v1 providers", () => {
     const deploy = read(".vitepress/theme/components/DeployPage.vue");
+    const deployMarkdown = pageDocs.find((doc) => doc.key === "deploy")?.markdown ?? "";
 
     expect(deploy).toContain('name: "Railway"');
     expect(deploy).toContain('name: "Docker"');
+    expect(deploy).toContain("RAILWAY_TEMPLATE_URL");
+    expect(deployMarkdown).toContain(RAILWAY_TEMPLATE_URL);
+    expect(deploy).toContain("MANUAL_GHCR_IMAGE");
+    expect(deployMarkdown).toContain(MANUAL_GHCR_IMAGE);
+    expect(deploy).toContain("Manual image deploy");
     expect(deploy).toContain("Min 12 chars");
     expect(deploy).not.toMatch(/\bRender\b|Fly\.io|officially-tested|24 chars|render\.yaml|fly\.toml|LiteFS/);
   });

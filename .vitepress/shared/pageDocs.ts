@@ -1,7 +1,6 @@
 import { PRODUCT_VERSION } from "../theme/data/product";
 import { AUTOVAULT_AGENT_SETUP_PROMPT, AUTOVAULT_BOOTSTRAP_INSTALL_PATH, AUTOVAULT_BOOTSTRAP_SKILL_URL } from "./bootstrap";
-
-const CURRENT_VERSION_LABEL = `v${PRODUCT_VERSION}`;
+import { MANUAL_GHCR_IMAGE, RAILWAY_TEMPLATE_URL } from "./deploy";
 
 export const SITE_URL = "https://autovault.dev";
 
@@ -251,6 +250,48 @@ Deploy AutoVault when a team needs a shared remote vault, OAuth-protected MCP ac
 - Serves Streamable HTTP MCP at /mcp.
 - Uses OAuth for registration, login, token issuance, and protected-resource metadata.
 - Keeps validation, signing, transforms, resource reads, and drift checks on the same code path as local mode.
+
+## Railway template
+
+Use the Railway template as the primary self-hosted setup path:
+
+${RAILWAY_TEMPLATE_URL}
+
+Template checklist:
+
+- Provide AUTOVAULT_ADMIN_EMAIL and AUTOVAULT_ADMIN_PASSWORD during deploy. The password must be at least 12 characters and is hashed on first boot.
+- Keep the persistent volume mounted at /data/autovault before the first healthy deploy.
+- Set AUTOVAULT_MODE=remote and AUTOVAULT_STORAGE_PATH=/data/autovault.
+- Confirm AUTOVAULT_PUBLIC_URL matches the generated https://<service>.up.railway.app domain. Railway injects PORT, so do not override it.
+- Verify /healthz, /.well-known/oauth-authorization-server, and /mcp after deploy.
+
+## Manual image deploy
+
+Advanced operators can deploy the public GHCR image directly:
+
+\`\`\`text
+${MANUAL_GHCR_IMAGE}
+volume: /data/autovault
+leave PORT unset
+\`\`\`
+
+Required variables:
+
+\`\`\`bash
+AUTOVAULT_MODE=remote
+AUTOVAULT_STORAGE_PATH=/data/autovault
+AUTOVAULT_PUBLIC_URL=https://<your-service>.up.railway.app
+AUTOVAULT_ADMIN_EMAIL=admin@example.com
+AUTOVAULT_ADMIN_PASSWORD=<long random string, min 12 chars>
+AUTOVAULT_SECURITY_STRICT=true
+AUTOVAULT_LOG_LEVEL=info
+\`\`\`
+
+Remote MCP URL:
+
+\`\`\`text
+https://<your-service>.up.railway.app/mcp
+\`\`\`
 `;
 
 const compareMarkdown = `# AutoVault Comparison
@@ -335,7 +376,7 @@ AutoVault is brought to you by Jack Arturo, Jason Coleman, Flint, Zack Katz, and
 
 const changelogMarkdown = `# AutoVault Changelog
 
-AutoVault is currently pre-1.0. The public source package is MIT licensed and the current source README identifies v0.2.0 as the release status, with unreleased work already documented for bundled skills, bootstrap flow, signing, and installer polish.
+AutoVault is currently pre-1.0. The public source package is MIT licensed and the current source README identifies v0.2.1 as the release status, with unreleased work already documented for bundled skills, bootstrap flow, signing, and installer polish.
 
 ## Current source sync
 

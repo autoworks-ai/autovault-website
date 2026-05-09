@@ -7219,12 +7219,14 @@ body {
 }
 
 .deploy-detail > .head {
+  flex-wrap: wrap;
   border-bottom: 1px solid var(--line);
   background: var(--panel);
   padding: 18px 24px;
 }
 
 .deploy-detail .ttl {
+  flex: 1 1 260px;
   color: var(--ink);
   font-family: var(--mono);
   font-size: 13px;
@@ -7235,6 +7237,7 @@ body {
 }
 
 .deploy-detail .copy-btn,
+.deploy-detail .deploy-primary,
 .sd-link-btn,
 .au-cert .cert-actions button {
   border: 1px solid var(--line-2);
@@ -7246,8 +7249,17 @@ body {
   padding: 6px 10px;
 }
 
-.deploy-detail .copy-btn {
+.deploy-detail .deploy-primary {
   margin-left: auto;
+  border-color: rgba(90, 214, 192, 0.48);
+  background: var(--accent);
+  color: #04201a;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.deploy-detail .copy-btn {
+  margin-left: 0;
 }
 
 .deploy-detail .body {
@@ -7312,7 +7324,21 @@ body {
   border-radius: 5px;
   background: var(--bg);
   padding: 8px 12px;
-  white-space: pre;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.deploy-detail .manual-image {
+  margin-top: 18px;
+  border-top: 1px dashed var(--line-2);
+  padding-top: 20px;
+}
+
+.deploy-detail .manual-label {
+  margin-bottom: 8px;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11px;
 }
 
 .term {
