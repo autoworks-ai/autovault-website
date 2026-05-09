@@ -1,0 +1,66 @@
+{
+  "inputDir": "scripts/social-assets/source",
+  "outputDir": "public",
+  "chromePath": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "selector": ".canvas",
+  "dpr": 1,
+  "generated": [
+    {
+      "source": "scripts/social-assets/source/og-1200x630.html",
+      "output": "public/og-1200x630.png",
+      "selector": ".canvas",
+      "width": 1200,
+      "height": 630,
+      "bytes": 297318
+    },
+    {
+      "source": "scripts/social-assets/source/twitter-1200x600.html",
+      "output": "public/twitter-1200x600.png",
+      "selector": ".canvas",
+      "width": 1200,
+      "height": 600,
+      "bytes": 257596
+    },
+    {
+      "source": "scripts/social-assets/source/github-1280x640.html",
+      "output": "public/github-1280x640.png",
+      "selector": ".canvas",
+      "width": 1280,
+      "height": 640,
+      "bytes": 279420
+    },
+    {
+      "source": "scripts/social-assets/source/square-1200x1200.html",
+      "output": "public/square-1200x1200.png",
+      "selector": ".canvas",
+      "width": 1200,
+      "height": 1200,
+      "bytes": 425590
+    },
+    {
+      "source": "scripts/social-assets/source/favicon-512.html",
+      "output": "public/favicon-512.png",
+      "selector": ".canvas",
+      "width": 512,
+      "height": 512,
+      "bytes": 84235
+    },
+    {
+      "source": "scripts/social-assets/source/favicon-180.html",
+      "output": "public/apple-touch-icon.png",
+      "selector": ".canvas",
+      "width": 180,
+      "height": 180,
+      "bytes": 11889
+    },
+    {
+      "source": "scripts/social-assets/source/favicon-32.html",
+      "output": "public/favicon-32.png",
+      "selector": ".canvas",
+      "width": 32,
+      "height": 32,
+      "bytes": 897
+    }
+  ],
+  "skipped": []
+}

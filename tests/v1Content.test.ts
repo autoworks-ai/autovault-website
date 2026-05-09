@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -102,6 +102,35 @@ describe("v1 content guardrails", () => {
       value: "<1s",
       label: "local validation fixture"
     });
+  });
+
+  it("keeps rendered social assets aligned with current positioning", () => {
+    const socialSurfaces = [
+      "scripts/social-assets/source/og-1200x630.html",
+      "scripts/social-assets/source/twitter-1200x600.html",
+      "scripts/social-assets/source/github-1280x640.html",
+      "scripts/social-assets/source/square-1200x1200.html",
+      "scripts/social-assets/manifest.json",
+      "public/social-card.svg",
+      ".vitepress/config.ts"
+    ].map(read).join("\n");
+
+    expect(socialSurfaces).toContain("Local-first skill vault");
+    expect(socialSurfaces).toContain("/og-1200x630.png");
+    expect(socialSurfaces).toContain("/twitter-1200x600.png");
+    expect(socialSurfaces).not.toMatch(/The skill registry|registry with a gate|11\.4%|820ms|v1\.0|github:org\/skills\/extract-pdf/);
+
+    for (const asset of [
+      "og-1200x630.png",
+      "twitter-1200x600.png",
+      "github-1280x640.png",
+      "square-1200x1200.png",
+      "favicon-512.png",
+      "apple-touch-icon.png",
+      "favicon-32.png"
+    ]) {
+      expect(existsSync(resolve(repoRoot, "public", asset))).toBe(true);
+    }
   });
 
   it("avoids Cloudflare email-obfuscation traps in visible demos", () => {

@@ -1,0 +1,27 @@
+name: Docs change
+description: Suggest a correction or improvement to the public documentation.
+title: "[Docs]: "
+labels:
+  - documentation
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Page URL
+      placeholder: https://autovault.dev/
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: Requested change
+      description: What should be corrected, clarified, or removed?
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Source or evidence
+      description: Link to release notes, source code, logs, or another supporting reference.
+    validations:
+      required: false

@@ -1,0 +1,232 @@
+/* ============================================================
+   AutoVault · social asset shared styles
+   Each social asset is a self-contained HTML file sized to its
+   exact pixel dimensions, designed to be screenshotted to PNG.
+   ============================================================ */
+
+@import url("../colors_and_type.css");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap");
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+  font-feature-settings: "ss01", "cv11";
+}
+
+/* The asset frame. Each size sets its own width/height. */
+.canvas {
+  position: relative;
+  background: var(--bg);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* The radial-grid backdrop reserved (per system) for hero / gate
+   surfaces. Two crossed linear-gradients masked by a radial fade. */
+.grid-backdrop {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(40, 55, 68, 0.32) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(40, 55, 68, 0.32) 1px, transparent 1px);
+  background-size: 40px 40px;
+  -webkit-mask-image: radial-gradient(circle at 70% 50%, #000 0%, rgba(0,0,0,0.55) 45%, transparent 78%);
+          mask-image: radial-gradient(circle at 70% 50%, #000 0%, rgba(0,0,0,0.55) 45%, transparent 78%);
+  pointer-events: none;
+}
+.grid-backdrop.center {
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0%, rgba(0,0,0,0.55) 50%, transparent 80%);
+          mask-image: radial-gradient(circle at 50% 50%, #000 0%, rgba(0,0,0,0.55) 50%, transparent 80%);
+}
+
+/* Soft mint halo behind hero composition. */
+.mint-halo {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 70% 50%, rgba(90, 214, 192, 0.07), transparent 55%);
+  pointer-events: none;
+}
+.mint-halo.center {
+  background: radial-gradient(circle at 50% 50%, rgba(90, 214, 192, 0.08), transparent 60%);
+}
+
+/* Top + bottom hairline registration marks — the system's signature. */
+.hair-top, .hair-bottom {
+  position: absolute;
+  left: 0; right: 0;
+  height: 1px;
+  background: var(--line);
+}
+.hair-top    { top: 0; }
+.hair-bottom { bottom: 0; }
+
+/* Mono micro-label tier: uppercase, +0.06em, ink-3. */
+.mono-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.mono-label .dash {
+  display: inline-block;
+  width: 14px;
+  height: 1px;
+  background: var(--ink-3);
+  vertical-align: middle;
+  margin-right: 8px;
+  transform: translateY(-2px);
+}
+.mono-label .dot-live {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  margin-right: 8px;
+  vertical-align: middle;
+  transform: translateY(-1px);
+}
+
+/* Wordmark — Inter 500, tight tracking. */
+.wordmark {
+  font-family: var(--sans);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  color: var(--ink);
+  line-height: 1;
+}
+.wordmark .auto { color: var(--ink); }
+.wordmark .vault { color: var(--accent); }
+
+/* Italic serif accent inside headings. */
+.ital {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
+
+/* Card head + mono block (lifted from the docs theme). */
+.panel {
+  border: 1px solid var(--line);
+  border-radius: var(--r-2xl);
+  background: var(--panel);
+  overflow: hidden;
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.panel-head .verified {
+  margin-left: auto;
+  color: var(--accent);
+  font-weight: 500;
+}
+.panel-body {
+  padding: 18px 20px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--ink);
+}
+.panel-body .pmt { color: var(--ink-3); margin-right: 6px; }
+.panel-body .ok  { color: var(--accent); }
+.panel-body .mut { color: var(--ink-3); }
+.panel-body .arg { color: var(--accent-2); }
+
+/* Status pill — uppercase mono single-word. */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  color: var(--ink-3);
+  background: var(--panel);
+}
+.tag.mint    { color: var(--accent); border-color: rgba(90,214,192,0.35); background: var(--accent-soft); }
+.tag.solid   { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+.tag.ghost   { color: var(--ink-3); border-style: dashed; background: transparent; }
+
+/* SVG flow line (gate diagram). Stroke uses currentColor so we can
+   tint via parent. The mint dot scans along the path. */
+.flow path { fill: none; stroke: var(--line-2); stroke-width: 1.25; }
+.flow path.lit { stroke: var(--accent); stroke-opacity: 0.55; }
+.flow .scan {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 6px var(--accent));
+}
+
+/* Vault brand-mark inline (used at large sizes). */
+.mark { display: block; }
+.mark rect, .mark path, .mark circle { stroke: var(--accent); fill: none; }
+
+/* Numbered gate-step pill */
+.gstep {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px 8px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.gstep .num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  color: var(--ink-3);
+}
+.gstep.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+  box-shadow: 0 0 28px rgba(90,214,192,0.12);
+}
+.gstep.active .num {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.gstep.passed { color: var(--ink-2); }
+.gstep.passed .num {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}

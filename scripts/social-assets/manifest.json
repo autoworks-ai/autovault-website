@@ -1,0 +1,60 @@
+{
+  "assets": [
+    {
+      "source": "og-1200x630.html",
+      "output": "og-1200x630.png",
+      "width": 1200,
+      "height": 630,
+      "selector": ".canvas",
+      "maxBytes": 1000000
+    },
+    {
+      "source": "twitter-1200x600.html",
+      "output": "twitter-1200x600.png",
+      "width": 1200,
+      "height": 600,
+      "selector": ".canvas",
+      "maxBytes": 1000000
+    },
+    {
+      "source": "github-1280x640.html",
+      "output": "github-1280x640.png",
+      "width": 1280,
+      "height": 640,
+      "selector": ".canvas",
+      "maxBytes": 1000000
+    },
+    {
+      "source": "square-1200x1200.html",
+      "output": "square-1200x1200.png",
+      "width": 1200,
+      "height": 1200,
+      "selector": ".canvas",
+      "maxBytes": 1000000
+    },
+    {
+      "source": "favicon-512.html",
+      "output": "favicon-512.png",
+      "width": 512,
+      "height": 512,
+      "selector": ".canvas",
+      "maxBytes": 300000
+    },
+    {
+      "source": "favicon-180.html",
+      "output": "apple-touch-icon.png",
+      "width": 180,
+      "height": 180,
+      "selector": ".canvas",
+      "maxBytes": 150000
+    },
+    {
+      "source": "favicon-32.html",
+      "output": "favicon-32.png",
+      "width": 32,
+      "height": 32,
+      "selector": ".canvas",
+      "maxBytes": 50000
+    }
+  ]
+}

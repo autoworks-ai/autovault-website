@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AutoVault · apple-touch-icon 180×180</title>
+<link rel="stylesheet" href="_shared.css">
+<style>
+  body { display: flex; align-items: center; justify-content: center; }
+  .canvas { width: 180px; height: 180px; border-radius: 36px; }
+  .frame { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .mark { width: 116px; height: 116px; }
+  .mark rect { stroke-width: 1.5; stroke: var(--accent); }
+  .mark path, .mark circle { stroke-width: 1.4; stroke: var(--accent); }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="mint-halo center"></div>
+  <div class="frame">
+    <svg class="mark" viewBox="0 0 24 24" fill="none">
+      <rect x="2.4" y="2.4" width="19.2" height="16.8" rx="3.84" stroke-linejoin="round"/>
+      <path d="M7.2 19.2v1.9" stroke-linecap="round"/>
+      <path d="M16.8 19.2v1.9" stroke-linecap="round"/>
+      <circle cx="12" cy="10.8" r="2.9"/>
+      <path d="M12 7.9v1.45" stroke-linecap="round"/>
+    </svg>
+  </div>
+</div>
+</body>
+</html>
