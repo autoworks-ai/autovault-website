@@ -3,13 +3,13 @@
     <div class="about-hero">
       <div>
         <div class="eyebrow"><span class="dash" /> About</div>
-        <h1>Brought to you by Jack, AutoJack, Jason, Flint, Zack, and Daniel.</h1>
+        <h1>Brought to you by Jack, Jason, Flint, Zack, and Daniel — with AutoJack in the loop.</h1>
         <p class="lede">
           AutoVault is built in the open by people who spend their days shipping WordPress products, agent infrastructure, memory systems, and automation workflows.
         </p>
         <div class="about-actions">
           <a class="pill-btn primary" href="/quick-start">Install locally <UiIcon name="arrow" /></a>
-          <a class="pill-btn" href="https://drunk.support/">Read the build notes</a>
+          <a class="pill-btn" href="https://drunk.support/">Jack's build notes</a>
           <a class="pill-btn" href="https://automem.ai/">AutoMem</a>
         </div>
       </div>

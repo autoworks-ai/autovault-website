@@ -10677,6 +10677,24 @@ body {
   color: var(--accent);
 }
 
+.av-compare thead th a {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.av-compare thead th a:hover {
+  color: var(--ink);
+  border-bottom-color: currentColor;
+}
+
+.av-compare thead th a:focus-visible,
+.av-compare-sources a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-bottom-color: currentColor;
+}
+
 .av-compare tbody tr:last-child td {
   border-bottom: 0;
 }
@@ -10696,6 +10714,42 @@ body {
 
 .av-compare .partial {
   color: var(--warn);
+}
+
+.av-compare-sources {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 14px;
+  margin-top: 14px;
+  color: var(--ink-4);
+  font-family: var(--mono);
+  font-size: 10.5px;
+}
+
+.av-compare-sources span {
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.av-compare-sources ul {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.av-compare-sources a {
+  color: var(--ink-3);
+  text-decoration: none;
+}
+
+.av-compare-sources a:hover {
+  color: var(--accent);
 }
 
 .av-qs-grid {

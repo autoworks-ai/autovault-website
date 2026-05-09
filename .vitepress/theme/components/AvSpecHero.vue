@@ -2,6 +2,7 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import BrandMark from './BrandMark.vue'
 import { copyText } from '../utils/clipboard'
+import { homepageGateMetrics } from '../data/marketing'
 import { AUTOVAULT_AGENT_SETUP_PROMPT, AUTOVAULT_STAGED_INSTALL_COMMAND, AUTOVAULT_STAGED_RUN_COMMAND } from '../../shared/bootstrap'
 
 // Sources: messy, varied, often unsigned. The "before" column.
@@ -73,10 +74,9 @@ function dstY(i: number) { return 90 + i * (VBOX_H - 180) / (ADOPTERS.length - 1
         </h1>
 
         <p class="av-flow-sub">
-          GitHub repos, public indexes, team docs, Discord pastes — the format
-          is open, so SKILL.md files arrive from anywhere, in any state.
-          AutoVault gates them on the way in, signs what passes, and renders
-          one clean canonical view per agent on the way out.
+          SKILL.md files arrive from GitHub repos, public indexes, team docs,
+          and agent drafts. AutoVault validates them at the door, signs what
+          passes, and renders one clean view per agent without forking.
         </p>
       </header>
 
@@ -213,16 +213,16 @@ function dstY(i: number) { return 90 + i * (VBOX_H - 180) / (ADOPTERS.length - 1
 
       <div class="av-flow-footer">
         <div class="meta">
-          <span class="meta-num">11.4%</span>
-          <span class="meta-lbl">rejected at the gate</span>
+          <span class="meta-num">{{ homepageGateMetrics.reject.value }}</span>
+          <span class="meta-lbl">{{ homepageGateMetrics.reject.label }}</span>
         </div>
         <div class="meta">
-          <span class="meta-num">820ms</span>
-          <span class="meta-lbl">avg validation</span>
+          <span class="meta-num">{{ homepageGateMetrics.latency.value }}</span>
+          <span class="meta-lbl">{{ homepageGateMetrics.latency.label }}</span>
         </div>
         <div class="meta">
-          <span class="meta-num">4ms</span>
-          <span class="meta-lbl">render per caller</span>
+          <span class="meta-num">{{ homepageGateMetrics.render.value }}</span>
+          <span class="meta-lbl">{{ homepageGateMetrics.render.label }}</span>
         </div>
         <div class="bridge">
           <span>The format works. The bits around it don't.</span>

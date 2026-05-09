@@ -11,7 +11,7 @@ export const denyRows = [
 
 export const gateStages = [
   { title: "YAML auto-repair", desc: "Frontmatter is the main source of breakage. We fix it before storage.", status: "fix" },
-  { title: "Security denylist", desc: "Known-bad patterns: credential stealers, fork bombs, exfiltration.", status: "scan" },
+  { title: "Security denylist", desc: "Known-bad patterns: credential reads, fork bombs, exfiltration.", status: "scan" },
   { title: "Capability vs. behavior", desc: "Does the skill actually do what its frontmatter claims?", status: "verify" },
   { title: "Dedup", desc: "Text similarity in V1, embedding-space matching in V2.", status: "match" },
   { title: "Ed25519 sign", desc: "Provenance becomes a first-class artifact, not a hope.", status: "sign" }

@@ -79,7 +79,7 @@
     <div class="terminal static-terminal">
       <div class="terminal-head"><span class="dot live" /><span class="dot" /><span class="dot" /><span class="ttl">gate run · skill-author</span></div>
       <div class="terminal-body compact">
-        <div class="out">  ↳ fetching skill-author@1.0.0</div>
+        <div class="out">  ↳ fetching skill-author v1.0.0</div>
         <div class="ok">  ✓ yaml-repair · frontmatter clean</div>
         <div class="ok">  ✓ denylist · no known bad patterns</div>
         <div class="ok">  ✓ capability/behavior · declared matches observed</div>
@@ -274,7 +274,7 @@ const TerminalDemo = defineComponent({
       { type: "ok", text: "✓ vault ready · bundled skills bootstrapped · profiles synced" },
       { type: "blank", text: "" },
       { type: "cmd", text: "autovault add url:https://autovault.dev/skills/skill-author/SKILL.md" },
-      { type: "out", text: "↳ fetching skill-author@1.0.0" },
+      { type: "out", text: "↳ fetching skill-author v1.0.0" },
       { type: "out", text: "↳ [1/5] yaml-repair    : ok" },
       { type: "out", text: "↳ [2/5] denylist       : ok" },
       { type: "out", text: "↳ [3/5] cap/behavior   : ok" },

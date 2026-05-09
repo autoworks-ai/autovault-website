@@ -261,7 +261,7 @@ AutoVault is a local-first vault, not a browsing destination. It overlaps most c
 
 - Skillfish: strong open-source manager for installing, updating, syncing, and sharing skill bundles across many agents.
 - Tessl: useful public ecosystem and distribution layer for skills and agents.
-- SkillKit-style directories and Agent Skills spec repos: useful places to find or standardize source material before local admission.
+- SkillKit / Agent Skills directories and spec repos: useful places to find or standardize source material before local admission.
 - Manual per-agent folders: simplest for one person with a few files, but drift grows quickly.
 
 ## Tradeoff
@@ -312,12 +312,12 @@ AutoVault is MIT licensed and self-buildable from the public source repository.`
 
 const aboutMarkdown = `# About AutoVault
 
-AutoVault is brought to you by Jack Arturo, AutoJack, Jason Coleman, Flint, Zack Katz, and Daniel Iser.
+AutoVault is brought to you by Jack Arturo, Jason Coleman, Flint, Zack Katz, and Daniel Iser, with AutoJack in the loop.
 
 ## People and projects
 
-- Jack Arturo builds AutoVault, AutoMem, and the Drunk Support working notebook for memory-bearing agents and half-built systems.
-- AutoJack is the agent-backed writing and workflow track on Drunk Support.
+- Jack Arturo builds AutoVault, AutoMem, and Jack's build notes for memory-bearing agents and half-built systems.
+- AutoJack is the agent-backed writing and workflow track on Jack's build notes.
 - Jason Coleman is Co-Founder and CEO of Paid Memberships Pro.
 - Flint helps automate business, marketing, and development processes for Stranger Studios.
 - Zack Katz is Project Lead and Developer at GravityKit.
@@ -325,9 +325,9 @@ AutoVault is brought to you by Jack Arturo, AutoJack, Jason Coleman, Flint, Zack
 
 ## Links
 
-- Jack Arturo: https://drunk.support/about/
+- Jack's build notes: https://drunk.support/about/
 - AutoMem: https://automem.ai/
-- AutoJack: https://drunk.support/category/autojack/
+- AutoJack archive: https://drunk.support/category/autojack/
 - Jason Coleman: https://www.paidmembershipspro.com/about/
 - Flint: https://github.com/flintfromthebasement
 - Zack Katz: https://www.gravitykit.com/about/
@@ -425,7 +425,7 @@ export const pageDocs: PageDoc[] = [
     key: "compare",
     file: "compare.md",
     title: "AutoVault vs Alternatives",
-    description: "Compare AutoVault with Skillfish, Tessl, SkillKit-style directories, and manual per-agent folders across provenance, transforms, scoping, and portability.",
+    description: "Compare AutoVault with Skillfish, Tessl, SkillKit / Agent Skills directories, and manual per-agent folders across provenance, transforms, scoping, and portability.",
     route: "/compare",
     agentPath: "/agents/compare",
     markdown: compareMarkdown
