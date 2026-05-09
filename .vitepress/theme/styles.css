@@ -11191,6 +11191,7 @@ body {
   min-width: 0;
   padding: 24px;
   font: 15px/1.5 var(--mono);
+  overflow-x: auto;
 }
 
 .install-cmd .prompt {
@@ -11202,7 +11203,8 @@ body {
   min-width: 0;
   flex: 1;
   color: var(--ink);
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  white-space: nowrap;
 }
 
 .copy-btn {
@@ -11754,6 +11756,11 @@ body {
     padding-inline: 16px;
   }
 
+  .install-cmd code {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
   .install-foot a {
     margin-left: 0;
   }
@@ -11988,13 +11995,19 @@ body {
 }
 
 .cd-docs-content .qs-final-hero {
-  grid-template-columns: minmax(360px, 0.82fr) minmax(520px, 1.18fr);
-  gap: clamp(40px, 5vw, 72px);
+  grid-template-columns: minmax(500px, 0.9fr) minmax(480px, 1.1fr);
+  gap: clamp(36px, 4vw, 64px);
 }
 
 .cd-docs-content .install-final-card,
 .cd-docs-content .prereqs {
-  max-width: 520px;
+  max-width: 620px;
+}
+
+.cd-docs-content .install-cmd {
+  gap: 10px;
+  padding: 22px;
+  font-size: 14px;
 }
 
 @media (max-width: 1500px) {
@@ -12087,5 +12100,9 @@ body {
 
   .cd-docs-content {
     padding: 32px 20px 72px;
+  }
+
+  .cd-docs-content .install-cmd {
+    padding: 18px 16px;
   }
 }
