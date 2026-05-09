@@ -21,8 +21,16 @@
         <div class="mono-label">prototype mode</div>
         <p>Use real account data by default, or preview internal states without writing to Clerk, Stripe, D1, or a managed runtime.</p>
       </div>
-      <div class="cloud-sim-controls">
-        <button v-for="mode in simulationModes" :key="mode.id" type="button" :class="{ active: simulationMode === mode.id }" @click="simulationMode = mode.id">
+      <div class="cloud-sim-controls" role="radiogroup" aria-label="Prototype simulation mode">
+        <button
+          v-for="mode in simulationModes"
+          :key="mode.id"
+          type="button"
+          role="radio"
+          :aria-checked="simulationMode === mode.id"
+          :class="{ active: simulationMode === mode.id }"
+          @click="simulationMode = mode.id"
+        >
           <span>{{ mode.label }}</span>
           <small>{{ mode.detail }}</small>
         </button>
@@ -115,7 +123,7 @@
               <span class="cloud-chip pending">coming soon</span>
             </div>
             <h3>Hosted MCP surface</h3>
-            <p>The endpoint preview stays disabled until a real managed runtime exists.</p>
+            <p>The endpoint preview is copyable for planning, but it returns pending runtime until managed provisioning exists.</p>
             <div class="cloud-endpoint compact">
               <span>{{ mcpEndpoint }}</span>
               <button type="button" @click="copyText(mcpEndpoint)">Copy</button>
@@ -142,7 +150,7 @@
       </main>
 
       <aside class="cloud-side">
-        <HostedVaultFunnel entry="deploy" @state-change="loadCloudState" />
+        <HostedVaultFunnel entry="deploy" @state-change="syncCloudState" />
 
         <section class="cloud-panel cloud-command-panel">
           <div class="cloud-panel-head compact">
@@ -163,11 +171,13 @@
 import { computed, onMounted, ref } from "vue";
 import HostedVaultFunnel from "./HostedVaultFunnel.vue";
 import { skills } from "../data/skills";
+import { copyText as copyToClipboard } from "../utils/clipboard";
 
 type CloudUser = { id: string; email?: string | null; name?: string | null; avatar_url?: string | null };
 type CloudSubscription = { active: boolean; status?: string | null } | null;
 type CloudVault = { id?: string; slug: string; status: string; public_url: string; provisioned_at?: string | null } | null;
 type CloudState = { user: CloudUser | null; subscription: CloudSubscription; vault: CloudVault };
+type CloudStatePayload = { user: CloudUser | null; subscription?: CloudSubscription; vault?: CloudVault };
 type StatusState = "done" | "ready" | "pending";
 type SimulationMode = "live" | "anonymous" | "unpaid" | "paid" | "reserved";
 
@@ -272,17 +282,24 @@ async function loadCloudState() {
       cloudState.value = { user: null, subscription: null, vault: null };
       return;
     }
-    const payload = await response.json() as CloudState;
-    cloudState.value = {
-      user: payload.user ?? null,
-      subscription: payload.subscription ?? null,
-      vault: payload.vault ?? null
-    };
+    cloudState.value = normalizeCloudState(await response.json() as CloudStatePayload);
   } catch {
     cloudState.value = { user: null, subscription: null, vault: null };
   } finally {
     loading.value = false;
   }
+}
+
+function syncCloudState(payload: CloudStatePayload) {
+  cloudState.value = normalizeCloudState(payload);
+}
+
+function normalizeCloudState(payload: CloudStatePayload): CloudState {
+  return {
+    user: payload.user ?? null,
+    subscription: payload.subscription ?? null,
+    vault: payload.vault ?? null
+  };
 }
 
 function simulatedState(mode: SimulationMode): CloudState {
@@ -324,11 +341,7 @@ function toggleSkill(name: string) {
 }
 
 async function copyText(text: string) {
-  try {
-    await navigator.clipboard?.writeText(text);
-  } catch {
-    // Copy buttons are browser conveniences; visible text remains available.
-  }
+  await copyToClipboard(text);
 }
 
 function slugify(value: string) {

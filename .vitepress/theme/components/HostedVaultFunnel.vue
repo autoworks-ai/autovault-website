@@ -131,7 +131,7 @@ const props = withDefaults(defineProps<{
   evaluation: null
 });
 const emit = defineEmits<{
-  stateChange: [];
+  stateChange: [state: MeResponse];
 }>();
 
 const busy = ref(false);
@@ -306,14 +306,14 @@ async function loadMe() {
     const response = await fetch("/api/me", { credentials: "include", headers: await authHeaders({ accept: "application/json" }) });
     if (!response.ok) {
       me.value = { user: null };
-      emit("stateChange");
+      emit("stateChange", me.value);
       return;
     }
     me.value = await response.json() as MeResponse;
-    emit("stateChange");
+    emit("stateChange", me.value);
   } catch {
     me.value = { user: null };
-    emit("stateChange");
+    emit("stateChange", me.value);
   }
 }
 
@@ -365,7 +365,7 @@ async function provisionVault() {
   }
 
   me.value = { ...(me.value ?? { user: null }), vault: payload.vault };
-  emit("stateChange");
+  emit("stateChange", me.value);
   await savePendingImport();
   provisioning.value = false;
   notice.value = { kind: "ok", text: "Hosted namespace reserved. Cloud sync is not enabled yet; keep signing and serving skills locally for now." };
