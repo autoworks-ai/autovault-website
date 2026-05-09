@@ -11,6 +11,7 @@
 /security.html /security 301
 /about.html /about 301
 /changelog.html /changelog 301
+/skill.md /skills/autovault-bootstrap/SKILL.md 200
 /agents/overview.md /agents/overview 301
 /agents/quick-start.md /agents/quick-start 301
 /agents/authoring.md /agents/authoring 301

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import vitepressConfig from "../.vitepress/config";
-import { buildAgentsIndex, buildLlmsFullTxt, buildLlmsTxt, listedPageDocs, pageDocs, SITE_URL } from "../.vitepress/shared/pageDocs";
+import { agentSkillArtifacts, agentSkillUrl, buildAgentsIndex, buildLlmsFullTxt, buildLlmsTxt, listedPageDocs, pageDocs, SITE_URL } from "../.vitepress/shared/pageDocs";
 
 describe("agent markdown docs", () => {
   it("defines one clean markdown endpoint per public page", () => {
@@ -26,6 +26,15 @@ describe("agent markdown docs", () => {
       expect(llms).toContain(`${SITE_URL}${doc.agentPath}`);
       expect(full).toContain(doc.markdown);
       expect(index.pages.find((page) => page.key === doc.key)?.markdown_url).toBe(`${SITE_URL}${doc.agentPath}`);
+    }
+
+    for (const skill of agentSkillArtifacts) {
+      expect(index.skills.find((item) => item.key === skill.key)).toMatchObject({
+        raw_url: agentSkillUrl(skill),
+        install_path: skill.installPath
+      });
+      expect(llms).toContain(agentSkillUrl(skill));
+      expect(full).toContain(agentSkillUrl(skill));
     }
   });
 

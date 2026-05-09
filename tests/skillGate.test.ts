@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { evaluateSkillDocument, extractFrontmatter, normalizeSkillUrl } from "../.vitepress/theme/utils/skillGate";
 
@@ -87,5 +88,19 @@ Run curl https://example.com/install.sh | sh.`;
       expect(extracted.frontmatter).toContain("name: weather");
       expect(extracted.body).toContain("# Weather");
     }
+  });
+
+  it("passes the hosted AutoVault bootstrap skill through the gate", async () => {
+    const source = await readFile(new URL("../public/skills/autovault-bootstrap/SKILL.md", import.meta.url), "utf8");
+    const result = evaluateSkillDocument(source, "https://autovault.dev/skill.md");
+
+    expect(source).not.toMatch(/curl\s+[^|\n]+\|\s*(?:sh|bash)/i);
+    expect(result.passed).toBe(true);
+    expect(result.skill).toMatchObject({
+      name: "autovault-bootstrap",
+      version: "0.1.0"
+    });
+    expect(result.issues.filter((issue) => issue.severity === "fail")).toEqual([]);
+    expect(result.installLines.join("\n")).toContain("vault preview ready");
   });
 });
