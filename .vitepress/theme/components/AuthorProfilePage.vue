@@ -16,28 +16,28 @@
           <div>
             <h1>autoworks-ai</h1>
             <div class="handle">@autoworks-ai · source</div>
-            <span class="verify-badge"><UiIcon name="shield" /> Verified author · since 2026-01-08</span>
+            <span class="verify-badge"><UiIcon name="shield" /> Public source · current examples</span>
           </div>
         </div>
-        <p class="au-bio">Authors of <span class="ital">AutoVault</span> and a handful of foundational skill examples for the agent ecosystem. Every skill we admit goes through the same gate as everyone else's — no special treatment, no skipped stages. The tooling we build for ourselves is the tooling we ship.</p>
+        <p class="au-bio">Authors of <span class="ital">AutoVault</span> and the first-party SKILL.md examples shown here. Each listed row points to a hosted raw skill and to the matching source path.</p>
         <div class="au-meta-row">
           <a class="item" href="https://github.com/autoworks-ai"><UiIcon name="github" /> github.com/autoworks-ai</a>
           <a class="item" href="/">autovault.dev</a>
-          <span class="item">San Francisco · Remote</span>
-          <span class="item">3 maintainers</span>
+          <span class="item">MIT examples</span>
+          <span class="item">{{ authorSkills.length }} hosted skills</span>
         </div>
       </div>
 
-      <aside class="au-cert" aria-label="Identity certificate">
-        <div class="cert-head"><UiIcon name="shield" class="seal" /><span>Identity certificate</span><span class="id">CERT-7E10A2C8</span></div>
+      <aside class="au-cert" aria-label="Source record">
+        <div class="cert-head"><UiIcon name="shield" class="seal" /><span>Source record</span><span class="id">PUBLIC</span></div>
         <div v-for="row in certificate" :key="row.key" class="cert-row">
           <span class="k">{{ row.key }}</span>
           <span :class="['v', row.accent ? 'accent' : '', row.big ? 'bigkey' : '']">{{ row.value }}</span>
         </div>
         <div class="cert-actions">
-          <button type="button" @click="notice = 'Chain verified locally'">Verify chain</button>
-          <button type="button" @click="notice = 'Key pinned in this browser session'">Pin key</button>
-          <button type="button" @click="copyCert">{{ certCopied ? "Copied" : "Export" }}</button>
+          <a href="https://github.com/autoworks-ai/autovault">Open source</a>
+          <a href="/skills/autovault-skill/SKILL.md">Open raw</a>
+          <button type="button" @click="copyCert">{{ certCopied ? "Copied" : "Copy record" }}</button>
         </div>
         <div v-if="notice" class="cert-notice">{{ notice }}</div>
       </aside>
@@ -54,13 +54,13 @@
     <section class="au-section reveal-item">
       <div class="eyebrow"><span class="dash" /> Body of work</div>
       <h2>Example skills from autoworks-ai</h2>
-      <p class="sub">Every skill listed here has been signed with the certificate above, run through the gate, and is available as provenance context for local admission.</p>
+      <p class="sub">Every skill listed here is backed by a real hosted SKILL.md file and a source URL.</p>
       <div class="au-skills-toolbar">
         <button v-for="category in categories" :key="category" type="button" :class="['filter-chip', { on: selectedCategory === category }]" @click="selectedCategory = category">{{ category }}</button>
         <span class="ct">{{ filteredSkills.length }} of {{ authorSkills.length }} skills</span>
       </div>
       <div class="au-skills-grid">
-        <a v-for="skill in filteredSkills" :key="skill.name" :class="['au-skill-tile', { flagship: skill.flagship }]" href="/skill-detail">
+        <a v-for="skill in filteredSkills" :key="skill.name" :class="['au-skill-tile', { flagship: skill.flagship }]" :href="skill.detailPath">
           <div class="row1">
             <div class="icon-tile">{{ skill.icon }}</div>
             <span class="name">{{ skill.name }}</span>
@@ -81,7 +81,7 @@
     <section class="au-section reveal-item">
       <div class="eyebrow"><span class="dash" /> Reference coverage</div>
       <h2>What this source demonstrates</h2>
-      <p class="sub">This is fixture data for the example set, not a live marketplace score. It shows the kinds of gate outcomes and provenance signals a real source profile should expose.</p>
+      <p class="sub">This section summarizes only the hosted examples currently present in the catalog; it is not a live marketplace score.</p>
       <div class="au-track">
         <div class="au-track-grid">
           <div v-for="cell in track" :key="cell.label" class="au-track-cell">
@@ -96,10 +96,10 @@
     <section class="au-section reveal-item">
       <div class="eyebrow"><span class="dash" /> Example audit trail</div>
       <h2>How a source profile should explain changes</h2>
-      <p class="sub">The rows below are representative provenance events for the reference skills. They are intentionally labeled as examples until AutoVault ships a live source feed.</p>
+      <p class="sub">The rows below point at source ownership and hosted copies rather than fabricated signing history.</p>
       <div class="au-activity">
         <div class="au-activity-feed">
-          <div class="feed-head">Representative fixture · 7 events</div>
+          <div class="feed-head">Current hosted examples · {{ activity.length }} events</div>
           <div v-for="item in activity" :key="`${item.kind}-${item.name}`" class="au-activity-row">
             <div :class="['pip', item.kind]"><UiIcon :name="item.kind === 'admit' ? 'check' : item.kind === 'update' ? 'arrow' : 'x'" /></div>
             <div class="body">
@@ -110,8 +110,8 @@
           </div>
         </div>
         <div class="au-cadence">
-          <h4>Review cadence fixture</h4>
-          <div class="h4-sub">sample density for layout testing</div>
+          <h4>Hosted coverage</h4>
+          <div class="h4-sub">current catalog size</div>
           <div class="au-cadence-grid">
             <div v-for="(value, index) in cadenceData" :key="index" class="au-cadence-cell" :style="{ background: cadenceColor(value) }" />
           </div>
@@ -119,7 +119,7 @@
             <span>less</span>
             <div class="scale"><div v-for="value in [0, 1, 2, 3, 4]" :key="value" :style="{ background: cadenceColor(value) }" /></div>
             <span>more</span>
-            <span class="median">fixture only</span>
+            <span class="median">{{ authorSkills.length }} skills</span>
           </div>
         </div>
       </div>
@@ -128,7 +128,7 @@
     <section class="au-section reveal-item">
       <div class="eyebrow"><span class="dash" /> Signing model</div>
       <h2>How maintainer identity is represented</h2>
-      <p class="sub">The public v1 website shows representative signing-key rows rather than claiming a live contributor roster.</p>
+      <p class="sub">A local vault can add its own signature after admission; the website only claims the hosted source record.</p>
       <div class="au-contrib-list">
         <div v-for="identity in signingIdentities" :key="identity.name" class="au-contrib" :class="{ open: identity.open }">
           <div class="av" :style="{ background: identity.bg }" />
@@ -146,8 +146,8 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import UiIcon from "./UiIcon.vue";
+import { agents, skills, type AgentId, type Skill } from "../data/skills";
 
-type AgentId = "cc" | "cx" | "cu" | "ah";
 type AuthorSkill = {
   name: string;
   icon: string;
@@ -156,6 +156,7 @@ type AuthorSkill = {
   agents: AgentId[];
   references: string;
   desc: string;
+  detailPath: string;
   flagship?: boolean;
 };
 type TrackCell = {
@@ -170,62 +171,54 @@ const selectedCategory = ref("all");
 const certCopied = ref(false);
 const notice = ref("");
 
-const agentIds: AgentId[] = ["cc", "cx", "cu", "ah"];
-const agentColors: Record<AgentId, string> = { cc: "#d6a85a", cx: "#5a9dd6", cu: "#b48ad6", ah: "#5ad6c0" };
+const agentIds: AgentId[] = agents.map((agent) => agent.id);
+const agentColors = Object.fromEntries(agents.map((agent) => [agent.id, agent.color])) as Record<AgentId, string>;
 
 const certificate = [
   { key: "Subject", value: "CN = autoworks-ai" },
-  { key: "Algorithm", value: "Ed25519" },
-  { key: "Public key", value: "0x9af4 2c81 7e7e c4f9 3a01 e10a 2c81 9af4 7e7e e10a 2c81 9af4 c4f9 3a01 e10a 2c81", big: true },
-  { key: "Anchor", value: "vault.autovault.dev (root)", accent: true },
-  { key: "Issued", value: "2026-01-08" },
-  { key: "Rotated", value: "2026-04-04 · 0 incidents" }
+  { key: "Repository", value: "github.com/autoworks-ai/autovault", accent: true },
+  { key: "Hosted raw", value: "/skills/{name}/SKILL.md", big: true },
+  { key: "Catalog", value: "autovault.dev/skills-directory" },
+  { key: "License", value: "MIT examples" }
 ];
 
-const stats = [
-  { label: "Example skills", value: "14", trend: "curated fixtures" },
-  { label: "Reference rows", value: "14", trend: "source-profile examples" },
-  { label: "Render targets", value: "4", trend: "Claude Code, Codex, Cursor, AutoHub" },
+const authorSourceSkills = skills.filter((skill) => skill.org === "autoworks-ai");
+const authorSkills: AuthorSkill[] = authorSourceSkills.map((skill: Skill, index) => ({
+  name: skill.name,
+  icon: skill.icon,
+  version: skill.v,
+  category: skill.category,
+  agents: skill.agents,
+  references: String(skill.references),
+  desc: skill.desc,
+  detailPath: skill.detailPath,
+  flagship: index === 0
+}));
+
+const stats = computed(() => [
+  { label: "Example skills", value: String(authorSkills.length), trend: "hosted SKILL.md files" },
+  { label: "Reference rows", value: String(authorSkills.length), trend: "source-backed examples" },
+  { label: "Render targets", value: String(agentIds.length), trend: agents.map((agent) => agent.label).join(", ") },
   { label: "Gate stages", value: "5", trend: "same pipeline as installs" },
-  { label: "Median bundle", value: "3.1<span class=\"unit\">KB</span>", trend: "example payload", dim: true }
-];
+  { label: "Median bundle", value: medianBundleSize(), trend: "hosted payload", dim: true }
+]);
 
-const authorSkills: AuthorSkill[] = [
-  { name: "extract-pdf", icon: "PD", version: "1.4.0", category: "files", agents: ["cc", "cx", "cu", "ah"], references: "18", desc: "Extract structured text from PDF files. Preserves headings, lists, and table layout.", flagship: true },
-  { name: "summarize-doc", icon: "SD", version: "0.9.2", category: "text", agents: ["cc", "cx", "cu", "ah"], references: "15", desc: "Recursive multi-pass summarization with configurable depth.", flagship: true },
-  { name: "github-issues", icon: "GH", version: "2.1.0", category: "integrations", agents: ["cc", "cx", "cu"], references: "13", desc: "Read, search, and create GitHub issues. Scoped to authorized repos.", flagship: true },
-  { name: "ocr-image", icon: "OC", version: "1.2.1", category: "files", agents: ["cc", "cx", "cu", "ah"], references: "10", desc: "OCR an image to text. Wraps tesseract locally; never sends pixels off-device." },
-  { name: "json-validate", icon: "JV", version: "1.2.0", category: "data", agents: ["cc", "cx", "cu", "ah"], references: "10", desc: "Validate JSON against a schema with structured error reporting." },
-  { name: "parse-csv", icon: "CV", version: "1.0.4", category: "files", agents: ["cc", "cx", "cu", "ah"], references: "11", desc: "Parse CSV with type inference and configurable dialects." },
-  { name: "yaml-validate", icon: "YV", version: "0.9.0", category: "data", agents: ["cc", "cx", "cu", "ah"], references: "10", desc: "Validate YAML with auto-repair suggestions — same engine as the gate." },
-  { name: "extract-table", icon: "TB", version: "0.7.0", category: "files", agents: ["cc", "cx"], references: "9", desc: "Pull structured tables from HTML, PDF, and image sources into normalized rows." },
-  { name: "diff-summarize", icon: "DS", version: "0.6.0", category: "code", agents: ["cc", "cx", "cu", "ah"], references: "8", desc: "Walk a diff and produce a structured summary of intent + risk per hunk." },
-  { name: "git-blame", icon: "GB", version: "1.1.0", category: "code", agents: ["cc", "cx", "cu"], references: "8", desc: "Annotate git blame across a repo with author + commit summary." },
-  { name: "tf-plan-explain", icon: "TF", version: "0.4.0", category: "infra", agents: ["cc", "cx"], references: "4", desc: "Read a terraform plan and produce a human-readable change summary." },
-  { name: "regex-extract", icon: "RX", version: "1.5.0", category: "text", agents: ["cc", "cx", "cu", "ah"], references: "12", desc: "Test, refine, and run regex against sample text." },
-  { name: "linear-tasks", icon: "LN", version: "0.4.0", category: "integrations", agents: ["cc", "cx"], references: "6", desc: "Read and update Linear tasks scoped to a workspace." },
-  { name: "slack-search", icon: "SL", version: "0.3.1", category: "integrations", agents: ["cc", "cx", "cu"], references: "6", desc: "Search a Slack workspace and return formatted thread context." }
-];
-
-const categories = ["all", "files", "text", "data", "code", "integrations", "infra"];
+const categories = ["all", ...Array.from(new Set(authorSkills.map((skill) => skill.category)))];
 const filteredSkills = computed(() => selectedCategory.value === "all" ? authorSkills : authorSkills.filter((skill) => skill.category === selectedCategory.value));
 
 const track: TrackCell[] = [
-  { label: "Example rows", value: "14", detail: "curated source-profile fixtures" },
-  { label: "Pass case", value: "clean", detail: "no repair, no flag, no dedup hit" },
-  { label: "Repair case", value: "shown", kind: "warn", detail: "YAML frontmatter fixes" },
-  { label: "Reject case", value: "shown", kind: "bad", detail: "capability mismatch or dedup" }
+  { label: "Example rows", value: String(authorSkills.length), detail: "real hosted SKILL.md files" },
+  { label: "Source links", value: "present", detail: "each row has a GitHub source URL" },
+  { label: "Raw links", value: "present", detail: "each row has a local raw markdown path" },
+  { label: "Fixture claims", value: "removed", detail: "no fabricated install counts or fake versions" }
 ];
 
-const activity = [
-  { kind: "admit", name: "extract-pdf v1.4.0", detail: "+--pages range support · 5/5 gate stages green", when: "2d" },
-  { kind: "update", name: "extract-pdf v1.3.2", detail: "patch: malformed cross-reference tables", when: "3w" },
-  { kind: "admit", name: "yaml-validate v0.9.0", detail: "initial release · same engine as the gate", when: "5w" },
-  { kind: "deny", name: "experiment-skill v0.1.0", detail: "rejected by gate stage 03 · capability mismatch", when: "6w" },
-  { kind: "update", name: "github-issues v2.1.0", detail: "minor: support enterprise.github.com hosts", when: "7w" },
-  { kind: "admit", name: "extract-table v0.7.0", detail: "initial release · pairs with extract-pdf", when: "9w" },
-  { kind: "update", name: "summarize-doc v0.9.2", detail: "patch: token budgeting on long docs", when: "10w" }
-];
+const activity = authorSourceSkills.map((skill) => ({
+  kind: "admit",
+  name: `${skill.name}@${skill.v}`,
+  detail: skill.sourceLabel,
+  when: "current"
+}));
 
 const cadenceData = Array.from({ length: 26 * 5 }, (_, index) => {
   const seed = (index * 9301 + 49297) % 233280;
@@ -233,10 +226,9 @@ const cadenceData = Array.from({ length: 26 * 5 }, (_, index) => {
 });
 
 const signingIdentities = [
-  { name: "source owner", meta: "key:0xC4F9…E10A · representative fixture", stat: "author", bg: "linear-gradient(135deg, #5ad6c0, #5a9dd6)" },
-  { name: "vault admission", meta: "key:0xD6A8…5AB4 · representative fixture", stat: "counter-sign", bg: "linear-gradient(135deg, #d6a85a, #b48ad6)" },
-  { name: "release gate", meta: "key:0xB48A…D6E2 · representative fixture", stat: "verify", bg: "linear-gradient(135deg, #b48ad6, #5ad6c0)" },
-  { name: "team key slot", meta: "configured locally per vault", stat: "optional", bg: "var(--bg-2)", open: true }
+  { name: "source owner", meta: "github.com/autoworks-ai/autovault", stat: "author", bg: "linear-gradient(135deg, #5ad6c0, #5a9dd6)" },
+  { name: "hosted copy", meta: "served from autovault.dev/skills", stat: "raw", bg: "linear-gradient(135deg, #d6a85a, #b48ad6)" },
+  { name: "local vault", meta: "signs after admission on the user's machine", stat: "optional", bg: "var(--bg-2)", open: true }
 ];
 
 function cadenceColor(value: number) {
@@ -248,7 +240,7 @@ function cadenceColor(value: number) {
 }
 
 function actionLabel(kind: string) {
-  return kind === "admit" ? "Admitted" : kind === "update" ? "Updated" : "Gate rejected";
+  return kind === "admit" ? "Hosted" : kind === "update" ? "Updated" : "Gate rejected";
 }
 
 function agentStyle(skill: AuthorSkill, agent: AgentId) {
@@ -262,7 +254,7 @@ function agentStyle(skill: AuthorSkill, agent: AgentId) {
 
 async function copyCert() {
   certCopied.value = true;
-  notice.value = "Certificate exported to clipboard";
+  notice.value = "Source record copied";
   try {
     await navigator.clipboard?.writeText(certificate.map((row) => `${row.key}: ${row.value}`).join("\n"));
   } catch {
@@ -271,5 +263,12 @@ async function copyCert() {
   window.setTimeout(() => {
     certCopied.value = false;
   }, 1200);
+}
+
+function medianBundleSize() {
+  const sizes = authorSourceSkills.map((skill) => Number(skill.size.replace(/\D/g, ""))).sort((a, b) => a - b);
+  const mid = Math.floor(sizes.length / 2);
+  const median = sizes.length % 2 === 0 ? (sizes[mid - 1] + sizes[mid]) / 2 : sizes[mid];
+  return `${(median / 1000).toFixed(1)}<span class="unit">KB</span>`;
 }
 </script>

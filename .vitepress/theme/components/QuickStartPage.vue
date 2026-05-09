@@ -68,18 +68,18 @@
         <div class="ok">  ✓ binary signed · {{ PRODUCT_VERSION }}</div>
         <div class="ok">  ✓ ~/.autovault initialized · bundled skills indexed</div>
         <div class="ok">  ✓ local keypair available · ed25519</div>
-        <div class="ok">  ✓ detected agents · claude-code, codex, cursor</div>
+        <div class="ok">  ✓ detected agents · claude-code, codex</div>
         <div class="out">  ↳ next: autovault add &lt;source&gt;</div>
       </div>
     </div>
 
     <h2 id="first">Step 3 — Add your first skill</h2>
     <p>Skills enter through a source adapter. Each adapter fetches from one origin and hands the raw skill to the validation gate. Whatever the source, the gate runs the same checks before admission.</p>
-    <CodeBlock lang="bash"><span class="pmt">$</span> autovault <span class="arg">add</span> github:autoworks-ai/skills/extract-pdf</CodeBlock>
-      <div class="terminal static-terminal">
-      <div class="terminal-head"><span class="dot live" /><span class="dot" /><span class="dot" /><span class="ttl">gate run · extract-pdf</span></div>
+    <CodeBlock lang="bash"><span class="pmt">$</span> autovault <span class="arg">add</span> url:https://autovault.dev/skills/skill-author/SKILL.md</CodeBlock>
+    <div class="terminal static-terminal">
+      <div class="terminal-head"><span class="dot live" /><span class="dot" /><span class="dot" /><span class="ttl">gate run · skill-author</span></div>
       <div class="terminal-body compact">
-        <div class="out">  ↳ fetching extract-pdf v1.4.0</div>
+        <div class="out">  ↳ fetching skill-author v1.0.0</div>
         <div class="ok">  ✓ yaml-repair · frontmatter clean</div>
         <div class="ok">  ✓ denylist · no known bad patterns</div>
         <div class="ok">  ✓ capability/behavior · declared matches observed</div>
@@ -119,8 +119,8 @@
 
     <h2 id="scope">Step 4 — Scope it to your context</h2>
     <p>By default a freshly added skill is visible only after you scope it. A caller sees a skill when it matches the agents and projects you approved, so dev-machine skills do not leak into prod and client work does not bleed across projects.</p>
-    <CodeBlock lang="bash"><span class="pmt">$</span> autovault <span class="arg">scope</span> extract-pdf \<br />
-    <span class="arg">--agent</span> claude-code,codex,cursor \<br />
+    <CodeBlock lang="bash"><span class="pmt">$</span> autovault <span class="arg">scope</span> skill-author \<br />
+    <span class="arg">--agent</span> claude-code,codex \<br />
     <span class="arg">--project</span> autovault-website \<br />
     <span class="arg">--device</span> $(hostname)<br />
 <span class="pmt">$</span> autovault sync-profiles <span class="arg">--discover</span></CodeBlock>
@@ -213,14 +213,14 @@ const VAULT_TREE: VaultRow[] = [
   { depth: 2, label: "ed25519.priv", kind: "file" },
   { depth: 2, label: "ed25519.pub", kind: "file" },
   { depth: 1, label: "skills/", kind: "dir", id: "skills" },
-  { depth: 2, label: "extract-pdf/", kind: "dir", id: "skill" },
+  { depth: 2, label: "skill-author/", kind: "dir", id: "skill" },
   { depth: 3, label: "SKILL.md", kind: "file" },
   { depth: 3, label: "manifest.json", kind: "file" },
   { depth: 3, label: "SKILL.md.sig", kind: "sig" },
   { depth: 3, label: "rendered/", kind: "dir", id: "rendered" },
   { depth: 4, label: "claude-code.md", kind: "file" },
   { depth: 4, label: "codex.md", kind: "file" },
-  { depth: 4, label: "cursor.mdc", kind: "file" },
+  { depth: 4, label: "autojack.md", kind: "file" },
   { depth: 1, label: "cache/", kind: "dir", id: "cache" },
   { depth: 1, label: "audit.log", kind: "file", id: "audit" }
 ];
@@ -230,7 +230,7 @@ const VAULT_NOTES: Record<string, { title: string; body: string; tags?: string[]
   config: { title: "config.toml", body: "Trusted sources, default scope policy, and render targets live here so the policy diffs cleanly." },
   keys: { title: "keys/", body: "A local Ed25519 keypair signs admitted skills. The private key stays on the machine.", tags: ["ed25519", "local-only"] },
   skills: { title: "skills/", body: "One subfolder per canonical skill. The source SKILL.md remains the thing humans review." },
-  skill: { title: "extract-pdf/", body: "The source, manifest, detached signature, and rendered agent files stay together under the canonical id.", tags: ["canonical", "signed"] },
+  skill: { title: "skill-author/", body: "The source, manifest, detached signature, and rendered agent files stay together under the canonical id.", tags: ["canonical", "signed"] },
   rendered: { title: "rendered/", body: "Generated files for each agent profile. Regenerate these from source rather than hand-editing forks." },
   cache: { title: "cache/", body: "Fetch and token-budget cache. Safe to delete; excluded from sync by default." },
   audit: { title: "audit.log", body: "Append-only admission and scope-change events used for provenance and troubleshooting.", tags: ["provenance"] }
@@ -245,16 +245,15 @@ function selectVaultRow(id: string | undefined) {
 }
 
 const ACCESS_ROWS = [
-  { agent: "Claude Code", path: "~/.autovault/skills/extract-pdf/rendered/claude-code.md", via: "symlink to ~/.claude/skills" },
-  { agent: "Codex", path: "~/.autovault/skills/extract-pdf/rendered/codex.md", via: "symlink to ~/.codex/skills" },
-  { agent: "Cursor", path: "~/.autovault/skills/extract-pdf/rendered/cursor.mdc", via: "project rule or profile link" },
-  { agent: "AutoHub", path: "~/.autovault/skills/extract-pdf/SKILL.md", via: "native read of canonical source" }
+  { agent: "Claude Code", path: "~/.autovault/skills/skill-author/rendered/claude-code.md", via: "symlink to ~/.claude/skills" },
+  { agent: "Codex", path: "~/.autovault/skills/skill-author/rendered/codex.md", via: "symlink to ~/.codex/skills" },
+  { agent: "AutoJack", path: "~/.autovault/skills/skill-author/SKILL.md", via: "native read of canonical source" }
 ];
 
 const agentOptions = [
-  { id: "claude-code", label: "Claude Code", color: "#d6a85a", cmd: "use extract-pdf to summarize report.pdf", out: "✓ tool resolved: read, write" },
-  { id: "codex", label: "Codex", color: "#5a9dd6", cmd: "use extract-pdf to summarize report.pdf", out: "✓ tool resolved: file_read, file_write" },
-  { id: "cursor", label: "Cursor", color: "#b48ad6", cmd: "@extract-pdf summarize report.pdf", out: "✓ tool resolved: fs_read, fs_write" }
+  { id: "claude-code", label: "Claude Code", color: "#d6a85a", cmd: "use skill-author to draft a new SKILL.md", out: "✓ tool resolved: Read, Edit, Write" },
+  { id: "codex", label: "Codex", color: "#5a9dd6", cmd: "use skill-author to draft a new SKILL.md", out: "✓ tool resolved: read/write workspace files" },
+  { id: "autojack", label: "AutoJack", color: "#5ad6c0", cmd: "use skill-author to review this SKILL.md", out: "✓ canonical SKILL.md loaded" }
 ];
 const agent = ref(agentOptions[0].id);
 const activeAgent = computed(() => agentOptions.find((item) => item.id === agent.value) ?? agentOptions[0]);
@@ -271,17 +270,17 @@ const TerminalDemo = defineComponent({
       { type: "out", text: "↳ refreshing managed profile links:" },
       { type: "out", text: "    ~/.claude/skills/autovault-skill → ~/.autovault/profiles/claude-code/autovault-skill" },
       { type: "out", text: "    ~/.codex/skills/autovault-skill  → ~/.autovault/profiles/codex/autovault-skill" },
-      { type: "out", text: "    ~/.cursor/skills/autovault-skill → ~/.autovault/profiles/cursor/autovault-skill" },
+      { type: "out", text: "    ~/.autojack/skills/autovault-skill → ~/.autovault/profiles/autojack/autovault-skill" },
       { type: "ok", text: "✓ vault ready · bundled skills bootstrapped · profiles synced" },
       { type: "blank", text: "" },
-      { type: "cmd", text: "autovault add github:autoworks-ai/skills/extract-pdf" },
-      { type: "out", text: "↳ fetching extract-pdf v1.4.0" },
+      { type: "cmd", text: "autovault add url:https://autovault.dev/skills/skill-author/SKILL.md" },
+      { type: "out", text: "↳ fetching skill-author v1.0.0" },
       { type: "out", text: "↳ [1/5] yaml-repair    : ok" },
       { type: "out", text: "↳ [2/5] denylist       : ok" },
       { type: "out", text: "↳ [3/5] cap/behavior   : ok" },
       { type: "out", text: "↳ [4/5] dedup          : ok" },
       { type: "out", text: "↳ [5/5] sign           : ed25519" },
-      { type: "ok", text: "✓ admitted to vault · scoped to: claude-code, codex, cursor" }
+      { type: "ok", text: "✓ admitted to vault · scoped to: claude-code, codex" }
     ];
     const replay = useTerminalReplay(lines, { autoStart: true, scrollTarget: () => bodyRef.value });
 

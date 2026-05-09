@@ -240,7 +240,7 @@ const provenance = [
 
 const VerifierDemo = defineComponent({
   setup() {
-    const input = ref("autoworks-ai/extract-pdf v1.4.0");
+    const input = ref("autoworks-ai/skill-author v1.0.0");
     const phase = ref<Phase>("idle");
     const step = ref(0);
     let timer: ReturnType<typeof setInterval> | null = null;
@@ -269,7 +269,7 @@ const VerifierDemo = defineComponent({
       timer = null;
       phase.value = "idle";
       step.value = 0;
-      input.value = "autoworks-ai/extract-pdf v1.4.0";
+      input.value = "autoworks-ai/skill-author v1.0.0";
     }
 
     onBeforeUnmount(() => {
