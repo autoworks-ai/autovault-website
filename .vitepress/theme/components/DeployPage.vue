@@ -5,7 +5,7 @@
         <div class="eyebrow">
           <span class="dash" />
           Deploy a remote vault
-          <span class="pr">v0.2.1 · current</span>
+          <span class="pr">{{ PRODUCT_VERSION_SHORT }} · current</span>
         </div>
         <h1>From a local CLI to <span class="ital">a network service</span> in two minutes.</h1>
         <p class="lede">In remote mode, the same vault binary speaks Streamable HTTP MCP with OAuth auth-code + PKCE. Stand it up on a real host so your agents — wherever they run, sandboxed or not — can resolve, verify, and install signed skills without ever touching a local filesystem.</p>
@@ -94,9 +94,9 @@
       <p class="lede">All knobs are env-var driven. The first card is the breaking change in remote mode — Compose now hard-fails if these aren't set, instead of falling back to a known-default password.</p>
       <div class="env-grid">
         <div v-for="group in envGroups" :key="group.title" class="env-card">
-          <div class="head">{{ group.title }} <span :class="['req-chip', group.required ? 'req' : 'opt']">{{ group.required ? "required" : "optional" }}</span></div>
+          <div class="head">{{ group.title }} <span :class="['req-chip', envGroupChipClass(group)]">{{ envGroupChipLabel(group) }}</span></div>
           <div v-for="row in group.rows" :key="row.key" class="env-row">
-            <div class="k">{{ row.key }}</div>
+            <div class="k">{{ row.key }} <span v-if="row.optional" class="row-opt">optional</span></div>
             <div class="v" v-html="row.value" />
           </div>
         </div>
@@ -132,7 +132,7 @@
       <p class="lede">Every route the remote service exposes. Public routes are reachable pre-auth; bearer routes need a valid access token; owner routes additionally require <code>role:owner</code>.</p>
       <div class="routes-table">
         <div class="h"><span>Method</span><span>Path</span><span>Description</span><span>Auth</span></div>
-        <div v-for="route in routes" :key="route.path" class="r">
+        <div v-for="route in routes" :key="`${route.method} ${route.path}`" class="r">
           <span><span :class="['meth', route.method]">{{ route.method }}</span></span>
           <span class="path">{{ route.path }}</span>
           <span class="desc">{{ route.desc }}</span>
@@ -283,11 +283,11 @@ const envGroups = [
   { title: "Public surface", required: true, rows: [
     { key: "AUTOVAULT_MODE", value: "Set to <code>remote</code> to enable the HTTP MCP service. <code>local</code> (default) is stdio-only." },
     { key: "AUTOVAULT_PUBLIC_URL", value: "Public HTTPS origin (no path). Used as the OAuth issuer and embedded in <code>/.well-known</code> metadata. Required in remote mode." },
-    { key: "AUTOVAULT_HTTP_PORT", value: "Bind port. Default <code>3000</code>. On Railway, leave it unset because Railway injects <code>PORT</code> and the server reads that automatically." }
+    { key: "AUTOVAULT_HTTP_PORT", optional: true, value: "Bind port. Default <code>3000</code>. On Railway, leave it unset because Railway injects <code>PORT</code> and the server reads that automatically." }
   ] },
   { title: "Storage", required: true, rows: [
     { key: "AUTOVAULT_STORAGE_PATH", value: "Filesystem root for skills, signing keys, and SQLite. On Railway this should be the volume mount, e.g. <code>/data/autovault</code>." },
-    { key: "AUTOVAULT_DB_PATH", value: "Optional override for the SQLite path. Defaults to <code>$AUTOVAULT_STORAGE_PATH/autovault.sqlite</code>." }
+    { key: "AUTOVAULT_DB_PATH", optional: true, value: "Optional override for the SQLite path. Defaults to <code>$AUTOVAULT_STORAGE_PATH/autovault.sqlite</code>." }
   ] },
   { title: "Hardening", required: false, rows: [
     { key: "AUTOVAULT_SECURITY_STRICT", value: "Default <code>true</code>. When true, security-scanner flags block writes; when false, they become warnings. Leave on in production." },
@@ -333,7 +333,7 @@ const routes = [
 
 const securityCards = [
   { icon: "shield" as const, title: "Policy gate on every call", body: "The same role + scope filter runs at the MCP boundary. Non-owner reads are filtered by capability access; writes require explicit <code>scope:write</code>.", file: "src/remote/policy.ts" },
-  { icon: "lock" as const, title: "PKCE is mandatory", body: "The <code>/oauth/authorize</code> endpoint rejects requests without a <code>code_challenge</code>. Refresh tokens rotate on use.", file: "src/remote/auth.ts" },
+  { icon: "lock" as const, title: "PKCE is mandatory", body: "The <code>/authorize</code> endpoint rejects requests without a <code>code_challenge</code>. Refresh tokens rotate on use.", file: "src/remote/auth.ts" },
   { icon: "tip" as const, title: "CORS & origin pinning", body: "Browser access is opt-in. <code>AUTOVAULT_ALLOWED_ORIGINS</code> is a strict allowlist; server-to-server calls bypass cleanly.", file: "src/remote/server.ts" }
 ];
 
@@ -367,6 +367,19 @@ function lineClass(line: string) {
 
 function midpoint(from: number, to: number) {
   return (oauthActors[from].x + oauthActors[to].x) / 2;
+}
+
+type EnvRow = { key: string; value: string; optional?: boolean };
+type EnvGroup = { title: string; required: boolean; rows: EnvRow[] };
+
+function envGroupChipLabel(group: EnvGroup) {
+  if (!group.required) return "optional";
+  return group.rows.some((row) => row.optional) ? "mixed" : "required";
+}
+
+function envGroupChipClass(group: EnvGroup) {
+  if (!group.required) return "opt";
+  return group.rows.some((row) => row.optional) ? "mixed" : "req";
 }
 
 async function copyProvider() {
