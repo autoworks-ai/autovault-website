@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import BrandMark from './BrandMark.vue'
+import { copyText } from '../utils/clipboard'
 
 // Sources: messy, varied, often unsigned. The "before" column.
 const SOURCES = [
@@ -21,8 +22,21 @@ const ADOPTERS = [
 
 const tickIn  = ref(0)
 const tickOut = ref(0)
+const copiedStart = ref<'shell' | 'agent' | null>(null)
 let t1: number | undefined
 let t2: number | undefined
+
+const SHELL_INSTALL = 'curl -fsSL https://autovault.sh | sh'
+const AGENT_PROMPT = 'Fetch https://autovault.dev/skill.md, show me what it will do, install it into ~/.claude/skills/autovault-bootstrap/SKILL.md if approved, then run /autovault-bootstrap.'
+
+async function copyStart(kind: 'shell' | 'agent') {
+  const ok = await copyText(kind === 'shell' ? SHELL_INSTALL : AGENT_PROMPT)
+  if (!ok) return
+  copiedStart.value = kind
+  window.setTimeout(() => {
+    if (copiedStart.value === kind) copiedStart.value = null
+  }, 1400)
+}
 
 onMounted(() => {
   t1 = window.setInterval(() => { tickIn.value  = (tickIn.value  + 1) % SOURCES.length  }, 900)
@@ -67,6 +81,27 @@ function dstY(i: number) { return 90 + i * (VBOX_H - 180) / (ADOPTERS.length - 1
           one clean canonical view per agent on the way out.
         </p>
       </header>
+
+      <div class="av-start-panel" aria-label="Start AutoVault">
+        <div class="av-start-card primary">
+          <div class="av-start-kicker">Terminal</div>
+          <div class="av-start-title">Install the local vault</div>
+          <div class="av-start-command">
+            <span class="prompt">$</span>
+            <code>{{ SHELL_INSTALL }}</code>
+            <button type="button" @click="copyStart('shell')">{{ copiedStart === 'shell' ? 'copied' : 'copy' }}</button>
+          </div>
+        </div>
+        <div class="av-start-card">
+          <div class="av-start-kicker">Agent-assisted</div>
+          <div class="av-start-title">Have Claude Code set itself up</div>
+          <div class="av-start-command prompt-block">
+            <code>{{ AGENT_PROMPT }}</code>
+            <button type="button" @click="copyStart('agent')">{{ copiedStart === 'agent' ? 'copied' : 'copy' }}</button>
+          </div>
+          <p>Fetches a raw SKILL.md, shows the behavior, installs locally only after approval, then verifies AutoVault.</p>
+        </div>
+      </div>
 
       <div class="av-flow-stage">
         <!-- ── Sources column (messy in) ──────────────────── -->
@@ -266,6 +301,98 @@ function dstY(i: number) { return 90 + i * (VBOX_H - 180) / (ADOPTERS.length - 1
   color: var(--ink-2); font-size: 16px; line-height: 1.6;
 }
 
+/* ── First-run entry points ─────────────────────── */
+.av-start-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+  gap: 12px;
+  max-width: 980px;
+  margin: 0 auto 44px;
+}
+.av-start-card {
+  min-width: 0;
+  background: rgba(16, 23, 29, 0.84);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.18);
+}
+.av-start-card.primary {
+  border-color: rgba(90, 214, 192, 0.28);
+  background: rgba(90, 214, 192, 0.06);
+}
+.av-start-kicker {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.av-start-title {
+  margin-top: 8px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
+}
+.av-start-command {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  margin-top: 12px;
+  padding: 10px 10px 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.av-start-command .prompt {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+.av-start-command code {
+  min-width: 0;
+  flex: 1;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0;
+}
+.av-start-command.prompt-block {
+  align-items: flex-start;
+}
+.av-start-command.prompt-block code {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.45;
+}
+.av-start-command button {
+  flex: 0 0 auto;
+  border: 1px solid var(--line-2);
+  background: var(--panel);
+  color: var(--ink-3);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.av-start-command button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.av-start-card p {
+  margin: 10px 0 0;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
 /* ── Stage ──────────────────────────────────────── */
 .av-flow-stage {
   position: relative;
@@ -406,6 +533,7 @@ function dstY(i: number) { return 90 + i * (VBOX_H - 180) / (ADOPTERS.length - 1
 
 @media (max-width: 1080px) {
   .av-flow-title { font-size: 44px; }
+  .av-start-panel { grid-template-columns: 1fr; max-width: 720px; }
   .av-flow-stage { grid-template-columns: 1fr; gap: 32px; }
   .av-flow-lines { display: none; }
   .av-flow-footer { grid-template-columns: 1fr 1fr; gap: 24px; }

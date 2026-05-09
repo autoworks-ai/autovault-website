@@ -54,6 +54,11 @@
 <span class="pmt">$</span> autovault skill list</CodeBlock>
     <div class="callout tip"><div class="callout-dot" /><div><strong>Bundled skills.</strong> The installer seeds first-party bundled skills through the same validation path used by remote installs and proposals, then refreshes discovered host profiles.</div></div>
 
+    <h2 id="agent-assisted">Agent-assisted setup</h2>
+    <p>If you want Claude Code to configure its own AutoVault bootstrap skill, give it this prompt. The hosted skill is a raw <code>SKILL.md</code>; the agent should fetch it, show you the behavior, install it locally only after approval, then run it.</p>
+    <CodeBlock lang="text" file="Claude Code prompt">{{ AGENT_SETUP_PROMPT }}</CodeBlock>
+    <div class="callout warn"><div class="callout-dot" /><div><strong>Opt-in by design.</strong> The bootstrap skill stages the installer for inspection, asks before shell execution, then runs <code>autovault doctor</code> and <code>autovault sync-profiles --discover</code>.</div></div>
+
     <h2 id="verify">Step 2 — Verify the install</h2>
     <p>One command confirms the binary, local vault folder, profile discovery, and signing key are ready before any skill enters the vault.</p>
     <div class="terminal static-terminal">
@@ -185,6 +190,7 @@ const INSTALL_COMMANDS: Record<Method, string> = {
 };
 const selectedMethod = ref<Method>("curl");
 const copied = ref(false);
+const AGENT_SETUP_PROMPT = "Fetch https://autovault.dev/skill.md, show me what it will do, install it into ~/.claude/skills/autovault-bootstrap/SKILL.md if approved, then run /autovault-bootstrap.";
 
 async function copyInstall() {
   copied.value = await copyText(INSTALL_COMMANDS[selectedMethod.value]);

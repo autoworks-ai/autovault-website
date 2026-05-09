@@ -30,6 +30,30 @@ export interface PageDoc {
   listed?: boolean;
 }
 
+export interface AgentSkillArtifact {
+  key: string;
+  name: string;
+  title: string;
+  description: string;
+  rawPath: string;
+  installPath: string;
+}
+
+export const agentSkillArtifacts: AgentSkillArtifact[] = [
+  {
+    key: "autovault-bootstrap",
+    name: "autovault-bootstrap",
+    title: "AutoVault Bootstrap Skill",
+    description: "A raw SKILL.md an agent can audit, install locally, and use to configure AutoVault for its own profile.",
+    rawPath: "/skill.md",
+    installPath: "~/.claude/skills/autovault-bootstrap/SKILL.md"
+  }
+];
+
+export function agentSkillUrl(skill: AgentSkillArtifact): string {
+  return `${SITE_URL}${skill.rawPath}`;
+}
+
 const overviewMarkdown = `# AutoVault
 
 AutoVault is a local-first vault for agent skills: it validates, signs, scopes, transforms, and serves reusable SKILL.md files from one canonical place.
@@ -79,6 +103,16 @@ autovault skill list
 \`\`\`
 
 The installer writes ~/.autovault, installs the local CLI shim, preserves the folder as user-owned storage, and bootstraps bundled skills unless AUTOVAULT_NO_BOOTSTRAP=1 is set. The current public package is ${PRODUCT_VERSION}; AutoVault remains pre-1.0.
+
+## Agent-assisted setup
+
+Give Claude Code this prompt when you want the agent to install its own bootstrap skill after review:
+
+\`\`\`text
+Fetch https://autovault.dev/skill.md, show me what it will do, install it into ~/.claude/skills/autovault-bootstrap/SKILL.md if approved, then run /autovault-bootstrap.
+\`\`\`
+
+The skill is opt-in. It stages the installer for inspection, asks before shell execution, then runs doctor and profile sync after approval.
 
 ## Verify
 
@@ -475,6 +509,14 @@ export function buildAgentsIndex() {
       description: doc.description,
       html_url: canonicalUrl(doc),
       markdown_url: agentUrl(doc)
+    })),
+    skills: agentSkillArtifacts.map((skill) => ({
+      key: skill.key,
+      name: skill.name,
+      title: skill.title,
+      description: skill.description,
+      raw_url: agentSkillUrl(skill),
+      install_path: skill.installPath
     }))
   };
 }
@@ -488,8 +530,12 @@ export function buildLlmsTxt(): string {
     "## Canonical Docs",
     ...listedPageDocs.map((doc) => `- [${doc.title}](${agentUrl(doc)}): ${doc.description}`),
     "",
+    "## Hosted Skills",
+    ...agentSkillArtifacts.map((skill) => `- [${skill.title}](${agentSkillUrl(skill)}): ${skill.description}`),
+    "",
     "## Agent Notes",
     "- Prefer the /agents/* markdown endpoints for compact agent context.",
+    "- The hosted bootstrap skill is an opt-in raw SKILL.md; audit it before installing it into an agent profile.",
     "- Use /llms-full.txt when a single bundled context file is more useful than page-by-page loading.",
     "- Human-facing canonical pages use clean URLs without .html extensions."
   ];
