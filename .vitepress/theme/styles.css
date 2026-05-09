@@ -7378,6 +7378,22 @@ body {
   color: var(--ink-3);
 }
 
+.env-card .req-chip.mixed {
+  background: rgba(217, 159, 113, 0.14);
+  color: var(--ink-2);
+}
+
+.env-row .row-opt {
+  margin-left: 6px;
+  border-radius: 3px;
+  font-size: 9px;
+  padding: 1px 6px;
+  background: var(--bg);
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .env-row {
   display: grid;
   grid-template-columns: 200px minmax(0, 1fr);
