@@ -11,14 +11,8 @@ const items = [
 
 <template>
   <section class="av-section" id="problems">
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 40px; gap: 32px">
-      <div>
-        <div class="av-eyebrow"><span class="dash" /> If you've used skills…</div>
-        <h2 style="margin-top: 16px; max-width: 720px">…you've probably hit some of these.</h2>
-      </div>
-      <p class="av-lede" style="max-width: 380px">
-        The format itself is fine. What's missing is everything around it. Six small papercuts that compound the more skills you keep around.
-      </p>
+    <div style="margin-bottom: 40px">
+      <h2 style="max-width: 720px">If you're running AI skills, you have these problems.</h2>
     </div>
     <div class="av-problems">
       <div v-for="p in items" :key="p.num" class="av-problem">
@@ -28,5 +22,15 @@ const items = [
         <span class="badge">{{ p.badge }}</span>
       </div>
     </div>
+    <p class="av-problems-close">AutoVault fixes all of them.</p>
   </section>
 </template>
+
+<style scoped>
+.av-problems-close {
+  margin-top: 40px;
+  font-size: 1.125rem;
+  font-weight: 500;
+  color: var(--ink-1);
+}
+</style>
