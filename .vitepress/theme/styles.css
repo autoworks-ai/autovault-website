@@ -427,6 +427,101 @@ body {
   display: inline-flex;
 }
 
+.clerk-menu-glyph {
+  position: relative;
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 72%, var(--line-2));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.clerk-menu-glyph::before,
+.clerk-menu-glyph::after {
+  position: absolute;
+  content: "";
+}
+
+.clerk-menu-glyph--cloud::before {
+  inset: 4px 3px 5px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+}
+
+.clerk-menu-glyph--cloud::after {
+  right: 3px;
+  bottom: 3px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.clerk-menu-glyph--docs::before {
+  inset: 3px 4px;
+  border-top: 1px solid var(--accent);
+  border-bottom: 1px solid var(--accent);
+}
+
+.clerk-menu-glyph--docs::after {
+  top: 7px;
+  left: 4px;
+  width: 8px;
+  border-top: 1px solid var(--accent);
+}
+
+.clerk-menu-glyph--support::before {
+  inset: 4px;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+}
+
+.clerk-menu-glyph--support::after {
+  top: 3px;
+  left: 7px;
+  width: 1px;
+  height: 10px;
+  background: var(--accent);
+}
+
+.clerk-profile-page {
+  display: grid;
+  max-width: 520px;
+  gap: 10px;
+  color: var(--ink-2);
+  font: 13px/1.5 var(--sans);
+}
+
+.clerk-profile-page h2,
+.clerk-profile-page p {
+  margin: 0;
+}
+
+.clerk-profile-page h2 {
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.clerk-profile-kicker {
+  color: var(--accent);
+  font: 11px var(--mono);
+  text-transform: uppercase;
+}
+
+.clerk-profile-page a {
+  width: max-content;
+  border: 1px solid color-mix(in srgb, var(--accent) 68%, var(--line-2));
+  border-radius: 4px;
+  padding: 8px 11px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
 .status-dot {
   width: 6px;
   height: 6px;

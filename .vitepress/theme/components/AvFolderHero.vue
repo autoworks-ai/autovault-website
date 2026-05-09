@@ -152,9 +152,9 @@ function resumeCycle() {
             <div>└── <span class="file">config.toml</span></div>
           </div>
         </div>
-        <div class="av-folder-side" :key="current.id + readPulse">
+        <div class="av-folder-side">
           <div class="side-eyebrow">read path →</div>
-          <div class="side-card">
+          <div class="side-card" :key="current.id + readPulse">
             <div class="side-head">
               <span class="side-name">{{ current.id }}</span>
               <span class="side-ver">v{{ current.ver }}</span>
@@ -261,6 +261,7 @@ function resumeCycle() {
   grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.9fr);
   gap: 16px;
   align-items: stretch;
+  min-height: 430px;
 }
 .av-folder-tree-pane {
   background: var(--bg-2);
@@ -352,6 +353,7 @@ function resumeCycle() {
 
 .av-folder-side {
   display: flex; flex-direction: column; gap: 10px;
+  min-height: 0;
   padding: 20px 22px;
   background: var(--panel); border: 1px solid var(--line);
   border-radius: 10px;
@@ -365,6 +367,7 @@ function resumeCycle() {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  height: 100%;
   animation: folderReadIn 260ms var(--ease);
 }
 .side-head {
@@ -451,6 +454,7 @@ function resumeCycle() {
 .agent-reads {
   display: grid;
   gap: 6px;
+  margin-top: auto;
 }
 .agent-read {
   display: grid;
@@ -510,7 +514,10 @@ function resumeCycle() {
 }
 
 @media (max-width: 720px) {
-  .av-folder-explorer { grid-template-columns: 1fr; }
+  .av-folder-explorer {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
 }
 
 .av-folder-cta {

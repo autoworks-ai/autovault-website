@@ -24,7 +24,11 @@ binding = "AUTOVAULT_VAULT_OBJECTS"
 id = "f483d8cf70724b0bb1c0d4628a6b4839"
 
 # Paid hosted onboarding production requirements:
-# - Clerk secrets: CLERK_SECRET_KEY, VITE_CLERK_PUBLISHABLE_KEY
+# - Clerk runtime secrets: CLERK_SECRET_KEY, VITE_CLERK_PUBLISHABLE_KEY
+# - Clerk build variables: VITE_CLERK_PREVIEW_PUBLISHABLE_KEY (pk_test_...)
+#   and VITE_CLERK_PRODUCTION_PUBLISHABLE_KEY (pk_live_...) feed the CI
+#   workflow, which writes the app-facing VITE_CLERK_PUBLISHABLE_KEY before
+#   VitePress builds static assets.
 # - Stripe secrets: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
 # - Stripe price: AUTOVAULT_HOSTED_PRICE_ID
 # - D1 binding AUTOVAULT_DB migrated with migrations/0001_hosted_vault.sql
