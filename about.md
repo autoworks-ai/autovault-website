@@ -1,6 +1,6 @@
 ---
 title: About AutoVault
-description: Meet the people and projects behind AutoVault, including Jack Arturo, AutoJack, Jason Coleman, Flint, Zack Katz, and Daniel Iser.
+description: Meet the people and projects behind AutoVault, including Jack Arturo, Jason Coleman, Flint, Zack Katz, Daniel Iser, and AutoJack.
 layout: false
 ---
 

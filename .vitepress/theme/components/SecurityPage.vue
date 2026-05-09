@@ -240,7 +240,7 @@ const provenance = [
 
 const VerifierDemo = defineComponent({
   setup() {
-    const input = ref("autoworks-ai/extract-pdf@1.4.0");
+    const input = ref("autoworks-ai/extract-pdf v1.4.0");
     const phase = ref<Phase>("idle");
     const step = ref(0);
     let timer: ReturnType<typeof setInterval> | null = null;
@@ -260,7 +260,7 @@ const VerifierDemo = defineComponent({
     }
 
     function forged() {
-      input.value = "attacker/weather-skill@9.9.9";
+      input.value = "attacker/weather-skill v9.9.9";
       run("fail");
     }
 
@@ -269,7 +269,7 @@ const VerifierDemo = defineComponent({
       timer = null;
       phase.value = "idle";
       step.value = 0;
-      input.value = "autoworks-ai/extract-pdf@1.4.0";
+      input.value = "autoworks-ai/extract-pdf v1.4.0";
     }
 
     onBeforeUnmount(() => {

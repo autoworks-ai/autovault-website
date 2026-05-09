@@ -383,7 +383,7 @@ const provenance = [
   { icon: "check" as const, ok: true, title: `Gate run · ${PRODUCT_VERSION} · all 5 stages passed`, detail: "repair: 0 fixes · denylist: clean · capabilities: aligned · dedup: unique · sign: ed25519", when: "example" },
   { icon: "shield" as const, ok: true, title: "Vault counter-signature", detail: "local vault key · source sidecar · signed manifest", when: "example" },
   { icon: "check" as const, ok: true, title: "Rendered profile outputs", detail: "Claude Code, Codex, Cursor, and AutoHub variants generated from the same source", when: "example" },
-  { icon: "lock" as const, title: "Available for local admission", detail: "verify locally with <code>autovault verify autoworks-ai/extract-pdf@1.4.0</code>", when: "on demand" }
+  { icon: "lock" as const, title: "Available for local admission", detail: "verify locally with <code>autovault verify autoworks-ai/extract-pdf<span>&#64;</span>1.4.0</code>", when: "on demand" }
 ];
 
 const versions = [

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { comparisonPlayers, comparisonSources, homepageComparisonRows, homepageGateMetrics } from "../.vitepress/theme/data/marketing";
 import { PRODUCT_STATUS, PRODUCT_VERSION, PRODUCT_VERSION_BADGE, PRODUCT_VERSION_SHORT } from "../.vitepress/theme/data/product";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -61,6 +62,62 @@ describe("v1 content guardrails", () => {
     expect(hostedCopy).toContain("Cloud sync is not enabled yet");
     expect(hostedCopy).toContain("Reserve a paid hosted AutoVault namespace");
     expect(hostedCopy).not.toMatch(/cloud sync is enabled|enabled cloud sync|sync now/i);
+  });
+
+  it("keeps homepage comparison credible and linked", () => {
+    const homepageCopy = [
+      ".vitepress/theme/components/AvComparison.vue",
+      ".vitepress/theme/components/AvSpecHero.vue",
+      ".vitepress/theme/components/AvProblems.vue",
+      ".vitepress/theme/components/AvValidationGate.vue"
+    ].map(read).join("\n");
+
+    expect(homepageCopy).not.toMatch(/ClawdHub|TLC registry|credential stealers|shipping malware|11\.4%|820ms/);
+    expect(comparisonPlayers.map((player) => player.name)).toEqual([
+      "AutoVault",
+      "Skillfish",
+      "Tessl",
+      "SkillKit / Agent Skills",
+      "Manual"
+    ]);
+    expect(comparisonSources.map((source) => source.label)).toEqual([
+      "Skill.Fish",
+      "Tessl docs",
+      "Agent Skills GitHub",
+      "SkillKit",
+      "ClawHub docs",
+      "Cloudflare obfuscation docs"
+    ]);
+    expect(comparisonSources.every((source) => source.href.startsWith("https://"))).toBe(true);
+    expect(homepageComparisonRows.some((row) => row[1] === "partial")).toBe(true);
+    expect(homepageComparisonRows.every((row) => row.length === comparisonPlayers.length + 1)).toBe(true);
+  });
+
+  it("keeps homepage gate metrics labeled as fixtures", () => {
+    expect(homepageGateMetrics.reject).toEqual({
+      value: "~1 in 9",
+      label: "held in the demo fixture"
+    });
+    expect(homepageGateMetrics.latency).toEqual({
+      value: "<1s",
+      label: "local validation fixture"
+    });
+  });
+
+  it("avoids Cloudflare email-obfuscation traps in visible demos", () => {
+    const demoSurfaces = [
+      ".vitepress/theme/components/AvSpecHero.vue",
+      ".vitepress/theme/components/AvValidationGate.vue",
+      ".vitepress/theme/components/AvFolderHero.vue",
+      ".vitepress/theme/components/AvQuickStart.vue",
+      ".vitepress/theme/components/QuickStartPage.vue",
+      ".vitepress/theme/components/SecurityPage.vue",
+      ".vitepress/theme/components/ApiReferencePage.vue",
+      ".vitepress/theme/components/AuthorProfilePage.vue",
+      ".vitepress/theme/components/SkillDetailPage.vue"
+    ].map(read).join("\n");
+
+    expect(demoSurfaces).not.toMatch(/[A-Za-z0-9._%+/-]+@[0-9]+(?:\.[0-9]+)+/);
   });
 });
 

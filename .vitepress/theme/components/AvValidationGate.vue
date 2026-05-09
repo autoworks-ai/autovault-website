@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import UiIcon from './UiIcon.vue'
+import { homepageGateMetrics } from '../data/marketing'
 
 const STEPS = [
   { title: 'YAML auto-repair',         desc: 'Frontmatter is the #1 source of breakage. We fix it before storage.' },
-  { title: 'Security denylist',        desc: 'Known-bad patterns: credential stealers, fork bombs, exfiltration.' },
+  { title: 'Security denylist',        desc: 'Known-bad patterns: credential reads, fork bombs, exfiltration.' },
   { title: 'Capability vs. behavior',  desc: 'Does the skill actually do what its frontmatter claims?' },
   { title: 'Dedup',                    desc: 'Text similarity in V1, embedding-space matching in V2.' },
   { title: 'Ed25519 sign',             desc: 'Provenance becomes a first-class artifact, not a hope.' },
@@ -24,34 +25,34 @@ const SCENARIOS: Record<ScenarioKey, {
   clean: {
     label: 'Clean install',
     tag: 'UNTRUSTED',
-    input: 'weather-skill@1.2.0 from clawdhub-mirror',
+    input: 'weather-skill v1.2.0 from public mirror',
     failAt: null,
     diagnostic: 'Gate admits the skill and writes a signature beside it.',
-    output: 'weather-skill@1.2.0 — admitted',
+    output: 'weather-skill v1.2.0 — admitted',
   },
   unsigned: {
     label: 'Unsigned source',
     tag: 'UNSIGNED',
-    input: 'pdf-helper@0.1.0 from raw paste',
+    input: 'pdf-helper v0.1.0 from raw paste',
     failAt: 4,
     diagnostic: 'No trusted signing key was available, so the skill is held outside the vault.',
-    output: 'pdf-helper@0.1.0 — held for review',
+    output: 'pdf-helper v0.1.0 — held for review',
   },
   overscoped: {
     label: 'Overscoped tools',
     tag: 'OVERSCOPED',
-    input: 'deploy-prod@2.0.0 requests fs.write + net.fetch + secrets',
+    input: 'deploy-prod v2.0.0 requests fs.write + net.fetch + secrets',
     failAt: 1,
     diagnostic: 'Requested capabilities exceed the caller profile and never reach signing.',
-    output: 'deploy-prod@2.0.0 — rejected',
+    output: 'deploy-prod v2.0.0 — rejected',
   },
   mismatch: {
     label: 'Behavior mismatch',
     tag: 'MISMATCH',
-    input: 'csv-cleaner@0.4.0 claims read-only, writes output files',
+    input: 'csv-cleaner v0.4.0 claims read-only, writes output files',
     failAt: 2,
     diagnostic: 'Observed behavior disagrees with frontmatter, so the manifest has to be fixed first.',
-    output: 'csv-cleaner@0.4.0 — needs manifest repair',
+    output: 'csv-cleaner v0.4.0 — needs manifest repair',
   },
 }
 
@@ -145,13 +146,13 @@ function stepStatus(i: number) {
         <div style="margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 460px">
           <div>
             <div style="font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); letter-spacing: 0.06em; text-transform: uppercase">Reject rate</div>
-            <div style="font-size: 28px; font-weight: 500; margin-top: 4px; letter-spacing: -0.02em">11.4%</div>
-            <div style="font-size: 12px; color: var(--ink-3)">example fixture signal</div>
+            <div style="font-size: 28px; font-weight: 500; margin-top: 4px; letter-spacing: -0.02em">{{ homepageGateMetrics.reject.value }}</div>
+            <div style="font-size: 12px; color: var(--ink-3)">{{ homepageGateMetrics.reject.label }}</div>
           </div>
           <div>
             <div style="font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); letter-spacing: 0.06em; text-transform: uppercase">Avg. gate latency</div>
-            <div style="font-size: 28px; font-weight: 500; margin-top: 4px; letter-spacing: -0.02em">820ms</div>
-            <div style="font-size: 12px; color: var(--ink-3)">per skill, fully validated</div>
+            <div style="font-size: 28px; font-weight: 500; margin-top: 4px; letter-spacing: -0.02em">{{ homepageGateMetrics.latency.value }}</div>
+            <div style="font-size: 12px; color: var(--ink-3)">{{ homepageGateMetrics.latency.label }}</div>
           </div>
         </div>
       </div>

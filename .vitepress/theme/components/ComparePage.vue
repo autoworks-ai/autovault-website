@@ -12,7 +12,7 @@
         <div class="readtime">~30s read</div>
       </div>
       <div class="body">
-        <p><strong>Skillfish</strong> is the closest direct neighbor: it has a strong open-source story for installing, updating, syncing, and bundling skills across many agents. AutoVault is built for a stricter path: admit skills into a local-first vault, validate and sign what passes, scope delivery, and render one canonical SKILL.md for the caller that needs it. If you mainly need public discovery, look at Tessl or SkillKit-style directories first. If you only have a few files, manual folders can still be enough.</p>
+        <p><strong>Skillfish</strong> is the closest direct neighbor: it has a strong open-source story for installing, updating, syncing, and bundling skills across many agents. AutoVault is built for a stricter path: admit skills into a local-first vault, validate and sign what passes, scope delivery, and render one canonical SKILL.md for the caller that needs it. If you mainly need public discovery, look at Tessl or SkillKit / Agent Skills surfaces first. If you only have a few files, manual folders can still be enough.</p>
       </div>
     </section>
 
@@ -62,7 +62,7 @@
 
       <div class="cm-honest">
         <div class="ttl">Honesty box</div>
-        <p><strong>Where AutoVault is genuinely behind.</strong> Skillfish currently has broader agent/runtime coverage and a clearer skill manager workflow for install, update, sync, and team bundles. Tessl and SkillKit-style ecosystems are better starting points when public discovery or standardization is the main job. Manual folders are still simpler for one person with a handful of trusted skills. AutoVault is intentionally narrower: local-first validation, signing, scoped delivery, transforms, remote MCP, and OAuth before a broader management surface.</p>
+        <p><strong>Where AutoVault is genuinely behind.</strong> Skillfish currently has broader agent/runtime coverage and a clearer skill manager workflow for install, update, sync, and team bundles. Tessl and SkillKit / Agent Skills ecosystems are better starting points when public discovery or standardization is the main job. Manual folders are still simpler for one person with a handful of trusted skills. AutoVault is intentionally narrower: local-first validation, signing, scoped delivery, transforms, remote MCP, and OAuth before a broader management surface.</p>
       </div>
     </section>
 
@@ -139,7 +139,7 @@ const players = [
   { id: "av" as const, name: "AutoVault", desc: "Local-first vault. Gate, sign, scope, and render one SKILL.md per caller.", badge: "AV", color: "#5ad6c0", ink: "#062821", us: true, meta: [PRODUCT_VERSION, "MIT", "self-hosted"] },
   { id: "sf" as const, name: "Skillfish", desc: "Open-source skill manager for install, update, sync, and team bundles across many agents.", badge: "SF", color: "#5a9dd6", ink: "#06182a", meta: ["open source", "multi-agent", "team bundles"] },
   { id: "ts" as const, name: "Tessl", desc: "Package and distribution layer for skills and agents, strongest as a published ecosystem.", badge: "TS", color: "#b48ad6", ink: "#1d0f2a", meta: ["ecosystem", "distribution", "hosted"] },
-  { id: "sk" as const, name: "SkillKit / specs", desc: "Directory and spec-oriented discovery surfaces for reusable skill source material.", badge: "SK", color: "#d6a85a", ink: "#2a1a06", meta: ["discovery", "specs", "source material"] },
+  { id: "sk" as const, name: "SkillKit / Agent Skills", desc: "Directory and spec-oriented discovery surfaces for reusable skill source material.", badge: "SK", color: "#d6a85a", ink: "#2a1a06", meta: ["discovery", "specs", "source material"] },
   { id: "mn" as const, name: "Manual folders", desc: "Hand-maintained ~/.claude/skills, ~/.codex/skills, Cursor rules, and repo docs.", badge: "—", color: "#4a5b6b", ink: "#0a0d11", meta: ["zero tooling", "local", "high drift"] }
 ];
 
@@ -167,7 +167,7 @@ const rows: ComparisonRow[] = [
 const whenCards = [
   { title: "Pick AutoVault when…", badge: "AV", color: "#5ad6c0", ink: "#062821", us: true, pick: "You need skills to pass a local gate, carry provenance, stay scoped to specific profiles, and render cleanly across more than one agent.", signals: ["We have ~/.claude, ~/.codex, and Cursor rules drifting apart", "Security wants signatures before skills reach developer machines", "We need to audit which skills loaded last week", "We want a private vault behind our VPN"] },
   { title: "Pick Skillfish when…", badge: "SF", color: "#5a9dd6", ink: "#06182a", pick: "You mainly need broad multi-agent install, update, sync, and team bundle workflows, and a signed local admission gate is not the primary requirement.", signals: ["Agent coverage matters most", "Team bundles are the core workflow", "You want a skill manager more than a vault policy layer", "You are comfortable reviewing trust outside the tool"] },
-  { title: "Pick Tessl or SkillKit-style sources when…", badge: "TS", color: "#b48ad6", ink: "#1d0f2a", pick: "You are looking for public ecosystem discovery, reusable specs, or source material before deciding what belongs in your local vault.", signals: ["Discovery matters more than local policy", "You want examples to adapt", "You are evaluating agent-skill standards", "You will still review before local use"] },
+  { title: "Pick Tessl or SkillKit / Agent Skills when…", badge: "TS", color: "#b48ad6", ink: "#1d0f2a", pick: "You are looking for public ecosystem discovery, reusable specs, or source material before deciding what belongs in your local vault.", signals: ["Discovery matters more than local policy", "You want examples to adapt", "You are evaluating agent-skill standards", "You will still review before local use"] },
   { title: "Skip tooling entirely when…", badge: "—", color: "#4a5b6b", ink: "#0a0d11", pick: "You have fewer than five trusted skills, your team is one or two people, and manual folders are smaller than the tooling overhead.", signals: ["The whole skill folder fits in one screenshot", "You can name every skill from memory", "Your agents don't support skill autoloading yet"] }
 ];
 

@@ -27,7 +27,7 @@ import BrandMark from './BrandMark.vue'
       </div>
       <div class="av-footer-col">
         <h5>Org</h5>
-        <a href="https://github.com/autoworks-ai/autovault">autoworks-ai</a><a href="https://automem.ai">AutoMem</a><a href="https://github.com/autoworks-ai">AutoHub</a><a href="https://drunk.support">AutoJack</a><a href="https://github.com/autoworks-ai/autovault/security">Security policy</a>
+        <a href="https://github.com/autoworks-ai/autovault">autoworks-ai</a><a href="https://automem.ai">AutoMem</a><a href="https://github.com/autoworks-ai">AutoHub</a><a href="https://drunk.support/category/autojack/">AutoJack archive</a><a href="https://github.com/autoworks-ai/autovault/security">Security policy</a>
       </div>
     </div>
     <div class="av-footer-bottom">

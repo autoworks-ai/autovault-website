@@ -155,7 +155,7 @@ const sections: ApiSection[] = [
         ],
         examples: [
           { label: "Bash", body: "<div><span class=\"pmt\">$</span> autovault add autoworks-ai/extract-pdf</div><div><span class=\"ok\">  ✓</span> resolved @1.4.0</div><div><span class=\"ok\">  ✓</span> verified ed25519 sig</div><div><span class=\"ok\">  ✓</span> rendered → CLAUDE.md, AGENTS.md, .cursorrules</div>" },
-          { label: "Pinned", body: "<div><span class=\"pmt\">$</span> autovault add autoworks-ai/extract-pdf@1.3.2</div><div><span class=\"ok\">  ✓</span> resolved @1.3.2 (pinned)</div>" },
+          { label: "Pinned", body: "<div><span class=\"pmt\">$</span> autovault add autoworks-ai/extract-pdf<span>&#64;</span>1.3.2</div><div><span class=\"ok\">  ✓</span> resolved @1.3.2 (pinned)</div>" },
           { label: "Single target", body: "<div><span class=\"pmt\">$</span> autovault add autoworks-ai/extract-pdf \\</div><div>    --target claude-code</div><div><span class=\"ok\">  ✓</span> rendered → CLAUDE.md only</div>" }
         ]
       },
@@ -187,7 +187,7 @@ const sections: ApiSection[] = [
         ],
         examples: [
           { label: "TypeScript", body: "<div><span class=\"key\">import</span> { loadSkill } <span class=\"key\">from</span> <span class=\"str\">\"@autovault/sdk\"</span>;</div><div></div><div><span class=\"key\">const</span> skill = <span class=\"key\">await</span> loadSkill(<span class=\"str\">\"autoworks-ai/extract-pdf\"</span>);</div><div><span class=\"com\">// skill.frontmatter.version === \"1.4.0\"</span></div>" },
-          { label: "Pinned + offline", body: "<div><span class=\"key\">const</span> skill = <span class=\"key\">await</span> loadSkill(</div><div>  <span class=\"str\">\"autoworks-ai/extract-pdf@1.4.0\"</span>,</div><div>  { cache: <span class=\"str\">\"prefer\"</span> }</div><div>);</div>" }
+          { label: "Pinned + offline", body: "<div><span class=\"key\">const</span> skill = <span class=\"key\">await</span> loadSkill(</div><div>  <span class=\"str\">\"autoworks-ai/extract-pdf<span>&#64;</span>1.4.0\"</span>,</div><div>  { cache: <span class=\"str\">\"prefer\"</span> }</div><div>);</div>" }
         ]
       },
       endpoint("lib-render", "renderForTarget", "renderForTarget(skill, target)", "Pure function. Takes a verified skill and a target identifier; returns the agent-specific output string.", "function renderForTarget(skill: SignedSkill, target: \"claude-code\" | \"codex\" | \"cursor\" | \"autohub\"): string", "renderForTarget(skill, \"codex\")", "0.2.0"),
