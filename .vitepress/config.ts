@@ -4,6 +4,19 @@ import { canonicalUrl, findPageDocByFile, SITE_URL, type PageDoc } from "./share
 
 const OG_IMAGE = `${SITE_URL}/og-1200x630.png`;
 const TWITTER_IMAGE = `${SITE_URL}/twitter-1200x600.png`;
+const PIRSCH_DATA_CODE = process.env.PIRSCH_DATA_CODE?.trim();
+
+const pirschHead: HeadConfig[] = PIRSCH_DATA_CODE
+  ? [[
+      "script",
+      {
+        defer: "",
+        src: "https://api.pirsch.io/pa.js",
+        id: "pianjs",
+        "data-code": PIRSCH_DATA_CODE
+      }
+    ]]
+  : [];
 
 function pageHead(doc: PageDoc): HeadConfig[] {
   const url = canonicalUrl(doc);
@@ -92,7 +105,8 @@ export default defineConfig({
         href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap"
       }
     ],
-    ["meta", { name: "theme-color", content: "#0b1014" }]
+    ["meta", { name: "theme-color", content: "#0b1014" }],
+    ...pirschHead
   ],
   transformHead({ pageData }) {
     const doc = findPageDocByFile(pageData.relativePath);
@@ -111,6 +125,7 @@ export default defineConfig({
     nav: [
       { text: "Overview", link: "/" },
       { text: "Quick start", link: "/quick-start" },
+      { text: "Permissions", link: "/permissions" },
       { text: "Authoring", link: "/authoring" },
       { text: "Examples", link: "/skills-directory" },
       { text: "Security", link: "/security" },
@@ -129,11 +144,21 @@ export default defineConfig({
         ]
       },
       {
+        text: "Permissions",
+        items: [
+          { text: "Three-layer model", link: "/permissions" },
+          { text: "Capabilities", link: "/permissions#capabilities" },
+          { text: "Transforms", link: "/permissions#transforms" },
+          { text: "Install scope", link: "/permissions#install-scope" },
+          { text: "Agent-mediated install", link: "/permissions#agents-do-the-work" }
+        ]
+      },
+      {
         text: "Authoring",
         items: [
           { text: "Anatomy of a SKILL.md", link: "/authoring" },
           { text: "Transformation manifest", link: "/authoring#manifest" },
-          { text: "Permissions", link: "/authoring#perms" },
+          { text: "Capabilities reference", link: "/authoring#perms" },
           { text: "Admission", link: "/authoring#publish" }
         ]
       },

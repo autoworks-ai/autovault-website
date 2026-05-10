@@ -43,7 +43,7 @@ import MarkdownActions from "./MarkdownActions.vue";
 import { PRODUCT_VERSION } from "../data/product";
 import type { PageDocKey } from "../../shared/pageDocs";
 
-type PageKey = "quick-start" | "authoring" | "skills" | "api" | "deploy" | "compare" | "skill-detail" | "author-profile" | "security" | "about" | "cloud" | "changelog";
+type PageKey = "quick-start" | "authoring" | "permissions" | "skills" | "api" | "deploy" | "compare" | "skill-detail" | "author-profile" | "security" | "about" | "cloud" | "changelog";
 type ShellVariant = "docs" | "full";
 type TocItem = { label: string; id: string };
 
@@ -65,7 +65,16 @@ const sidebarGroups = [
       { label: "Authoring", href: "/authoring" },
       { label: "SKILL.md anatomy", href: "/authoring#anatomy" },
       { label: "Schema", href: "/authoring#schema" },
-      { label: "Scoping", href: "/authoring#perms" }
+      { label: "Capabilities ref", href: "/authoring#perms" }
+    ]
+  },
+  {
+    title: "Permissions",
+    items: [
+      { label: "Permissions", href: "/permissions" },
+      { label: "Capabilities", href: "/permissions#capabilities" },
+      { label: "Transforms", href: "/permissions#transforms" },
+      { label: "Install scope", href: "/permissions#install-scope" }
     ]
   },
   {
@@ -104,9 +113,24 @@ const configs: Record<PageKey, { active: string; sidebarActive: string; variant:
       { label: "Anatomy of a SKILL.md", id: "anatomy" },
       { label: "Frontmatter schema", id: "schema" },
       { label: "Transformation manifest", id: "manifest" },
-      { label: "Scope and permissions", id: "perms" },
+      { label: "Capabilities reference", id: "perms" },
       { label: "Try the gate", id: "playground" },
       { label: "Admission", id: "publish" }
+    ]
+  },
+  permissions: {
+    active: "Permissions",
+    sidebarActive: "Permissions",
+    variant: "docs",
+    toc: [
+      { label: "Start here", id: "story" },
+      { label: "Layer 1 — Capabilities", id: "capabilities" },
+      { label: "Layer 2 — Transforms", id: "transforms" },
+      { label: "Layer 3 — Install scope", id: "install-scope" },
+      { label: "Agent-mediated install", id: "agents-do-the-work" },
+      { label: "Open SKILL.md compat", id: "open-skill-md" },
+      { label: "Deep dive", id: "deep-dive" },
+      { label: "Where next", id: "next" }
     ]
   },
   skills: { active: "Examples", sidebarActive: "Examples", variant: "full", toc: [] },
@@ -124,8 +148,12 @@ const configs: Record<PageKey, { active: string; sidebarActive: string; variant:
 const searchResults = [
   { title: "Quick start", section: "Get started", href: "/quick-start", terms: "install local vault doctor first skill scope run vault anatomy add-local autovault_skill_install bootstrap" },
   { title: "Vault anatomy", section: "Get started", href: "/quick-start#vault-anatomy", terms: "vault folder tree anatomy signatures rendered profiles audit access map" },
-  { title: "Authoring skills", section: "Authoring", href: "/authoring", terms: "skill md schema tools_required transformations permissions agents admission gate propose_skill get_skill add_skill update_skill delete_skill include_resources scoping" },
-  { title: "SKILL.md schema", section: "Authoring", href: "/authoring#schema", terms: "frontmatter fields schema tools_required transformations permissions agents resources" },
+  { title: "Authoring skills", section: "Authoring", href: "/authoring", terms: "skill md schema tools_required transformations capabilities agents admission gate propose_skill get_skill add_skill update_skill delete_skill include_resources scoping" },
+  { title: "SKILL.md schema", section: "Authoring", href: "/authoring#schema", terms: "frontmatter fields schema tools_required transformations capabilities agents resources" },
+  { title: "Permissions model", section: "Permissions", href: "/permissions", terms: "permissions capabilities transforms install scope claude desktop project agents admission gate three layer model open skill md compat" },
+  { title: "Capabilities", section: "Permissions", href: "/permissions#capabilities", terms: "capabilities network filesystem readonly readwrite tools declared author signal" },
+  { title: "Transforms", section: "Permissions", href: "/permissions#transforms", terms: "transforms transform.md priority targets agents add remove tools per agent rendered profile" },
+  { title: "Install scope", section: "Permissions", href: "/permissions#install-scope", terms: "install scope agents project device profile link symlink claude codex sync-profiles host policy" },
   { title: "Verify a skill", section: "Authoring", href: "/authoring#playground", terms: "paste url playground browser gate diagnostics verify check skill" },
   { title: "Skill examples", section: "Reference", href: "/skills-directory", terms: "examples vault inventory filters agent category source refs mit license" },
   { title: "API reference", section: "Reference", href: "/api", terms: "cli library http mcp endpoint load render verify resolve add_skill update_skill delete_skill propose_skill get_skill check_updates" },
@@ -147,7 +175,10 @@ const activeSidebarLabel = computed(() => {
   if (props.page === "quick-start" && currentHash.value === "#vault-anatomy") return "Vault anatomy";
   if (props.page === "authoring" && currentHash.value === "#playground") return "Verify a skill";
   if (props.page === "authoring" && currentHash.value === "#schema") return "Schema";
-  if (props.page === "authoring" && currentHash.value === "#perms") return "Scoping";
+  if (props.page === "authoring" && currentHash.value === "#perms") return "Capabilities ref";
+  if (props.page === "permissions" && currentHash.value === "#capabilities") return "Capabilities";
+  if (props.page === "permissions" && currentHash.value === "#transforms") return "Transforms";
+  if (props.page === "permissions" && currentHash.value === "#install-scope") return "Install scope";
   return config.value.sidebarActive;
 });
 

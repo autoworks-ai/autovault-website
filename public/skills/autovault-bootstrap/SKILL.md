@@ -32,16 +32,14 @@ transformations:
     shell.run: exec_command
     fs.read: exec_command
     fs.write: apply_patch
-permissions:
+capabilities:
   network: true
-  egress:
-    - https://raw.githubusercontent.com/autoworks-ai/autovault/main/scripts/install.sh
-    - https://autovault.dev
-    - https://autovault.sh
-  fs_scope:
-    - "$TMPDIR/autovault-*"
-    - "~/.claude/skills/autovault-bootstrap"
-    - "~/.autovault"
+  filesystem: readwrite
+  tools:
+    - http.fetch
+    - shell.run
+    - fs.read
+    - fs.write
 agents:
   - claude-code
   - codex
