@@ -4,6 +4,19 @@ import { canonicalUrl, findPageDocByFile, SITE_URL, type PageDoc } from "./share
 
 const OG_IMAGE = `${SITE_URL}/og-1200x630.png`;
 const TWITTER_IMAGE = `${SITE_URL}/twitter-1200x600.png`;
+const PIRSCH_DATA_CODE = process.env.PIRSCH_DATA_CODE?.trim();
+
+const pirschHead: HeadConfig[] = PIRSCH_DATA_CODE
+  ? [[
+      "script",
+      {
+        defer: "",
+        src: "https://api.pirsch.io/pa.js",
+        id: "pianjs",
+        "data-code": PIRSCH_DATA_CODE
+      }
+    ]]
+  : [];
 
 function pageHead(doc: PageDoc): HeadConfig[] {
   const url = canonicalUrl(doc);
@@ -93,15 +106,7 @@ export default defineConfig({
       }
     ],
     ["meta", { name: "theme-color", content: "#0b1014" }],
-    [
-      "script",
-      {
-        defer: "",
-        src: "https://api.pirsch.io/pa.js",
-        id: "pianjs",
-        "data-code": "ooKBAPbmvXCA4hyKwoBDBx66yNyNswJL"
-      }
-    ]
+    ...pirschHead
   ],
   transformHead({ pageData }) {
     const doc = findPageDocByFile(pageData.relativePath);
