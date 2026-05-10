@@ -4,18 +4,18 @@
       <AvDocBreadcrumb section="Authoring" page="Write a SKILL.md" />
       <div class="eyebrow"><span class="dash" /> Authoring · 12 min read</div>
       <h1>A skill is one file.<br><span class="ital">Frontmatter, body, that's it.</span></h1>
-      <p class="lede">A SKILL.md is markdown with YAML frontmatter. AutoVault keeps the format plain, then validates the extra production fields it needs for capability mapping, permission signals, agent targeting, and signed delivery.</p>
+      <p class="lede">A SKILL.md is markdown with YAML frontmatter. AutoVault keeps the format plain, then validates the extra production fields it needs for capability mapping, capability signals, agent targeting, and signed delivery.</p>
       <div class="pillrow">
         <span class="pill">YAML frontmatter</span>
         <span class="pill">tools_required</span>
         <span class="pill">transformations</span>
-        <span class="pill">permissions</span>
+        <span class="pill">capabilities</span>
         <span class="pill">agents</span>
       </div>
     </section>
 
     <h2 id="anatomy">Hover a field to see what it does</h2>
-    <p>The colored rows show how the validation gate reads a skill: identity first, then tool requirements, rendering transforms, permission signals, and the markdown body the agent actually follows.</p>
+    <p>The colored rows show how the validation gate reads a skill: identity first, then tool requirements, rendering transforms, capability signals, and the markdown body the agent actually follows.</p>
     <div class="skill-viewer final-skill-viewer">
       <div class="skill-code code-block">
         <div class="file-head code-tab">
@@ -82,20 +82,25 @@
       </div>
     </div>
 
-    <h2 id="perms">Scope and permissions are separate</h2>
-    <p>Permissions are signals declared inside the skill. Scope is the local policy that decides where that signed skill can load. Keep both narrow; the host agent still owns runtime enforcement.</p>
-    <div class="scope-rows" aria-label="Example scope rows">
-      <div v-for="row in scopeRows" :key="row.axis" class="scope-row">
-        <span class="axis">{{ row.axis }}</span>
-        <span class="vals">
-          <span v-for="value in row.allowed" :key="value" class="v on">{{ value }}</span>
-          <span v-for="value in row.blocked" :key="value" class="v off">{{ value }}</span>
-        </span>
+    <h2 id="perms">The capabilities block, in author terms</h2>
+    <p>The full three-layer permission model — capabilities, transforms, and install scope — has its own page at <a href="/permissions">/permissions</a>. This section is the author-facing slice: what to put in the SKILL.md you are actually writing, and what AutoVault validates when it admits it.</p>
+    <p>Inside the skill, <code>capabilities</code> is the author's signal: which canonical tools the skill body uses, whether the network is needed, whether the filesystem is read-only or read-write. This is intent, not enforcement — the host agent still owns runtime gating. The schema is exactly three fields:</p>
+    <div class="schema final-schema" aria-label="capabilities block fields">
+      <div class="schema-row head">
+        <span>Field</span><span>Type</span><span>Required</span><span>Description</span>
+      </div>
+      <div v-for="row in capabilityRows" :key="row.field" class="schema-row">
+        <span class="f">{{ row.field }}</span>
+        <span class="t">{{ row.type }}</span>
+        <span><span class="badge" :class="row.required ? 'req' : 'no'">{{ row.required ? "yes" : "optional" }}</span></span>
+        <span class="d">{{ row.description }}</span>
       </div>
     </div>
+    <p class="muted">Per-agent renames belong in a separate <code>TRANSFORM.md</code>; install scope belongs outside the skill entirely. See <a href="/permissions#transforms">transforms</a> and <a href="/permissions#install-scope">install scope</a>.</p>
+
     <div class="dodont final-dodont">
-      <div class="col do"><div class="mono-label arg">Do</div><ul><li>Declare exact canonical tools in <code>tools_required</code>.</li><li>Use <code>permissions</code> for network and filesystem expectations.</li><li>Use local scope policy to choose agents, projects, and profile links.</li></ul></div>
-      <div class="col dont"><div class="mono-label bad">Don't</div><ul><li>Hide shell or browser access inside prose.</li><li>Embed credentials in frontmatter.</li><li>Ship broad helper skills when a narrow task skill will do.</li></ul></div>
+      <div class="col do"><div class="mono-label arg">Do (as an author)</div><ul><li>Declare canonical tools in <code>capabilities.tools</code> and let transforms rename them per agent.</li><li>Keep <code>capabilities.network</code> and <code>capabilities.filesystem</code> honest — the gate cross-checks the body.</li><li>Ship one canonical SKILL.md and a <code>TRANSFORM.md</code> per agent variant, not three forks.</li></ul></div>
+      <div class="col dont"><div class="mono-label bad">Don't</div><ul><li>Hide network or filesystem expectations in prose instead of the <code>capabilities</code> block.</li><li>Embed credentials, tokens, or shell scripts in frontmatter.</li><li>Encode host-level install decisions inside the skill — that is the operator's job.</li></ul></div>
     </div>
 
     <h2 id="playground">Try the gate yourself</h2>
@@ -204,10 +209,12 @@ const skillLines: SkillLine[] = [
   { id: "tr-5", text: "    fs.read: file_read", group: "trans" },
   { id: "tr-6", text: "    fs.write: file_write", group: "trans" },
   { id: "blank-4", text: "", group: null },
-  { id: "perm-key", text: "permissions:", group: "perm" },
+  { id: "perm-key", text: "capabilities:", group: "perm" },
   { id: "perm-1", text: "  network: false", group: "perm" },
-  { id: "perm-2", text: '  fs_scope: ["./inputs", "./outputs"]', group: "perm" },
-  { id: "perm-3", text: "  egress: deny", group: "perm" },
+  { id: "perm-2", text: "  filesystem: readonly", group: "perm" },
+  { id: "perm-3", text: "  tools:", group: "perm" },
+  { id: "perm-4", text: "    - fs.read", group: "perm" },
+  { id: "perm-5", text: "    - fs.write", group: "perm" },
   { id: "blank-5", text: "", group: null },
   { id: "fm-close", text: "---", group: "fm" },
   { id: "blank-6", text: "", group: null },
@@ -220,13 +227,13 @@ const skillLines: SkillLine[] = [
 ];
 
 const explanations = {
-  fm: { lines: "L1, L28", label: "frontmatter", short: "YAML boundary", required: true, title: "YAML frontmatter delimiters", body: "<p>The skill begins and ends its metadata block with <code>---</code>. Everything between is parsed as YAML; everything after is markdown instruction content.</p><p>The gate repairs common frontmatter mistakes before it performs the strict schema and security checks.</p>" },
+  fm: { lines: "L1, L30", label: "frontmatter", short: "YAML boundary", required: true, title: "YAML frontmatter delimiters", body: "<p>The skill begins and ends its metadata block with <code>---</code>. Everything between is parsed as YAML; everything after is markdown instruction content.</p><p>The gate repairs common frontmatter mistakes before it performs the strict schema and security checks.</p>" },
   id: { lines: "L2-L5", label: "identity", short: "name, version, license", required: true, title: "Identity block", body: "<p><code>name</code> and <code>version</code> form the canonical lookup key. <code>description</code> is loaded during discovery, so it should stay direct and short.</p><p>Use kebab-case names and semver-like versions so updates can be compared cleanly.</p>" },
   tools: { lines: "L7-L9", label: "tools_required", short: "canonical capabilities", required: true, title: "Canonical tool requirements", body: "<p>The skill declares the capabilities it expects using AutoVault's stable names, not one agent's temporary tool vocabulary.</p><p>The capability/behavior check compares these declarations with the body and transform maps.</p>" },
   agents: { lines: "L11-L13", label: "agents", short: "target callers", required: false, title: "Target agents", body: "<p><code>agents</code> tells the renderer which callers this skill is prepared to support. Local scope policy can narrow this further by project, device, or profile link.</p>" },
   trans: { lines: "L15-L21", label: "transformations", short: "per-agent mapping", required: false, title: "Per-caller transformation", body: "<p>The transform map rewrites canonical capability names into each agent's native tool names at render time.</p><p>That keeps the source skill reviewable while still producing caller-specific output.</p>" },
-  perm: { lines: "L23-L26", label: "permissions", short: "runtime expectations", required: false, title: "Permission boundaries", body: "<p>Permission fields are signals to the host agent about expected network, filesystem, and egress behavior.</p><p>AutoVault validates and surfaces them. The agent or runtime sandbox owns actual enforcement.</p>" },
-  body: { lines: "L30-L35", label: "body", short: "agent instructions", required: true, title: "Skill body", body: "<p>The markdown body is what the agent reads when the skill is loaded. Keep it operational, specific, and short enough that discovery stays cheap.</p><p>Use packaged resources only when the body needs deeper reference material.</p>" }
+  perm: { lines: "L23-L28", label: "capabilities", short: "declared boundaries", required: false, title: "Capability declarations", body: "<p>The <code>capabilities</code> block is the author's signal: <code>network</code> on or off, <code>filesystem</code> as <code>readonly</code> or <code>readwrite</code>, and the canonical <code>tools</code> the skill body uses.</p><p>AutoVault validates and surfaces these. Per-agent transforms can override them at render time, and the host agent still owns runtime enforcement.</p>" },
+  body: { lines: "L32-L37", label: "body", short: "agent instructions", required: true, title: "Skill body", body: "<p>The markdown body is what the agent reads when the skill is loaded. Keep it operational, specific, and short enough that discovery stays cheap.</p><p>Use packaged resources only when the body needs deeper reference material.</p>" }
 } as const;
 
 const hovered = ref<AnnotationGroup>("tools");
@@ -244,16 +251,15 @@ const schemaRows: SchemaRow[] = [
   { field: "license", type: "string", required: false, description: "License metadata. First-party examples currently use MIT." },
   { field: "tools_required", type: "string[]", required: true, description: "Canonical capability names the skill body expects to use." },
   { field: "transformations", type: "agent map", required: false, description: "Per-agent mapping from canonical capabilities to caller-specific tool names." },
-  { field: "permissions", type: "object", required: false, description: "Network, filesystem, egress, and runtime expectation signals." },
+  { field: "capabilities", type: "object", required: false, description: "Network, filesystem (readonly/readwrite), and canonical tools declared by the skill author." },
   { field: "agents", type: "string[]", required: false, description: "Supported target agents before local scope narrows delivery." },
   { field: "resources", type: "file[]", required: false, description: "Packaged files loaded through get_skill with include_resources." }
 ];
 
-const scopeRows = [
-  { axis: "agents", allowed: ["claude-code", "codex"], blocked: ["cursor", "autohub"] },
-  { axis: "project", allowed: ["autovault-website"], blocked: ["client-foo", "internal/*"] },
-  { axis: "device", allowed: ["this host"], blocked: ["ci", "shared runner"] },
-  { axis: "profile link", allowed: ["~/.codex/skills", "~/.claude/skills"], blocked: ["global fallback"] }
+const capabilityRows: SchemaRow[] = [
+  { field: "network", type: "boolean", required: false, description: "Whether the skill needs outbound network access. Defaults to false." },
+  { field: "filesystem", type: '"readonly" | "readwrite"', required: false, description: "Filesystem access expected by the skill body." },
+  { field: "tools", type: "string[]", required: false, description: "Canonical tool names the skill expects. Per-agent transforms can rename or override these." }
 ];
 
 const src = ref(`---
@@ -267,9 +273,11 @@ transformations:
     http.fetch: web_fetch
   codex:
     http.fetch: browser_request
-permissions:
+capabilities:
   network: true
-  egress: allowlist
+  filesystem: readonly
+  tools:
+    - http.fetch
 agents:
   - claude-code
   - codex
@@ -338,9 +346,11 @@ transformations:
     http.fetch: web_fetch
   codex:
     http.fetch: browser_request
-permissions:
+capabilities:
   network: true
-  egress: allowlist
+  filesystem: readonly
+  tools:
+    - http.fetch
 agents:
   - claude-code
   - codex

@@ -9,6 +9,7 @@ export type PageDocKey =
   | "cloud"
   | "quick-start"
   | "authoring"
+  | "permissions"
   | "skills-directory"
   | "api"
   | "deploy"
@@ -161,7 +162,7 @@ Use hosted AutoVault when a team wants to reserve its cloud namespace and join t
 
 const authoringMarkdown = `# Authoring AutoVault Skills
 
-A skill is one SKILL.md file: YAML frontmatter plus a markdown body. AutoVault validates production fields for identity, capability declarations, transform maps, permission signals, resources, and target agents.
+A skill is one SKILL.md file: YAML frontmatter plus a markdown body. AutoVault validates production fields for identity, canonical tools, transform maps, capability declarations, resources, and target agents.
 
 ## Minimal shape
 
@@ -181,10 +182,12 @@ transformations:
   codex:
     fs.read: file_read
     fs.write: file_write
-permissions:
+capabilities:
   network: false
-  fs_scope: ["./inputs", "./outputs"]
-  egress: deny
+  filesystem: readonly
+  tools:
+    - fs.read
+    - fs.write
 agents:
   - claude-code
   - codex
@@ -198,9 +201,9 @@ Use this skill when the user wants to create or repair a SKILL.md file.
 ## Schema and validation
 
 - Keep name kebab-case, version semver-like, and description short.
-- Declare capabilities in tools_required using canonical names.
+- Declare canonical tool names in tools_required.
 - Map caller-specific tool names in transformations instead of forking the skill.
-- Keep permissions narrow and treat them as runtime signals for the host agent.
+- Use the capabilities block for declared network, filesystem, and tool boundaries; the host agent still owns runtime enforcement.
 - Package resources beside SKILL.md and load them through get_skill with include_resources.
 
 ## Scope
@@ -210,6 +213,41 @@ Scope is local policy, not a frontmatter substitute. Use it to decide which agen
 ## Admission
 
 Use propose_skill while iterating, add_skill for trusted remote sources or local bundles, and update_skill when replacing an existing skill. All write paths run through the validation and signing gate.`;
+
+const permissionsMarkdown = `# AutoVault Permissions Model
+
+AutoVault keeps three independent answers to "what can a skill do, where, and for whom" so the canonical SKILL.md stays portable while operators stay in control. The three layers are configured separately and visible in plain text.
+
+## Layer 1 — Capabilities
+
+The author declares a small block inside SKILL.md describing what the skill expects: network on or off, filesystem readonly or readwrite, the canonical tool names the body calls.
+
+\`\`\`yaml
+capabilities:
+  network: false
+  filesystem: readonly
+  tools:
+    - fs.read
+    - fs.write
+\`\`\`
+
+This is the author's signal, not enforcement. The admission gate validates the shape and rejects skills whose body contradicts their declarations. A SKILL.md without a capabilities block is accepted with a warning.
+
+## Layer 2 — Transforms
+
+A separate TRANSFORM.md rewrites those declarations per agent. Transforms can add tools, remove tools, flip network, or change filesystem access. Multiple transforms stack in priority order; targets.agents narrows a transform to specific agents (or matches every agent when empty). The author writes one canonical SKILL.md and AutoVault renders one profile per agent at install time.
+
+## Layer 3 — Install scope
+
+After AutoVault renders a profile for an agent, install scope decides whether that profile is symlinked into a host's ~/.claude/skills, ~/.codex/skills, or another agent surface. The agents axis is enforced by autovault sync-profiles. project, device, and profile link are host-policy hooks the local installer composes.
+
+## Agent-mediated install
+
+Operators do not write capabilities, transforms, or scope by hand. Agents understand the model and ask the install-scope questions in plain English: which agents, which projects, which devices. The skill author wrote intent; the operator supplied policy; AutoVault is where those two meet.
+
+## Compatibility
+
+The SKILL.md shape matches the open spec used by Claude Code skills: YAML frontmatter, markdown body. capabilities, transformations, and agents are optional fields layered on top — the gate accepts open-spec skills without them and uses warnings to flag missing declarations rather than blocking admission.`;
 
 const skillsMarkdown = `# AutoVault Skill Examples
 
@@ -434,6 +472,15 @@ export const pageDocs: PageDoc[] = [
     route: "/authoring",
     agentPath: "/agents/authoring",
     markdown: authoringMarkdown
+  },
+  {
+    key: "permissions",
+    file: "permissions.md",
+    title: "AutoVault Permissions",
+    description: "AutoVault's three-layer permission model — capabilities, transforms, install scope — explained the way agents already use it.",
+    route: "/permissions",
+    agentPath: "/agents/permissions",
+    markdown: permissionsMarkdown
   },
   {
     key: "skills-directory",

@@ -202,9 +202,9 @@ export function evaluateSkillDocument(source: string, sourceLabel = "pasted SKIL
     kind: unusedTools.length ? "warn" : "ok"
   });
 
-  const permissionResult = validatePermissions(metadata.permissions, tools, extracted.lines, extracted.closingLine);
-  checks.push(permissionResult.check);
-  issues.push(...permissionResult.issues);
+  const capabilityResult = validateCapabilities(metadata.capabilities, extracted.lines, extracted.closingLine);
+  checks.push(capabilityResult.check);
+  issues.push(...capabilityResult.issues);
   checks.push({
     name: "transformation manifest",
     detail: transforms.length ? `${transforms.length} render target${transforms.length === 1 ? "" : "s"} mapped` : "canonical-only · no transform targets",
@@ -280,34 +280,60 @@ function buildInstallLines(skill: ParsedSkill | null, signature: string | null, 
   ];
 }
 
-function validatePermissions(value: unknown, tools: string[], lines: string[], closingLine: number): { check: GateCheck; issues: GateIssue[] } {
+// Validates the `capabilities` block against the canonical AutoVault schema:
+// network is a boolean, filesystem is the "readonly" | "readwrite" enum, and
+// tools is a string[]. Earlier copies of this gate validated a richer
+// `permissions: { network, egress, fs_scope }` shape that does not exist in
+// autovault/src/validation/schema.ts — a SKILL.md the website said was clean
+// could be admitted by the real vault with zero capability metadata. The
+// rename keeps the docs and the runtime gate honest.
+function validateCapabilities(
+  value: unknown,
+  lines: string[],
+  closingLine: number
+): { check: GateCheck; issues: GateIssue[] } {
   const issues: GateIssue[] = [];
-  const permissionsLine = findYamlKeyLine(lines, "permissions", closingLine) ?? insertionLine({ closingLine });
+  const capabilitiesLine = findYamlKeyLine(lines, "capabilities", closingLine) ?? insertionLine({ closingLine });
+
   if (value === undefined) {
-    issues.push(createIssue("permissions", "warn", "permissions not declared; host will prompt broadly", permissionsLine, permissionsLine));
-    return { check: { name: "permissions", detail: "not declared · host will prompt broadly", kind: "warn" }, issues };
+    issues.push(
+      createIssue("capabilities", "warn", "capabilities not declared; host will prompt broadly", capabilitiesLine, capabilitiesLine)
+    );
+    return {
+      check: { name: "capabilities", detail: "not declared · host will prompt broadly", kind: "warn" },
+      issues
+    };
   }
+
   if (!isRecord(value)) {
-    issues.push(createIssue("permissions", "fail", "permissions must be a mapping", permissionsLine, permissionsLine));
-    return { check: { name: "permissions", detail: "permissions must be a mapping", kind: "fail" }, issues };
+    issues.push(createIssue("capabilities", "fail", "capabilities must be a mapping", capabilitiesLine, capabilitiesLine));
+    return { check: { name: "capabilities", detail: "capabilities must be a mapping", kind: "fail" }, issues };
   }
+
   if ("network" in value && typeof value.network !== "boolean") {
-    const line = findNestedYamlKeyLine(lines, "permissions", "network", closingLine) ?? permissionsLine;
-    issues.push(createIssue("permissions", "fail", "network must be true or false", line, line));
-    return { check: { name: "permissions", detail: "network must be true or false", kind: "fail" }, issues };
+    const line = findNestedYamlKeyLine(lines, "capabilities", "network", closingLine) ?? capabilitiesLine;
+    issues.push(createIssue("capabilities", "fail", "network must be true or false", line, line));
+    return { check: { name: "capabilities", detail: "network must be true or false", kind: "fail" }, issues };
   }
-  const fsTools = tools.some((tool) => tool.startsWith("fs."));
-  if (fsTools && !("fs_scope" in value)) {
-    const line = permissionsLine;
-    issues.push(createIssue("permissions", "warn", "fs tool declared without fs_scope boundary", line, line));
-    return { check: { name: "permissions", detail: "fs tool declared without fs_scope", kind: "warn" }, issues };
+
+  if ("filesystem" in value && value.filesystem !== "readonly" && value.filesystem !== "readwrite") {
+    const line = findNestedYamlKeyLine(lines, "capabilities", "filesystem", closingLine) ?? capabilitiesLine;
+    issues.push(
+      createIssue("capabilities", "fail", 'filesystem must be "readonly" or "readwrite"', line, line)
+    );
+    return {
+      check: { name: "capabilities", detail: 'filesystem must be "readonly" or "readwrite"', kind: "fail" },
+      issues
+    };
   }
-  if (value.network === true && !("egress" in value)) {
-    const line = findNestedYamlKeyLine(lines, "permissions", "network", closingLine) ?? permissionsLine;
-    issues.push(createIssue("permissions", "warn", "network true without egress boundary", line, line));
-    return { check: { name: "permissions", detail: "network true without egress boundary", kind: "warn" }, issues };
+
+  if ("tools" in value && !Array.isArray(value.tools)) {
+    const line = findNestedYamlKeyLine(lines, "capabilities", "tools", closingLine) ?? capabilitiesLine;
+    issues.push(createIssue("capabilities", "fail", "tools must be a YAML list", line, line));
+    return { check: { name: "capabilities", detail: "tools must be a YAML list", kind: "fail" }, issues };
   }
-  return { check: { name: "permissions", detail: "boundaries declared", kind: "ok" }, issues };
+
+  return { check: { name: "capabilities", detail: "boundaries declared", kind: "ok" }, issues };
 }
 
 function bodyMentionsCapability(body: string, tool: string): boolean {
