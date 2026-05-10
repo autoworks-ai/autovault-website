@@ -8,6 +8,7 @@ import LandingPage from "./components/LandingPage.vue";
 import DocsShell from "./components/DocsShell.vue";
 import QuickStartPage from "./components/QuickStartPage.vue";
 import AuthoringPage from "./components/AuthoringPage.vue";
+import PermissionsPage from "./components/PermissionsPage.vue";
 import SkillsDirectoryPage from "./components/SkillsDirectoryPage.vue";
 import SecurityPage from "./components/SecurityPage.vue";
 import ChangelogPage from "./components/ChangelogPage.vue";
@@ -34,6 +35,7 @@ export default {
     app.component("DocsShell", DocsShell);
     app.component("QuickStartPage", QuickStartPage);
     app.component("AuthoringPage", AuthoringPage);
+    app.component("PermissionsPage", PermissionsPage);
     app.component("SkillsDirectoryPage", SkillsDirectoryPage);
     app.component("SecurityPage", SecurityPage);
     app.component("ChangelogPage", ChangelogPage);
