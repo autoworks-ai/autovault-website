@@ -92,7 +92,16 @@ export default defineConfig({
         href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap"
       }
     ],
-    ["meta", { name: "theme-color", content: "#0b1014" }]
+    ["meta", { name: "theme-color", content: "#0b1014" }],
+    [
+      "script",
+      {
+        defer: "",
+        src: "https://api.pirsch.io/pa.js",
+        id: "pianjs",
+        "data-code": "ooKBAPbmvXCA4hyKwoBDBx66yNyNswJL"
+      }
+    ]
   ],
   transformHead({ pageData }) {
     const doc = findPageDocByFile(pageData.relativePath);
