@@ -211,7 +211,7 @@ const skillLines: SkillLine[] = [
   { id: "blank-4", text: "", group: null },
   { id: "perm-key", text: "capabilities:", group: "perm" },
   { id: "perm-1", text: "  network: false", group: "perm" },
-  { id: "perm-2", text: "  filesystem: readonly", group: "perm" },
+  { id: "perm-2", text: "  filesystem: readwrite", group: "perm" },
   { id: "perm-3", text: "  tools:", group: "perm" },
   { id: "perm-4", text: "    - fs.read", group: "perm" },
   { id: "perm-5", text: "    - fs.write", group: "perm" },

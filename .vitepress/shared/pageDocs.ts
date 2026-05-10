@@ -184,7 +184,7 @@ transformations:
     fs.write: file_write
 capabilities:
   network: false
-  filesystem: readonly
+  filesystem: readwrite
   tools:
     - fs.read
     - fs.write
@@ -225,13 +225,13 @@ The author declares a small block inside SKILL.md describing what the skill expe
 \`\`\`yaml
 capabilities:
   network: false
-  filesystem: readonly
+  filesystem: readwrite
   tools:
     - fs.read
     - fs.write
 \`\`\`
 
-This is the author's signal, not enforcement. The admission gate validates the shape and rejects skills whose body contradicts their declarations. A SKILL.md without a capabilities block is accepted with a warning.
+This is the author's signal, not enforcement. The admission gate validates the shape (types, enums, list contents) and runs a small denylist on the body; the agent at install time is what compares the declaration against what the skill actually does. A SKILL.md without a capabilities block is accepted with a warning.
 
 ## Layer 2 — Transforms
 

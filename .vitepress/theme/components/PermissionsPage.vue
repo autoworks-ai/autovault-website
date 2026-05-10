@@ -39,11 +39,11 @@
     <p>The author of a skill puts a small <code>capabilities</code> block at the top of the SKILL.md. Three fields, no surprises:</p>
     <pre class="mono-block">capabilities:
   network: false
-  filesystem: readonly
+  filesystem: readwrite
   tools:
     - fs.read
     - fs.write</pre>
-    <p>This is the author's signal: "I read files, I do not need the network, and these are the canonical tool names I call." It is not enforcement — the agent on your machine still owns what actually happens at runtime — but it makes the skill's expectations explicit and reviewable. AutoVault's admission gate validates the shape (types, enums, list contents) and runs a small denylist on the body; the agent at install time is what compares the declaration against what the skill actually does.</p>
+    <p>This is the author's signal: "I read and write files, I do not need the network, and these are the canonical tool names I call." It is not enforcement — the agent on your machine still owns what actually happens at runtime — but it makes the skill's expectations explicit and reviewable. AutoVault's admission gate validates the shape (types, enums, list contents) and runs a small denylist on the body; the agent at install time is what compares the declaration against what the skill actually does.</p>
     <p class="muted">A skill without a <code>capabilities</code> block is accepted with a warning. AutoVault treats the block as optional metadata that improves on the open SKILL.md shape rather than as a new mandatory contract.</p>
 
     <h2 id="transforms">Layer 2 — What each agent calls those tools</h2>
@@ -55,7 +55,7 @@
         <div class="mono-label"><span class="swatch" style="background:#5ad6c0;display:inline-block;margin-right:8px" />rendered/claude-code/extract-pdf/SKILL.md</div>
         <pre class="mono-block">capabilities:
   network: false
-  filesystem: readonly
+  filesystem: readwrite
   tools:
     - read
     - write</pre>
@@ -65,7 +65,7 @@
         <div class="mono-label"><span class="swatch" style="background:#f7c97a;display:inline-block;margin-right:8px" />rendered/codex/extract-pdf/SKILL.md</div>
         <pre class="mono-block">capabilities:
   network: false
-  filesystem: readonly
+  filesystem: readwrite
   tools:
     - file_read
     - file_write</pre>

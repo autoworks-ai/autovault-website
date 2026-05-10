@@ -35,7 +35,7 @@ export const baseSkill = {
   description: "Extract structured text from PDF files.",
   capabilities: {
     network: false,
-    filesystem: "readonly",
+    filesystem: "readwrite",
     tools: ["fs.read", "fs.write"]
   } satisfies DeclaredCapabilities
 };
@@ -50,6 +50,19 @@ export const transformExamples: TransformExample[] = [
     capability_overrides: {
       tools: {
         add: ["read", "write"],
+        remove: ["fs.read", "fs.write"]
+      }
+    }
+  },
+  {
+    id: "codex-defaults",
+    name: "codex-defaults",
+    description: "Rename canonical fs tools to Codex's native names.",
+    priority: 10,
+    targets: { agents: ["codex"] },
+    capability_overrides: {
+      tools: {
+        add: ["file_read", "file_write"],
         remove: ["fs.read", "fs.write"]
       }
     }
