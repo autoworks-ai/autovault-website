@@ -99,7 +99,7 @@
     <p class="muted">Per-agent renames belong in a separate <code>TRANSFORM.md</code>; install scope belongs outside the skill entirely. See <a href="/permissions#transforms">transforms</a> and <a href="/permissions#install-scope">install scope</a>.</p>
 
     <div class="dodont final-dodont">
-      <div class="col do"><div class="mono-label arg">Do (as an author)</div><ul><li>Declare canonical tools in <code>capabilities.tools</code> and let transforms rename them per agent.</li><li>Keep <code>capabilities.network</code> and <code>capabilities.filesystem</code> honest — the gate cross-checks the body.</li><li>Ship one canonical SKILL.md and a <code>TRANSFORM.md</code> per agent variant, not three forks.</li></ul></div>
+      <div class="col do"><div class="mono-label arg">Do (as an author)</div><ul><li>List the canonical capabilities the skill body uses in <code>tools_required</code> — this is the field the gate checks against the body, and the one transforms map per agent.</li><li>Add a <code>capabilities</code> block alongside it to declare <code>network</code>, <code>filesystem</code>, and (optionally) the same tool list as readable metadata for reviewers and agents.</li><li>Ship one canonical SKILL.md and a <code>TRANSFORM.md</code> per agent variant, not three forks.</li></ul></div>
       <div class="col dont"><div class="mono-label bad">Don't</div><ul><li>Hide network or filesystem expectations in prose instead of the <code>capabilities</code> block.</li><li>Embed credentials, tokens, or shell scripts in frontmatter.</li><li>Encode host-level install decisions inside the skill — that is the operator's job.</li></ul></div>
     </div>
 

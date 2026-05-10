@@ -104,6 +104,38 @@ Read files.`;
     );
   });
 
+  it("flags non-string entries inside capabilities.tools", () => {
+    const skill = `---
+name: junk-tools
+version: 0.1.0
+description: "tools list contains non-strings"
+tools_required:
+  - fs.read
+capabilities:
+  network: false
+  filesystem: readonly
+  tools:
+    - 1
+    - true
+---
+
+# Junk
+
+Read files.`;
+    const result = evaluateSkillDocument(skill);
+
+    expect(result.passed).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          check: "capabilities",
+          severity: "fail",
+          message: expect.stringMatching(/tools entries must be non-empty strings/)
+        })
+      ])
+    );
+  });
+
   it("warns when capabilities are not declared at all", () => {
     const skill = `---
 name: bare

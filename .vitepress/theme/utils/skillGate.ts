@@ -327,10 +327,17 @@ function validateCapabilities(
     };
   }
 
-  if ("tools" in value && !Array.isArray(value.tools)) {
+  if ("tools" in value) {
     const line = findNestedYamlKeyLine(lines, "capabilities", "tools", closingLine) ?? capabilitiesLine;
-    issues.push(createIssue("capabilities", "fail", "tools must be a YAML list", line, line));
-    return { check: { name: "capabilities", detail: "tools must be a YAML list", kind: "fail" }, issues };
+    if (!Array.isArray(value.tools)) {
+      issues.push(createIssue("capabilities", "fail", "tools must be a YAML list", line, line));
+      return { check: { name: "capabilities", detail: "tools must be a YAML list", kind: "fail" }, issues };
+    }
+    const invalid = value.tools.find((entry) => typeof entry !== "string" || entry.trim().length === 0);
+    if (invalid !== undefined) {
+      issues.push(createIssue("capabilities", "fail", "tools entries must be non-empty strings", line, line));
+      return { check: { name: "capabilities", detail: "tools entries must be non-empty strings", kind: "fail" }, issues };
+    }
   }
 
   return { check: { name: "capabilities", detail: "boundaries declared", kind: "ok" }, issues };

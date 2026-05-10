@@ -12815,10 +12815,8 @@ body {
 .cd-docs-content .docs-rich > .process-ribbon,
 .cd-docs-content .docs-rich > .next-grid,
 .cd-docs-content .docs-rich > .transform-stacker,
-.cd-docs-content .docs-rich > .perms-story,
 .cd-docs-content .docs-rich > .perms-storyboard,
-.cd-docs-content .docs-rich > .perms-overlay,
-.cd-docs-content .docs-rich > .perms-compat {
+.cd-docs-content .docs-rich > .perms-overlay {
   max-width: 1120px;
 }
 

@@ -43,7 +43,7 @@
   tools:
     - fs.read
     - fs.write</pre>
-    <p>This is the author's signal: "I read files, I do not need the network, and these are the canonical tool names I call." It is not enforcement — the agent on your machine still owns what actually happens at runtime — but it makes the skill's expectations explicit and reviewable. AutoVault's admission gate validates the shape; if a skill's body uses <code>curl</code> but declares <code>network: false</code>, it is rejected.</p>
+    <p>This is the author's signal: "I read files, I do not need the network, and these are the canonical tool names I call." It is not enforcement — the agent on your machine still owns what actually happens at runtime — but it makes the skill's expectations explicit and reviewable. AutoVault's admission gate validates the shape (types, enums, list contents) and runs a small denylist on the body; the agent at install time is what compares the declaration against what the skill actually does.</p>
     <p class="muted">A skill without a <code>capabilities</code> block is accepted with a warning. AutoVault treats the block as optional metadata that improves on the open SKILL.md shape rather than as a new mandatory contract.</p>
 
     <h2 id="transforms">Layer 2 — What each agent calls those tools</h2>
