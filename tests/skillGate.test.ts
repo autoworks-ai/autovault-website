@@ -163,6 +163,50 @@ Fetch data over http.`;
     );
   });
 
+  it("warns when the capabilities block has no recognized fields", () => {
+    const skill = `---
+name: empty-caps
+version: 0.1.0
+description: "capabilities block present but empty"
+tools_required:
+  - fs.read
+capabilities: {}
+---
+
+# Empty
+
+Read files.`;
+    const result = evaluateSkillDocument(skill);
+
+    const capabilityCheck = result.checks.find((check) => check.name === "capabilities");
+    expect(capabilityCheck?.kind).toBe("warn");
+    expect(capabilityCheck?.detail).toMatch(/no recognized fields/);
+  });
+
+  it("reports which capability fields were declared in the OK detail", () => {
+    const skill = `---
+name: declared
+version: 0.1.0
+description: "all three fields declared"
+tools_required:
+  - fs.read
+capabilities:
+  network: false
+  filesystem: readonly
+  tools:
+    - fs.read
+---
+
+# Declared
+
+Read files.`;
+    const result = evaluateSkillDocument(skill);
+
+    const capabilityCheck = result.checks.find((check) => check.name === "capabilities");
+    expect(capabilityCheck?.kind).toBe("ok");
+    expect(capabilityCheck?.detail).toMatch(/3 fields declared.*network.*filesystem.*tools/);
+  });
+
   it("normalizes GitHub blob URLs to raw URLs", () => {
     expect(normalizeSkillUrl("https://github.com/autoworks-ai/skills/blob/main/weather/SKILL.md")).toBe(
       "https://raw.githubusercontent.com/autoworks-ai/skills/main/weather/SKILL.md"

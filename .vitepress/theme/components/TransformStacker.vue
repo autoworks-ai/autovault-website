@@ -1,21 +1,26 @@
 <template>
   <div class="transform-stacker" :data-agent="agent">
     <div class="ts-controls">
-      <div class="ts-agent-pick">
-        <span class="mono-label">target agent</span>
-        <div class="ts-agent-row" role="radiogroup" aria-label="Target agent">
-          <button
+      <fieldset class="ts-agent-pick">
+        <legend class="mono-label">target agent</legend>
+        <div class="ts-agent-row">
+          <label
             v-for="option in agentOptions"
             :key="option"
-            type="button"
             class="ts-agent-btn"
             :class="{ active: agent === option }"
-            role="radio"
-            :aria-checked="agent === option"
-            @click="agent = option"
-          >{{ option }}</button>
+          >
+            <input
+              type="radio"
+              name="ts-agent"
+              :value="option"
+              :checked="agent === option"
+              @change="agent = option"
+            />
+            <span>{{ option }}</span>
+          </label>
         </div>
-      </div>
+      </fieldset>
     </div>
 
     <div class="ts-grid">

@@ -340,7 +340,25 @@ function validateCapabilities(
     }
   }
 
-  return { check: { name: "capabilities", detail: "boundaries declared", kind: "ok" }, issues };
+  const declaredFields = ["network", "filesystem", "tools"].filter((field) => field in value);
+  if (declaredFields.length === 0) {
+    issues.push(
+      createIssue(
+        "capabilities",
+        "warn",
+        "capabilities block has no recognized fields (network/filesystem/tools)",
+        capabilitiesLine,
+        capabilitiesLine
+      )
+    );
+    return {
+      check: { name: "capabilities", detail: "no recognized fields set", kind: "warn" },
+      issues
+    };
+  }
+
+  const detail = `${declaredFields.length} ${declaredFields.length === 1 ? "field" : "fields"} declared (${declaredFields.join(", ")})`;
+  return { check: { name: "capabilities", detail, kind: "ok" }, issues };
 }
 
 function bodyMentionsCapability(body: string, tool: string): boolean {
