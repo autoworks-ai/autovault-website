@@ -4037,6 +4037,12 @@ body {
   letter-spacing: 0;
 }
 
+.cd-docs-content .docs-rich > h3 {
+  margin: 32px 0 8px;
+  padding-top: 8px;
+  scroll-margin-top: 92px;
+}
+
 .cd-docs-content .breadcrumbs {
   display: flex;
   align-items: center;
@@ -12293,6 +12299,245 @@ body {
   margin-top: 20px;
 }
 
+.transform-stacker {
+  margin: 16px 0 28px;
+  display: grid;
+  gap: 14px;
+}
+
+.ts-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+
+.ts-agent-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.ts-agent-pick > legend {
+  padding: 0;
+}
+
+.ts-agent-row {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ts-agent-btn {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink-2);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font: 12px/1.3 var(--mono);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ts-agent-btn > input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.ts-agent-btn:hover {
+  color: var(--ink);
+}
+
+.ts-agent-btn:focus-within {
+  outline: 2px solid rgba(90, 214, 192, 0.55);
+  outline-offset: 2px;
+}
+
+.ts-agent-btn.active {
+  border-color: rgba(90, 214, 192, 0.45);
+  background: rgba(90, 214, 192, 0.08);
+  color: var(--ink);
+}
+
+.ts-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.ts-col {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ts-col .card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font: 12px/1.3 var(--mono);
+  color: var(--ink-2);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+
+.ts-pre {
+  font: 12px/1.5 var(--mono);
+  margin: 0;
+  white-space: pre;
+  overflow-x: auto;
+  color: var(--ink);
+  background: transparent;
+  padding: 0;
+}
+
+.ts-foot {
+  font: 11px/1.3 var(--mono);
+  border-top: 1px dashed var(--line);
+  padding-top: 8px;
+  word-break: break-all;
+}
+
+.ts-transform-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.ts-transform {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.015);
+  display: grid;
+  gap: 6px;
+}
+
+.ts-transform.applied {
+  border-color: rgba(90, 214, 192, 0.32);
+  background: rgba(90, 214, 192, 0.04);
+}
+
+.ts-transform.skipped {
+  opacity: 0.55;
+}
+
+.ts-transform.disabled {
+  opacity: 0.42;
+  border-style: dashed;
+}
+
+.ts-transform-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.ts-transform-head input[type="checkbox"] {
+  margin: 0;
+}
+
+.ts-name {
+  font: 13px/1.3 var(--mono);
+  color: var(--ink);
+}
+
+.ts-priority {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.ts-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font: 11px/1.3 var(--mono);
+  color: var(--ink-3);
+}
+
+.ts-target {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 8px;
+  color: var(--ink-3);
+}
+
+.ts-target.on {
+  border-color: rgba(90, 214, 192, 0.45);
+  color: var(--ink);
+  background: rgba(90, 214, 192, 0.08);
+}
+
+.ts-target.all {
+  border-style: dashed;
+  color: var(--ink-2);
+}
+
+.ts-overrides {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 3px;
+  font: 12px/1.4 var(--mono);
+}
+
+.ts-override {
+  display: flex;
+  gap: 8px;
+}
+
+.ts-override .op {
+  min-width: 64px;
+  color: var(--ink-3);
+}
+
+.ts-override.add .op {
+  color: rgba(90, 214, 192, 0.95);
+}
+
+.ts-override.remove .op {
+  color: rgba(217, 113, 113, 0.95);
+}
+
+.ts-override.flip .op {
+  color: rgba(214, 168, 90, 0.95);
+}
+
+.ts-status {
+  font: 11px/1.3 var(--mono);
+}
+
+@media (max-width: 1180px) {
+  .ts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .process-ribbon .step-title {
   color: var(--ink);
   font-weight: 500;
@@ -12595,7 +12840,10 @@ body {
 .cd-docs-content .docs-rich > .dodont,
 .cd-docs-content .docs-rich > .man-grid,
 .cd-docs-content .docs-rich > .process-ribbon,
-.cd-docs-content .docs-rich > .next-grid {
+.cd-docs-content .docs-rich > .next-grid,
+.cd-docs-content .docs-rich > .transform-stacker,
+.cd-docs-content .docs-rich > .perms-storyboard,
+.cd-docs-content .docs-rich > .perms-overlay {
   max-width: 1120px;
 }
 

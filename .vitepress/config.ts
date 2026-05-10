@@ -125,6 +125,7 @@ export default defineConfig({
     nav: [
       { text: "Overview", link: "/" },
       { text: "Quick start", link: "/quick-start" },
+      { text: "Permissions", link: "/permissions" },
       { text: "Authoring", link: "/authoring" },
       { text: "Examples", link: "/skills-directory" },
       { text: "Security", link: "/security" },
@@ -143,11 +144,21 @@ export default defineConfig({
         ]
       },
       {
+        text: "Permissions",
+        items: [
+          { text: "Three-layer model", link: "/permissions" },
+          { text: "Capabilities", link: "/permissions#capabilities" },
+          { text: "Transforms", link: "/permissions#transforms" },
+          { text: "Install scope", link: "/permissions#install-scope" },
+          { text: "Agent-mediated install", link: "/permissions#agents-do-the-work" }
+        ]
+      },
+      {
         text: "Authoring",
         items: [
           { text: "Anatomy of a SKILL.md", link: "/authoring" },
           { text: "Transformation manifest", link: "/authoring#manifest" },
-          { text: "Permissions", link: "/authoring#perms" },
+          { text: "Capabilities reference", link: "/authoring#perms" },
           { text: "Admission", link: "/authoring#publish" }
         ]
       },
