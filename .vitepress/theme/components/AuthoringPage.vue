@@ -107,7 +107,7 @@
     <p>AutoVault is a skill vault, not a credential vault. A skill may describe that it needs authorization, but secret values belong in the host's real secret store: SSH agent, macOS Keychain, 1Password CLI, provider CLIs, or the deployment platform's secret manager. Do not put passwords, private keys, API tokens, or filled <code>.env</code> files in <code>SKILL.md</code>, resources, transforms, or the vault folder.</p>
     <div class="man-grid">
       <div class="man-card">
-        <div class="mono-label"><span class="swatch" style="background:#5ad6c0;display:inline-block;margin-right:8px" />declare the requirement</div>
+        <div class="mono-label"><span class="swatch swatch-accent" />declare the requirement</div>
         <pre class="mono-block">requires-secrets:
   - name: SITE_SSH_ALIAS
     description: SSH config alias for the production host.
@@ -115,7 +115,7 @@
         <p class="muted">This is metadata for review and setup. It stores the name and purpose, never the secret value.</p>
       </div>
       <div class="man-card">
-        <div class="mono-label"><span class="swatch" style="background:#f7c97a;display:inline-block;margin-right:8px" />set up outside the agent</div>
+        <div class="mono-label"><span class="swatch swatch-warn" />set up outside the agent</div>
         <pre class="mono-block">bin:
   setup:
     command: bin/setup

@@ -41,7 +41,10 @@
       </div>
       <div class="callout security-note">
         <span class="icn"><UiIcon name="tip" /></span>
-        <div><strong>AutoVault is not a credential vault.</strong> Skill bundles can declare required secret names and signed setup actions, but secret values stay in SSH agent, Keychain, 1Password, provider CLIs, or deployment secrets. A <code>.env</code> file or private key inside a skill bundle is content, not protected secret storage.</div>
+        <div>
+          <p><strong>AutoVault is not a credential vault.</strong> Skill bundles can declare required secret names and signed setup actions, but secret values stay in SSH agent, Keychain, 1Password, provider CLIs, or deployment secrets.</p>
+          <p>A <code>.env</code> file or private key inside a skill bundle is content, not protected secret storage.</p>
+        </div>
       </div>
     </section>
 

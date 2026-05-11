@@ -1060,6 +1060,19 @@ body {
   border-radius: 2px;
 }
 
+.mono-label .swatch {
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.swatch-accent {
+  background: var(--accent);
+}
+
+.swatch-warn {
+  background: var(--warn);
+}
+
 .xform-stage {
   display: grid;
   grid-template-columns: 1fr 80px 1fr 80px 1fr;
@@ -2419,6 +2432,14 @@ body {
 .security-note {
   margin-top: 28px;
   border-left: 3px solid var(--accent);
+}
+
+.security-note p {
+  margin: 0;
+}
+
+.security-note p + p {
+  margin-top: 8px;
 }
 
 .trust-diagram,

@@ -62,18 +62,19 @@ describe("v1 content guardrails", () => {
   });
 
   it("documents that AutoVault is not a credential vault", () => {
-    const secretDocs = [
+    const [authoring, security, docsMarkdown] = [
       ".vitepress/theme/components/AuthoringPage.vue",
       ".vitepress/theme/components/SecurityPage.vue",
       ".vitepress/shared/pageDocs.ts"
-    ].map(read).join("\n");
+    ].map((path) => read(path));
 
-    expect(secretDocs).toContain("AutoVault is a skill vault, not a credential vault");
-    expect(secretDocs).toContain("requires-secrets");
-    expect(secretDocs).toContain("SSH agent");
-    expect(secretDocs).toContain("Keychain");
-    expect(secretDocs).toContain(".env");
-    expect(secretDocs).toMatch(/Do not (?:put|bundle).*SSH private keys|Do not bundle \\.env files, SSH private keys/s);
+    expect(authoring).toContain("AutoVault is a skill vault, not a credential vault");
+    expect(authoring).toContain("requires-secrets");
+    expect(authoring).toContain("SSH agent");
+    expect(authoring).toContain("Keychain");
+    expect(authoring).toContain("Do not bundle <code>.env</code> files, SSH private keys, access tokens, or copied dashboard secrets.");
+    expect(security).toContain("A <code>.env</code> file or private key inside a skill bundle is content, not protected secret storage.");
+    expect(docsMarkdown).toContain("Do not bundle .env files, SSH private keys, API tokens, or copied dashboard secrets");
   });
 
   it("keeps hidden hosted copy reservation-only", () => {
