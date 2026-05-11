@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { AUTOVAULT_INSTALL_COMMAND } from '../../shared/bootstrap'
 
 const active = ref(0)
 const playing = ref(true)
@@ -49,7 +50,7 @@ onBeforeUnmount(stop)
           <span class="av-qs-step-title">Install the local vault</span>
         </div>
         <div class="av-qs-step-body">
-          <div class="row"><span class="pmt">$</span><span>curl -fsSL autovault.sh | sh</span></div>
+          <div class="row"><span class="pmt">$</span><span>{{ AUTOVAULT_INSTALL_COMMAND }}</span></div>
           <div class="out" style="margin-top: 6px">↳ installed → ~/.autovault</div>
           <div class="out">↳ profile dirs symlinked: ~/.claude/skills, ~/.codex/skills</div>
           <div class="row" style="margin-top: 10px"><span class="pmt">$</span><span>autovault status</span></div>

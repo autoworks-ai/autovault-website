@@ -99,6 +99,7 @@ import BrandMark from "./BrandMark.vue";
 import ClerkAuthControls from "./ClerkAuthControls.vue";
 import { skills } from "../data/skills";
 import type { GateEvaluation } from "../utils/skillGate";
+import { AUTOVAULT_INSTALL_COMMAND } from "../../shared/bootstrap";
 
 const PENDING_DRAFT_KEY = "autovault.hostedVault.pendingDraft";
 
@@ -157,7 +158,7 @@ const namespaceStatusLabel = computed(() => vault.value ? "Hosted namespace rese
 const hostedVaultState = computed<"locked" | "unlocked">(() => (vault.value || provisioning.value ? "unlocked" : "locked"));
 const hostedVaultPhase = computed(() => (vault.value ? "ready" : provisioning.value ? "active" : "locked"));
 const commandBlock = computed(() => [
-  "curl -fsSL https://autovault.sh | sh",
+  AUTOVAULT_INSTALL_COMMAND,
   ". \"$HOME/.autovault/env\"",
   "autovault skill list",
   "",
