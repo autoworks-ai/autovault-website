@@ -235,7 +235,7 @@ type ProvenanceDetail =
 
 const provenance = computed(() => [
   { icon: "check" as const, ok: true, title: "Hosted raw SKILL.md", detail: { kind: "link" as const, href: currentSkill.value.rawPath, text: currentSkill.value.rawPath }, when: "current" },
-  { icon: "github" as const, ok: true, title: "Provider/source reference", detail: { kind: "link" as const, href: currentSkill.value.sourceUrl, text: currentSkill.value.sourceLabel }, when: currentSkill.value.providerName },
+  { icon: currentSkill.value.sourceUrl.startsWith("https://github.com/") ? ("github" as const) : ("tip" as const), ok: true, title: "Provider/source reference", detail: { kind: "link" as const, href: currentSkill.value.sourceUrl, text: currentSkill.value.sourceLabel }, when: currentSkill.value.providerName },
   { icon: "shield" as const, ok: true, title: currentSkill.value.trustLabel, detail: { kind: "text" as const, text: currentSkill.value.provenanceNote }, when: currentSkill.value.admissionStatus === "provenance-example" ? "review" : "hosted" },
   { icon: "shield" as const, ok: true, title: `Website gate · ${PRODUCT_VERSION}`, detail: { kind: "text" as const, text: "Catalog tests parse the hosted file and verify frontmatter against the listing." }, when: "CI" },
   { icon: "lock" as const, title: "Available for local admission", detail: { kind: "code" as const, text: currentSkill.value.install }, when: "on demand" }

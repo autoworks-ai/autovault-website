@@ -30,7 +30,7 @@ npm run dev                             # vitepress dev — http://localhost:517
 npm run docs:build                      # static build → .vitepress/dist
 npm run docs:preview                    # preview built site
 
-npm test                                # vitest run (one-shot, 55 tests/11 files)
+npm test                                # vitest run (one-shot)
 npm run typecheck                       # vue-tsc --noEmit
 npm run pages:functions:build           # compile Cloudflare Functions
 npm run ci                              # full local check (typecheck + test + functions + docs)
