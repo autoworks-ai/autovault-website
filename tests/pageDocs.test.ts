@@ -4,6 +4,7 @@ import { agentSkillArtifacts, agentSkillUrl, buildAgentsIndex, buildLlmsFullTxt,
 
 describe("agent markdown docs", () => {
   it("includes the Pirsch tracking snippet by default", () => {
+    const expectedDataCode = process.env.PIRSCH_DATA_CODE?.trim() || "ooKBAPbmvXCA4hyKwoBDBx66yNyNswJL";
     const pirschScripts = (vitepressConfig.head ?? []).filter((entry) => {
       return Array.isArray(entry) && entry[0] === "script" && entry[1]?.id === "pianjs";
     });
@@ -15,7 +16,7 @@ describe("agent markdown docs", () => {
         defer: "",
         src: "https://api.pirsch.io/pa.js",
         id: "pianjs",
-        "data-code": "ooKBAPbmvXCA4hyKwoBDBx66yNyNswJL"
+        "data-code": expectedDataCode
       }
     ]);
   });
