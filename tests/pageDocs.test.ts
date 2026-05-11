@@ -3,6 +3,21 @@ import vitepressConfig from "../.vitepress/config";
 import { agentSkillArtifacts, agentSkillUrl, buildAgentsIndex, buildLlmsFullTxt, buildLlmsTxt, listedPageDocs, pageDocs, SITE_URL } from "../.vitepress/shared/pageDocs";
 
 describe("agent markdown docs", () => {
+  it("includes the Pirsch tracking snippet by default", () => {
+    const expectedDataCode = process.env.PIRSCH_DATA_CODE?.trim() || "ooKBAPbmvXCA4hyKwoBDBx66yNyNswJL";
+    const pirschScripts = (vitepressConfig.head ?? []).filter((entry) => {
+      return Array.isArray(entry) && entry[0] === "script" && entry[1]?.id === "pianjs";
+    });
+
+    expect(pirschScripts).toHaveLength(1);
+    expect(pirschScripts[0][0]).toBe("script");
+    expect(pirschScripts[0][1]).toMatchObject({
+      src: "https://api.pirsch.io/pa.js",
+      id: "pianjs",
+      "data-code": expectedDataCode
+    });
+  });
+
   it("defines one clean markdown endpoint per public page", () => {
     const keys = new Set(pageDocs.map((doc) => doc.key));
     const routes = new Set(pageDocs.map((doc) => doc.route));
