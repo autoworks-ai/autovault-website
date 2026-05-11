@@ -103,6 +103,46 @@
       <div class="col dont"><div class="mono-label bad">Don't</div><ul><li>Hide network or filesystem expectations in prose instead of the <code>capabilities</code> block.</li><li>Embed credentials, tokens, or shell scripts in frontmatter.</li><li>Encode host-level install decisions inside the skill — that is the operator's job.</li></ul></div>
     </div>
 
+    <h2 id="secrets">Secrets and .env variables</h2>
+    <p>AutoVault is a skill vault, not a credential vault. A skill may describe that it needs authorization, but secret values belong in the host's real secret store: SSH agent, macOS Keychain, 1Password CLI, provider CLIs, or the deployment platform's secret manager. Do not put passwords, private keys, API tokens, or filled <code>.env</code> files in <code>SKILL.md</code>, resources, transforms, or the vault folder.</p>
+    <div class="man-grid">
+      <div class="man-card">
+        <div class="mono-label"><span class="swatch swatch-accent" />declare the requirement</div>
+        <pre class="mono-block">requires-secrets:
+  - name: SITE_SSH_ALIAS
+    description: SSH config alias for the production host.
+    required: true</pre>
+        <p class="muted">This is metadata for review and setup. It stores the name and purpose, never the secret value.</p>
+      </div>
+      <div class="man-card">
+        <div class="mono-label"><span class="swatch swatch-warn" />set up outside the agent</div>
+        <pre class="mono-block">bin:
+  setup:
+    command: bin/setup
+    description: Configure SSH alias and key lookup.
+    requires-tty: true</pre>
+        <p class="muted">Use signed <code>bin</code> setup for interactive configuration. The user runs it in their terminal, so credentials do not enter the agent transcript.</p>
+      </div>
+    </div>
+    <div class="dodont">
+      <div class="col do">
+        <div class="mono-label arg">Good pattern</div>
+        <ul>
+          <li>Store SSH keys under <code>~/.ssh</code> with a named host alias and least-privileged server account.</li>
+          <li>Store API tokens in Keychain, 1Password, provider CLIs, or platform secrets.</li>
+          <li>Teach the skill the safe workflow, expected remote paths, dry-run checks, and rollback commands.</li>
+        </ul>
+      </div>
+      <div class="col dont">
+        <div class="mono-label bad">Avoid</div>
+        <ul>
+          <li>Do not bundle <code>.env</code> files, SSH private keys, access tokens, or copied dashboard secrets.</li>
+          <li>Do not instruct the agent to read <code>~/.ssh/id_*</code>, <code>~/.aws/credentials</code>, or full environment dumps.</li>
+          <li>Do not use AutoVault signatures as a substitute for secret rotation, revocation, or least privilege.</li>
+        </ul>
+      </div>
+    </div>
+
     <h2 id="playground">Try the gate yourself</h2>
     <p>This is the same five-step pipeline that runs on every skill admitted to a real vault, minus the actual signing step. Paste a SKILL.md, fetch a GitHub/raw URL, and run the browser gate to see what passes, warns, or fails.</p>
     <div class="playground" :data-ready="hydrated ? 'true' : 'false'">
@@ -252,6 +292,8 @@ const schemaRows: SchemaRow[] = [
   { field: "tools_required", type: "string[]", required: true, description: "Canonical capability names the skill body expects to use." },
   { field: "transformations", type: "agent map", required: false, description: "Per-agent mapping from canonical capabilities to caller-specific tool names." },
   { field: "capabilities", type: "object", required: false, description: "Network, filesystem (readonly/readwrite), and canonical tools declared by the skill author." },
+  { field: "requires-secrets", type: "object[]", required: false, description: "Names and purposes of required secrets. Values are never stored in the skill." },
+  { field: "bin", type: "action map", required: false, description: "Signed user-run setup, verify, or rotation actions for out-of-band configuration." },
   { field: "agents", type: "string[]", required: false, description: "Supported target agents before local scope narrows delivery." },
   { field: "resources", type: "file[]", required: false, description: "Packaged files loaded through get_skill with include_resources." }
 ];

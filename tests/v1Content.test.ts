@@ -61,6 +61,22 @@ describe("v1 content guardrails", () => {
     expect(deploy).not.toMatch(/\bRender\b|Fly\.io|officially-tested|24 chars|render\.yaml|fly\.toml|LiteFS/);
   });
 
+  it("documents that AutoVault is not a credential vault", () => {
+    const [authoring, security, docsMarkdown] = [
+      ".vitepress/theme/components/AuthoringPage.vue",
+      ".vitepress/theme/components/SecurityPage.vue",
+      ".vitepress/shared/pageDocs.ts"
+    ].map((path) => read(path));
+
+    expect(authoring).toContain("AutoVault is a skill vault, not a credential vault");
+    expect(authoring).toContain("requires-secrets");
+    expect(authoring).toContain("SSH agent");
+    expect(authoring).toContain("Keychain");
+    expect(authoring).toContain("Do not bundle <code>.env</code> files, SSH private keys, access tokens, or copied dashboard secrets.");
+    expect(security).toContain("A <code>.env</code> file or private key inside a skill bundle is content, not protected secret storage.");
+    expect(docsMarkdown).toContain("Do not bundle .env files, SSH private keys, API tokens, or copied dashboard secrets");
+  });
+
   it("keeps hidden hosted copy reservation-only", () => {
     const hostedCopy = [
       ".vitepress/theme/components/CloudPage.vue",

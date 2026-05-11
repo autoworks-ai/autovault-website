@@ -39,6 +39,13 @@
         <span class="icn"><UiIcon name="tip" /></span>
         <div><strong>AutoVault never runs skills.</strong> It serves them. The agent on your machine executes locally, with its own tools, in its own sandbox.</div>
       </div>
+      <div class="callout security-note">
+        <span class="icn"><UiIcon name="tip" /></span>
+        <div>
+          <p><strong>AutoVault is not a credential vault.</strong> Skill bundles can declare required secret names and signed setup actions, but secret values stay in SSH agent, Keychain, 1Password, provider CLIs, or deployment secrets.</p>
+          <p>A <code>.env</code> file or private key inside a skill bundle is content, not protected secret storage.</p>
+        </div>
+      </div>
     </section>
 
     <section class="sec-section">
