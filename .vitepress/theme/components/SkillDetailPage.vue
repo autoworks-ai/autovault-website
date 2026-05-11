@@ -17,6 +17,7 @@
             <h1><span class="org">{{ currentSkill.org }} / </span>{{ currentSkill.name }}</h1>
             <div class="sub-row">
               <span class="verified"><UiIcon name="check" /> Hosted SKILL.md</span>
+              <span class="source-badge" :class="currentSkill.sourceKind">{{ currentSkill.trustLabel }}</span>
               <span>v{{ currentSkill.v }}</span><span class="dot" />
               <span>{{ currentSkill.license }}</span><span class="dot" />
               <span>{{ currentSkill.size }}</span><span class="dot" />
@@ -27,12 +28,13 @@
         <p class="desc">{{ currentSkill.desc }}</p>
       </div>
       <div class="actions">
-        <button class="sd-installbtn" type="button" @click="copyInstall">Add to your vault <UiIcon name="arrow" /></button>
+        <button class="sd-installbtn" type="button" @click="copyInstall">Copy add command <UiIcon name="arrow" /></button>
+        <div class="sd-copy-status" aria-live="polite">{{ copyStatus }}</div>
         <div class="sd-install">
           <div class="lbl">Or via CLI</div>
           <div class="cmd">
             <span class="pmt">$</span>
-            <span>{{ currentSkill.install }}</span>
+            <span class="cmd-text">{{ currentSkill.install }}</span>
             <button class="copy" type="button" @click="copyInstall">{{ copied ? "Copied" : copyFailed ? "Copy failed" : "Copy" }}</button>
           </div>
         </div>
@@ -67,7 +69,7 @@
               <a class="raw" :href="currentSkill.rawPath">view raw →</a>
             </div>
             <div class="sd-md-body">
-              <div class="sd-frontmatter">
+          <div class="sd-frontmatter">
                 <div class="marker">---</div>
                 <div v-for="line in currentSkill.frontmatter" :key="line">{{ line }}</div>
                 <div class="marker">---</div>
@@ -80,6 +82,8 @@
               </ul>
               <h2>Install</h2>
               <p><code>{{ currentSkill.install }}</code></p>
+              <h2>Provenance</h2>
+              <p>{{ currentSkill.provenanceNote }}</p>
             </div>
           </div>
           <div class="sd-related-wrap">
@@ -182,6 +186,7 @@ import { computed, ref } from "vue";
 import UiIcon from "./UiIcon.vue";
 import { PRODUCT_VERSION } from "../data/product";
 import { agents as catalogAgents, findSkillByName, skills } from "../data/skills";
+import { copyText } from "../utils/clipboard";
 
 type TabId = "overview" | "perms" | "prov" | "versions";
 
@@ -209,7 +214,7 @@ const stats = computed(() => [
   { label: "Declared agents", value: String(currentSkill.value.agents.length), trend: "from frontmatter" },
   { label: "Gate stages", value: "5", trend: "covered by tests" },
   { label: "Permission rows", value: String(currentSkill.value.permissions.length), trend: "declared metadata", muted: true },
-  { label: "Source", value: currentSkill.value.org, trend: "real source link" }
+  { label: "Source", value: currentSkill.value.providerName, trend: currentSkill.value.trustLabel }
 ]);
 
 const agentRows = computed(() => catalogAgents.map((agent) => ({
@@ -230,7 +235,8 @@ type ProvenanceDetail =
 
 const provenance = computed(() => [
   { icon: "check" as const, ok: true, title: "Hosted raw SKILL.md", detail: { kind: "link" as const, href: currentSkill.value.rawPath, text: currentSkill.value.rawPath }, when: "current" },
-  { icon: "github" as const, ok: true, title: "Source path", detail: { kind: "link" as const, href: currentSkill.value.sourceUrl, text: currentSkill.value.sourceLabel }, when: "current" },
+  { icon: currentSkill.value.sourceUrl.startsWith("https://github.com/") ? ("github" as const) : ("tip" as const), ok: true, title: "Provider/source reference", detail: { kind: "link" as const, href: currentSkill.value.sourceUrl, text: currentSkill.value.sourceLabel }, when: currentSkill.value.providerName },
+  { icon: "shield" as const, ok: true, title: currentSkill.value.trustLabel, detail: { kind: "text" as const, text: currentSkill.value.provenanceNote }, when: currentSkill.value.admissionStatus === "provenance-example" ? "review" : "hosted" },
   { icon: "shield" as const, ok: true, title: `Website gate · ${PRODUCT_VERSION}`, detail: { kind: "text" as const, text: "Catalog tests parse the hosted file and verify frontmatter against the listing." }, when: "CI" },
   { icon: "lock" as const, title: "Available for local admission", detail: { kind: "code" as const, text: currentSkill.value.install }, when: "on demand" }
 ]);
@@ -243,32 +249,37 @@ const metadata = computed(() => [
   { key: "version", value: currentSkill.value.v, mono: true },
   { key: "size", value: currentSkill.value.size, mono: true },
   { key: "license", value: currentSkill.value.license },
-  { key: "source", value: currentSkill.value.org, accent: true },
+  { key: "provider", value: currentSkill.value.providerName, accent: true },
+  { key: "trust", value: currentSkill.value.trustLabel },
   { key: "raw", value: currentSkill.value.rawPath, mono: true }
 ]);
 
 const summaryPermissions = computed(() => currentSkill.value.permissions);
 
 const maintainers = computed(() => [
-  { name: currentSkill.value.org, meta: "source owner", bg: "linear-gradient(135deg, #5ad6c0, #5a9dd6)" },
+  { name: currentSkill.value.providerName, meta: currentSkill.value.sourceKind === "trusted-provider" ? "trusted provider example" : "source owner", bg: "linear-gradient(135deg, #5ad6c0, #5a9dd6)" },
   { name: "AutoVault gate", meta: "validates before local admission", bg: "linear-gradient(135deg, #d6a85a, #b48ad6)" }
 ]);
+
+const copyStatus = computed(() => {
+  if (copied.value) return "Add command copied.";
+  if (copyFailed.value) return "Copy failed. Use the CLI command below.";
+  return "Copies the local CLI command. Hosted vault queueing is not enabled from this page.";
+});
 
 async function copyInstall() {
   copied.value = false;
   copyFailed.value = false;
-  try {
-    if (!navigator.clipboard) throw new Error("Clipboard unavailable");
-    await navigator.clipboard.writeText(currentSkill.value.install);
+  if (await copyText(currentSkill.value.install)) {
     copied.value = true;
     window.setTimeout(() => {
       copied.value = false;
     }, 1200);
-  } catch {
-    copyFailed.value = true;
-    window.setTimeout(() => {
-      copyFailed.value = false;
-    }, 1600);
+    return;
   }
+  copyFailed.value = true;
+  window.setTimeout(() => {
+    copyFailed.value = false;
+  }, 1600);
 }
 </script>

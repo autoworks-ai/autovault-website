@@ -82,7 +82,7 @@ export default defineConfig({
   lang: "en-US",
   cleanUrls: true,
   lastUpdated: false,
-  srcExclude: ["autovault/**", "AutoVault.md"],
+  srcExclude: ["autovault/**", "AutoVault.md", "CLAUDE.md", "AGENTS.md"],
   sitemap: {
     hostname: SITE_URL,
     transformItems: (items) => items.filter((item) => !isHiddenSitemapItem(item))

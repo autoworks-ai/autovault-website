@@ -1,5 +1,7 @@
 export type AgentId = "cc" | "cx" | "aj";
-export type SkillCategory = "setup" | "authoring" | "meta";
+export type SkillCategory = "setup" | "authoring" | "meta" | "provenance" | "transforms" | "security";
+export type SkillSourceKind = "first-party" | "trusted-provider";
+export type SkillAdmissionStatus = "hosted-example" | "provenance-example";
 
 export interface Skill {
   name: string;
@@ -17,6 +19,11 @@ export interface Skill {
   rawPath: string;
   sourceUrl: string;
   sourceLabel: string;
+  sourceKind: SkillSourceKind;
+  providerName: string;
+  trustLabel: string;
+  admissionStatus: SkillAdmissionStatus;
+  provenanceNote: string;
   frontmatter: string[];
   overview: string[];
   useCases: string[];
@@ -34,12 +41,16 @@ export const agents = [
 export const categories = [
   { id: "setup" as const, label: "Setup" },
   { id: "authoring" as const, label: "Authoring" },
-  { id: "meta" as const, label: "Meta" }
+  { id: "meta" as const, label: "Meta" },
+  { id: "provenance" as const, label: "Provenance" },
+  { id: "transforms" as const, label: "Transforms" },
+  { id: "security" as const, label: "Security" }
 ];
 
 export const orgs = [
   { id: "autoworks-ai", label: "autoworks-ai" },
-  { id: "autovault.dev", label: "autovault.dev" }
+  { id: "autovault.dev", label: "autovault.dev" },
+  { id: "anthropic", label: "Anthropic" }
 ];
 
 export const skills: Skill[] = [
@@ -59,6 +70,11 @@ export const skills: Skill[] = [
     rawPath: "/skills/autovault-bootstrap/SKILL.md",
     sourceUrl: "https://github.com/autoworks-ai/autovault-website/blob/main/public/skills/autovault-bootstrap/SKILL.md",
     sourceLabel: "public/skills/autovault-bootstrap/SKILL.md",
+    sourceKind: "first-party",
+    providerName: "AutoVault",
+    trustLabel: "First-party hosted example",
+    admissionStatus: "hosted-example",
+    provenanceNote: "Hosted by autovault.dev and parsed by the website catalog test before being shown.",
     frontmatter: [
       "name: autovault-bootstrap",
       "version: 0.1.0",
@@ -100,6 +116,11 @@ export const skills: Skill[] = [
     rawPath: "/skills/skill-author/SKILL.md",
     sourceUrl: "https://github.com/autoworks-ai/autovault/blob/main/skills/skill-author/SKILL.md",
     sourceLabel: "autoworks-ai/autovault/skills/skill-author/SKILL.md",
+    sourceKind: "first-party",
+    providerName: "autoworks-ai",
+    trustLabel: "First-party source skill",
+    admissionStatus: "hosted-example",
+    provenanceNote: "Published from the AutoVault source tree and mirrored here as a hosted SKILL.md example.",
     frontmatter: [
       "name: skill-author",
       "version: 1.0.0",
@@ -141,6 +162,11 @@ export const skills: Skill[] = [
     rawPath: "/skills/autovault-skill/SKILL.md",
     sourceUrl: "https://github.com/autoworks-ai/autovault/blob/main/skills/autovault-skill/SKILL.md",
     sourceLabel: "autoworks-ai/autovault/skills/autovault-skill/SKILL.md",
+    sourceKind: "first-party",
+    providerName: "autoworks-ai",
+    trustLabel: "First-party source skill",
+    admissionStatus: "hosted-example",
+    provenanceNote: "Published from the AutoVault source tree and mirrored here as a hosted SKILL.md example.",
     frontmatter: [
       "name: autovault-skill",
       "version: 1.0.0",
@@ -165,6 +191,141 @@ export const skills: Skill[] = [
     ],
     related: ["skill-author", "autovault-bootstrap"],
     featured: true
+  },
+  {
+    name: "trusted-skill-import",
+    org: "anthropic",
+    icon: "TP",
+    category: "provenance",
+    agents: ["cc", "cx"],
+    desc: "Review a skill obtained from a trusted external provider before admitting it to a local AutoVault.",
+    v: "0.1.0",
+    references: 3,
+    license: "MIT",
+    size: "1,774 B",
+    install: "autovault add url:https://autovault.dev/skills/trusted-skill-import/SKILL.md",
+    detailPath: "/skill/trusted-skill-import",
+    rawPath: "/skills/trusted-skill-import/SKILL.md",
+    sourceUrl: "https://docs.claude.com/en/docs/agents-and-tools/agent-skills",
+    sourceLabel: "docs.claude.com/agents-and-tools/agent-skills",
+    sourceKind: "trusted-provider",
+    providerName: "Anthropic",
+    trustLabel: "Trusted provider provenance example",
+    admissionStatus: "provenance-example",
+    provenanceNote: "Models a trusted-provider review flow using Anthropic's public skills guidance without making the catalog a marketplace.",
+    frontmatter: [
+      "name: trusted-skill-import",
+      "version: 0.1.0",
+      "description: Review a skill obtained from a trusted external provider before admitting it to a local AutoVault.",
+      "source.provider: Anthropic",
+      "capabilities.filesystem: readonly",
+      "tools_required: Read"
+    ],
+    overview: [
+      "Shows how AutoVault can represent a trusted external provider source while still requiring local review.",
+      "Keeps install behavior local: users copy the add command and run the admission gate themselves."
+    ],
+    useCases: [
+      "A user brings a skill from a trusted external provider.",
+      "The source URL and local copy need provenance review before admission.",
+      "A team wants to show third-party trust context without operating a marketplace."
+    ],
+    permissions: [
+      { kind: "no", label: "network", scope: "none during local review" },
+      { kind: "ok", label: "filesystem", scope: "readonly SKILL.md inspection" },
+      { kind: "warn", label: "provider", scope: "trust label still requires local admission" }
+    ],
+    related: ["autovault-skill", "skill-author"]
+  },
+  {
+    name: "multi-agent-transform",
+    org: "autoworks-ai",
+    icon: "MT",
+    category: "transforms",
+    agents: ["cc", "cx", "aj"],
+    desc: "Demonstrate a single canonical skill rendered into Claude Code, Codex, and AutoJack tool vocabularies.",
+    v: "0.1.0",
+    references: 2,
+    license: "MIT",
+    size: "1,508 B",
+    install: "autovault add url:https://autovault.dev/skills/multi-agent-transform/SKILL.md",
+    detailPath: "/skill/multi-agent-transform",
+    rawPath: "/skills/multi-agent-transform/SKILL.md",
+    sourceUrl: "https://github.com/autoworks-ai/autovault-website/blob/main/public/skills/multi-agent-transform/SKILL.md",
+    sourceLabel: "public/skills/multi-agent-transform/SKILL.md",
+    sourceKind: "first-party",
+    providerName: "autoworks-ai",
+    trustLabel: "First-party transform example",
+    admissionStatus: "hosted-example",
+    provenanceNote: "Demonstrates transform metadata for Claude Code, Codex, and AutoJack from one canonical skill source.",
+    frontmatter: [
+      "name: multi-agent-transform",
+      "version: 0.1.0",
+      "description: Demonstrate a single canonical skill rendered into Claude Code, Codex, and AutoJack tool vocabularies.",
+      "transformations: claude-code, codex, autojack",
+      "capabilities.filesystem: readwrite",
+      "tools_required: fs.read, fs.write, shell.run"
+    ],
+    overview: [
+      "Shows how canonical capabilities can render into each supported agent's tool vocabulary.",
+      "Uses one reviewed SKILL.md so per-agent copies do not drift."
+    ],
+    useCases: [
+      "A workflow needs to run across Claude Code, Codex, and AutoJack.",
+      "A reviewer wants to inspect transform metadata before profile sync.",
+      "A team wants to demonstrate more complex AutoVault capability rendering."
+    ],
+    permissions: [
+      { kind: "no", label: "network", scope: "none" },
+      { kind: "ok", label: "filesystem", scope: "read/write demo scope" },
+      { kind: "ok", label: "transforms", scope: "three agent renderers declared" }
+    ],
+    related: ["autovault-skill", "skill-author"]
+  },
+  {
+    name: "secret-safe-setup",
+    org: "autoworks-ai",
+    icon: "SS",
+    category: "security",
+    agents: ["cc", "cx"],
+    desc: "Guide a user through secret-safe setup where credentials stay in host secret stores, not in SKILL.md.",
+    v: "0.1.0",
+    references: 2,
+    license: "MIT",
+    size: "1,908 B",
+    install: "autovault add url:https://autovault.dev/skills/secret-safe-setup/SKILL.md",
+    detailPath: "/skill/secret-safe-setup",
+    rawPath: "/skills/secret-safe-setup/SKILL.md",
+    sourceUrl: "https://github.com/autoworks-ai/autovault-website/blob/main/public/skills/secret-safe-setup/SKILL.md",
+    sourceLabel: "public/skills/secret-safe-setup/SKILL.md",
+    sourceKind: "first-party",
+    providerName: "autoworks-ai",
+    trustLabel: "First-party secret-safe example",
+    admissionStatus: "hosted-example",
+    provenanceNote: "Shows `requires-secrets` and signed setup actions while keeping secret values outside the skill and vault.",
+    frontmatter: [
+      "name: secret-safe-setup",
+      "version: 0.1.0",
+      "description: Guide a user through secret-safe setup where credentials stay in host secret stores, not in SKILL.md.",
+      "requires-secrets: PROVIDER_PROFILE",
+      "bin: setup, verify",
+      "capabilities.filesystem: readonly"
+    ],
+    overview: [
+      "Documents how skills should refer to credentials by name without storing secret values.",
+      "Demonstrates signed user-run setup and verify actions for out-of-band configuration."
+    ],
+    useCases: [
+      "A workflow needs a provider token, SSH key, or CLI profile.",
+      "The user wants setup guidance without exposing credentials to the agent transcript.",
+      "A reviewer wants to see `requires-secrets` and `bin` metadata in context."
+    ],
+    permissions: [
+      { kind: "no", label: "network", scope: "none" },
+      { kind: "ok", label: "filesystem", scope: "readonly metadata inspection" },
+      { kind: "warn", label: "secrets", scope: "host-managed profile names only" }
+    ],
+    related: ["skill-author", "trusted-skill-import"]
   }
 ];
 
@@ -188,7 +349,7 @@ export function filterSkills(input: Skill[], filters: SkillFilters): Skill[] {
   const orgSet = new Set(filters.orgs ?? []);
 
   return input.filter((skill) => {
-    const matchesQuery = !query || [skill.name, skill.org, skill.desc, skill.category].some((field) => field.toLowerCase().includes(query));
+    const matchesQuery = !query || [skill.name, skill.org, skill.desc, skill.category, skill.providerName, skill.trustLabel, skill.provenanceNote].some((field) => field.toLowerCase().includes(query));
     const matchesAgents = agentSet.size === 0 || skill.agents.some((agent) => agentSet.has(agent));
     const matchesCategories = categorySet.size === 0 || categorySet.has(skill.category);
     const matchesOrgs = orgSet.size === 0 || orgSet.has(skill.org);

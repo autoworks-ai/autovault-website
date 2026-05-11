@@ -1013,6 +1013,7 @@ body {
   align-items: flex-start;
   gap: 24px;
   margin-bottom: 36px;
+  min-width: 0;
 }
 
 .segmented,
@@ -1043,6 +1044,12 @@ body {
   font: inherit;
   font-size: 12px;
   font-weight: 500;
+  white-space: nowrap;
+}
+
+.toolbar .segmented {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .seg-btn.active,
@@ -1181,6 +1188,7 @@ body {
   align-items: center;
   gap: 5px;
   margin-left: auto;
+  flex: 0 0 auto;
   border-radius: 3px;
   background: var(--accent-soft);
   color: var(--accent);
@@ -1188,6 +1196,12 @@ body {
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.04em;
+}
+
+.verified.trusted {
+  border: 1px solid rgba(214, 168, 90, 0.28);
+  background: rgba(214, 168, 90, 0.1);
+  color: var(--warn);
 }
 
 .mono-block {
@@ -2034,7 +2048,7 @@ body {
 
 .dir-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -2064,11 +2078,15 @@ body {
 .fg-row {
   display: flex;
   align-items: center;
+  width: 100%;
   gap: 8px;
+  border: 0;
   padding: 6px 8px;
   border-radius: 4px;
+  background: transparent;
   color: var(--ink-2);
   cursor: pointer;
+  font: inherit;
   font-size: 13px;
 }
 
@@ -2148,6 +2166,7 @@ body {
 }
 
 .skill-tile {
+  min-width: 0;
   min-height: 200px;
   display: flex;
   flex-direction: column;
@@ -2171,6 +2190,7 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  min-width: 0;
 }
 
 .stl-icon {
@@ -2190,13 +2210,18 @@ body {
 
 .stl-name {
   flex: 1;
+  display: flex;
   min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+  line-height: 1.25;
 }
 
 .stl-name .name {
   color: var(--ink);
   font-size: 15px;
   font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
 .skill-tile.big .name {
@@ -2205,22 +2230,37 @@ body {
 
 .stl-name .org,
 .stl-meta,
-.meta-cell {
+.meta-cell,
+.source-cell {
   color: var(--ink-3);
   font-family: var(--mono);
   font-size: 10.5px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .stl-desc {
   flex: 1;
+  min-width: 0;
   color: var(--ink-2);
   font-size: 13px;
   line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.stl-provenance {
+  border-left: 2px solid var(--line-2);
+  color: var(--ink-3);
+  padding-left: 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .stl-agents,
 .agents-cell {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
@@ -2240,6 +2280,7 @@ body {
 
 .stl-meta {
   align-items: center;
+  flex-wrap: wrap;
   border-top: 1px solid var(--line);
   padding-top: 12px;
 }
@@ -2251,7 +2292,7 @@ body {
 
 .dir-list-item {
   display: grid;
-  grid-template-columns: 280px 1fr 120px 100px 80px;
+  grid-template-columns: minmax(220px, 280px) minmax(220px, 1fr) minmax(110px, 150px) minmax(88px, 120px) 72px 78px;
   gap: 16px;
   align-items: center;
   border: 1px solid transparent;
@@ -2265,11 +2306,19 @@ body {
 }
 
 .desc-cell {
-  overflow: hidden;
+  min-width: 0;
   color: var(--ink-2);
   font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.source-cell {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg-2);
+  padding: 4px 7px;
+  text-align: center;
 }
 
 .sec-page,
@@ -8565,6 +8614,7 @@ body {
 
 .sd-head h1 {
   font-size: 36px;
+  overflow-wrap: anywhere;
 }
 
 .sd-head h1 .org {
@@ -8585,7 +8635,8 @@ body {
 }
 
 .sd-head .verified,
-.au-id .verify-badge {
+.au-id .verify-badge,
+.sd-head .source-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -8597,6 +8648,12 @@ body {
   font-size: 10.5px;
   padding: 3px 8px;
   text-transform: uppercase;
+}
+
+.sd-head .source-badge.trusted-provider {
+  border-color: rgba(214, 168, 90, 0.32);
+  background: rgba(214, 168, 90, 0.1);
+  color: var(--warn);
 }
 
 .sd-head .dot {
@@ -8623,6 +8680,7 @@ body {
   flex-direction: column;
   gap: 8px;
   min-width: 280px;
+  max-width: 420px;
 }
 
 .sd-installbtn {
@@ -8637,6 +8695,13 @@ body {
   cursor: pointer;
   font: 600 13.5px var(--sans);
   padding: 11px 16px;
+}
+
+.sd-copy-status {
+  min-height: 17px;
+  color: var(--ink-3);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .sd-install,
@@ -8664,10 +8729,17 @@ body {
 .sd-install .cmd {
   display: flex;
   align-items: center;
+  min-width: 0;
   gap: 8px;
   color: var(--ink);
   font-family: var(--mono);
   font-size: 13px;
+}
+
+.sd-install .cmd-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .sd-install .pmt {
@@ -8675,6 +8747,7 @@ body {
 }
 
 .sd-install .copy {
+  flex: 0 0 auto;
   margin-left: auto;
   border: 1px solid var(--line-2);
   border-radius: 4px;
@@ -8742,6 +8815,7 @@ body {
   color: var(--ink);
   font-size: 20px;
   font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
 .sd-stats .unit,
@@ -8758,6 +8832,7 @@ body {
   color: var(--accent);
   font-family: var(--mono);
   font-size: 10px;
+  overflow-wrap: anywhere;
 }
 
 .sd-tabs {
@@ -8833,6 +8908,7 @@ body {
 
 .sd-md-body {
   padding: 32px 36px;
+  min-width: 0;
 }
 
 .sd-md-body h1,
@@ -8864,9 +8940,16 @@ body {
   color: var(--ink-2);
   font-size: 14px;
   line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.sd-md-body code {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .sd-frontmatter {
+  overflow-x: auto;
   margin-bottom: 18px;
   border-radius: 6px;
   background: var(--bg);
@@ -8948,6 +9031,8 @@ body {
 .sd-card .kv .v {
   color: var(--ink-2);
   font-size: 12.5px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .sd-card .kv .mono {
@@ -9208,6 +9293,7 @@ body {
   color: var(--ink-3);
   font-family: var(--mono);
   font-size: 10.5px;
+  overflow-wrap: anywhere;
 }
 
 .sd-prov-timeline {
@@ -9266,11 +9352,13 @@ body {
   color: var(--ink-3);
   font-family: var(--mono);
   font-size: 11.5px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .sd-prov-row .when {
   color: var(--ink-4);
-  white-space: nowrap;
+  text-align: right;
 }
 
 .sd-versions-table {
@@ -9331,6 +9419,7 @@ body {
 .sd-versions-row .install {
   color: var(--ink-3);
   font-size: 11.5px;
+  overflow-wrap: anywhere;
 }
 
 .sd-versions-row .gate {

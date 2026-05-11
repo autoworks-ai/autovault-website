@@ -18,7 +18,7 @@
       <aside class="dir-side">
         <FilterGroup title="Agent" :items="agentRows" :selected="selectedAgents" @toggle="toggleAgent" @clear="selectedAgents.clear()" />
         <FilterGroup title="Category" :items="categoryRows" :selected="selectedCategories" @toggle="toggleCategory" @clear="selectedCategories.clear()" />
-        <FilterGroup title="Org" :items="orgRows" :selected="selectedOrgs" @toggle="toggleOrg" @clear="selectedOrgs.clear()" />
+        <FilterGroup title="Source" :items="orgRows" :selected="selectedOrgs" @toggle="toggleOrg" @clear="selectedOrgs.clear()" />
       </aside>
 
       <main class="dir-main">
@@ -151,17 +151,22 @@ const SkillTile = defineComponent({
   setup(props) {
     return () => h("article", { class: ["skill-tile", props.skill.featured ? "featured" : "", props.big ? "big" : ""] }, [
       h("a", { class: "stl-main", href: props.skill.detailPath }, [
-        h("div", { class: "stl-head" }, [
+          h("div", { class: "stl-head" }, [
           h("span", { class: "stl-icon" }, props.skill.icon),
-          h("div", { class: "stl-name" }, [h("span", { class: "name" }, props.skill.name), h("span", { class: "org" }, props.skill.org)]),
-          h("span", { class: "verified" }, "REAL")
+          h("div", { class: "stl-name" }, [
+            h("span", { class: "name" }, props.skill.name),
+            h("span", { class: "org" }, `${props.skill.providerName} · ${props.skill.trustLabel}`)
+          ]),
+          h("span", { class: ["verified", props.skill.sourceKind === "trusted-provider" ? "trusted" : ""] }, props.skill.sourceKind === "trusted-provider" ? "TRUSTED" : "REAL")
         ]),
         h("p", { class: "stl-desc" }, props.skill.desc),
+        h("div", { class: "stl-provenance" }, props.skill.provenanceNote),
         h("div", { class: "stl-agents" }, skillAgents(props.skill).map((agent) => h("span", { class: "ag", style: agent.on ? { background: agent.color, color: "#0a0d11", borderColor: agent.color } : undefined }, agent.id)))
       ]),
       h("div", { class: "stl-meta" }, [
         h("span", `v${props.skill.v}`),
         h("span", props.skill.license),
+        h("span", props.skill.admissionStatus === "provenance-example" ? "provenance example" : "hosted example"),
         h("span", { style: "flex:1" }),
         h("a", { href: props.skill.rawPath }, "Raw"),
         h("button", { class: "copy-btn", type: "button", onClick: () => copyInstall(props.skill.install) }, "Copy add")
@@ -174,8 +179,15 @@ const SkillListItem = defineComponent({
   props: { skill: { type: Object as () => Skill, required: true } },
   setup(props) {
     return () => h("a", { class: "dir-list-item", href: props.skill.detailPath }, [
-      h("div", { class: "stl-head" }, [h("span", { class: "stl-icon" }, props.skill.icon), h("div", { class: "stl-name" }, [h("span", { class: "name" }, props.skill.name), h("span", { class: "org" }, props.skill.org)])]),
+      h("div", { class: "stl-head" }, [
+        h("span", { class: "stl-icon" }, props.skill.icon),
+        h("div", { class: "stl-name" }, [
+          h("span", { class: "name" }, props.skill.name),
+          h("span", { class: "org" }, `${props.skill.providerName} · ${props.skill.trustLabel}`)
+        ])
+      ]),
       h("div", { class: "desc-cell" }, props.skill.desc),
+      h("span", { class: "source-cell" }, props.skill.sourceKind === "trusted-provider" ? "trusted provider" : "first party"),
       h("div", { class: "agents-cell" }, skillAgents(props.skill).map((agent) => h("span", { class: "ag", style: agent.on ? { background: agent.color, color: "#0a0d11", borderColor: agent.color } : undefined }, agent.id))),
       h("span", { class: "meta-cell" }, `v${props.skill.v}`),
       h("span", { class: "meta-cell" }, `${props.skill.references.toLocaleString()} refs`)
