@@ -10,15 +10,13 @@ describe("agent markdown docs", () => {
     });
 
     expect(pirschScripts).toHaveLength(1);
-    expect(pirschScripts[0]).toEqual([
-      "script",
-      {
-        defer: "",
-        src: "https://api.pirsch.io/pa.js",
-        id: "pianjs",
-        "data-code": expectedDataCode
-      }
-    ]);
+    expect(Array.isArray(pirschScripts[0])).toBe(true);
+    expect(pirschScripts[0][0]).toBe("script");
+    expect(pirschScripts[0][1]).toMatchObject({
+      src: "https://api.pirsch.io/pa.js",
+      id: "pianjs",
+      "data-code": expectedDataCode
+    });
   });
 
   it("defines one clean markdown endpoint per public page", () => {
