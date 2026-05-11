@@ -49,7 +49,7 @@ onBeforeUnmount(stop)
           <span class="av-qs-step-title">Install the local vault</span>
         </div>
         <div class="av-qs-step-body">
-          <div class="row"><span class="pmt">$</span><span>curl -fsSL autovault.sh | sh</span></div>
+          <div class="row"><span class="pmt">$</span><span>curl -fsSL https://autovault.sh | sh</span></div>
           <div class="out" style="margin-top: 6px">↳ installed → ~/.autovault</div>
           <div class="out">↳ profile dirs symlinked: ~/.claude/skills, ~/.codex/skills</div>
           <div class="row" style="margin-top: 10px"><span class="pmt">$</span><span>autovault status</span></div>

@@ -1,5 +1,5 @@
 import { PRODUCT_VERSION } from "../theme/data/product";
-import { AUTOVAULT_AGENT_SETUP_PROMPT, AUTOVAULT_BOOTSTRAP_INSTALL_PATH, AUTOVAULT_BOOTSTRAP_SKILL_URL } from "./bootstrap";
+import { AUTOVAULT_AGENT_SETUP_PROMPT, AUTOVAULT_BOOTSTRAP_INSTALL_PATH, AUTOVAULT_BOOTSTRAP_SKILL_URL, AUTOVAULT_INSTALL_COMMAND } from "./bootstrap";
 import { MANUAL_GHCR_IMAGE, RAILWAY_TEMPLATE_URL } from "./deploy";
 
 export const SITE_URL = "https://autovault.dev";
@@ -72,7 +72,7 @@ AutoVault is a local-first vault for agent skills: it validates, signs, scopes, 
 ## Fast path
 
 \`\`\`bash
-curl -fsSL https://autovault.sh | sh
+${AUTOVAULT_INSTALL_COMMAND}
 autovault skill list
 \`\`\`
 
@@ -98,7 +98,7 @@ Install AutoVault, verify the local vault, add a signed skill, scope it, and run
 ## Install
 
 \`\`\`bash
-curl -fsSL https://autovault.sh | sh
+${AUTOVAULT_INSTALL_COMMAND}
 brew install autoworks-ai/tap/autovault
 autovault skill list
 \`\`\`

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { copyText } from '../utils/clipboard'
+import { AUTOVAULT_INSTALL_COMMAND } from '../../shared/bootstrap'
 
 const copied = ref(false)
 async function copyInstall() {
-  copied.value = await copyText('curl -fsSL https://autovault.sh | sh')
+  copied.value = await copyText(AUTOVAULT_INSTALL_COMMAND)
   window.setTimeout(() => (copied.value = false), 1400)
 }
 

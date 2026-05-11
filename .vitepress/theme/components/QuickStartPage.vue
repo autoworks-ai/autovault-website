@@ -178,7 +178,7 @@ import AvDocBreadcrumb from "./AvDocBreadcrumb.vue";
 import CodeBlock from "./CodeBlock.vue";
 import { useTerminalReplay, type TerminalReplayLine } from "../composables/useTerminalReplay";
 import { PRODUCT_VERSION, PRODUCT_VERSION_BADGE } from "../data/product";
-import { AUTOVAULT_AGENT_SETUP_PROMPT } from "../../shared/bootstrap";
+import { AUTOVAULT_AGENT_SETUP_PROMPT, AUTOVAULT_INSTALL_COMMAND } from "../../shared/bootstrap";
 import { copyText } from "../utils/clipboard";
 
 type Method = "curl" | "brew";
@@ -186,7 +186,7 @@ type VaultRow = { depth: number; label: string; kind: "dir" | "file" | "sig"; id
 
 const INSTALL_METHODS: Method[] = ["curl", "brew"];
 const INSTALL_COMMANDS: Record<Method, string> = {
-  curl: "curl -fsSL https://autovault.sh | sh",
+  curl: AUTOVAULT_INSTALL_COMMAND,
   brew: "brew install autoworks-ai/tap/autovault"
 };
 const selectedMethod = ref<Method>("curl");
@@ -262,7 +262,7 @@ const TerminalDemo = defineComponent({
   setup() {
     const bodyRef = ref<HTMLElement | null>(null);
     const lines: TerminalReplayLine[] = [
-      { type: "cmd", text: "curl -fsSL https://autovault.sh | sh" },
+      { type: "cmd", text: AUTOVAULT_INSTALL_COMMAND },
       { type: "out", text: "↳ downloading autovault-installer" },
       { type: "out", text: "↳ verifying installer signature" },
       { type: "ok", text: `✓ signature ok · ${PRODUCT_VERSION}` },

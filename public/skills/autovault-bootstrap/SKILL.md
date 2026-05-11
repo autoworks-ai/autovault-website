@@ -8,7 +8,7 @@ allowed-tools:
   - "Bash(uname:*)"
   - "Bash(command -v autovault:*)"
   - "Bash(mktemp:*)"
-  - "Bash(curl -fsSL https://raw.githubusercontent.com/autoworks-ai/autovault/main/scripts/install.sh -o *)"
+  - "Bash(curl -fsSL https://autovault.sh -o *)"
   - "Bash(wc -c *)"
   - "Bash(sed -n *)"
   - "Bash(sh *)"
@@ -80,7 +80,7 @@ Use this skill when the user asks to install, configure, repair, or verify AutoV
    ```bash
    tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/autovault-installer.XXXXXX")"
    installer="$tmpdir/install.sh"
-   curl -fsSL https://raw.githubusercontent.com/autoworks-ai/autovault/main/scripts/install.sh -o "$installer"
+   curl -fsSL https://autovault.sh -o "$installer"
    wc -c "$installer"
    sed -n '1,160p' "$installer"
    ```

@@ -3,7 +3,7 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import BrandMark from './BrandMark.vue'
 import { copyText } from '../utils/clipboard'
 import { homepageGateMetrics } from '../data/marketing'
-import { AUTOVAULT_AGENT_SETUP_PROMPT, AUTOVAULT_STAGED_INSTALL_COMMAND, AUTOVAULT_STAGED_RUN_COMMAND } from '../../shared/bootstrap'
+import { AUTOVAULT_AGENT_SETUP_PROMPT, AUTOVAULT_INSTALL_COMMAND } from '../../shared/bootstrap'
 
 // Sources: messy, varied, often unsigned. The "before" column.
 const SOURCES = [
@@ -29,7 +29,7 @@ let t1: number | undefined
 let t2: number | undefined
 
 async function copyStart(kind: 'shell' | 'agent') {
-  const ok = await copyText(kind === 'shell' ? AUTOVAULT_STAGED_INSTALL_COMMAND : AUTOVAULT_AGENT_SETUP_PROMPT)
+  const ok = await copyText(kind === 'shell' ? AUTOVAULT_INSTALL_COMMAND : AUTOVAULT_AGENT_SETUP_PROMPT)
   if (!ok) return
   copiedStart.value = kind
   window.setTimeout(() => {
@@ -83,13 +83,13 @@ function dstY(i: number) { return 90 + i * (VBOX_H - 180) / (ADOPTERS.length - 1
       <section class="av-start-panel" aria-label="Start AutoVault">
         <div class="av-start-card primary">
           <div class="av-start-kicker">Terminal</div>
-          <div class="av-start-title">Review, then install the local vault</div>
+          <div class="av-start-title">Install the local vault</div>
           <div class="av-start-command">
             <span class="prompt">$</span>
-            <code>{{ AUTOVAULT_STAGED_INSTALL_COMMAND }}</code>
+            <code>{{ AUTOVAULT_INSTALL_COMMAND }}</code>
             <button type="button" @click="copyStart('shell')">{{ copiedStart === 'shell' ? 'copied' : 'copy' }}</button>
           </div>
-          <p>Inspect the script, then run <code>{{ AUTOVAULT_STAGED_RUN_COMMAND }}</code>.</p>
+          <p>One copy-paste command. The installer creates <code>~/.autovault</code> and refreshes local agent profiles.</p>
         </div>
         <div class="av-start-card">
           <div class="av-start-kicker">Agent-assisted</div>

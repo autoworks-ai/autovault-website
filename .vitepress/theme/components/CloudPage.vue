@@ -172,6 +172,7 @@ import { computed, onMounted, ref } from "vue";
 import HostedVaultFunnel from "./HostedVaultFunnel.vue";
 import { skills } from "../data/skills";
 import { copyText as copyToClipboard } from "../utils/clipboard";
+import { AUTOVAULT_INSTALL_COMMAND } from "../../shared/bootstrap";
 
 type CloudUser = { id: string; email?: string | null; name?: string | null; avatar_url?: string | null };
 type CloudSubscription = { active: boolean; status?: string | null } | null;
@@ -261,7 +262,7 @@ const auditEvents = computed(() => [
 ]);
 
 const commandBlock = computed(() => [
-  "curl -fsSL https://autovault.sh | sh",
+  AUTOVAULT_INSTALL_COMMAND,
   ". \"$HOME/.autovault/env\"",
   "autovault skill list",
   "",
