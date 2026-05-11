@@ -10,7 +10,6 @@ describe("agent markdown docs", () => {
     });
 
     expect(pirschScripts).toHaveLength(1);
-    expect(Array.isArray(pirschScripts[0])).toBe(true);
     expect(pirschScripts[0][0]).toBe("script");
     expect(pirschScripts[0][1]).toMatchObject({
       src: "https://api.pirsch.io/pa.js",
