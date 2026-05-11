@@ -4,19 +4,20 @@ import { canonicalUrl, findPageDocByFile, SITE_URL, type PageDoc } from "./share
 
 const OG_IMAGE = `${SITE_URL}/og-1200x630.png`;
 const TWITTER_IMAGE = `${SITE_URL}/twitter-1200x600.png`;
-const PIRSCH_DATA_CODE = process.env.PIRSCH_DATA_CODE?.trim();
+// Pirsch data-code is a public browser-side identifier. Keep a source default
+// so production builds track even when the Pages build environment omits it.
+const DEFAULT_PIRSCH_DATA_CODE = "ooKBAPbmvXCA4hyKwoBDBx66yNyNswJL";
+const PIRSCH_DATA_CODE = process.env.PIRSCH_DATA_CODE?.trim() || DEFAULT_PIRSCH_DATA_CODE;
 
-const pirschHead: HeadConfig[] = PIRSCH_DATA_CODE
-  ? [[
-      "script",
-      {
-        defer: "",
-        src: "https://api.pirsch.io/pa.js",
-        id: "pianjs",
-        "data-code": PIRSCH_DATA_CODE
-      }
-    ]]
-  : [];
+const pirschHead: HeadConfig[] = [[
+  "script",
+  {
+    defer: "",
+    src: "https://api.pirsch.io/pa.js",
+    id: "pianjs",
+    "data-code": PIRSCH_DATA_CODE
+  }
+]];
 
 function pageHead(doc: PageDoc): HeadConfig[] {
   const url = canonicalUrl(doc);
