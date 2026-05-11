@@ -204,7 +204,25 @@ Use this skill when the user wants to create or repair a SKILL.md file.
 - Declare canonical tool names in tools_required.
 - Map caller-specific tool names in transformations instead of forking the skill.
 - Use the capabilities block for declared network, filesystem, and tool boundaries; the host agent still owns runtime enforcement.
+- Use requires-secrets for secret names and purposes only. Never put secret values in SKILL.md, resources, transforms, or vault files.
 - Package resources beside SKILL.md and load them through get_skill with include_resources.
+
+## Secrets and .env variables
+
+AutoVault is a skill vault, not a credential vault. A skill may describe that it needs authorization, but secret values belong in the host's real secret store: SSH agent, macOS Keychain, 1Password CLI, provider CLIs, or deployment platform secrets.
+
+Good pattern:
+
+- Store SSH keys under ~/.ssh with a named host alias and least-privileged server account.
+- Store API tokens in Keychain, 1Password, provider CLIs, or platform secrets.
+- Teach the skill the safe workflow, expected remote paths, dry-run checks, and rollback commands.
+- Use signed bin setup actions for interactive configuration that the user runs in their own terminal.
+
+Avoid:
+
+- Bundling .env files, SSH private keys, access tokens, or copied dashboard secrets.
+- Instructing the agent to read ~/.ssh/id_*, ~/.aws/credentials, or full environment dumps.
+- Treating AutoVault signatures as a substitute for secret rotation, revocation, or least privilege.
 
 ## Scope
 
@@ -372,10 +390,15 @@ AutoVault does not execute skills. It validates, stores, signs, scopes, and serv
 - Authors own what the skill claims to do.
 - The vault owns validation, signing, indexing, transforms, and filtered delivery.
 - The agent owns runtime execution, approval prompts, and enforcement of declared permissions.
+- Secret values stay outside the vault in SSH agent, Keychain, 1Password, provider CLIs, or deployment secrets. AutoVault stores skill content and secret names, not credential values.
 
 ## Validation pipeline
 
 Every install or proposal runs through frontmatter parsing, schema validation, security scanning, capability/behavior checks, deduplication, and Ed25519 signing. Strict mode blocks denylist hits; non-strict mode can report warnings.
+
+## Secret handling
+
+Use requires-secrets to document required variable or credential names. Use signed bin setup actions when a skill needs interactive setup. Do not bundle .env files, SSH private keys, API tokens, or copied dashboard secrets in SKILL.md, resources, transforms, or the vault directory.
 
 ## Remote mode
 
