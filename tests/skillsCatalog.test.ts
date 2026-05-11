@@ -22,8 +22,13 @@ describe("skills catalog integrity", () => {
       expect(skill.detailPath).toBe(`/skill/${skill.name}`);
       expect(skill.rawPath).toBe(`/skills/${skill.name}/SKILL.md`);
       expect(skill.install).toContain(skill.rawPath);
-      expect(skill.sourceUrl).toMatch(/^https:\/\/github\.com\/autoworks-ai\//);
+      expect(skill.sourceUrl).toMatch(/^https:\/\//);
       expect(skill.sourceUrl).not.toContain("autoworks-ai/skills/");
+      expect(skill.sourceKind).toMatch(/^(first-party|trusted-provider)$/);
+      expect(skill.providerName.length).toBeGreaterThan(2);
+      expect(skill.trustLabel.length).toBeGreaterThan(6);
+      expect(skill.admissionStatus).toMatch(/^(hosted-example|provenance-example)$/);
+      expect(skill.provenanceNote.length).toBeGreaterThan(20);
 
       const rawFile = resolve(repoRoot, "public", skill.rawPath.replace(/^\//, ""));
       expect(existsSync(rawFile), `${skill.name} rawPath does not exist`).toBe(true);
@@ -38,6 +43,36 @@ describe("skills catalog integrity", () => {
       expect(readVersion(frontmatter)).toBe(skill.v);
       expect(frontmatter.license).toBe(skill.license);
     }
+  });
+
+  it("includes provenance, transform, and secret-safe showcase variations", () => {
+    expect(skills.map((skill) => skill.name)).toEqual(expect.arrayContaining([
+      "trusted-skill-import",
+      "multi-agent-transform",
+      "secret-safe-setup"
+    ]));
+
+    const trusted = skills.find((skill) => skill.name === "trusted-skill-import");
+    expect(trusted?.sourceKind).toBe("trusted-provider");
+    expect(trusted?.providerName).toBe("Anthropic");
+    expect(trusted?.admissionStatus).toBe("provenance-example");
+
+    const transform = skills.find((skill) => skill.name === "multi-agent-transform");
+    expect(transform?.provenanceNote).toContain("transform");
+    expect(transform?.agents.length).toBeGreaterThanOrEqual(3);
+
+    const secretSafe = skills.find((skill) => skill.name === "secret-safe-setup");
+    expect(secretSafe?.provenanceNote).toContain("secret");
+    expect(secretSafe?.permissions.some((row) => row.label === "secrets")).toBe(true);
+  });
+
+  it("makes the skill detail install CTA visibly copy the CLI command", () => {
+    const detail = readFileSync(resolve(repoRoot, ".vitepress/theme/components/SkillDetailPage.vue"), "utf8");
+
+    expect(detail).toContain("Copy add command");
+    expect(detail).toContain('aria-live="polite"');
+    expect(detail).toContain("copyText(currentSkill.value.install)");
+    expect(detail).not.toContain("/api/vaults/current/pending-skills");
   });
 
   it("keeps fake historical example skills out of the public catalog", () => {
