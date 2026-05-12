@@ -199,7 +199,7 @@ const stats = computed(() => [
   { label: "Example skills", value: String(authorSkills.length), trend: "hosted SKILL.md files" },
   { label: "Reference rows", value: String(authorSkills.length), trend: "source-backed examples" },
   { label: "Render targets", value: String(agentIds.length), trend: agents.map((agent) => agent.label).join(", ") },
-  { label: "Gate stages", value: "5", trend: "same pipeline as installs" },
+  { label: "Gate stages", value: "5", trend: "same pipeline as admissions" },
   { label: "Median bundle", value: medianBundleSize(), trend: "hosted payload", dim: true }
 ]);
 

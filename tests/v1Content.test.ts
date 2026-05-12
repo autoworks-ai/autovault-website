@@ -77,6 +77,43 @@ describe("v1 content guardrails", () => {
     expect(docsMarkdown).toContain("Do not bundle .env files, SSH private keys, API tokens, or copied dashboard secrets");
   });
 
+  it("keeps current API, storage, and remote-mode docs aligned to v0 surfaces", () => {
+    const api = read(".vitepress/theme/components/ApiReferencePage.vue");
+    const quickStart = read(".vitepress/theme/components/QuickStartPage.vue");
+    const deploy = read(".vitepress/theme/components/DeployPage.vue");
+    const authoring = read(".vitepress/theme/components/AuthoringPage.vue");
+    const apiCurrentSurface = [
+      sliceBetween(api, "<section class=\"api-hero", "</section>"),
+      sliceBetween(api, "const nav: NavItem[] = [", "function endpoint")
+    ].join("\n");
+    const vaultAnatomy = sliceBetween(quickStart, "<h2 id=\"vault-anatomy\">", "const ACCESS_ROWS");
+    const remoteModeCopy = sliceBetween(deploy, "<section id=\"hosts\"", "const providers");
+    const authoringSchemaIntro = sliceBetween(authoring, "<h2 id=\"schema\">", "<div class=\"schema final-schema\"");
+    const apiMarkdown = pageDocs.find((doc) => doc.key === "api")?.markdown ?? "";
+    const deployMarkdown = pageDocs.find((doc) => doc.key === "deploy")?.markdown ?? "";
+
+    expect(apiCurrentSurface).toContain("Current v0.2.1 surfaces");
+    expect(apiCurrentSurface).toContain("MCP tools are the agent-facing API");
+    expect(apiCurrentSurface).toContain("autovault add-local");
+    expect(apiCurrentSurface).not.toMatch(/@autovault\/sdk|\/api\/v1|autovault init|MCP 2024-11-05/);
+
+    expect(vaultAnatomy).toContain("current implementation layout");
+    expect(vaultAnatomy).toContain(".signing-key.json");
+    expect(vaultAnatomy).toContain(".autovault-source.json");
+    expect(vaultAnatomy).toContain(".autovault-manifest");
+    expect(vaultAnatomy).not.toMatch(/keys\/|ed25519\.priv|manifest\.json|SKILL\.md\.sig/);
+
+    expect(remoteModeCopy).toContain("Remote mode cannot create symlinks on client machines");
+    expect(remoteModeCopy).toContain("Remote clients should discover and read skills through <code>get_skill</code>");
+    expect(remoteModeCopy).not.toContain("install signed skills without ever touching a local filesystem");
+
+    expect(authoringSchemaIntro).toContain("Open Agent Skills fields");
+    expect(authoringSchemaIntro).toContain("AutoVault extensions");
+    expect(authoringSchemaIntro).toContain("<code>name</code> and <code>description</code> remain the portable core");
+    expect(deployMarkdown).toContain("Remote mode cannot create symlinks on client machines");
+    expect(apiMarkdown).toContain("Current v0.2.1 surfaces");
+  });
+
   it("keeps hidden hosted copy reservation-only", () => {
     const hostedCopy = [
       ".vitepress/theme/components/CloudPage.vue",
@@ -185,4 +222,19 @@ describe("v1 content guardrails", () => {
 
 function read(path: string) {
   return readFileSync(resolve(repoRoot, path), "utf8");
+}
+
+function sliceBetween(source: string, start: string, end: string) {
+  const startIndex = source.indexOf(start);
+  const endIndex = source.indexOf(end, startIndex + start.length);
+
+  if (startIndex < 0) {
+    throw new Error(`Missing slice start marker: ${start}`);
+  }
+
+  if (endIndex <= startIndex) {
+    throw new Error(`Missing slice end marker after "${start}": ${end}`);
+  }
+
+  return source.slice(startIndex, endIndex);
 }

@@ -8,7 +8,7 @@
           <span class="pr">{{ PRODUCT_VERSION_SHORT }} · current</span>
         </div>
         <h1>From a local CLI to <span class="ital">a network service</span> in two minutes.</h1>
-        <p class="lede">In remote mode, the same vault binary speaks Streamable HTTP MCP with OAuth auth-code + PKCE. Stand it up on a real host so your agents — wherever they run, sandboxed or not — can resolve, verify, and install signed skills without ever touching a local filesystem.</p>
+        <p class="lede">In remote mode, the same vault binary speaks Streamable HTTP MCP with OAuth auth-code + PKCE. Stand it up on a real host so agents can resolve, read, propose, and update signed skills through MCP; local filesystem-native host folders still require local profile sync or a future mirror helper.</p>
         <div class="hero-meta">
           <div class="m">Transport: <strong>Streamable HTTP MCP</strong></div>
           <div class="m">Auth: <strong>OAuth 2.1 + PKCE</strong></div>
@@ -50,7 +50,7 @@
 
     <section id="hosts" class="providers-section reveal-item">
       <h2>Pick a host</h2>
-      <p class="lede">Self-host the remote MCP service with the documented Docker or Railway paths. Local installs remain the source of truth; remote mode adds OAuth-protected HTTPS access for agents that cannot read your local filesystem.</p>
+      <p class="lede">Self-host the remote MCP service with the documented Docker or Railway paths. Local installs remain the source of truth for host profile links. Remote mode cannot create symlinks on client machines. Remote clients should discover and read skills through <code>get_skill</code> when they cannot read your local filesystem.</p>
       <div class="providers">
         <button v-for="provider in providers" :key="provider.id" type="button" :class="['provider', { active: active === provider.id }]" @click="active = provider.id">
           <span class="head">

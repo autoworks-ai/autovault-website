@@ -64,7 +64,7 @@ AutoVault is a local-first vault for agent skills: it validates, signs, scopes, 
 - Stores filesystem-native skills in a local vault backed by SQLite.
 - Serves the same vault through local stdio MCP or remote Streamable HTTP MCP.
 - Uses OAuth and role-aware access checks in remote mode.
-- Validates installs and proposals with frontmatter parsing, schema checks, security scanning, capability/behavior checks, deduplication, and Ed25519 signing.
+- Validates install requests and proposals with frontmatter parsing, schema checks, security scanning, capability/behavior checks, deduplication, and Ed25519 signing.
 - Renders per-agent skill profiles for Claude Code, Codex, Cursor, AutoHub, and custom callers.
 - Applies vault-local skill transforms so teams can adapt a skill without forking upstream content.
 - Tracks source provenance and upstream drift with check_updates.
@@ -93,7 +93,7 @@ AutoVault is MIT licensed.`;
 
 const quickStartMarkdown = `# AutoVault Quick Start
 
-Install AutoVault, verify the local vault, add a signed skill, scope it, and run it from an agent.
+Install AutoVault, verify the local vault, add a local signed skill bundle, sync profiles, and run it from an agent.
 
 ## Install
 
@@ -103,7 +103,7 @@ brew install autoworks-ai/tap/autovault
 autovault skill list
 \`\`\`
 
-The installer writes ~/.autovault, installs the local CLI shim, preserves the folder as user-owned storage, and bootstraps bundled skills unless AUTOVAULT_NO_BOOTSTRAP=1 is set. The current public package is ${PRODUCT_VERSION}; AutoVault remains pre-1.0.
+The installer writes ~/.autovault, places the local CLI shim, preserves the folder as user-owned storage, and bootstraps bundled skills unless AUTOVAULT_NO_BOOTSTRAP=1 is set. The current public package is ${PRODUCT_VERSION}; AutoVault remains pre-1.0.
 
 ## Agent-assisted setup
 
@@ -123,26 +123,26 @@ autovault doctor
 
 Doctor confirms the binary, vault folder, signing key, bundled skill index, and discovered agent profiles.
 
-## Add a skill
+## Add a local skill bundle
 
 \`\`\`bash
-autovault add url:https://autovault.dev/skills/skill-author/SKILL.md
+autovault add-local ./skills/skill-author --source vendor/skills --sync-profiles
 \`\`\`
 
-Every source adapter hands raw skill content to the same gate: frontmatter repair, schema validation, denylist scan, capability/behavior check, deduplication, and Ed25519 signing.
+The \`autovault add-local\` command hands raw skill content and sibling resources to the same gate used by MCP install paths: frontmatter repair, schema validation, denylist scan, capability/behavior check, deduplication, and Ed25519 signing.
 
 ## Vault anatomy
 
-The vault is a normal ~/.autovault folder with config.toml, keys, source skills, detached signatures, rendered agent files, cache, and audit.log. Agent profiles read generated files from the vault rather than maintaining hand-edited forks.
+The vault is a normal ~/.autovault folder. The current implementation layout includes config.toml, autovault.sqlite, .signing-key.json, source skills under skills/, .autovault-source.json, .autovault-manifest, rendered variants, profiles/, and optional profiles.config.json. Agent profiles read generated files from the vault rather than maintaining hand-edited forks.
 
 ## Scope and run
 
 \`\`\`bash
-autovault scope skill-author --agent claude-code,codex --project autovault-website --device $(hostname)
 autovault sync-profiles --discover
+autovault skill search code-review --top-k 5
 \`\`\`
 
-Scope decides which agents, projects, devices, and profile links can load the signed skill. The skill name stays stable while transforms render caller-specific tool names.`;
+Profile policy decides which agents, named profiles, tags, and profile links can load a signed skill. The skill name stays stable while transforms render caller-specific tool names.`;
 
 const cloudMarkdown = `# AutoVault Cloud Launch
 
@@ -162,7 +162,7 @@ Use hosted AutoVault when a team wants to reserve its cloud namespace and join t
 
 const authoringMarkdown = `# Authoring AutoVault Skills
 
-A skill is one SKILL.md file: YAML frontmatter plus a markdown body. AutoVault validates production fields for identity, canonical tools, transform maps, capability declarations, resources, and target agents.
+A skill is one SKILL.md file: YAML frontmatter plus a markdown body. Open Agent Skills fields provide the portable core: name, description, optional metadata, and resources. AutoVault extensions add production validation fields for canonical tools, transform maps, capability declarations, resources, secret requirements, signed setup actions, and target agents.
 
 ## Minimal shape
 
@@ -200,11 +200,12 @@ Use this skill when the user wants to create or repair a SKILL.md file.
 
 ## Schema and validation
 
-- Keep name kebab-case, version semver-like, and description short.
+- Keep the open SKILL.md core portable: name, description, metadata, resources, and markdown body should still make sense without AutoVault.
 - Declare canonical tool names in tools_required.
 - Map caller-specific tool names in transformations instead of forking the skill.
 - Use the capabilities block for declared network, filesystem, and tool boundaries; the host agent still owns runtime enforcement.
 - Use requires-secrets for secret names and purposes only. Never put secret values in SKILL.md, resources, transforms, or vault files.
+- Use signed bin setup actions only for user-run setup, verify, or rotation workflows.
 - Package resources beside SKILL.md and load them through get_skill with include_resources.
 
 ## Secrets and .env variables
@@ -285,17 +286,18 @@ Agents should use get_skill for vault inventory lookup, fetch full content only 
 
 const apiMarkdown = `# AutoVault API Reference
 
-AutoVault exposes the same skill primitives through CLI, library, HTTP, and MCP surfaces. Human operators use the CLI, programs use the SDK or HTTP API, and agents connect through local stdio MCP or remote Streamable HTTP MCP.
+Current v0.2.1 surfaces are the local CLI, source ESM library exports, local stdio MCP, and remote Streamable HTTP MCP at /mcp. There is no public REST API or separately published SDK package yet. MCP tools are the agent-facing API.
 
-## Current surfaces
+## Current v0.2.1 surfaces
 
-- CLI commands for installing, listing, proposing, verifying, syncing profiles, and checking updates.
+- CLI commands for add-local install, profile sync, doctor checks, local skill search/list/which, repo audit, setup, capability resolve, and remote service startup.
+- Source ESM library exports for resolveCapabilities, syncProfiles, addSkill, updateSkill, deleteSkill, proposeSkill, transforms, auditRepo, and profile discovery.
 - MCP tools for discovery/full reads through get_skill, trusted adds, updates, deletes, proposals, and drift checks.
-- Remote Streamable HTTP MCP with OAuth and role-aware filtering.
+- Remote Streamable HTTP MCP with OAuth and role-aware filtering at /mcp.
 
 ## Agent guidance
 
-Prefer inventory lookup first, full reads second, and get_skill with include_resources when packaged resources are needed.`;
+Prefer inventory lookup first, full reads second, and get_skill with include_resources when packaged resources are needed. Use local sync-profiles when a filesystem-native host needs files under its local skill root.`;
 
 const deployMarkdown = `# Deploy A Remote AutoVault
 
@@ -306,6 +308,7 @@ Deploy AutoVault when a team needs a shared remote vault, OAuth-protected MCP ac
 - Serves Streamable HTTP MCP at /mcp.
 - Uses OAuth for registration, login, token issuance, and protected-resource metadata.
 - Keeps validation, signing, transforms, resource reads, and drift checks on the same code path as local mode.
+- Remote mode cannot create symlinks on client machines. Remote clients should discover and read skills through get_skill; local filesystem-native hosts still need local sync-profiles or a future mirror helper.
 
 ## Railway template
 
@@ -406,7 +409,7 @@ Remote AutoVault serves Streamable HTTP MCP at /mcp. It uses OAuth for client re
 
 ## Provenance and drift
 
-Installed skills store source sidecars and detached signatures. check_updates compares installed content against upstream sources and reports drift, including transform base drift through transform_reviews.
+Installed skills store source sidecars and signed manifests. check_updates compares installed content against upstream sources and reports drift, including transform base drift through transform_reviews.
 
 ## License
 
