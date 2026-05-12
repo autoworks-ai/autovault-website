@@ -13,7 +13,7 @@ function rowMarks(row: (typeof homepageComparisonRows)[number]) { return row.sli
       <span class="ital">Different defaults.</span>
     </h2>
     <p class="av-lede" style="margin-top: 16px">
-      Skillfish is the closest direct neighbor: broad install, update, sync, and team bundle workflows across many agents. AutoVault is narrower on purpose: every skill enters a local vault through a gate, gets signed, scoped, and rendered from one canonical source.
+      Skillfish is the closest direct neighbor for broad install, update, sync, and team bundle workflows across many agents. Managers and registries place skills; AutoVault admits trusted source, signs it, scopes it, and renders caller-specific output from one canonical skill without long-lived forks.
     </p>
 
     <div class="av-compare">
