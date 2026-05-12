@@ -357,12 +357,20 @@ const compareMarkdown = `# AutoVault Comparison
 
 AutoVault is a local-first vault, not a browsing destination. It overlaps most closely with Skillfish for multi-agent skill install/update/sync, then differs by making validation, signing, scoped delivery, transforms, and local/remote vault operation the center of the product.
 
+The core AutoVault wedge is transforms instead of forks. Keep pristine upstream source, apply workspace-local deltas at render time, then sign and scope the output each caller actually loads.
+
 ## Useful alternatives
 
 - Skillfish: strong open-source manager for installing, updating, syncing, and sharing skill bundles across many agents.
 - Tessl: useful public ecosystem and distribution layer for skills and agents.
 - SkillKit / Agent Skills directories and spec repos: useful places to find or standardize source material before local admission.
 - Manual per-agent folders: simplest for one person with a few files, but drift grows quickly.
+
+## Deduplication bet
+
+Admission-time dedup matters because agent-authored skill corpora already show clone pressure. SkillClone found 75% of all analyzed skills involved in clone pairs, 3.5x ecosystem inflation, only 5,642 unique skill concepts, and 41% of skills in clone families superseded by a strictly better variant.
+
+Source: https://arxiv.org/abs/2603.22447
 
 ## Tradeoff
 

@@ -21,6 +21,7 @@ const navItems = [
   { label: "Quick start", href: "/quick-start" },
   { label: "Authoring", href: "/authoring" },
   { label: "Examples", href: "/skills-directory" },
+  { label: "Compare", href: "/compare" },
   { label: "Security", href: "/security" }
 ];
 

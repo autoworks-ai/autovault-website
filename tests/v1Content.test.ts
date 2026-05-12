@@ -155,12 +155,43 @@ describe("v1 content guardrails", () => {
       "Tessl docs",
       "Agent Skills GitHub",
       "SkillKit",
+      "SkillClone",
       "ClawHub docs",
       "Cloudflare obfuscation docs"
     ]);
     expect(comparisonSources.every((source) => source.href.startsWith("https://"))).toBe(true);
     expect(homepageComparisonRows.some((row) => row[1] === "partial")).toBe(true);
     expect(homepageComparisonRows.every((row) => row.length === comparisonPlayers.length + 1)).toBe(true);
+  });
+
+  it("keeps compare-page positioning focused on no-fork transforms and admission-time dedup", () => {
+    const compare = read(".vitepress/theme/components/ComparePage.vue");
+
+    expect(compare).toContain("transforms instead of forks");
+    expect(compare).toContain("workspace-local deltas");
+    expect(compare).toContain("Post-hoc dedup helps you browse a messy list. Admission-time dedup stops a duplicate from becoming local infrastructure.");
+    expect(compare).toContain("SkillClone");
+    expect(compare).toContain("https://arxiv.org/abs/2603.22447");
+    expect(compare).toContain("75% of all skills");
+    expect(compare).toContain("3.5x");
+    expect(compare).toContain("5,642 unique skill concepts");
+    expect(compare).toContain("41% of skills in clone families");
+  });
+
+  it("keeps compare discoverable in top navigation, search, and markdown export", () => {
+    const topbar = read(".vitepress/theme/components/AvTopbar.vue");
+    const docsShell = read(".vitepress/theme/components/DocsShell.vue");
+    const pageDocsSource = read(".vitepress/shared/pageDocs.ts");
+    const compareMarkdown = pageDocs.find((doc) => doc.key === "compare")?.markdown ?? "";
+
+    expect(topbar).toContain('{ label: "Compare", href: "/compare" }');
+    expect(docsShell).toContain("transforms instead of forks");
+    expect(docsShell).toContain("skillclone");
+    expect(compareMarkdown).toContain("transforms instead of forks");
+    expect(compareMarkdown).toContain("workspace-local deltas");
+    expect(compareMarkdown).toContain("Admission-time dedup");
+    expect(compareMarkdown).toContain("https://arxiv.org/abs/2603.22447");
+    expect(pageDocsSource).toContain("SkillClone");
   });
 
   it("keeps homepage gate metrics labeled as fixtures", () => {

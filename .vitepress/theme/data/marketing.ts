@@ -36,6 +36,7 @@ export const comparisonSources = [
   { label: "Tessl docs", href: "https://docs.tessl.io/create/creating-skills" },
   { label: "Agent Skills GitHub", href: "https://github.com/agentskills" },
   { label: "SkillKit", href: "https://skillkit.io/" },
+  { label: "SkillClone", href: "https://arxiv.org/abs/2603.22447" },
   { label: "ClawHub docs", href: "https://clawdhub.mintlify.app/tools/clawhub" },
   { label: "Cloudflare obfuscation docs", href: "https://developers.cloudflare.com/waf/tools/scrape-shield/email-address-obfuscation/" }
 ];
