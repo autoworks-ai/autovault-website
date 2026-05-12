@@ -220,7 +220,7 @@ const VAULT_TREE: VaultRow[] = [
   { depth: 2, label: "claude-code/skill-author/", kind: "dir" },
   { depth: 2, label: "codex/skill-author/", kind: "dir" },
   { depth: 1, label: "profiles/", kind: "dir", id: "profiles" },
-  { depth: 2, label: "claude-code/skill-author -> rendered/...", kind: "file" },
+  { depth: 2, label: "claude-code/skill-author/ -> rendered/...", kind: "dir" },
   { depth: 1, label: "profiles.config.json", kind: "file", id: "profile-config" }
 ];
 

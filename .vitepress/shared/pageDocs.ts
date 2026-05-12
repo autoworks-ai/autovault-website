@@ -162,7 +162,7 @@ Use hosted AutoVault when a team wants to reserve its cloud namespace and join t
 
 const authoringMarkdown = `# Authoring AutoVault Skills
 
-A skill is one SKILL.md file: YAML frontmatter plus a markdown body. Open Agent Skills fields provide the portable core: name and description remain the portable core, with optional metadata and resources. AutoVault extensions add production validation fields for canonical tools, transform maps, capability declarations, resources, secret requirements, signed setup actions, and target agents.
+A skill is one SKILL.md file: YAML frontmatter plus a markdown body. Open Agent Skills fields provide the portable core: name, description, optional metadata, and resources. AutoVault extensions add production validation fields for canonical tools, transform maps, capability declarations, resources, secret requirements, signed setup actions, and target agents.
 
 ## Minimal shape
 

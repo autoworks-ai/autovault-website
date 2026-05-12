@@ -50,7 +50,7 @@
 
     <section id="hosts" class="providers-section reveal-item">
       <h2>Pick a host</h2>
-      <p class="lede">Self-host the remote MCP service with the documented Docker or Railway paths. Local installs remain the source of truth for host profile links. Remote mode cannot create symlinks on client machines. Remote clients should discover and read skills through get_skill when they cannot read your local filesystem.</p>
+      <p class="lede">Self-host the remote MCP service with the documented Docker or Railway paths. Local installs remain the source of truth for host profile links. Remote mode cannot create symlinks on client machines. Remote clients should discover and read skills through <code>get_skill</code> when they cannot read your local filesystem.</p>
       <div class="providers">
         <button v-for="provider in providers" :key="provider.id" type="button" :class="['provider', { active: active === provider.id }]" @click="active = provider.id">
           <span class="head">

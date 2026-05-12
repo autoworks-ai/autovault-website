@@ -104,12 +104,12 @@ describe("v1 content guardrails", () => {
     expect(vaultAnatomy).not.toMatch(/keys\/|ed25519\.priv|manifest\.json|SKILL\.md\.sig/);
 
     expect(remoteModeCopy).toContain("Remote mode cannot create symlinks on client machines");
-    expect(remoteModeCopy).toContain("Remote clients should discover and read skills through get_skill");
+    expect(remoteModeCopy).toContain("Remote clients should discover and read skills through <code>get_skill</code>");
     expect(remoteModeCopy).not.toContain("install signed skills without ever touching a local filesystem");
 
     expect(authoringSchemaIntro).toContain("Open Agent Skills fields");
     expect(authoringSchemaIntro).toContain("AutoVault extensions");
-    expect(authoringSchemaIntro).toContain("name and description remain the portable core");
+    expect(authoringSchemaIntro).toContain("<code>name</code> and <code>description</code> remain the portable core");
     expect(deployMarkdown).toContain("Remote mode cannot create symlinks on client machines");
     expect(apiMarkdown).toContain("Current v0.2.1 surfaces");
   });
@@ -228,8 +228,13 @@ function sliceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
   const endIndex = source.indexOf(end, startIndex + start.length);
 
-  expect(startIndex).toBeGreaterThanOrEqual(0);
-  expect(endIndex).toBeGreaterThan(startIndex);
+  if (startIndex < 0) {
+    throw new Error(`Missing slice start marker: ${start}`);
+  }
+
+  if (endIndex <= startIndex) {
+    throw new Error(`Missing slice end marker after "${start}": ${end}`);
+  }
 
   return source.slice(startIndex, endIndex);
 }
