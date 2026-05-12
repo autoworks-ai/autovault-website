@@ -3897,6 +3897,10 @@ body {
   .av-nav {
     display: none;
   }
+
+  .av-topbar.nav-open .av-nav {
+    display: flex;
+  }
 }
 
 /* CLOUD DESIGN SHELL OVERRIDES
@@ -11843,9 +11847,12 @@ body {
     display: none;
   }
 
+  .av-topbar.nav-open .av-nav {
+    display: flex;
+  }
+
   .av-topbar-right {
-    width: 100%;
-    margin-left: 0;
+    margin-left: auto;
     overflow-x: auto;
   }
 
