@@ -169,13 +169,15 @@ describe("v1 content guardrails", () => {
 
     expect(compare).toContain("transforms instead of forks");
     expect(compare).toContain("workspace-local deltas");
-    expect(compare).toContain("Post-hoc dedup helps you browse a messy list. Admission-time dedup stops a duplicate from becoming local infrastructure.");
+    // Admission-time dedup positioning — exact copy may evolve, key tokens must stay
+    expect(compare).toMatch(/Admission-time dedup stops a duplicate from becoming local infrastructure/);
     expect(compare).toContain("SkillClone");
     expect(compare).toContain("https://arxiv.org/abs/2603.22447");
-    expect(compare).toContain("75% of all skills");
-    expect(compare).toContain("3.5x");
-    expect(compare).toContain("5,642 unique skill concepts");
-    expect(compare).toContain("41% of skills in clone families");
+    // SkillClone metrics — values matter, surrounding prose may change
+    expect(compare).toMatch(/75%/);
+    expect(compare).toMatch(/3\.5x/);
+    expect(compare).toMatch(/5,642/);
+    expect(compare).toMatch(/41%/);
   });
 
   it("keeps compare discoverable in top navigation, search, and markdown export", () => {

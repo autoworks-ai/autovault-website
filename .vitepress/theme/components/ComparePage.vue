@@ -62,7 +62,7 @@
 
       <div class="cm-honest">
         <div class="ttl">Honesty box</div>
-        <p><strong>Where AutoVault is genuinely behind.</strong> Skillfish currently has broader agent/runtime coverage and a clearer skill manager workflow for install, update, sync, and team bundles. Tessl and SkillKit / Agent Skills ecosystems are better starting points when public discovery or standardization is the main job. Manual folders are still simpler for one person with a handful of trusted skills. AutoVault is intentionally narrower: local-first validation, signing, scoped delivery, transform overlays, remote MCP, and OAuth before a broader management surface.</p>
+        <p><strong>Where AutoVault is genuinely behind.</strong> Skillfish currently has broader agent/runtime coverage and a clearer skill manager workflow for install, update, sync, and team bundles. Tessl and SkillKit / Agent Skills ecosystems are better starting points when public discovery or standardization is the main job. Manual folders are still simpler for one person with a handful of trusted skills. AutoVault is intentionally narrower: local-first validation, signing, scoped delivery, transforms instead of forks, remote MCP, and OAuth before a broader management surface.</p>
       </div>
 
       <div class="cm-honest">
@@ -142,7 +142,7 @@ type ComparisonRow =
 
 const players = [
   { id: "av" as const, name: "AutoVault", desc: "Local-first vault. Admits trusted source, then renders scoped variants from pristine upstream plus local deltas.", badge: "AV", color: "#5ad6c0", ink: "#062821", us: true, meta: [PRODUCT_VERSION, "MIT", "self-hosted"] },
-  { id: "sf" as const, name: "Skillfish", desc: "Open-source skill manager and placer for install, update, sync, and team bundles across many agents.", badge: "SF", color: "#5a9dd6", ink: "#06182a", meta: ["open source", "multi-agent", "team bundles"] },
+  { id: "sf" as const, name: "Skillfish", desc: "Open-source skill manager for install, update, sync, and team bundles across many agents.", badge: "SF", color: "#5a9dd6", ink: "#06182a", meta: ["open source", "multi-agent", "team bundles"] },
   { id: "ts" as const, name: "Tessl", desc: "Package and distribution layer for skills and agents, strongest as a published ecosystem.", badge: "TS", color: "#b48ad6", ink: "#1d0f2a", meta: ["ecosystem", "distribution", "hosted"] },
   { id: "sk" as const, name: "SkillKit / Agent Skills", desc: "Directory and spec-oriented discovery surfaces for reusable skill source material.", badge: "SK", color: "#d6a85a", ink: "#2a1a06", meta: ["discovery", "specs", "source material"] },
   { id: "mn" as const, name: "Manual folders", desc: "Hand-maintained ~/.claude/skills, ~/.codex/skills, Cursor rules, and repo docs.", badge: "—", color: "#4a5b6b", ink: "#0a0d11", meta: ["zero tooling", "local", "high drift"] }
