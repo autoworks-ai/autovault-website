@@ -89,7 +89,7 @@
     </div>
 
     <h2 id="vault-anatomy">The vault is a folder</h2>
-    <p>The final model is intentionally boring: a regular folder on disk, with source skills, manifests, detached signatures, rendered agent profiles, and an audit trail. Select a row to inspect how the folder is read.</p>
+    <p>The final model is intentionally boring: a regular folder on disk. This is the current implementation layout: SQLite index, local signing key, source skills, source metadata, signed manifests, rendered variants, and profile links. Select a row to inspect how the folder is read.</p>
     <div class="vault-anatomy">
       <div class="vault-tree" aria-label="Vault folder tree">
         <button
@@ -209,31 +209,31 @@ const PREREQS = [
 const VAULT_TREE: VaultRow[] = [
   { depth: 0, label: "~/.autovault", kind: "dir", id: "root" },
   { depth: 1, label: "config.toml", kind: "file", id: "config" },
-  { depth: 1, label: "keys/", kind: "dir", id: "keys" },
-  { depth: 2, label: "ed25519.priv", kind: "file" },
-  { depth: 2, label: "ed25519.pub", kind: "file" },
+  { depth: 1, label: "autovault.sqlite", kind: "file", id: "db" },
+  { depth: 1, label: ".signing-key.json", kind: "sig", id: "signing" },
   { depth: 1, label: "skills/", kind: "dir", id: "skills" },
   { depth: 2, label: "skill-author/", kind: "dir", id: "skill" },
   { depth: 3, label: "SKILL.md", kind: "file" },
-  { depth: 3, label: "manifest.json", kind: "file" },
-  { depth: 3, label: "SKILL.md.sig", kind: "sig" },
-  { depth: 3, label: "rendered/", kind: "dir", id: "rendered" },
-  { depth: 4, label: "claude-code.md", kind: "file" },
-  { depth: 4, label: "codex.md", kind: "file" },
-  { depth: 4, label: "autojack.md", kind: "file" },
-  { depth: 1, label: "cache/", kind: "dir", id: "cache" },
-  { depth: 1, label: "audit.log", kind: "file", id: "audit" }
+  { depth: 3, label: ".autovault-source.json", kind: "file" },
+  { depth: 3, label: ".autovault-manifest", kind: "sig" },
+  { depth: 1, label: "rendered/", kind: "dir", id: "rendered" },
+  { depth: 2, label: "claude-code/skill-author/", kind: "dir" },
+  { depth: 2, label: "codex/skill-author/", kind: "dir" },
+  { depth: 1, label: "profiles/", kind: "dir", id: "profiles" },
+  { depth: 2, label: "claude-code/skill-author -> rendered/...", kind: "file" },
+  { depth: 1, label: "profiles.config.json", kind: "file", id: "profile-config" }
 ];
 
 const VAULT_NOTES: Record<string, { title: string; body: string; tags?: string[] }> = {
   root: { title: "The vault itself", body: "A normal folder. Inspect it, sync it, back it up, or version it the same way you handle dotfiles." },
   config: { title: "config.toml", body: "Trusted sources, default scope policy, and render targets live here so the policy diffs cleanly." },
-  keys: { title: "keys/", body: "A local Ed25519 keypair signs admitted skills. The private key stays on the machine.", tags: ["ed25519", "local-only"] },
+  db: { title: "autovault.sqlite", body: "SQLite index for capabilities, callers, tool groups, profiles, and installed skill metadata.", tags: ["sqlite", "index"] },
+  signing: { title: ".signing-key.json", body: "A local Ed25519 keypair signs admitted skills and manifests. Treat write access to the storage root as vault compromise.", tags: ["ed25519", "local-only"] },
   skills: { title: "skills/", body: "One subfolder per canonical skill. The source SKILL.md remains the thing humans review." },
-  skill: { title: "skill-author/", body: "The source, manifest, detached signature, and rendered agent files stay together under the canonical id.", tags: ["canonical", "signed"] },
-  rendered: { title: "rendered/", body: "Generated files for each agent profile. Regenerate these from source rather than hand-editing forks." },
-  cache: { title: "cache/", body: "Fetch and token-budget cache. Safe to delete; excluded from sync by default." },
-  audit: { title: "audit.log", body: "Append-only admission and scope-change events used for provenance and troubleshooting.", tags: ["provenance"] }
+  skill: { title: "skill-author/", body: "The source SKILL.md, source metadata, resources, and signed manifest stay together under the canonical id.", tags: ["canonical", "signed"] },
+  rendered: { title: "rendered/", body: "Generated per-agent variants. Regenerate these from source rather than hand-editing forks." },
+  profiles: { title: "profiles/", body: "Symlink targets for filesystem-native host skill roots. sync-profiles can project these into Claude Code, Codex, Cursor, and named profiles." },
+  "profile-config": { title: "profiles.config.json", body: "Optional named-profile policy for tag-filtered project profiles and explicit profile roots.", tags: ["scope"] }
 };
 const selectedVaultRow = ref("root");
 const activeVaultNote = computed(() => VAULT_NOTES[selectedVaultRow.value]);
@@ -245,8 +245,8 @@ function selectVaultRow(id: string | undefined) {
 }
 
 const ACCESS_ROWS = [
-  { agent: "Claude Code", path: "~/.autovault/skills/skill-author/rendered/claude-code.md", via: "symlink to ~/.claude/skills" },
-  { agent: "Codex", path: "~/.autovault/skills/skill-author/rendered/codex.md", via: "symlink to ~/.codex/skills" },
+  { agent: "Claude Code", path: "~/.autovault/profiles/claude-code/skill-author", via: "symlink into ~/.claude/skills" },
+  { agent: "Codex", path: "~/.autovault/profiles/codex/skill-author", via: "symlink into ~/.codex/skills" },
   { agent: "AutoJack", path: "~/.autovault/skills/skill-author/SKILL.md", via: "native read of canonical source" }
 ];
 

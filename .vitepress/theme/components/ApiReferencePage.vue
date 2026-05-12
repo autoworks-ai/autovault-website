@@ -17,12 +17,12 @@
     <main class="api-main">
       <section class="api-hero reveal-item">
         <div class="eyebrow"><span class="dash" /> Reference · {{ PRODUCT_RELEASE_LABEL }}</div>
-        <h1>Three surfaces. <span class="ital">One vocabulary.</span></h1>
-        <p class="lede">AutoVault exposes the same primitives — admit, load, render, verify — through three interfaces: a CLI for humans, a library for programs, and an HTTP/MCP endpoint for remote agents. They're versioned together; if a name appears here, it works the same way in all three.</p>
+        <h1>Current surfaces. <span class="ital">Clear boundaries.</span></h1>
+        <p class="lede">Current v0.2.1 surfaces are the local CLI, source ESM library exports, local stdio MCP, and remote Streamable HTTP MCP at <code>/mcp</code>. There is no public REST API or separately published SDK package yet; MCP tools are the agent-facing API.</p>
         <div class="api-versions">
           <div class="v"><div class="lbl">CLI</div><div class="val">autovault@{{ PRODUCT_VERSION_SHORT }} <span class="meta">npm · brew · cargo</span></div></div>
-          <div class="v"><div class="lbl">Library</div><div class="val">@autovault/sdk@{{ PRODUCT_VERSION_SHORT }} <span class="meta">node, deno, bun</span></div></div>
-          <div class="v"><div class="lbl">HTTP</div><div class="val">/api/v1 <span class="meta">+ MCP 2024-11-05</span></div></div>
+          <div class="v"><div class="lbl">Library</div><div class="val">source ESM exports <span class="meta">Node/TypeScript</span></div></div>
+          <div class="v"><div class="lbl">Remote</div><div class="val">/mcp <span class="meta">Streamable HTTP MCP</span></div></div>
         </div>
       </section>
 
@@ -89,140 +89,62 @@ type ApiEndpoint = {
 type ApiSection = { id: string; title: string; meta: string; lede: string; items: ApiEndpoint[] };
 type NavItem = { kind: "section"; label: string; color: string } | { kind: "item"; id: string; method: "cli" | "fn" | "get" | "post"; label: string };
 
-const activeId = ref("cli-init");
+const activeId = ref("cli-add-local");
 const copied = ref("");
 
 const nav: NavItem[] = [
   { kind: "section", label: "CLI", color: "#5a9dd6" },
-  { kind: "item", id: "cli-init", method: "cli", label: "init" },
-  { kind: "item", id: "cli-add", method: "cli", label: "add" },
-  { kind: "item", id: "cli-list", method: "cli", label: "list" },
   { kind: "item", id: "cli-add-local", method: "cli", label: "add-local" },
-  { kind: "item", id: "cli-verify", method: "cli", label: "verify" },
-  { kind: "item", id: "cli-check-updates", method: "cli", label: "check-updates" },
-  { kind: "section", label: "Library", color: "#b48ad6" },
-  { kind: "item", id: "lib-load", method: "fn", label: "loadSkill()" },
-  { kind: "item", id: "lib-render", method: "fn", label: "renderForTarget()" },
-  { kind: "item", id: "lib-verify", method: "fn", label: "verifyChain()" },
-  { kind: "section", label: "HTTP / MCP", color: "#5ad6c0" },
-  { kind: "item", id: "http-skill", method: "get", label: "/skill/{name}" },
-  { kind: "item", id: "http-resolve", method: "post", label: "/resolve" },
-  { kind: "item", id: "http-verify", method: "post", label: "/verify" }
+  { kind: "item", id: "cli-sync-profiles", method: "cli", label: "sync-profiles" },
+  { kind: "item", id: "cli-doctor", method: "cli", label: "doctor" },
+  { kind: "item", id: "cli-skill-search", method: "cli", label: "skill search" },
+  { kind: "item", id: "cli-serve", method: "cli", label: "serve" },
+  { kind: "section", label: "Library exports", color: "#b48ad6" },
+  { kind: "item", id: "lib-resolve", method: "fn", label: "resolveCapabilities()" },
+  { kind: "item", id: "lib-install", method: "fn", label: "addSkill()" },
+  { kind: "item", id: "lib-profiles", method: "fn", label: "syncProfiles()" },
+  { kind: "section", label: "MCP tools", color: "#5ad6c0" },
+  { kind: "item", id: "mcp-get-skill", method: "fn", label: "get_skill" },
+  { kind: "item", id: "mcp-add-skill", method: "fn", label: "add_skill" },
+  { kind: "item", id: "mcp-propose-skill", method: "fn", label: "propose_skill" },
+  { kind: "item", id: "mcp-check-updates", method: "fn", label: "check_updates" }
 ];
 
 const sections: ApiSection[] = [
   {
     id: "cli",
     title: "CLI",
-    meta: "six commands · everything else is a flag",
-    lede: "The CLI is the canonical surface. Library and HTTP are thin wrappers over the same machinery. If a workflow can't be expressed as a CLI invocation, it can't be expressed at all.",
+    meta: "user-facing local operations",
+    lede: "The CLI is the local operator surface. It installs local bundles, syncs host profiles, audits repository capabilities, inspects installed skills, and starts the remote service when you self-host.",
     items: [
-      {
-        id: "cli-init",
-        short: "init",
-        title: "autovault init",
-        status: "stable",
-        since: "0.1.0",
-        description: "Scaffold a local vault. Generates a signing key, creates the <code>~/.autovault</code> folder when needed, and writes a starter <code>config.toml</code>.",
-        signature: ["<span class=\"pmt\">$</span> autovault init <span class=\"opt\">[--key &lt;path&gt;] [--anchor &lt;url&gt;] [--no-key]</span>"],
-        copy: "autovault init",
-        argsLabel: "Flag",
-        args: [
-          { name: "--key", type: "path", description: "Existing Ed25519 private key to import. If omitted, a new key is generated and written under <code>~/.autovault</code>." },
-          { name: "--anchor", type: "url <span class=\"def\">= autovault.dev</span>", description: "Trust anchor URL. Override to point at a private vault for self-hosted deployments." },
-          { name: "--no-key", type: "flag", description: "Skip key generation. Use this if you only intend to read skills from an existing vault." }
-        ],
-        examples: [
-          { label: "Bash", body: "<div><span class=\"com\"># first local vault</span></div><div><span class=\"pmt\">$</span> autovault init</div><div><span class=\"ok\">  ✓</span> generated key:0x9af4…2c81</div><div><span class=\"ok\">  ✓</span> ~/.autovault created</div><div><span class=\"ok\">  ✓</span> anchored to autovault.dev (root)</div>" },
-          { label: "Self-hosted", body: "<div><span class=\"pmt\">$</span> autovault init \\</div><div>    --anchor https://vault.internal.acme.com</div><div><span class=\"ok\">  ✓</span> anchored to vault.internal.acme.com</div>" },
-          { label: "Import key", body: "<div><span class=\"pmt\">$</span> autovault init --key ./signing.pem</div><div><span class=\"ok\">  ✓</span> imported key:0xD6A8…5AB4</div>" }
-        ]
-      },
-      {
-        id: "cli-add",
-        short: "add",
-        title: "autovault add <skill>",
-        status: "stable",
-        since: "0.1.0",
-        description: "Resolve, fetch, verify, and install a skill into the current vault. Renders the appropriate transformation for each agent declared in <code>config.toml</code>'s <code>[targets]</code>.",
-        signature: ["<span class=\"pmt\">$</span> autovault add <span class=\"key\">&lt;skill&gt;</span> <span class=\"opt\">[@&lt;version&gt;] [--target &lt;agent&gt;] [--dry-run]</span>"],
-        copy: "autovault add autoworks-ai/skill-author",
-        argsLabel: "Argument",
-        args: [
-          { name: "skill", required: true, type: "string", description: "Fully-qualified name: <code>org/name</code>. Can include <code>@version</code> suffix; otherwise resolves to latest signed version." },
-          { name: "--target", type: "enum", description: "Restrict installation to a specific agent: <code>claude-code</code>, <code>codex</code>, <code>cursor</code>, <code>autohub</code>. Repeatable." },
-          { name: "--dry-run", type: "flag", description: "Verify and render without writing any files. Useful in CI gates." }
-        ],
-        examples: [
-          { label: "Bash", body: "<div><span class=\"pmt\">$</span> autovault add autoworks-ai/skill-author</div><div><span class=\"ok\">  ✓</span> resolved @1.0.0</div><div><span class=\"ok\">  ✓</span> verified ed25519 sig</div><div><span class=\"ok\">  ✓</span> rendered → CLAUDE.md, AGENTS.md, AutoJack profile</div>" },
-          { label: "Pinned", body: "<div><span class=\"pmt\">$</span> autovault add autoworks-ai/skill-author <span class=\"opt\">--version 1.0.0</span></div><div><span class=\"ok\">  ✓</span> resolved v1.0.0 (pinned)</div>" },
-          { label: "Single target", body: "<div><span class=\"pmt\">$</span> autovault add autoworks-ai/skill-author \\</div><div>    --target claude-code</div><div><span class=\"ok\">  ✓</span> rendered → CLAUDE.md only</div>" }
-        ]
-      },
-      endpoint("cli-list", "list", "autovault list", "Print the installed skills in this vault, their versions, and the last verification timestamp. Adds <code>--json</code> for machine output.", "$ autovault list [--json] [--stale]", "autovault list"),
-      endpoint("cli-add-local", "add-local", "autovault add-local <path>", "Admit a local SKILL.md bundle into the vault. Runs the same gate as remote sources, writes provenance, signs what passes, and can refresh generated profiles.", "$ autovault add-local <path> [--source <id>] [--sync-profiles]", "autovault add-local ./skills/skill-author --sync-profiles", "0.2.0"),
-      endpoint("cli-verify", "verify", "autovault verify", "Walk the provenance chain for a skill. Resolves the latest version, fetches the signature bundle, and verifies every link from author through mirror.", "$ autovault verify <skill> [--chain] [--offline]", "autovault verify autoworks-ai/skill-author", "0.3.0"),
-      endpoint("cli-check-updates", "check-updates", "autovault check-updates", "Compare admitted skills against their recorded source sidecars and report upstream drift, including transform review state when applicable.", "$ autovault check-updates [--json]", "autovault check-updates", "0.2.0")
+      endpoint("cli-add-local", "add-local", "autovault add-local <path>", "Admit a local SKILL.md bundle. The command collects sibling resources, rejects symlinks, validates, signs, records local provenance, and can refresh profile links.", "$ autovault add-local <skill-dir> --source <repo-or-url> [--sync-profiles] [--link agent=/path/to/skills] [--json]", "autovault add-local ./skills/skill-author --source vendor/skills --sync-profiles", "0.2.0"),
+      endpoint("cli-sync-profiles", "sync-profiles", "autovault sync-profiles", "Regenerate local filesystem-native profile links for detected or configured host skill roots. Remote mode cannot perform this on client machines.", "$ autovault sync-profiles [--discover] [--link agent=/path/to/skills]", "autovault sync-profiles --discover", "0.2.0"),
+      endpoint("cli-doctor", "doctor", "autovault doctor", "Inspect local vault health, installed skill integrity, ignored OS/editor metadata, and profile visibility. Add <code>--clean</code> only to remove ignored artifacts.", "$ autovault doctor [skill-name] [--clean] [--json]", "autovault doctor --json", "0.2.0"),
+      endpoint("cli-skill-search", "skill search", "autovault skill search", "Run local metadata text search over installed skills. This searches names, descriptions, tags, categories, and when-to-use metadata; embedding-backed semantic search is future work.", "$ autovault skill search <query> [--top-k N]", "autovault skill search code-review --top-k 5", "0.2.1"),
+      endpoint("cli-serve", "serve", "autovault serve", "Start the remote Streamable HTTP MCP service. Set <code>AUTOVAULT_MODE=remote</code>, <code>AUTOVAULT_PUBLIC_URL</code>, admin credentials, and storage path before exposing it.", "$ autovault serve", "AUTOVAULT_MODE=remote autovault serve", "0.2.1")
     ]
   },
   {
     id: "lib",
-    title: "Library",
-    meta: "@autovault/sdk · TypeScript-first",
-    lede: "The library is what the CLI calls under the hood. Every CLI command is a thin wrapper. Use it directly when you want skill resolution inside your own tooling — agent harnesses, CI checks, custom inspectors.",
+    title: "Library exports",
+    meta: "source package · TypeScript-first",
+    lede: "The source package exports the same storage, validation, profile-sync, and capability-resolution helpers used by the CLI and MCP server. This is useful for local integrations built from the repository; it is not a separately documented public SDK package.",
     items: [
-      {
-        id: "lib-load",
-        short: "loadSkill",
-        title: "loadSkill(spec, options?)",
-        status: "stable",
-        since: "0.2.0",
-        description: "Resolve and verify a signed skill bundle. Returns the canonical SKILL.md plus its frontmatter, transformations, and provenance chain.",
-        signature: ["<span class=\"key\">async function</span> <span class=\"num\">loadSkill</span>(", "  <span class=\"key\">spec</span>: <span class=\"str\">string</span>, <span class=\"com\">// \"org/name@version\" or \"org/name\"</span>", "  <span class=\"key\">options</span>?: <span class=\"str\">LoadOptions</span>", "): <span class=\"key\">Promise</span>&lt;<span class=\"str\">SignedSkill</span>&gt;"],
-        copy: "loadSkill(\"autoworks-ai/skill-author\")",
-        args: [
-          { name: "options.anchor", type: "string <span class=\"def\">= \"autovault.dev\"</span>", description: "Trust anchor URL. Skill must chain to a key trusted by this anchor." },
-          { name: "options.cache", type: "\"prefer\" | \"none\"", description: "Whether to use the local cache. <code>\"none\"</code> forces a network round-trip." },
-          { name: "options.signal", type: "AbortSignal", description: "Standard cancellation signal." }
-        ],
-        examples: [
-          { label: "TypeScript", body: "<div><span class=\"key\">import</span> { loadSkill } <span class=\"key\">from</span> <span class=\"str\">\"@autovault/sdk\"</span>;</div><div></div><div><span class=\"key\">const</span> skill = <span class=\"key\">await</span> loadSkill(<span class=\"str\">\"autoworks-ai/skill-author\"</span>);</div><div><span class=\"com\">// skill.frontmatter.version === \"1.0.0\"</span></div>" },
-          { label: "Pinned + offline", body: "<div><span class=\"key\">const</span> skill = <span class=\"key\">await</span> loadSkill(</div><div>  <span class=\"str\">\"autoworks-ai/skill-author\"</span>,</div><div>  { cache: <span class=\"str\">\"prefer\"</span>, version: <span class=\"str\">\"1.0.0\"</span> }</div><div>);</div>" }
-        ]
-      },
-      endpoint("lib-render", "renderForTarget", "renderForTarget(skill, target)", "Pure function. Takes a verified skill and a target identifier; returns the agent-specific output string.", "function renderForTarget(skill: SignedSkill, target: \"claude-code\" | \"codex\" | \"cursor\" | \"autohub\"): string", "renderForTarget(skill, \"codex\")", "0.2.0"),
-      endpoint("lib-verify", "verifyChain", "verifyChain(bundle)", "Verify a provenance chain offline. Takes a bundle from <code>loadSkill()</code>; returns a structured verdict with which links passed, which failed, and why.", "function verifyChain(bundle: SignedSkill): VerifyResult", "verifyChain(bundle)", "0.3.0")
+      endpoint("lib-resolve", "resolveCapabilities", "resolveCapabilities(input)", "Resolve tools, skills, and MCP servers for a scoped caller request. Unknown callers fail closed unless mapped to a restricted profile.", "resolveCapabilities({ caller_id, platform, query, channel })", "resolveCapabilities({ caller_id: \"codex\", platform: \"local\", query: \"review\" })", "0.2.1"),
+      endpoint("lib-install", "addSkill / proposeSkill / updateSkill", "skill lifecycle helpers", "Install from configured sources, validate caller-authored SKILL.md bytes, or refresh an installed skill. MCP tools wrap these same helpers.", "addSkill(input)\nproposeSkill(input)\nupdateSkill(input)", "proposeSkill({ skill_md })", "0.2.0"),
+      endpoint("lib-profiles", "syncProfiles", "syncProfiles(input)", "Regenerate per-agent and tag-filtered profile symlinks from installed skill metadata and optional profile config.", "syncProfiles({ discover: true, profileRoots })", "syncProfiles({ discover: true })", "0.2.0")
     ]
   },
   {
-    id: "http",
-    title: "HTTP & MCP",
-    meta: "remote endpoint · for sandboxed agents",
-    lede: "Use the HTTP surface when an agent runs in an environment without local CLI access — mobile, hosted notebooks, browser-only runtimes. The MCP server bundled with the vault speaks both the vanilla HTTP API below and the MCP protocol on the same port.",
+    id: "mcp",
+    title: "MCP tools",
+    meta: "local stdio · remote /mcp",
+    lede: "MCP tools are the agent-facing API. Local hosts spawn the stdio server; remote clients connect to Streamable HTTP MCP at <code>/mcp</code> with OAuth and role-aware filtering.",
     items: [
-      {
-        id: "http-skill",
-        short: "GET /skill",
-        title: "GET /api/v1/skill/{org}/{name}",
-        status: "stable",
-        since: "0.3.0",
-        description: "Fetch a signed skill bundle. Response is signed JSON; clients should verify the signature with the public key from the trust anchor before consuming the body.",
-        signature: ["GET /api/v1/skill/<span class=\"key\">{org}</span>/<span class=\"key\">{name}</span><span class=\"opt\">?version=1.0.0&target=claude-code</span>"],
-        copy: "curl https://vault.autovault.dev/api/v1/skill/autoworks-ai/skill-author",
-        argsLabel: "Param",
-        args: [
-          { name: "org", required: true, type: "path", description: "Publisher org, e.g. <code>autoworks-ai</code>." },
-          { name: "name", required: true, type: "path", description: "Skill name within the org." },
-          { name: "version", type: "query", description: "Specific version. Omit for latest signed." },
-          { name: "target", type: "query", description: "Pre-render the transformation for this target. Reduces caller-side work." }
-        ],
-        examples: [
-          { label: "curl", body: "<div><span class=\"pmt\">$</span> curl https://vault.autovault.dev/api/v1/skill/autoworks-ai/skill-author</div><div></div><div><span class=\"key\">{</span></div><div>  <span class=\"str\">\"name\"</span>: <span class=\"str\">\"skill-author\"</span>,</div><div>  <span class=\"str\">\"version\"</span>: <span class=\"str\">\"1.0.0\"</span>,</div><div>  <span class=\"str\">\"signature\"</span>: <span class=\"str\">\"ed25519:9af42c81…7e7e\"</span></div><div><span class=\"key\">}</span></div>" },
-          { label: "MCP", body: "<div><span class=\"com\">// MCP tool call</span></div><div><span class=\"key\">{</span></div><div>  <span class=\"str\">\"method\"</span>: <span class=\"str\">\"get_skill\"</span>,</div><div>  <span class=\"str\">\"params\"</span>: { <span class=\"str\">\"name\"</span>: <span class=\"str\">\"autoworks-ai/skill-author\"</span> }</div><div><span class=\"key\">}</span></div>" }
-        ]
-      },
-      endpoint("http-resolve", "POST /resolve", "POST /api/v1/resolve", "Batch-resolve a list of skill specs to their latest signed versions. Useful for vaults that want to refresh many skills in one round-trip.", "POST /api/v1/resolve\n\n{ \"specs\": [\"autoworks-ai/skill-author\"], \"target\": \"claude-code\" }", "POST /api/v1/resolve", "0.3.0"),
-      endpoint("http-verify", "POST /verify", "POST /api/v1/verify", "Server-side reproducible verification. Send a bundle; the vault re-runs the gate and returns whether its verdict matches what the bundle claims.", "POST /api/v1/verify\n\n// body: a SignedSkill bundle", "POST /api/v1/verify", "0.4.0", "beta")
+      endpoint("mcp-get-skill", "get_skill", "get_skill", "Search by query or fetch one installed skill by name. Pass <code>include_resources</code> when packaged resource files are needed.", "{ query?: string, name?: string, agent?: string, include_resources?: boolean }", "get_skill({ query: \"code review\" })"),
+      endpoint("mcp-add-skill", "add_skill", "add_skill", "Install a known skill from GitHub, agentskills, HTTPS URL, or local bundle source. Caller-authored bytes should use <code>propose_skill</code> instead.", "{ source: \"github\" | \"agentskills\" | \"url\" | \"local\", identifier: string, ... }", "add_skill({ source: \"url\", identifier: \"https://example.com/SKILL.md\" })"),
+      endpoint("mcp-propose-skill", "propose_skill", "propose_skill", "Submit newly authored SKILL.md content for validation, security scan, capability cross-check, deduplication, signing, and storage.", "{ skill_md: string, resources?: Array<{ path: string, content: string }> }", "propose_skill({ skill_md })"),
+      endpoint("mcp-check-updates", "check_updates", "check_updates", "Compare installed skills against recorded upstream source state and report drift, unchecked inline skills, warnings, and errors.", "{ skill?: string }", "check_updates({ skill: \"skill-author\" })")
     ]
   }
 ];

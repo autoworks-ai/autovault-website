@@ -59,6 +59,7 @@
 
     <h2 id="schema">Frontmatter fields, in full</h2>
     <p>AutoVault does not need proprietary files beside SKILL.md. The fields below are the current production contract the gate and renderer understand.</p>
+    <p class="muted"><strong>Open Agent Skills fields.</strong> The fields name and description remain the portable core; <code>license</code>, <code>resources</code>, and the markdown body stay plain SKILL.md. <strong>AutoVault extensions</strong> add local validation, transform, scope, secret-requirement, and signed setup metadata around that open shape.</p>
     <div class="schema final-schema" aria-label="SKILL.md frontmatter schema">
       <div class="schema-row head">
         <span>Field</span><span>Type</span><span>Required</span><span>Description</span>

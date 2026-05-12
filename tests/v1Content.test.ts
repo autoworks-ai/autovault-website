@@ -77,6 +77,35 @@ describe("v1 content guardrails", () => {
     expect(docsMarkdown).toContain("Do not bundle .env files, SSH private keys, API tokens, or copied dashboard secrets");
   });
 
+  it("keeps current API, storage, and remote-mode docs aligned to v0 surfaces", () => {
+    const api = read(".vitepress/theme/components/ApiReferencePage.vue");
+    const quickStart = read(".vitepress/theme/components/QuickStartPage.vue");
+    const deploy = read(".vitepress/theme/components/DeployPage.vue");
+    const authoring = read(".vitepress/theme/components/AuthoringPage.vue");
+    const allMarkdown = pageDocs.map((doc) => doc.markdown).join("\n");
+
+    expect(api).toContain("Current v0.2.1 surfaces");
+    expect(api).toContain("MCP tools are the agent-facing API");
+    expect(api).toContain("autovault add-local");
+    expect(api).not.toMatch(/@autovault\/sdk|\/api\/v1|autovault init|MCP 2024-11-05/);
+
+    expect(quickStart).toContain("current implementation layout");
+    expect(quickStart).toContain(".signing-key.json");
+    expect(quickStart).toContain(".autovault-source.json");
+    expect(quickStart).toContain(".autovault-manifest");
+    expect(quickStart).not.toMatch(/keys\/|ed25519\.priv|manifest\.json|SKILL\.md\.sig/);
+
+    expect(deploy).toContain("Remote mode cannot create symlinks on client machines");
+    expect(deploy).toContain("Remote clients should discover and read skills through get_skill");
+    expect(deploy).not.toContain("install signed skills without ever touching a local filesystem");
+
+    expect(authoring).toContain("Open Agent Skills fields");
+    expect(authoring).toContain("AutoVault extensions");
+    expect(authoring).toContain("name and description remain the portable core");
+    expect(allMarkdown).toContain("Remote mode cannot create symlinks on client machines");
+    expect(allMarkdown).toContain("Current v0.2.1 surfaces");
+  });
+
   it("keeps hidden hosted copy reservation-only", () => {
     const hostedCopy = [
       ".vitepress/theme/components/CloudPage.vue",
