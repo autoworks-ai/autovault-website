@@ -129,7 +129,7 @@ Doctor confirms the binary, vault folder, signing key, bundled skill index, and 
 autovault add-local ./skills/skill-author --source vendor/skills --sync-profiles
 \`\`\`
 
-add-local hands raw skill content and sibling resources to the same gate used by MCP install paths: frontmatter repair, schema validation, denylist scan, capability/behavior check, deduplication, and Ed25519 signing.
+The \`autovault add-local\` command hands raw skill content and sibling resources to the same gate used by MCP install paths: frontmatter repair, schema validation, denylist scan, capability/behavior check, deduplication, and Ed25519 signing.
 
 ## Vault anatomy
 

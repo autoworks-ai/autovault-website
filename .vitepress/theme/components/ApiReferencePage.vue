@@ -101,7 +101,7 @@ const nav: NavItem[] = [
   { kind: "item", id: "cli-serve", method: "cli", label: "serve" },
   { kind: "section", label: "Library exports", color: "#b48ad6" },
   { kind: "item", id: "lib-resolve", method: "fn", label: "resolveCapabilities()" },
-  { kind: "item", id: "lib-install", method: "fn", label: "addSkill()" },
+  { kind: "item", id: "lib-install", method: "fn", label: "skill lifecycle" },
   { kind: "item", id: "lib-profiles", method: "fn", label: "syncProfiles()" },
   { kind: "section", label: "MCP tools", color: "#5ad6c0" },
   { kind: "item", id: "mcp-get-skill", method: "fn", label: "get_skill" },
@@ -131,7 +131,7 @@ const sections: ApiSection[] = [
     lede: "The source package exports the same storage, validation, profile-sync, and capability-resolution helpers used by the CLI and MCP server. This is useful for local integrations built from the repository; it is not a separately documented public SDK package.",
     items: [
       endpoint("lib-resolve", "resolveCapabilities", "resolveCapabilities(input)", "Resolve tools, skills, and MCP servers for a scoped caller request. Unknown callers fail closed unless mapped to a restricted profile.", "resolveCapabilities({ caller_id, platform, query, channel })", "resolveCapabilities({ caller_id: \"codex\", platform: \"local\", query: \"review\" })", "0.2.1"),
-      endpoint("lib-install", "addSkill / proposeSkill / updateSkill", "skill lifecycle helpers", "Install from configured sources, validate caller-authored SKILL.md bytes, or refresh an installed skill. MCP tools wrap these same helpers.", "addSkill(input)\nproposeSkill(input)\nupdateSkill(input)", "proposeSkill({ skill_md })", "0.2.0"),
+      endpoint("lib-install", "lifecycle", "skill lifecycle helpers", "Grouped source exports for installing from configured sources, validating caller-authored SKILL.md bytes, or refreshing an installed skill. MCP tools wrap these same helpers.", "addSkill(input)\nproposeSkill(input)\nupdateSkill(input)", "proposeSkill({ skill_md })", "0.2.0"),
       endpoint("lib-profiles", "syncProfiles", "syncProfiles(input)", "Regenerate per-agent and tag-filtered profile symlinks from installed skill metadata and optional profile config.", "syncProfiles({ discover: true, profileRoots })", "syncProfiles({ discover: true })", "0.2.0")
     ]
   },

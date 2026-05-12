@@ -82,28 +82,36 @@ describe("v1 content guardrails", () => {
     const quickStart = read(".vitepress/theme/components/QuickStartPage.vue");
     const deploy = read(".vitepress/theme/components/DeployPage.vue");
     const authoring = read(".vitepress/theme/components/AuthoringPage.vue");
-    const allMarkdown = pageDocs.map((doc) => doc.markdown).join("\n");
+    const apiCurrentSurface = [
+      sliceBetween(api, "<section class=\"api-hero", "</section>"),
+      sliceBetween(api, "const nav: NavItem[] = [", "function endpoint")
+    ].join("\n");
+    const vaultAnatomy = sliceBetween(quickStart, "<h2 id=\"vault-anatomy\">", "const ACCESS_ROWS");
+    const remoteModeCopy = sliceBetween(deploy, "<section id=\"hosts\"", "const providers");
+    const authoringSchemaIntro = sliceBetween(authoring, "<h2 id=\"schema\">", "<div class=\"schema final-schema\"");
+    const apiMarkdown = pageDocs.find((doc) => doc.key === "api")?.markdown ?? "";
+    const deployMarkdown = pageDocs.find((doc) => doc.key === "deploy")?.markdown ?? "";
 
-    expect(api).toContain("Current v0.2.1 surfaces");
-    expect(api).toContain("MCP tools are the agent-facing API");
-    expect(api).toContain("autovault add-local");
-    expect(api).not.toMatch(/@autovault\/sdk|\/api\/v1|autovault init|MCP 2024-11-05/);
+    expect(apiCurrentSurface).toContain("Current v0.2.1 surfaces");
+    expect(apiCurrentSurface).toContain("MCP tools are the agent-facing API");
+    expect(apiCurrentSurface).toContain("autovault add-local");
+    expect(apiCurrentSurface).not.toMatch(/@autovault\/sdk|\/api\/v1|autovault init|MCP 2024-11-05/);
 
-    expect(quickStart).toContain("current implementation layout");
-    expect(quickStart).toContain(".signing-key.json");
-    expect(quickStart).toContain(".autovault-source.json");
-    expect(quickStart).toContain(".autovault-manifest");
-    expect(quickStart).not.toMatch(/keys\/|ed25519\.priv|manifest\.json|SKILL\.md\.sig/);
+    expect(vaultAnatomy).toContain("current implementation layout");
+    expect(vaultAnatomy).toContain(".signing-key.json");
+    expect(vaultAnatomy).toContain(".autovault-source.json");
+    expect(vaultAnatomy).toContain(".autovault-manifest");
+    expect(vaultAnatomy).not.toMatch(/keys\/|ed25519\.priv|manifest\.json|SKILL\.md\.sig/);
 
-    expect(deploy).toContain("Remote mode cannot create symlinks on client machines");
-    expect(deploy).toContain("Remote clients should discover and read skills through get_skill");
-    expect(deploy).not.toContain("install signed skills without ever touching a local filesystem");
+    expect(remoteModeCopy).toContain("Remote mode cannot create symlinks on client machines");
+    expect(remoteModeCopy).toContain("Remote clients should discover and read skills through get_skill");
+    expect(remoteModeCopy).not.toContain("install signed skills without ever touching a local filesystem");
 
-    expect(authoring).toContain("Open Agent Skills fields");
-    expect(authoring).toContain("AutoVault extensions");
-    expect(authoring).toContain("name and description remain the portable core");
-    expect(allMarkdown).toContain("Remote mode cannot create symlinks on client machines");
-    expect(allMarkdown).toContain("Current v0.2.1 surfaces");
+    expect(authoringSchemaIntro).toContain("Open Agent Skills fields");
+    expect(authoringSchemaIntro).toContain("AutoVault extensions");
+    expect(authoringSchemaIntro).toContain("name and description remain the portable core");
+    expect(deployMarkdown).toContain("Remote mode cannot create symlinks on client machines");
+    expect(apiMarkdown).toContain("Current v0.2.1 surfaces");
   });
 
   it("keeps hidden hosted copy reservation-only", () => {
@@ -214,4 +222,14 @@ describe("v1 content guardrails", () => {
 
 function read(path: string) {
   return readFileSync(resolve(repoRoot, path), "utf8");
+}
+
+function sliceBetween(source: string, start: string, end: string) {
+  const startIndex = source.indexOf(start);
+  const endIndex = source.indexOf(end, startIndex + start.length);
+
+  expect(startIndex).toBeGreaterThanOrEqual(0);
+  expect(endIndex).toBeGreaterThan(startIndex);
+
+  return source.slice(startIndex, endIndex);
 }
