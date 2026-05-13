@@ -1,20 +1,16 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import BrandMark from "./BrandMark.vue";
-import ClerkAuthControls from "./ClerkAuthControls.vue";
 import UiIcon from "./UiIcon.vue";
 import { PRODUCT_VERSION } from "../data/product";
-
-type TopbarSearchResult = { title: string; section: string; href: string; terms: string };
+import { searchResults } from "../data/searchResults";
 
 const props = withDefaults(defineProps<{
   active?: string;
   showSearch?: boolean;
-  searchResults?: TopbarSearchResult[];
 }>(), {
   active: "",
-  showSearch: false,
-  searchResults: () => []
+  showSearch: false
 });
 
 const navItems = [
@@ -32,7 +28,7 @@ const currentPath = ref("");
 const filteredResults = computed(() => {
   const q = query.value.trim().toLowerCase();
   if (!q) return [];
-  return props.searchResults.filter((result) => `${result.title} ${result.section} ${result.terms}`.toLowerCase().includes(q)).slice(0, 5);
+  return searchResults.filter((result) => `${result.title} ${result.section} ${result.terms}`.toLowerCase().includes(q)).slice(0, 5);
 });
 
 function isActive(item: { label: string; href: string }) {
@@ -66,14 +62,6 @@ onBeforeUnmount(() => {
   window.removeEventListener("keydown", handleKeydown);
 });
 </script>
-
-<style scoped>
-.av-install-pill { white-space: nowrap; gap: 6px; }
-.av-install-pill .prompt {
-  font-family: var(--mono); font-size: 12px; opacity: 0.7;
-}
-.av-install-pill .lbl { font-weight: 600; }
-</style>
 
 <template>
   <header class="av-topbar" :class="{ 'nav-open': navOpen }">
@@ -110,12 +98,6 @@ onBeforeUnmount(() => {
 
       <div class="av-topbar-right">
         <a class="av-icon-btn" href="https://github.com/autoworks-ai/autovault" title="GitHub"><UiIcon name="github" /></a>
-        <a class="av-pill-btn primary av-install-pill" href="/quick-start#install">
-          <span class="prompt">$</span>
-          <span class="lbl">Install</span>
-          <UiIcon name="arrow" />
-        </a>
-        <ClerkAuthControls />
       </div>
     </div>
   </header>

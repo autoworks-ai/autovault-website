@@ -59,7 +59,12 @@
     <CodeBlock lang="text" file="Claude Code prompt">{{ AGENT_SETUP_PROMPT }}</CodeBlock>
     <div class="callout warn"><div class="callout-dot" /><div><strong>Opt-in by design.</strong> The bootstrap skill stages the installer for inspection, asks before shell execution, then runs <code>autovault doctor</code> and <code>autovault sync-profiles --discover</code>.</div></div>
 
-    <h2 id="verify">Step 2 — Verify the install</h2>
+    <h2 id="setup">Step 2 — Run the setup wizard</h2>
+    <p>After install, <code>autovault setup</code> scans the vault, the bundled skills root, and any discovered native agent skill roots (<code>~/.claude/skills</code>, <code>~/.codex/skills</code>, <code>~/.cursor/skills</code>), then asks you per skill how to adopt it. Re-run any time to re-scan.</p>
+    <CodeBlock lang="bash"><span class="pmt">$</span> autovault setup <span class="arg">--review</span></CodeBlock>
+    <div class="callout warn"><div class="callout-dot" /><div><strong>Installed via Claude Code or another agent's shell tool?</strong> The install ran without a TTY, so the wizard was silently skipped. Open a real terminal and run <code>autovault setup</code> to finish onboarding. If your existing <code>~/.claude/skills</code> didn't import, pick the <code>backup</code> adoption mode (not the <code>augment</code> default). See <a href="/troubleshooting">Troubleshooting</a> for the full recovery.</div></div>
+
+    <h2 id="verify">Step 3 — Verify the install</h2>
     <p>One command confirms the binary, local vault folder, profile discovery, and signing key are ready before any skill enters the vault.</p>
     <div class="terminal static-terminal">
       <div class="terminal-head"><span class="dot live" /><span class="dot" /><span class="dot" /><span class="ttl">autovault doctor</span></div>
@@ -73,7 +78,7 @@
       </div>
     </div>
 
-    <h2 id="first">Step 3 — Add your first skill</h2>
+    <h2 id="first">Step 4 — Add your first skill</h2>
     <p>Skills enter through a source adapter. Each adapter fetches from one origin and hands the raw skill to the validation gate. Whatever the source, the gate runs the same checks before admission.</p>
     <CodeBlock lang="bash"><span class="pmt">$</span> autovault <span class="arg">add</span> url:https://autovault.dev/skills/skill-author/SKILL.md</CodeBlock>
     <div class="terminal static-terminal">
@@ -117,7 +122,7 @@
       </aside>
     </div>
 
-    <h2 id="scope">Step 4 — Scope it to your context</h2>
+    <h2 id="scope">Step 5 — Scope it to your context</h2>
     <p>By default a freshly added skill is visible only after you scope it. A caller sees a skill when it matches the agents and projects you approved, so dev-machine skills do not leak into prod and client work does not bleed across projects.</p>
     <CodeBlock lang="bash"><span class="pmt">$</span> autovault <span class="arg">scope</span> skill-author \<br />
     <span class="arg">--agent</span> claude-code,codex \<br />
@@ -138,7 +143,7 @@
       </div>
     </div>
 
-    <h2 id="run">Step 5 — Run it from your agent</h2>
+    <h2 id="run">Step 6 — Run it from your agent</h2>
     <p>The same skill is now validated, scoped, and rendered for each target agent. The skill name stays stable, while tool names are transformed to match the caller.</p>
     <div class="agent-tabs" aria-label="Agent">
       <button v-for="item in agentOptions" :key="item.id" :class="{ active: agent === item.id }" type="button" :aria-pressed="agent === item.id" @click="agent = item.id"><span class="agent-dot" :style="{ background: item.color }" />{{ item.label }}</button>

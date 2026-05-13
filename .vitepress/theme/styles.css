@@ -6729,6 +6729,11 @@ body {
   color: var(--warn);
 }
 
+.api-nav .meth.env {
+  background: rgba(170, 184, 197, 0.10);
+  color: var(--ink-3);
+}
+
 .api-main {
   min-width: 0;
   max-width: 880px;
