@@ -15,7 +15,7 @@ import AvComparison from "./AvComparison.vue";
 
 <template>
   <div class="av-home">
-    <AvTopbar />
+    <AvTopbar show-search />
     <main class="av-page" data-screen-label="01 Home">
       <AvSpecHero />
       <AvProblems />

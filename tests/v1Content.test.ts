@@ -182,13 +182,13 @@ describe("v1 content guardrails", () => {
 
   it("keeps compare discoverable in top navigation, search, and markdown export", () => {
     const topbar = read(".vitepress/theme/components/AvTopbar.vue");
-    const docsShell = read(".vitepress/theme/components/DocsShell.vue");
+    const searchResultsSource = read(".vitepress/theme/data/searchResults.ts");
     const pageDocsSource = read(".vitepress/shared/pageDocs.ts");
     const compareMarkdown = pageDocs.find((doc) => doc.key === "compare")?.markdown ?? "";
 
     expect(topbar).toContain('{ label: "Compare", href: "/compare" }');
-    expect(docsShell).toContain("transforms instead of forks");
-    expect(docsShell).toContain("skillclone");
+    expect(searchResultsSource).toContain("transforms instead of forks");
+    expect(searchResultsSource).toContain("skillclone");
     expect(compareMarkdown).toContain("transforms instead of forks");
     expect(compareMarkdown).toContain("workspace-local deltas");
     expect(compareMarkdown).toContain("Admission-time dedup");
