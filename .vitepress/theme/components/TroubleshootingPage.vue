@@ -26,7 +26,7 @@
       <li>Reload your Claude Code session so the new skill list is picked up.</li>
     </ol>
     <div class="callout security-note">
-      <span class="icn">!</span>
+      <span class="icn" aria-hidden="true"><UiIcon name="tip" /></span>
       <div>
         <strong>Why this is a footgun.</strong> <code>augment</code> is the safe default because it never touches your existing native skill directories. If you came expecting "import my existing skills," you'll see nothing change — and conclude AutoVault didn't work. The fix is to re-run <code>autovault setup</code> and pick <code>backup</code>.
       </div>
@@ -150,4 +150,5 @@ $ autovault add-local ~/.claude/skills.bak/&lt;name&gt; --source native:claude-c
 
 <script setup lang="ts">
 import AvDocBreadcrumb from "./AvDocBreadcrumb.vue";
+import UiIcon from "./UiIcon.vue";
 </script>

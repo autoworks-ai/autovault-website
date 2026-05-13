@@ -87,7 +87,7 @@ type ApiEndpoint = {
   examples?: ExampleTab[];
 };
 type ApiSection = { id: string; title: string; meta: string; lede: string; items: ApiEndpoint[] };
-type NavItem = { kind: "section"; label: string; color: string } | { kind: "item"; id: string; method: "cli" | "fn" | "get" | "post"; label: string };
+type NavItem = { kind: "section"; label: string; color: string } | { kind: "item"; id: string; method: "cli" | "fn" | "get" | "post" | "env"; label: string };
 
 const activeId = ref("cli-add-local");
 const copied = ref("");
@@ -107,8 +107,8 @@ const nav: NavItem[] = [
   { kind: "item", id: "cli-skill-action", method: "cli", label: "skill <action>" },
   { kind: "item", id: "cli-serve", method: "cli", label: "serve" },
   { kind: "section", label: "Environment", color: "#d6a85a" },
-  { kind: "item", id: "env-cli-runtime", method: "cli", label: "CLI runtime" },
-  { kind: "item", id: "env-install-script", method: "cli", label: "Install script" },
+  { kind: "item", id: "env-cli-runtime", method: "env", label: "CLI runtime" },
+  { kind: "item", id: "env-install-script", method: "env", label: "Install script" },
   { kind: "section", label: "Library exports", color: "#b48ad6" },
   { kind: "item", id: "lib-resolve", method: "fn", label: "resolveCapabilities()" },
   { kind: "item", id: "lib-install", method: "fn", label: "skill lifecycle" },

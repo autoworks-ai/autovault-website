@@ -116,6 +116,14 @@ ${AUTOVAULT_AGENT_SETUP_PROMPT}
 
 The skill is opt-in. It stages the installer for inspection, asks before shell execution, then runs doctor and profile sync after approval.
 
+## Run the setup wizard
+
+\`\`\`bash
+autovault setup --review
+\`\`\`
+
+The setup wizard scans the vault, bundled skills, and any native agent skill roots it discovers (~/.claude/skills, ~/.codex/skills, ~/.cursor/skills), then asks per skill how to adopt it: \`augment\` (default, leaves native dirs in place and refreshes profile symlinks), \`backup\` (moves the native dir to <root>.bak before admitting bytes — the typical "import my existing skills" choice), or \`in-place\` (admits bytes and replaces the native dir with a symlink — destructive). Re-run any time. If you installed AutoVault via Claude Code or another agent's shell tool, the install ran without a TTY and the wizard was skipped — open a real terminal and run \`autovault setup\` to finish onboarding. See Troubleshooting if your existing ~/.claude/skills did not import; picking \`backup\` (not the default \`augment\`) is the common fix.
+
 ## Verify
 
 \`\`\`bash
