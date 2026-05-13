@@ -17,6 +17,7 @@ export type PageDocKey =
   | "skill-detail"
   | "author-profile"
   | "security"
+  | "troubleshooting"
   | "about"
   | "changelog";
 
@@ -423,6 +424,47 @@ Installed skills store source sidecars and signed manifests. check_updates compa
 
 AutoVault is MIT licensed and self-buildable from the public source repository.`;
 
+const troubleshootingMarkdown = `# AutoVault Troubleshooting
+
+Most install-time confusion comes down to two things: the setup wizard was skipped because it ran without a TTY, or the wizard ran in augment mode when you wanted backup. Both have clean recoveries; no reinstall is required.
+
+## My existing native skills didn't import
+
+Recovery for the most common scenario — installed AutoVault via Claude Code (or another agent's shell tool) and existing \`~/.claude/skills\` content did not appear in the vault.
+
+1. Open a real terminal. Installers running inside another agent's shell tool execute as a subprocess without a TTY, so the interactive wizard is silently skipped.
+2. Run \`autovault setup\`.
+3. When the wizard reports your native skills, pick the \`backup\` adoption mode. The \`augment\` safe default only refreshes profile links — it does not ingest your existing content.
+4. Reload your Claude Code session so the new skill list is picked up.
+
+## Setup requires an interactive terminal
+
+\`autovault setup\` exits with code 2 and a NoTtyError when invoked without a TTY. Open a real terminal and re-run it, or pass \`autovault setup --json\` for a non-interactive scan that emits a DriftReport without prompting.
+
+## Adoption modes
+
+The wizard offers three adoption modes per native skill:
+
+- \`augment\` (safe default): refresh profile symlinks only. Existing native skill directories are not touched. Use this when you only want bundled AutoVault skills available alongside your existing native skills.
+- \`backup\`: rename each native skill directory to \`<root>.bak/<name>\`, admit the bytes into the vault through the validation gate, then replace the original with a managed symlink. Refuses to overwrite an existing backup. The typical "import my skills" choice.
+- \`in-place\`: admit the native bytes into the vault, then remove the native directory and replace with a managed symlink. Destructive — no backup.
+
+## sync-profiles ENOENT after install
+
+\`autovault sync-profiles --discover\` can crash with \`ENOENT scandir '.autovault/skills'\` when the vault directory exists but no skills have been installed. Run \`autovault setup\` first; the wizard creates the expected directory tree and admits any bundled skills.
+
+## Doctor signature mismatch
+
+Run \`autovault doctor --repair\`. The repair flow re-signs unsigned local skills under strict validation conditions. It refuses tampered metadata and remote sources. Today the doctor logs mismatches but does not enforce; future versions may reject mismatched signatures at load time.
+
+## Skill admitted but not visible in the agent
+
+After adoption the wizard runs sync-profiles, which reports restart_required: true when symlinks change. Reload the agent session. Use \`autovault skill which <name>\` to confirm where the skill resolves from — vault, bundled, or native.
+
+## Move a skill into the vault without the wizard
+
+Use \`autovault add-local <skill-dir> --source native:claude-code --sync-profiles\`. Sync refuses to overwrite an existing user-managed native directory, so move the native dir aside first if you want the managed symlink in its place.`;
+
 const aboutMarkdown = `# About AutoVault
 
 AutoVault is brought to you by Jack Arturo, Jason Coleman, Flint, Zack Katz, and Daniel Iser, with AutoJack in the loop.
@@ -578,6 +620,15 @@ export const pageDocs: PageDoc[] = [
     route: "/security",
     agentPath: "/agents/security",
     markdown: securityMarkdown
+  },
+  {
+    key: "troubleshooting",
+    file: "troubleshooting.md",
+    title: "AutoVault Troubleshooting",
+    description: "Diagnose and recover from common AutoVault install and adoption issues — setup wizard, adoption modes, sync-profiles, doctor.",
+    route: "/troubleshooting",
+    agentPath: "/agents/troubleshooting",
+    markdown: troubleshootingMarkdown
   },
   {
     key: "about",

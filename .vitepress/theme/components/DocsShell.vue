@@ -43,7 +43,7 @@ import MarkdownActions from "./MarkdownActions.vue";
 import { PRODUCT_VERSION } from "../data/product";
 import type { PageDocKey } from "../../shared/pageDocs";
 
-type PageKey = "quick-start" | "authoring" | "permissions" | "skills" | "api" | "deploy" | "compare" | "skill-detail" | "author-profile" | "security" | "about" | "cloud" | "changelog";
+type PageKey = "quick-start" | "authoring" | "permissions" | "skills" | "api" | "deploy" | "compare" | "skill-detail" | "author-profile" | "security" | "troubleshooting" | "about" | "cloud" | "changelog";
 type ShellVariant = "docs" | "full";
 type TocItem = { label: string; id: string };
 
@@ -85,6 +85,7 @@ const sidebarGroups = [
       { label: "Deploy", href: "/deploy" },
       { label: "Compare", href: "/compare" },
       { label: "Security", href: "/security" },
+      { label: "Troubleshooting", href: "/troubleshooting" },
       { label: "Changelog", href: "/changelog", badge: PRODUCT_VERSION }
     ]
   }
@@ -97,6 +98,7 @@ const configs: Record<PageKey, { active: string; sidebarActive: string; variant:
     variant: "docs",
     toc: [
       { label: "Install the local vault", id: "install" },
+      { label: "Run the setup wizard", id: "setup" },
       { label: "Verify the install", id: "verify" },
       { label: "Add your first skill", id: "first" },
       { label: "Vault anatomy", id: "vault-anatomy" },
@@ -141,6 +143,7 @@ const configs: Record<PageKey, { active: string; sidebarActive: string; variant:
   "skill-detail": { active: "Examples", sidebarActive: "Examples", variant: "full", toc: [] },
   "author-profile": { active: "Examples", sidebarActive: "Examples", variant: "full", toc: [] },
   security: { active: "Security", sidebarActive: "Security", variant: "full", toc: [] },
+  troubleshooting: { active: "Troubleshooting", sidebarActive: "Troubleshooting", variant: "full", toc: [] },
   about: { active: "About", sidebarActive: "About", variant: "full", toc: [] },
   cloud: { active: "Cloud", sidebarActive: "Cloud", variant: "full", toc: [] },
   changelog: { active: "Changelog", sidebarActive: "Changelog", variant: "full", toc: [] }
@@ -164,6 +167,7 @@ const searchResults = [
   { title: "skill-author", section: "Examples", href: "/skill/skill-author", terms: "skill author detail permissions provenance source" },
   { title: "autoworks-ai", section: "Examples", href: "/author-autoworks-ai", terms: "source author profile certificate maintainers skills examples" },
   { title: "Security & provenance", section: "Reference", href: "/security", terms: "security signature signing provenance denylist gate verifier oauth remote mcp secrets credentials keychain ssh env" },
+  { title: "Troubleshooting", section: "Reference", href: "/troubleshooting", terms: "troubleshooting faq setup wizard adoption augment backup in-place no tty no terminal sync-profiles ENOENT doctor repair signature mismatch skill which import didn't install agent shell tool" },
   { title: "About AutoVault", section: "Team", href: "/about", terms: "jack arturo autojack jason coleman flint zack katz daniel iser team credits" },
   { title: "Changelog", section: "Reference", href: "/changelog", terms: "release notes remote mcp oauth add-local transforms resource drift" }
 ];

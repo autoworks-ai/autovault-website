@@ -130,6 +130,7 @@ export default defineConfig({
       { text: "Authoring", link: "/authoring" },
       { text: "Examples", link: "/skills-directory" },
       { text: "Security", link: "/security" },
+      { text: "Troubleshooting", link: "/troubleshooting" },
       { text: "About", link: "/about" },
       { text: "Changelog", link: "/changelog" }
     ],
@@ -141,6 +142,7 @@ export default defineConfig({
           { text: "Quick start", link: "/quick-start" },
           { text: "Installation", link: "/quick-start#install" },
           { text: "Agent-assisted setup", link: "/quick-start#agent-assisted" },
+          { text: "Setup wizard", link: "/quick-start#setup" },
           { text: "Your first skill", link: "/quick-start#first" }
         ]
       },
@@ -171,6 +173,7 @@ export default defineConfig({
           { text: "Deploy remote vault", link: "/deploy" },
           { text: "Compare alternatives", link: "/compare" },
           { text: "Security & provenance", link: "/security" },
+          { text: "Troubleshooting", link: "/troubleshooting" },
           { text: "About", link: "/about" },
           { text: "Changelog", link: "/changelog" }
         ]

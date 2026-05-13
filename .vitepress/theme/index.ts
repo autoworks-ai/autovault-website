@@ -11,6 +11,7 @@ import AuthoringPage from "./components/AuthoringPage.vue";
 import PermissionsPage from "./components/PermissionsPage.vue";
 import SkillsDirectoryPage from "./components/SkillsDirectoryPage.vue";
 import SecurityPage from "./components/SecurityPage.vue";
+import TroubleshootingPage from "./components/TroubleshootingPage.vue";
 import ChangelogPage from "./components/ChangelogPage.vue";
 import ApiReferencePage from "./components/ApiReferencePage.vue";
 import DeployPage from "./components/DeployPage.vue";
@@ -38,6 +39,7 @@ export default {
     app.component("PermissionsPage", PermissionsPage);
     app.component("SkillsDirectoryPage", SkillsDirectoryPage);
     app.component("SecurityPage", SecurityPage);
+    app.component("TroubleshootingPage", TroubleshootingPage);
     app.component("ChangelogPage", ChangelogPage);
     app.component("ApiReferencePage", ApiReferencePage);
     app.component("DeployPage", DeployPage);
