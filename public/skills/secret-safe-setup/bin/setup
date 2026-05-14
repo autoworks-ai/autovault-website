@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+set -eu
+
+if [ -z "${PROVIDER_PROFILE:-}" ]; then
+  printf '%s\n' "Set PROVIDER_PROFILE to the host-managed credential profile name before setup." >&2
+  exit 2
+fi
+
+printf '%s\n' "AutoVault will reference provider profile: ${PROVIDER_PROFILE}"
+printf '%s\n' "Create or update the credential in your host secret store, then run verify."

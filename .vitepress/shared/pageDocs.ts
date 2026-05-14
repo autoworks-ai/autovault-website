@@ -136,9 +136,11 @@ Doctor confirms the binary, vault folder, signing key, bundled skill index, and 
 
 \`\`\`bash
 autovault add-local ./skills/skill-author --source vendor/skills --sync-profiles
+autovault add-local ~/.agents/skills/copilot-review --source native:agents --sync-profiles
+autovault add-local ./my-skill --source https://github.com/org/repo/tree/main/skills/my-skill
 \`\`\`
 
-The \`autovault add-local\` command hands raw skill content and sibling resources to the same gate used by MCP install paths: frontmatter repair, schema validation, denylist scan, capability/behavior check, deduplication, and Ed25519 signing.
+The \`autovault add-local\` command hands raw skill content and sibling resources to the same gate used by MCP install paths: frontmatter repair, schema validation, denylist scan, capability/behavior check, deduplication, and Ed25519 signing. In v0.3.0, \`--source\` is required so provenance is explicit.
 
 ## Vault anatomy
 
@@ -303,9 +305,9 @@ Agents should use get_skill for vault inventory lookup, fetch full content only 
 
 const apiMarkdown = `# AutoVault API Reference
 
-Current v0.2.1 surfaces are the local CLI, source ESM library exports, local stdio MCP, and remote Streamable HTTP MCP at /mcp. There is no public REST API or separately published SDK package yet. MCP tools are the agent-facing API.
+Current v0.3.0 surfaces are the local CLI, source ESM library exports, local stdio MCP, and remote Streamable HTTP MCP at /mcp. There is no public REST API or separately published SDK package yet. MCP tools are the agent-facing API.
 
-## Current v0.2.1 surfaces
+## Current v0.3.0 surfaces
 
 - CLI commands for add-local install, remove/uninstall cleanup, profile sync, doctor checks, local skill search/list/which, repo audit, setup, capability resolve, and remote service startup.
 - Source ESM library exports for resolveCapabilities, syncProfiles, addSkill, updateSkill, deleteSkill, proposeSkill, transforms, auditRepo, and profile discovery.
@@ -314,7 +316,17 @@ Current v0.2.1 surfaces are the local CLI, source ESM library exports, local std
 
 ## Agent guidance
 
-Prefer inventory lookup first, full reads second, and get_skill with include_resources when packaged resources are needed. Use local sync-profiles when a filesystem-native host needs files under its local skill root.`;
+Prefer inventory lookup first, full reads second, and get_skill with include_resources when packaged resources are needed. Use local sync-profiles when a filesystem-native host needs files under its local skill root.
+
+## add-local examples
+
+\`\`\`bash
+autovault add-local ./skills/skill-author --source vendor/skills --sync-profiles
+autovault add-local ~/.agents/skills/copilot-review --source native:agents --sync-profiles
+autovault add-local ./my-skill --source https://github.com/org/repo/tree/main/skills/my-skill
+\`\`\`
+
+\`--source\` is required in v0.3.0. Use a repository, URL, or native-root label that explains where the local bundle came from. \`--sync-profiles\` refreshes visible agent roots.`;
 
 const deployMarkdown = `# Deploy A Remote AutoVault
 
@@ -510,7 +522,7 @@ AutoVault is brought to you by Jack Arturo, Jason Coleman, Flint, Zack Katz, and
 
 const changelogMarkdown = `# AutoVault Changelog
 
-AutoVault is currently pre-1.0. The public source package is MIT licensed and the current source README identifies v0.2.1 as the release status, with unreleased work already documented for bundled skills, bootstrap flow, signing, and installer polish.
+AutoVault is currently pre-1.0. The public source package is MIT licensed and the current source README identifies v0.3.0 as the release status, including bundled skills, bootstrap flow, signing, removal cleanup, and installer polish.
 
 ## Current source sync
 
@@ -524,13 +536,17 @@ AutoVault is currently pre-1.0. The public source package is MIT licensed and th
 - get_skill agent rendering and include_resources for transformed variants and packaged resources.
 - check_updates for upstream drift and transform review state.
 
+## v0.3.0
+
+Released May 14, 2026. Adds vaulted skill removal, doctor repair for unsigned local skills, tag-filtered project profiles, v1 migration hardening, and smoother installer/setup/serve UX.
+
+## v0.2.1
+
+Bundled skill bootstrap, expanded validation, signing sidecars, add-local installer flow, remote OAuth docs, and MIT license alignment.
+
 ## v0.2.0
 
-Initial focused TypeScript MCP server release with skill storage, source adapters, validation, resource reads, update checks, smoke tests, and documentation.
-
-## Unreleased
-
-Bundled skill bootstrap, expanded validation, signing sidecars, add-local installer flow, remove/uninstall cleanup, remote OAuth docs, and MIT license alignment.`;
+Initial focused TypeScript MCP server release with skill storage, source adapters, validation, resource reads, update checks, smoke tests, and documentation.`;
 
 export const pageDocs: PageDoc[] = [
   {

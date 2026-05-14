@@ -18,9 +18,9 @@
       <section class="api-hero reveal-item">
         <div class="eyebrow"><span class="dash" /> Reference · {{ PRODUCT_RELEASE_LABEL }}</div>
         <h1>Current surfaces. <span class="ital">Clear boundaries.</span></h1>
-        <p class="lede">Current v0.2.1 surfaces are the local CLI, source ESM library exports, local stdio MCP, and remote Streamable HTTP MCP at <code>/mcp</code>. There is no public REST API or separately published SDK package yet; MCP tools are the agent-facing API.</p>
+        <p class="lede">Current v0.3.0 surfaces are the local CLI, source ESM library exports, local stdio MCP, and remote Streamable HTTP MCP at <code>/mcp</code>. There is no public REST API or separately published SDK package yet; MCP tools are the agent-facing API.</p>
         <div class="api-versions">
-          <div class="v"><div class="lbl">CLI</div><div class="val">autovault@{{ PRODUCT_VERSION_SHORT }} <span class="meta">npm · brew · cargo</span></div></div>
+          <div class="v"><div class="lbl">CLI</div><div class="val">autovault@{{ PRODUCT_VERSION_SHORT }} <span class="meta">source · brew · GHCR</span></div></div>
           <div class="v"><div class="lbl">Library</div><div class="val">source ESM exports <span class="meta">Node/TypeScript</span></div></div>
           <div class="v"><div class="lbl">Remote</div><div class="val">/mcp <span class="meta">Streamable HTTP MCP</span></div></div>
         </div>
@@ -42,7 +42,9 @@
           <p class="desc" v-html="endpoint.description" />
           <div class="api-sig">
             <button class="copy" type="button" @click="copyText(endpoint.copy, endpoint.id)">{{ copied === endpoint.id ? "Copied" : "Copy" }}</button>
-            <div v-for="(line, index) in endpoint.signature" :key="index" v-html="line" />
+            <div v-for="(line, index) in endpoint.signature" :key="index">
+              <span v-if="line.prompt" class="pmt">$</span><span>{{ line.text }}</span>
+            </div>
           </div>
           <div v-if="endpoint.args?.length" class="api-args">
             <div class="head"><span>{{ endpoint.argsLabel ?? "Field" }}</span><span>Type</span><span>Description</span></div>
@@ -73,6 +75,7 @@ import { PRODUCT_RELEASE_LABEL, PRODUCT_VERSION_SHORT } from "../data/product";
 
 type ExampleTab = { label: string; body: string };
 type ApiArg = { name: string; type: string; description: string; required?: boolean };
+type SignatureLine = { prompt: boolean; text: string };
 type ApiEndpoint = {
   id: string;
   short: string;
@@ -80,7 +83,7 @@ type ApiEndpoint = {
   status: "stable" | "beta" | "alpha";
   since: string;
   description: string;
-  signature: string[];
+  signature: SignatureLine[];
   copy: string;
   argsLabel?: string;
   args?: ApiArg[];
@@ -128,7 +131,7 @@ const sections: ApiSection[] = [
     meta: "user-facing local operations",
     lede: "The CLI is the local operator surface. It installs local bundles, runs the setup wizard, syncs host profiles, audits repositories, resolves capability visibility, inspects installed skills, and starts the remote service when you self-host.",
     items: [
-      endpoint("cli-add-local", "add-local", "autovault add-local <path>", "Admit a local SKILL.md bundle. The command collects sibling resources, rejects symlinks, validates, signs, records local provenance, and can refresh profile links.", "$ autovault add-local <skill-dir> --source <repo-or-url> [--sync-profiles] [--link agent=/path/to/skills] [--json]", "autovault add-local ./skills/skill-author --source vendor/skills --sync-profiles", "0.2.0"),
+      endpoint("cli-add-local", "add-local", "autovault add-local <skill-dir>", "Admit a local SKILL.md bundle. The command collects sibling resources, rejects symlinks, validates, signs, records explicit local provenance, and can refresh profile links. In v0.3.0, <code>--source</code> is required so the source sidecar records where the local bundle came from.", "$ autovault add-local <skill-dir> --source <repo-or-url> [--sync-profiles] [--link agent=/path/to/skills] [--json]\n$ autovault add-local ./skills/skill-author --source vendor/skills --sync-profiles\n$ autovault add-local ~/.agents/skills/copilot-review --source native:agents --sync-profiles\n$ autovault add-local ./my-skill --source https://github.com/org/repo/tree/main/skills/my-skill", "autovault add-local ./skills/skill-author --source vendor/skills --sync-profiles", "0.2.0"),
       endpoint("cli-remove", "remove", "autovault remove <skill-name>", "Remove a vaulted skill, delete vault-local transforms for that skill, and refresh managed profile links. Native profile-root discovery is on by default, so AutoVault prunes managed symlinks from discovered host roots such as <code>~/.claude/skills</code>, <code>~/.codex/skills</code>, and <code>~/.cursor/skills</code>. Use <code>--no-discover</code> to refresh only the vault's internal profile tree, <code>--link agent=/path</code> for an explicit host root, and <code>--json</code> for automation.", "$ autovault remove <skill-name> [--discover|--no-discover] [--link agent=/path/to/skills] [--json]", "autovault remove skill-author --json", "0.3.0"),
       endpoint("cli-sync-profiles", "sync-profiles", "autovault sync-profiles", "Regenerate local filesystem-native profile links for detected or configured host skill roots. Reports <code>restart_required: true</code> when symlinks change so the operator knows to reload their agent session. Remote mode cannot perform this on client machines.", "$ autovault sync-profiles [--discover] [--link agent=/path/to/skills]", "autovault sync-profiles --discover", "0.2.0"),
       endpoint("cli-setup", "setup", "autovault setup", "Interactive wizard that scans the vault, the bundled skills root, and any discovered native agent skill roots (<code>~/.claude/skills</code>, <code>~/.codex/skills</code>, <code>~/.cursor/skills</code>), then offers a per-skill adoption decision. The wizard requires a TTY; without one it exits with code <code>2</code> and a <code>NoTtyError</code>. Re-run any time to re-scan. Three adoption modes: <strong>augment</strong> (safe default) refreshes profile symlinks only — existing native dirs are not touched; <strong>backup</strong> renames each native dir to <code>&lt;root&gt;.bak/&lt;name&gt;</code>, admits the bytes into the vault, then replaces the original with a managed symlink (the typical “import my skills” choice); <strong>in-place</strong> admits the bytes then removes the native dir and replaces with a symlink — destructive, no backup. After adoption the wizard runs <code>sync-profiles</code>, which emits <code>restart_required: true</code> when symlinks change.", "$ autovault setup [--json] [--review] [--advanced]", "autovault setup --review", "0.2.0"),
@@ -157,7 +160,7 @@ const sections: ApiSection[] = [
         since: "0.2.0",
         description: "Set these before invoking the <code>autovault</code> CLI or starting <code>autovault serve</code>. Logs are JSON lines on <strong>stderr only</strong>; stdout is reserved for MCP framing — never write to stdout from server code.",
         copy: "AUTOVAULT_STORAGE_PATH=~/.autovault autovault doctor",
-        signature: ["<span class=\"pmt\">$</span> AUTOVAULT_STORAGE_PATH=~/.autovault autovault doctor"],
+        signature: signatureLines("$ AUTOVAULT_STORAGE_PATH=~/.autovault autovault doctor"),
         argsLabel: "Variable",
         args: [
           { name: "AUTOVAULT_STORAGE_PATH", type: "<code>~/.autovault</code>", description: "Vault root directory. Default if unset." },
@@ -182,7 +185,7 @@ const sections: ApiSection[] = [
         since: "0.2.0",
         description: "Read only by <code>scripts/install.sh</code> during the initial install. The <code>autovault</code> binary does not parse these — they shape the installer's interactive flow.",
         copy: "AUTOVAULT_NO_SETUP=1 curl -fsSL https://autovault.sh | sh",
-        signature: ["<span class=\"pmt\">$</span> AUTOVAULT_NO_SETUP=1 curl -fsSL https://autovault.sh | sh"],
+        signature: signatureLines("$ AUTOVAULT_NO_SETUP=1 curl -fsSL https://autovault.sh | sh"),
         argsLabel: "Variable",
         args: [
           { name: "AUTOVAULT_NO_SETUP", type: "<code>1</code>", description: "Skip launching the setup wizard at install time; the installer prints a hint to run <code>autovault setup</code> from a terminal afterward." },
@@ -210,7 +213,7 @@ const sections: ApiSection[] = [
     lede: "MCP tools are the agent-facing API. Local hosts spawn the stdio server; remote clients connect to Streamable HTTP MCP at <code>/mcp</code> with OAuth and role-aware filtering.",
     items: [
       endpoint("mcp-get-skill", "get_skill", "get_skill", "Search by query or fetch one installed skill by name. Pass <code>include_resources</code> when packaged resource files are needed.", "{ query?: string, name?: string, agent?: string, include_resources?: boolean }", "get_skill({ query: \"code review\" })"),
-      endpoint("mcp-add-skill", "add_skill", "add_skill", "Install a known skill from GitHub, agentskills, HTTPS URL, or local bundle source. Caller-authored bytes should use <code>propose_skill</code> instead.", "{ source: \"github\" | \"agentskills\" | \"url\" | \"local\", identifier: string, ... }", "add_skill({ source: \"url\", identifier: \"https://example.com/SKILL.md\" })"),
+      endpoint("mcp-add-skill", "add_skill", "add_skill", "Install a known skill from GitHub, agentskills, HTTPS URL, or local bundle source. Caller-authored bytes should use <code>propose_skill</code> instead. For local bundles, pass <code>skill_dir</code> and an explicit <code>identifier</code> matching the CLI provenance value.", "{ source: \"github\" | \"agentskills\" | \"url\" | \"local\", identifier: string, ... }", "add_skill({ source: \"github\", identifier: \"owner/repo:skills/example/SKILL.md\" })"),
       endpoint("mcp-propose-skill", "propose_skill", "propose_skill", "Submit newly authored SKILL.md content for validation, security scan, capability cross-check, deduplication, signing, and storage.", "{ skill_md: string, resources?: Array<{ path: string, content: string }> }", "propose_skill({ skill_md })"),
       endpoint("mcp-check-updates", "check_updates", "check_updates", "Compare installed skills against recorded upstream source state and report drift, unchecked inline skills, warnings, and errors.", "{ skill?: string }", "check_updates({ skill: \"skill-author\" })")
     ]
@@ -239,8 +242,15 @@ function endpoint(id: string, short: string, title: string, description: string,
     since,
     description,
     copy,
-    signature: signature.split("\n").map((line) => line.replace(/^\$ /, "<span class=\"pmt\">$</span> "))
+    signature: signatureLines(signature)
   };
+}
+
+function signatureLines(signature: string): SignatureLine[] {
+  return signature.split("\n").map((line) => {
+    if (line.startsWith("$ ")) return { prompt: true, text: line.slice(2) };
+    return { prompt: false, text: line };
+  });
 }
 
 async function copyText(text: string, key: string) {

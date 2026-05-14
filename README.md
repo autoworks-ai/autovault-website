@@ -6,7 +6,7 @@ This repository contains the public documentation site for AutoVault.
 - Installer: [autovault.sh](https://autovault.sh)
 - Source: [autoworks-ai/autovault](https://github.com/autoworks-ai/autovault)
 - Security policy: [Security policy](https://github.com/autoworks-ai/autovault/security/policy)
-- Current source release: [v0.2.1](https://github.com/autoworks-ai/autovault/releases/tag/v0.2.1)
+- Current source release: [v0.3.0](https://github.com/autoworks-ai/autovault/releases/tag/v0.3.0)
 
 AutoVault is a local-first vault for agent skills. The website is built with VitePress and is intentionally focused on the current verified install paths: the shell installer and the GHCR container image.
 
@@ -27,4 +27,4 @@ npm run ci
 
 - Do not advertise npm install commands until the package is published.
 - Keep deployment docs to verified Docker and Railway paths unless another host has been tested end to end.
-- Treat `v0.2.1` as the current public release until release-please publishes a newer release from the source repository.
+- Treat `v0.3.0` as the current public release until release-please publishes a newer release from the source repository.

@@ -28,12 +28,12 @@
         <p class="desc">{{ currentSkill.desc }}</p>
       </div>
       <div class="actions">
-        <button class="sd-installbtn" type="button" @click="copyInstall">Copy add command <UiIcon name="arrow" /></button>
+        <button class="sd-installbtn" type="button" @click="copyInstall">Copy MCP add <UiIcon name="arrow" /></button>
         <div class="sd-copy-status" aria-live="polite">{{ copyStatus }}</div>
         <div class="sd-install">
-          <div class="lbl">Or via CLI</div>
+          <div class="lbl">Via MCP add_skill</div>
           <div class="cmd">
-            <span class="pmt">$</span>
+            <span class="pmt">&gt;</span>
             <span class="cmd-text">{{ currentSkill.install }}</span>
             <button class="copy" type="button" @click="copyInstall">{{ copied ? "Copied" : copyFailed ? "Copy failed" : "Copy" }}</button>
           </div>
@@ -262,9 +262,9 @@ const maintainers = computed(() => [
 ]);
 
 const copyStatus = computed(() => {
-  if (copied.value) return "Add command copied.";
-  if (copyFailed.value) return "Copy failed. Use the CLI command below.";
-  return "Copies the local CLI command. Hosted vault queueing is not enabled from this page.";
+  if (copied.value) return "MCP add call copied.";
+  if (copyFailed.value) return "Copy failed. Use the MCP add call below.";
+  return "Copies the MCP add_skill call. Hosted vault queueing is not enabled from this page.";
 });
 
 async function copyInstall() {

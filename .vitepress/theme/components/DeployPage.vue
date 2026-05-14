@@ -91,7 +91,7 @@
           </div>
           <div class="preview">
             <div class="ttl-prev">After deploy</div>
-            <TerminalBlock title="autovault status" :lines="statusLines" />
+            <TerminalBlock title="remote MCP health" :lines="statusLines" />
           </div>
         </div>
       </div>

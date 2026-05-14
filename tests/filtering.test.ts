@@ -42,10 +42,10 @@ describe("changelog helpers", () => {
   });
 
   it("filters releases by security section and query", () => {
-    const result = filterReleases(releases, "security", "OAuth");
+    const result = filterReleases(releases, "security", "unsigned");
 
     expect(result).toHaveLength(1);
-    expect(result[0].version).toBe("Unreleased");
+    expect(result[0].version).toBe("0.3.0");
   });
 
   it("returns preview releases only when requested", () => {

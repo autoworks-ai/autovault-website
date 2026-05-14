@@ -196,7 +196,7 @@ const bets = [
 
 const migrations = [
   { title: "From Skillfish-managed skills", body: "Keep Skillfish where it is useful for broad agent coverage, then admit selected local skill folders into AutoVault when you need signing, scope, and transforms instead of forks. Upstream stays clean; workspace-local deltas render at profile sync time.", code: "autovault add-local ./skills/extract-pdf \\\n  --source skillfish/extract-pdf \\\n  --sync-profiles\n# gate passed · signed · profiles refreshed" },
-  { title: "From Tessl, SkillKit, or spec repos", body: "Treat external ecosystem entries as source material. Pull the SKILL.md or repo locally, review it, then let the AutoVault gate decide whether it belongs in the vault.", code: "autovault add github:owner/skills/extract-pdf\n# fetched source · running gate\n# admitted to ~/.autovault with provenance sidecar" },
+  { title: "From Tessl, SkillKit, or spec repos", body: "Treat external ecosystem entries as source material. Pull the SKILL.md or repo locally, review it, then let the AutoVault gate decide whether it belongs in the vault.", code: "git clone https://github.com/owner/skills ./vendor/skills\nautovault add-local ./vendor/skills/extract-pdf \\\n  --source github:owner/skills\n# gate passed · admitted with provenance sidecar" },
   { title: "From hand-maintained CLAUDE.md / AGENTS.md / .cursorrules", body: "Extract the reusable instructions into one SKILL.md, declare permissions and target agents, then admit that source instead of maintaining separate copies.", code: "mkdir -p ./drafts/extract-pdf\n$EDITOR ./drafts/extract-pdf/SKILL.md\nautovault add-local ./drafts/extract-pdf --sync-profiles" }
 ];
 

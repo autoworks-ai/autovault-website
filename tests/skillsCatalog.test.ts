@@ -42,6 +42,18 @@ describe("skills catalog integrity", () => {
       expect(skill.desc).toContain(String(frontmatter.description).slice(0, 18));
       expect(readVersion(frontmatter)).toBe(skill.v);
       expect(frontmatter.license).toBe(skill.license);
+
+      const bin = frontmatter.bin;
+      if (bin && typeof bin === "object" && !Array.isArray(bin)) {
+        expect(skill.install, `${skill.name} has bin resources, so raw URL install is incomplete`).toContain('source: "github"');
+        for (const action of Object.values(bin as Record<string, unknown>)) {
+          if (!action || typeof action !== "object") continue;
+          const command = (action as { command?: unknown }).command;
+          if (typeof command === "string") {
+            expect(existsSync(resolve(dirname(rawFile), command)), `${skill.name} missing bin command ${command}`).toBe(true);
+          }
+        }
+      }
     }
   });
 
@@ -66,10 +78,10 @@ describe("skills catalog integrity", () => {
     expect(secretSafe?.permissions.some((row) => row.label === "secrets")).toBe(true);
   });
 
-  it("makes the skill detail install CTA visibly copy the CLI command", () => {
+  it("makes the skill detail install CTA visibly copy the MCP add call", () => {
     const detail = readFileSync(resolve(repoRoot, ".vitepress/theme/components/SkillDetailPage.vue"), "utf8");
 
-    expect(detail).toContain("Copy add command");
+    expect(detail).toContain("Copy MCP add");
     expect(detail).toContain('aria-live="polite"');
     expect(detail).toContain("copyText(currentSkill.value.install)");
     expect(detail).not.toContain("/api/vaults/current/pending-skills");

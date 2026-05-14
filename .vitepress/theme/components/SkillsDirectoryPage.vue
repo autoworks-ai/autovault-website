@@ -169,7 +169,7 @@ const SkillTile = defineComponent({
         h("span", props.skill.admissionStatus === "provenance-example" ? "provenance example" : "hosted example"),
         h("span", { style: "flex:1" }),
         h("a", { href: props.skill.rawPath }, "Raw"),
-        h("button", { class: "copy-btn", type: "button", onClick: () => copyInstall(props.skill.install) }, "Copy add")
+        h("button", { class: "copy-btn", type: "button", onClick: () => copyInstall(props.skill.install) }, "Copy MCP add")
       ])
     ]);
   }
