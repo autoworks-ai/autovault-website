@@ -41,6 +41,7 @@ can run themselves:
 
 ```bash
 tmpdir=$(mktemp -d)
+trap 'rm -rf "$tmpdir"' EXIT
 curl -fsSL https://example.com/trusted-provider/SKILL.md -o "$tmpdir/SKILL.md"
 autovault add-local "$tmpdir" --source trusted-provider/example --sync-profiles
 ```

@@ -53,4 +53,8 @@ describe("changelog helpers", () => {
 
     expect(result.every((release) => release.tag === "preview")).toBe(true);
   });
+
+  it("uses commit-like release refs consistently", () => {
+    expect(releases.every((release) => /^[0-9a-f]{7,40}$/.test(release.commit))).toBe(true);
+  });
 });

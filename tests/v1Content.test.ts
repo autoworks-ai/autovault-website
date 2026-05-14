@@ -16,8 +16,9 @@ describe("v1 content guardrails", () => {
     expect(PRODUCT_STATUS).toBe("pre-1.0");
     expect(PRODUCT_VERSION_BADGE).toContain(PRODUCT_VERSION);
     expect(PRODUCT_VERSION_BADGE).not.toContain("Unreleased May 2026");
-    expect(pageDocs.find((doc) => doc.key === "changelog")?.markdown).toContain("## v0.3.0");
-    expect(pageDocs.find((doc) => doc.key === "changelog")?.markdown).not.toContain("## Unreleased");
+    const changelogMarkdown = pageDocs.find((doc) => doc.key === "changelog")?.markdown ?? "";
+    expect(changelogMarkdown).toContain("## v0.3.0");
+    expect(changelogMarkdown).not.toContain("## Unreleased");
 
     const primarySurfaces = [
       ".vitepress/theme/components/AvTopbar.vue",
