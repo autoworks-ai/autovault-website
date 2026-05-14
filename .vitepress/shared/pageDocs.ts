@@ -159,7 +159,7 @@ Profile policy decides which agents, named profiles, tags, and profile links can
 autovault remove skill-author --json
 \`\`\`
 
-Use \`autovault remove <name>\` to delete a vaulted skill and prune AutoVault-managed profile symlinks; native host root discovery is on by default, \`--no-discover\` skips discovered roots, and \`--link agent=/path\` targets a custom root.`;
+Use \`autovault remove <name>\` to delete a vaulted skill, delete its vault-local transforms, and prune AutoVault-managed profile symlinks; native host root discovery is on by default, \`--no-discover\` skips discovered roots, and \`--link agent=/path\` targets a custom root.`;
 
 const cloudMarkdown = `# AutoVault Cloud Launch
 
@@ -483,7 +483,7 @@ Use \`autovault add-local <skill-dir> --source native:claude-code --sync-profile
 
 ## Removed skill still visible
 
-Run \`autovault remove <name>\`, then reload the agent session. Removal deletes the vaulted skill, regenerates internal profiles, and prunes AutoVault-managed symlinks from discovered native host roots by default. If removal used \`--no-discover\`, discovered native roots were intentionally left alone; re-run without that flag or pass \`--link agent=/path/to/skills\`. Dedicated doctor cleanup for arbitrary orphan symlinks is a follow-up, not current behavior.`;
+Run \`autovault remove <name>\`, then reload the agent session. Removal deletes the vaulted skill, removes its vault-local transforms, regenerates internal profiles, and prunes AutoVault-managed symlinks from discovered native host roots by default. If removal used \`--no-discover\`, discovered native roots were intentionally left alone; re-run without that flag or pass \`--link agent=/path/to/skills\`. Dedicated doctor cleanup for arbitrary orphan symlinks is a follow-up, not current behavior.`;
 
 const aboutMarkdown = `# About AutoVault
 

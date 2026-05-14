@@ -88,7 +88,7 @@ $ autovault add-local ~/.claude/skills.bak/&lt;name&gt; --source native:claude-c
     <p>Start with the normal removal path:</p>
     <pre class="mono-block">$ autovault remove &lt;name&gt;
 $ autovault remove &lt;name&gt; --json</pre>
-    <p><code>autovault remove</code> deletes the vaulted skill, regenerates the internal profile tree, and prunes AutoVault-managed symlinks from discovered native host roots by default. Reload the agent session afterward, because hosts can cache filesystem skill lists.</p>
+    <p><code>autovault remove</code> deletes the vaulted skill, removes its vault-local transforms, regenerates the internal profile tree, and prunes AutoVault-managed symlinks from discovered native host roots by default. Reload the agent session afterward, because hosts can cache filesystem skill lists.</p>
     <p>If you used <code>--no-discover</code>, AutoVault refreshed only its internal profile tree and intentionally left discovered native host roots untouched. Re-run without that flag, or pass the host root explicitly:</p>
     <pre class="mono-block">$ autovault remove &lt;name&gt; --link codex=~/.codex/skills</pre>
     <p class="muted">This does not clean arbitrary orphan symlinks created outside AutoVault. Dedicated <code>doctor</code> orphan detection and cleanup is a follow-up, not current behavior.</p>
