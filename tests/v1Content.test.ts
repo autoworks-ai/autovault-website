@@ -86,6 +86,7 @@ describe("v1 content guardrails", () => {
     const quickStart = read(".vitepress/theme/components/QuickStartPage.vue");
     const deploy = read(".vitepress/theme/components/DeployPage.vue");
     const authoring = read(".vitepress/theme/components/AuthoringPage.vue");
+    const compare = read(".vitepress/theme/components/ComparePage.vue");
     const apiCurrentSurface = [
       sliceBetween(api, "<section class=\"api-hero", "</section>"),
       sliceBetween(api, "const nav: NavItem[] = [", "function endpoint")
@@ -124,6 +125,10 @@ describe("v1 content guardrails", () => {
     expect(authoringSchemaIntro).toContain("AutoVault extensions");
     expect(authoringSchemaIntro).toContain("<code>name</code> and <code>description</code> remain the portable core");
     expect(deployMarkdown).toContain("Remote mode cannot create symlinks on client machines");
+    expect(deploy).toContain('TerminalBlock title="remote MCP health" :lines="remoteHealthLines"');
+    expect(deploy).not.toContain("statusLines");
+    expect(compare).toContain("--source https://github.com/owner/skills");
+    expect(compare).not.toContain("--source github:");
     expect(apiMarkdown).toContain("Current v0.3.0 surfaces");
   });
 
