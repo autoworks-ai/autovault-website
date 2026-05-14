@@ -3178,13 +3178,6 @@ body {
   letter-spacing: 0.04em;
 }
 
-.changelog-meta .ago {
-  margin-top: 4px;
-  color: var(--ink-4);
-  font-family: var(--mono);
-  font-size: 10.5px;
-}
-
 .changelog-card {
   border-radius: 12px;
   padding: 28px 32px;

@@ -32,7 +32,6 @@
       <article v-for="release in filtered" :key="release.version" class="changelog-release" :class="release.type">
         <div class="changelog-meta">
           <div class="date">{{ release.date }}</div>
-          <div class="ago">{{ release.ago }}</div>
         </div>
         <div class="changelog-card" :class="{ featured: release.featured }">
           <div class="vh">

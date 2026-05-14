@@ -14,7 +14,6 @@ export interface ReleaseSection {
 export interface Release {
   version: string;
   date: string;
-  ago: string;
   type: "minor" | "patch";
   tag: ReleaseKind;
   codename?: string | null;
@@ -31,7 +30,6 @@ export const releases: Release[] = [
   {
     version: "0.3.0",
     date: "May 14, 2026",
-    ago: "current",
     type: "minor",
     tag: "minor",
     codename: "Cleanup",
@@ -69,7 +67,6 @@ export const releases: Release[] = [
   {
     version: "0.2.1",
     date: "May 9, 2026",
-    ago: "5 days ago",
     type: "patch",
     tag: "patch",
     title: "Bundled skills, signing, and installer UX",
@@ -104,7 +101,6 @@ export const releases: Release[] = [
   {
     version: "0.2.0",
     date: "Apr 19, 2026",
-    ago: "2 weeks ago",
     type: "minor",
     tag: "minor",
     title: "Focused TypeScript MCP server",
@@ -143,7 +139,6 @@ export const releases: Release[] = [
   {
     version: "0.1.0",
     date: "early 2026",
-    ago: "prototype",
     type: "minor",
     tag: "preview",
     title: "Initial vault prototype",
