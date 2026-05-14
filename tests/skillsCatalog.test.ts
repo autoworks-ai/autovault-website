@@ -24,7 +24,9 @@ describe("skills catalog integrity", () => {
       expect(skill.install).toContain(skill.rawPath.replace(/^\//, ""));
       if (skill.install.includes('source: "github"')) {
         expect(skill.install, `${skill.name} should use compact GitHub identifiers`).not.toContain("https://github.com/");
-        expect(skill.install, `${skill.name} should pin GitHub source refs`).toMatch(/@[0-9a-f]{40}:/);
+        const pinnedRef = skill.install.match(/@[0-9a-f]{40}:/)?.[0]?.slice(1, -1);
+        expect(pinnedRef, `${skill.name} should pin GitHub source refs`).toBeTruthy();
+        expect(skill.sourceUrl, `${skill.name} sourceUrl should match the pinned install ref`).toContain(`/blob/${pinnedRef}/`);
       }
       expect(skill.sourceUrl).toMatch(/^https:\/\//);
       expect(skill.sourceUrl).not.toContain("autoworks-ai/skills/");

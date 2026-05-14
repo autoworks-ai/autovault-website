@@ -36,7 +36,7 @@ export const releases: Release[] = [
     tag: "minor",
     codename: "Cleanup",
     featured: true,
-    title: "Remove cleanup, profile filters, and installer polish",
+    title: "Skill removal, profile filters, and installer polish",
     summary:
       "The current source release adds vaulted skill removal, doctor repair, tag-filtered profiles, migration hardening, and smoother setup/serve UX.",
     sections: [
