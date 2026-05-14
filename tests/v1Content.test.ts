@@ -81,6 +81,7 @@ describe("v1 content guardrails", () => {
 
   it("keeps current API, storage, and remote-mode docs aligned to v0 surfaces", () => {
     const api = read(".vitepress/theme/components/ApiReferencePage.vue");
+    const styles = read(".vitepress/theme/styles.css");
     const quickStart = read(".vitepress/theme/components/QuickStartPage.vue");
     const deploy = read(".vitepress/theme/components/DeployPage.vue");
     const authoring = read(".vitepress/theme/components/AuthoringPage.vue");
@@ -100,6 +101,8 @@ describe("v1 content guardrails", () => {
     expect(apiCurrentSurface).not.toMatch(/@autovault\/sdk|\/api\/v1|autovault init|MCP 2024-11-05/);
     expect(api).not.toContain('v-html="line"');
     expect(api).toContain("line.text");
+    expect(styles).toContain(".api-sig .pmt {");
+    expect(styles).toContain("margin-right: 0.35em");
     expect(api).toContain("autovault add-local <skill-dir> --source <repo-or-url>");
     expect(api).toContain("autovault add-local ./skills/skill-author --source vendor/skills");
     expect(api).not.toContain("autovault add-local ./my-skill/SKILL.md");

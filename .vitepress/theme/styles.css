@@ -6950,6 +6950,10 @@ body {
   color: var(--accent);
 }
 
+.api-sig .pmt {
+  margin-right: 0.35em;
+}
+
 .api-sig .key,
 .api-examples .key {
   color: var(--violet);
