@@ -67,6 +67,41 @@ export const releases: Release[] = [
     contributors: 4,
   },
   {
+    version: "0.2.1",
+    date: "May 9, 2026",
+    ago: "5 days ago",
+    type: "patch",
+    tag: "patch",
+    title: "Bundled skills, signing, and installer UX",
+    summary:
+      "Patch release adding bundled skill bootstrap, expanded validation, signing sidecars, add-local installer flow, remote OAuth docs, and MIT license alignment.",
+    sections: [
+      {
+        kind: "added",
+        items: [
+          "Bundled skill bootstrap seeds source-tree skills through the real validation path",
+          "add-local, GitHub URL discovery imports, overlay transforms, and remote OAuth HTTP MCP docs expand the local skill workflow",
+          "Setup wizard and GHCR release publishing improve agent-mediated installs and deployment verification",
+        ],
+      },
+      {
+        kind: "fixed",
+        items: [
+          "Update checks, bundle ergonomics, local installer friction, Node engine alignment, and vault integrity diagnostics were tightened",
+        ],
+      },
+      {
+        kind: "security",
+        items: [
+          "Capability gates, signing sidecars, hardened skill bundles, and bin action checks make admission review more explicit",
+        ],
+      },
+    ],
+    commit: "8e995e0",
+    author: "jack",
+    contributors: 4,
+  },
+  {
     version: "0.2.0",
     date: "Apr 19, 2026",
     ago: "2 weeks ago",

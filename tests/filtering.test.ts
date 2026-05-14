@@ -38,7 +38,8 @@ describe("changelog helpers", () => {
 
     expect(counts.all).toBe(releases.length);
     expect(counts.security).toBeGreaterThan(0);
-    expect(counts.patch).toBe(0);
+    expect(counts.patch).toBe(1);
+    expect(releases.find((release) => release.version === "0.2.1")?.tag).toBe("patch");
   });
 
   it("filters releases by security section and query", () => {
