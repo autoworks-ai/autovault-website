@@ -153,6 +153,13 @@
 <span class="yaml-comment"># extracting...</span><br />
 "This 24-page report covers Q1 platform metrics, with three..."</CodeBlock>
 
+    <h2 id="remove">Remove a skill cleanly</h2>
+    <p>If a skill no longer belongs in the vault, remove it through AutoVault rather than deleting folders by hand. The command deletes the vaulted copy and its vault-local transforms, refreshes generated profiles, and prunes AutoVault-managed symlinks from discovered native agent roots.</p>
+    <CodeBlock lang="bash"><span class="pmt">$</span> autovault remove skill-author<br />
+<span class="yaml-comment"># automation-friendly output</span><br />
+<span class="pmt">$</span> autovault remove skill-author <span class="arg">--json</span></CodeBlock>
+    <div class="callout tip"><div class="callout-dot" /><div><strong>Discovery is default.</strong> Use <code>--no-discover</code> only when you intentionally want to leave discovered native host roots untouched. Use <code>--link agent=/path/to/skills</code> for a custom profile root.</div></div>
+
     <h2 id="next">Where to next</h2>
     <div class="next-grid">
       <a class="next-card" href="/authoring">

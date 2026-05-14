@@ -4,12 +4,13 @@
       <AvDocBreadcrumb section="Reference" page="Troubleshooting" />
       <div class="eyebrow"><span class="dash" /> Troubleshooting · 6 min read</div>
       <h1>Something didn't import?<br><span class="ital">Re-run the wizard from a real terminal.</span></h1>
-      <p class="lede">Most install-time confusion comes down to two things: the setup wizard was skipped because it ran without a TTY, or the wizard ran in <code>augment</code> mode when you wanted <code>backup</code>. Both have clean recoveries — no reinstall required.</p>
+      <p class="lede">Most install-time confusion comes down to two things: the setup wizard was skipped because it ran without a TTY, or the wizard ran in <code>augment</code> mode when you wanted <code>backup</code>. Removal issues usually mean an old agent session still has cached filesystem skills, or native profile discovery was intentionally skipped.</p>
       <div class="pillrow">
         <span class="pill">setup wizard</span>
         <span class="pill">adoption modes</span>
         <span class="pill">no TTY</span>
         <span class="pill">sync-profiles</span>
+        <span class="pill">remove</span>
         <span class="pill">doctor</span>
       </div>
     </section>
@@ -83,6 +84,15 @@
     <pre class="mono-block">$ mv ~/.claude/skills/&lt;name&gt; ~/.claude/skills.bak/&lt;name&gt;
 $ autovault add-local ~/.claude/skills.bak/&lt;name&gt; --source native:claude-code --sync-profiles</pre>
 
+    <h3 id="faq-remove-still-visible">I removed a skill but it still shows up in an agent</h3>
+    <p>Start with the normal removal path:</p>
+    <pre class="mono-block">$ autovault remove &lt;name&gt;
+$ autovault remove &lt;name&gt; --json</pre>
+    <p><code>autovault remove</code> deletes the vaulted skill, removes its vault-local transforms, regenerates the internal profile tree, and prunes AutoVault-managed symlinks from discovered native host roots by default. Reload the agent session afterward, because hosts can cache filesystem skill lists.</p>
+    <p>If you used <code>--no-discover</code>, AutoVault refreshed only its internal profile tree and intentionally left discovered native host roots untouched. Re-run without that flag, or pass the host root explicitly:</p>
+    <pre class="mono-block">$ autovault remove &lt;name&gt; --link codex=~/.codex/skills</pre>
+    <p class="muted">This does not clean arbitrary orphan symlinks created outside AutoVault. Dedicated <code>doctor</code> orphan detection and cleanup is a follow-up, not current behavior.</p>
+
     <h2 id="matrix">Troubleshooting matrix</h2>
     <p>If you know the symptom but not the cause, start here.</p>
     <div class="access-table" aria-label="Troubleshooting matrix">
@@ -121,6 +131,12 @@ $ autovault add-local ~/.claude/skills.bak/&lt;name&gt; --source native:claude-c
         <span class="path"><code>autovault doctor --json</code></span>
         <span class="via">Local skill admitted before the signing key existed, or content rewritten outside the gate.</span>
         <span class="via">Run <code>autovault doctor --repair</code> on unsigned local skills.</span>
+      </div>
+      <div class="access-row">
+        <span class="agent">Removed skill still appears in an agent</span>
+        <span class="path"><code>autovault remove &lt;name&gt; --json</code></span>
+        <span class="via">Agent session cache, or removal was run with <code>--no-discover</code>.</span>
+        <span class="via">Reload the agent; re-run without <code>--no-discover</code> or with <code>--link agent=/path</code>.</span>
       </div>
     </div>
 

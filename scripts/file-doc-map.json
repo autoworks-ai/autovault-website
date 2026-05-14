@@ -13,7 +13,7 @@
     "package-lock.json": ["quick-start"],
     ".env.example": ["quick-start"],
 
-    "src/cli.ts": ["quick-start"],
+    "src/cli.ts": ["quick-start", "api", "troubleshooting", "changelog"],
     "src/library.ts": ["AutoVault", "quick-start"],
     "src/index.ts": ["AutoVault", "quick-start"],
     "src/mcp/**": ["AutoVault", "quick-start"],

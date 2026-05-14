@@ -151,7 +151,15 @@ autovault sync-profiles --discover
 autovault skill search code-review --top-k 5
 \`\`\`
 
-Profile policy decides which agents, named profiles, tags, and profile links can load a signed skill. The skill name stays stable while transforms render caller-specific tool names.`;
+Profile policy decides which agents, named profiles, tags, and profile links can load a signed skill. The skill name stays stable while transforms render caller-specific tool names.
+
+## Remove a skill
+
+\`\`\`bash
+autovault remove skill-author --json
+\`\`\`
+
+Use \`autovault remove <name>\` to delete a vaulted skill, delete its vault-local transforms, and prune AutoVault-managed profile symlinks; native host root discovery is on by default, \`--no-discover\` skips discovered roots, and \`--link agent=/path\` targets a custom root.`;
 
 const cloudMarkdown = `# AutoVault Cloud Launch
 
@@ -299,7 +307,7 @@ Current v0.2.1 surfaces are the local CLI, source ESM library exports, local std
 
 ## Current v0.2.1 surfaces
 
-- CLI commands for add-local install, profile sync, doctor checks, local skill search/list/which, repo audit, setup, capability resolve, and remote service startup.
+- CLI commands for add-local install, remove/uninstall cleanup, profile sync, doctor checks, local skill search/list/which, repo audit, setup, capability resolve, and remote service startup.
 - Source ESM library exports for resolveCapabilities, syncProfiles, addSkill, updateSkill, deleteSkill, proposeSkill, transforms, auditRepo, and profile discovery.
 - MCP tools for discovery/full reads through get_skill, trusted adds, updates, deletes, proposals, and drift checks.
 - Remote Streamable HTTP MCP with OAuth and role-aware filtering at /mcp.
@@ -471,7 +479,11 @@ After adoption the wizard runs sync-profiles, which reports restart_required: tr
 
 ## Move a skill into the vault without the wizard
 
-Use \`autovault add-local <skill-dir> --source native:claude-code --sync-profiles\`. Sync refuses to overwrite an existing user-managed native directory, so move the native dir aside first if you want the managed symlink in its place.`;
+Use \`autovault add-local <skill-dir> --source native:claude-code --sync-profiles\`. Sync refuses to overwrite an existing user-managed native directory, so move the native dir aside first if you want the managed symlink in its place.
+
+## Removed skill still visible
+
+Run \`autovault remove <name>\`, then reload the agent session. Removal deletes the vaulted skill, removes its vault-local transforms, regenerates internal profiles, and prunes AutoVault-managed symlinks from discovered native host roots by default. If removal used \`--no-discover\`, discovered native roots were intentionally left alone; re-run without that flag or pass \`--link agent=/path/to/skills\`. Dedicated doctor cleanup for arbitrary orphan symlinks is a follow-up, not current behavior.`;
 
 const aboutMarkdown = `# About AutoVault
 
@@ -505,6 +517,7 @@ AutoVault is currently pre-1.0. The public source package is MIT licensed and th
 - Local stdio MCP and remote Streamable HTTP MCP surfaces.
 - OAuth and role-aware access checks for remote mode.
 - add-local for third-party installers that already have a local skill bundle.
+- remove for deleting a vaulted skill and pruning AutoVault-managed profile symlinks.
 - AUTOVAULT_SKILL_INSTALL vendor routing modes.
 - Bundled skills are installed from each skills/*/SKILL.md bundle.
 - scripts/bootstrap-skills.mjs to seed bundled skills through the real validation path and refresh discovered host profiles.
@@ -517,7 +530,7 @@ Initial focused TypeScript MCP server release with skill storage, source adapter
 
 ## Unreleased
 
-Bundled skill bootstrap, expanded validation, signing sidecars, add-local installer flow, remote OAuth docs, and MIT license alignment.`;
+Bundled skill bootstrap, expanded validation, signing sidecars, add-local installer flow, remove/uninstall cleanup, remote OAuth docs, and MIT license alignment.`;
 
 export const pageDocs: PageDoc[] = [
   {
