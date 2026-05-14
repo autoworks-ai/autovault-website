@@ -91,7 +91,7 @@
           </div>
           <div class="preview">
             <div class="ttl-prev">After deploy</div>
-            <TerminalBlock title="autovault status" :lines="statusLines" />
+            <TerminalBlock title="remote MCP health" :lines="remoteHealthLines" />
           </div>
         </div>
       </div>
@@ -242,7 +242,7 @@ const topoRoutes = [
   { y: 236, label: "CORS · origin guard", desc: "allowed origins" }
 ];
 
-const remoteStatusLines = [
+const remoteHealthLines = [
   "$ curl -fsS https://your.vault/healthz | jq",
   "",
   "{",
@@ -265,8 +265,6 @@ const remoteStatusLines = [
   "",
   "✓ remote vault healthy"
 ];
-
-const statusLines = computed(() => remoteStatusLines);
 
 const smokeLines = [
   "$ AUTOVAULT_REMOTE_URL=https://vault.acme.dev \\",

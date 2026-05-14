@@ -12,10 +12,13 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 describe("v1 content guardrails", () => {
   it("keeps primary product version copy centralized", () => {
     expect(PRODUCT_VERSION).toBe(`v${PRODUCT_VERSION_SHORT}`);
-    expect(PRODUCT_VERSION).toBe("v0.2.1");
+    expect(PRODUCT_VERSION).toBe("v0.3.0");
     expect(PRODUCT_STATUS).toBe("pre-1.0");
     expect(PRODUCT_VERSION_BADGE).toContain(PRODUCT_VERSION);
     expect(PRODUCT_VERSION_BADGE).not.toContain("Unreleased May 2026");
+    const changelogMarkdown = pageDocs.find((doc) => doc.key === "changelog")?.markdown ?? "";
+    expect(changelogMarkdown).toContain("## v0.3.0");
+    expect(changelogMarkdown).not.toContain("## Unreleased");
 
     const primarySurfaces = [
       ".vitepress/theme/components/AvTopbar.vue",
@@ -79,9 +82,11 @@ describe("v1 content guardrails", () => {
 
   it("keeps current API, storage, and remote-mode docs aligned to v0 surfaces", () => {
     const api = read(".vitepress/theme/components/ApiReferencePage.vue");
+    const styles = read(".vitepress/theme/styles.css");
     const quickStart = read(".vitepress/theme/components/QuickStartPage.vue");
     const deploy = read(".vitepress/theme/components/DeployPage.vue");
     const authoring = read(".vitepress/theme/components/AuthoringPage.vue");
+    const compare = read(".vitepress/theme/components/ComparePage.vue");
     const apiCurrentSurface = [
       sliceBetween(api, "<section class=\"api-hero", "</section>"),
       sliceBetween(api, "const nav: NavItem[] = [", "function endpoint")
@@ -92,10 +97,19 @@ describe("v1 content guardrails", () => {
     const apiMarkdown = pageDocs.find((doc) => doc.key === "api")?.markdown ?? "";
     const deployMarkdown = pageDocs.find((doc) => doc.key === "deploy")?.markdown ?? "";
 
-    expect(apiCurrentSurface).toContain("Current v0.2.1 surfaces");
+    expect(apiCurrentSurface).toContain("Current v0.3.0 surfaces");
     expect(apiCurrentSurface).toContain("MCP tools are the agent-facing API");
     expect(apiCurrentSurface).toContain("autovault add-local");
     expect(apiCurrentSurface).not.toMatch(/@autovault\/sdk|\/api\/v1|autovault init|MCP 2024-11-05/);
+    expect(api).not.toContain('v-html="line"');
+    expect(api).toContain("line.text");
+    expect(styles).toContain(".api-sig .pmt {");
+    expect(styles).toContain("margin-right: 0.35em");
+    expect(api).toContain("autovault add-local <skill-dir> --source <repo-or-url>");
+    expect(api).toContain("autovault add-local ./skills/skill-author --source vendor/skills");
+    expect(api).not.toContain("autovault add-local ./my-skill/SKILL.md");
+    expect(apiMarkdown).toContain("autovault add-local ./skills/skill-author --source vendor/skills");
+    expect(apiMarkdown).not.toContain("autovault add-local ./my-skill/SKILL.md");
 
     expect(vaultAnatomy).toContain("current implementation layout");
     expect(vaultAnatomy).toContain(".signing-key.json");
@@ -111,7 +125,11 @@ describe("v1 content guardrails", () => {
     expect(authoringSchemaIntro).toContain("AutoVault extensions");
     expect(authoringSchemaIntro).toContain("<code>name</code> and <code>description</code> remain the portable core");
     expect(deployMarkdown).toContain("Remote mode cannot create symlinks on client machines");
-    expect(apiMarkdown).toContain("Current v0.2.1 surfaces");
+    expect(deploy).toContain('TerminalBlock title="remote MCP health" :lines="remoteHealthLines"');
+    expect(deploy).not.toContain("statusLines");
+    expect(compare).toContain("--source https://github.com/owner/skills");
+    expect(compare).not.toContain("--source github:");
+    expect(apiMarkdown).toContain("Current v0.3.0 surfaces");
   });
 
   it("keeps hidden hosted copy reservation-only", () => {

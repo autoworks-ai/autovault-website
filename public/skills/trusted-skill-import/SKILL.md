@@ -40,7 +40,10 @@ The user gets a clear provenance note, a local gate result, and a command they
 can run themselves:
 
 ```bash
-autovault add url:https://example.com/trusted-provider/SKILL.md
+tmpdir=$(mktemp -d)
+trap 'rm -rf "$tmpdir"' EXIT
+curl -fsSL https://example.com/trusted-provider/SKILL.md -o "$tmpdir/SKILL.md"
+autovault add-local "$tmpdir" --source trusted-provider/example --sync-profiles
 ```
 
 Do not install or execute any provider-supplied scripts until the user has

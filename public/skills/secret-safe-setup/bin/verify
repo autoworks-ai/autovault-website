@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+set -eu
+
+if [ -z "${PROVIDER_PROFILE:-}" ]; then
+  printf '%s\n' "PROVIDER_PROFILE is not set." >&2
+  exit 2
+fi
+
+printf '%s\n' "Provider profile is configured: ${PROVIDER_PROFILE}"

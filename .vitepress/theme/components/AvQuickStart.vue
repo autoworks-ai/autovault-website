@@ -53,7 +53,7 @@ onBeforeUnmount(stop)
           <div class="row"><span class="pmt">$</span><span>{{ AUTOVAULT_INSTALL_COMMAND }}</span></div>
           <div class="out" style="margin-top: 6px">↳ installed → ~/.autovault</div>
           <div class="out">↳ profile dirs symlinked: ~/.claude/skills, ~/.codex/skills</div>
-          <div class="row" style="margin-top: 10px"><span class="pmt">$</span><span>autovault status</span></div>
+          <div class="row" style="margin-top: 10px"><span class="pmt">$</span><span>autovault doctor</span></div>
           <div class="ok" style="margin-top: 6px">● vault healthy · 0 skills · ed25519 keypair generated</div>
         </div>
       </button>
@@ -64,8 +64,8 @@ onBeforeUnmount(stop)
           <span class="av-qs-step-title">Add a validated skill</span>
         </div>
         <div class="av-qs-step-body">
-          <div class="row"><span class="pmt">$</span><span>autovault add url:https://autovault.dev/skills/skill-author/SKILL.md</span></div>
-          <div class="out" style="margin-top: 6px">↳ fetching… 9.4kb</div>
+          <div class="row"><span class="pmt">$</span><span>autovault add-local ./skills/skill-author --source vendor/skills --sync-profiles</span></div>
+          <div class="out" style="margin-top: 6px">↳ scanning… 9.4kb</div>
           <div class="out">↳ <span class="ok">[1/5]</span> yaml-repair: ok</div>
           <div class="out">↳ <span class="ok">[2/5]</span> denylist: ok</div>
           <div class="out">↳ <span class="ok">[3/5]</span> capability/behavior: ok</div>
@@ -78,11 +78,11 @@ onBeforeUnmount(stop)
       <button class="av-qs-step" :class="{ active: active === 2 }" type="button" @click="choose(2)" @focus="choose(2)">
         <div class="av-qs-step-head">
           <span class="av-qs-step-num">STEP / 03</span>
-          <span class="av-qs-step-title">Scope to a project</span>
+          <span class="av-qs-step-title">Sync profiles</span>
         </div>
         <div class="av-qs-step-body">
-          <div class="row"><span class="pmt">$</span><span>autovault scope skill-author --project autovault-website --agent claude-code,codex</span></div>
-          <div class="out" style="margin-top: 6px">↳ scoped: 2 agents × 1 project</div>
+          <div class="row"><span class="pmt">$</span><span>autovault sync-profiles --discover</span></div>
+          <div class="out" style="margin-top: 6px">↳ discovered: ~/.claude/skills, ~/.codex/skills</div>
           <div class="out">↳ rendering for claude-code → fs.read → read</div>
           <div class="out">↳ rendering for codex → fs.read → file_read</div>
           <div class="ok" style="margin-top: 6px">✓ ready · cached</div>

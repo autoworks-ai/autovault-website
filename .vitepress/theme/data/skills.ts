@@ -53,6 +53,16 @@ export const orgs = [
   { id: "anthropic", label: "Anthropic" }
 ];
 
+const AUTOVAULT_WEBSITE_SKILL_REF = "457f238d0fd49425ac01ad7dad58c726624f1eaa";
+const AUTOVAULT_SOURCE_SKILL_REF = "85cea7424bfbc37901752600adf5eaab87e6b85a";
+
+function githubSkillSource(repo: string, ref: string, path: string) {
+  return {
+    install: `add_skill({ source: "github", identifier: "${repo}@${ref}:${path}" })`,
+    sourceUrl: `https://github.com/${repo}/blob/${ref}/${path}`
+  };
+}
+
 export const skills: Skill[] = [
   {
     name: "autovault-bootstrap",
@@ -65,10 +75,9 @@ export const skills: Skill[] = [
     references: 6,
     license: "MIT",
     size: "3,078 B",
-    install: "autovault add url:https://autovault.dev/skills/autovault-bootstrap/SKILL.md",
+    ...githubSkillSource("autoworks-ai/autovault-website", AUTOVAULT_WEBSITE_SKILL_REF, "public/skills/autovault-bootstrap/SKILL.md"),
     detailPath: "/skill/autovault-bootstrap",
     rawPath: "/skills/autovault-bootstrap/SKILL.md",
-    sourceUrl: "https://github.com/autoworks-ai/autovault-website/blob/main/public/skills/autovault-bootstrap/SKILL.md",
     sourceLabel: "public/skills/autovault-bootstrap/SKILL.md",
     sourceKind: "first-party",
     providerName: "AutoVault",
@@ -111,10 +120,9 @@ export const skills: Skill[] = [
     references: 5,
     license: "MIT",
     size: "9,406 B",
-    install: "autovault add url:https://autovault.dev/skills/skill-author/SKILL.md",
+    ...githubSkillSource("autoworks-ai/autovault", AUTOVAULT_SOURCE_SKILL_REF, "skills/skill-author/SKILL.md"),
     detailPath: "/skill/skill-author",
     rawPath: "/skills/skill-author/SKILL.md",
-    sourceUrl: "https://github.com/autoworks-ai/autovault/blob/main/skills/skill-author/SKILL.md",
     sourceLabel: "autoworks-ai/autovault/skills/skill-author/SKILL.md",
     sourceKind: "first-party",
     providerName: "autoworks-ai",
@@ -157,10 +165,9 @@ export const skills: Skill[] = [
     references: 4,
     license: "MIT",
     size: "6,709 B",
-    install: "autovault add url:https://autovault.dev/skills/autovault-skill/SKILL.md",
+    ...githubSkillSource("autoworks-ai/autovault", AUTOVAULT_SOURCE_SKILL_REF, "skills/autovault-skill/SKILL.md"),
     detailPath: "/skill/autovault-skill",
     rawPath: "/skills/autovault-skill/SKILL.md",
-    sourceUrl: "https://github.com/autoworks-ai/autovault/blob/main/skills/autovault-skill/SKILL.md",
     sourceLabel: "autoworks-ai/autovault/skills/autovault-skill/SKILL.md",
     sourceKind: "first-party",
     providerName: "autoworks-ai",
@@ -203,7 +210,7 @@ export const skills: Skill[] = [
     references: 3,
     license: "MIT",
     size: "1,774 B",
-    install: "autovault add url:https://autovault.dev/skills/trusted-skill-import/SKILL.md",
+    install: "add_skill({ source: \"url\", identifier: \"https://autovault.dev/skills/trusted-skill-import/SKILL.md\" })",
     detailPath: "/skill/trusted-skill-import",
     rawPath: "/skills/trusted-skill-import/SKILL.md",
     sourceUrl: "https://docs.claude.com/en/docs/agents-and-tools/agent-skills",
@@ -223,7 +230,7 @@ export const skills: Skill[] = [
     ],
     overview: [
       "Shows how AutoVault can represent a trusted external provider source while still requiring local review.",
-      "Keeps install behavior local: users copy the add command and run the admission gate themselves."
+      "Keeps install behavior explicit: users copy the MCP add_skill call or stage the file locally before running the admission gate."
     ],
     useCases: [
       "A user brings a skill from a trusted external provider.",
@@ -248,10 +255,9 @@ export const skills: Skill[] = [
     references: 2,
     license: "MIT",
     size: "1,508 B",
-    install: "autovault add url:https://autovault.dev/skills/multi-agent-transform/SKILL.md",
+    ...githubSkillSource("autoworks-ai/autovault-website", AUTOVAULT_WEBSITE_SKILL_REF, "public/skills/multi-agent-transform/SKILL.md"),
     detailPath: "/skill/multi-agent-transform",
     rawPath: "/skills/multi-agent-transform/SKILL.md",
-    sourceUrl: "https://github.com/autoworks-ai/autovault-website/blob/main/public/skills/multi-agent-transform/SKILL.md",
     sourceLabel: "public/skills/multi-agent-transform/SKILL.md",
     sourceKind: "first-party",
     providerName: "autoworks-ai",
@@ -292,11 +298,10 @@ export const skills: Skill[] = [
     v: "0.1.0",
     references: 2,
     license: "MIT",
-    size: "1,908 B",
-    install: "autovault add url:https://autovault.dev/skills/secret-safe-setup/SKILL.md",
+    size: "2,157 B",
+    ...githubSkillSource("autoworks-ai/autovault-website", AUTOVAULT_WEBSITE_SKILL_REF, "public/skills/secret-safe-setup/SKILL.md"),
     detailPath: "/skill/secret-safe-setup",
     rawPath: "/skills/secret-safe-setup/SKILL.md",
-    sourceUrl: "https://github.com/autoworks-ai/autovault-website/blob/main/public/skills/secret-safe-setup/SKILL.md",
     sourceLabel: "public/skills/secret-safe-setup/SKILL.md",
     sourceKind: "first-party",
     providerName: "autoworks-ai",

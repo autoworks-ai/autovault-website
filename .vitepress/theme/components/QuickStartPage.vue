@@ -74,17 +74,17 @@
         <div class="ok">  ✓ ~/.autovault initialized · bundled skills indexed</div>
         <div class="ok">  ✓ local keypair available · ed25519</div>
         <div class="ok">  ✓ detected agents · claude-code, codex</div>
-        <div class="out">  ↳ next: autovault add &lt;source&gt;</div>
+        <div class="out">  ↳ next: autovault add-local &lt;skill-dir&gt; --source &lt;origin&gt;</div>
       </div>
     </div>
 
-    <h2 id="first">Step 4 — Add your first skill</h2>
-    <p>Skills enter through a source adapter. Each adapter fetches from one origin and hands the raw skill to the validation gate. Whatever the source, the gate runs the same checks before admission.</p>
-    <CodeBlock lang="bash"><span class="pmt">$</span> autovault <span class="arg">add</span> url:https://autovault.dev/skills/skill-author/SKILL.md</CodeBlock>
+    <h2 id="first">Step 4 — Add a local skill bundle</h2>
+    <p>Local bundles enter through <code>add-local</code>. Remote URLs and GitHub sources use the same gate through the MCP <code>add_skill</code> tool; the CLI path expects files already present on disk.</p>
+    <CodeBlock lang="bash"><span class="pmt">$</span> autovault add-local ./skills/skill-author <span class="arg">--source</span> vendor/skills <span class="arg">--sync-profiles</span></CodeBlock>
     <div class="terminal static-terminal">
       <div class="terminal-head"><span class="dot live" /><span class="dot" /><span class="dot" /><span class="ttl">gate run · skill-author</span></div>
       <div class="terminal-body compact">
-        <div class="out">  ↳ fetching skill-author v1.0.0</div>
+        <div class="out">  ↳ scanning ./skills/skill-author</div>
         <div class="ok">  ✓ yaml-repair · frontmatter clean</div>
         <div class="ok">  ✓ denylist · no known bad patterns</div>
         <div class="ok">  ✓ capability/behavior · declared matches observed</div>
@@ -122,13 +122,9 @@
       </aside>
     </div>
 
-    <h2 id="scope">Step 5 — Scope it to your context</h2>
-    <p>By default a freshly added skill is visible only after you scope it. A caller sees a skill when it matches the agents and projects you approved, so dev-machine skills do not leak into prod and client work does not bleed across projects.</p>
-    <CodeBlock lang="bash"><span class="pmt">$</span> autovault <span class="arg">scope</span> skill-author \<br />
-    <span class="arg">--agent</span> claude-code,codex \<br />
-    <span class="arg">--project</span> autovault-website \<br />
-    <span class="arg">--device</span> $(hostname)<br />
-<span class="pmt">$</span> autovault sync-profiles <span class="arg">--discover</span></CodeBlock>
+    <h2 id="scope">Step 5 — Sync it to local agents</h2>
+    <p>Profile sync projects admitted skills into agent-native roots while preserving user-managed files on conflict. Visibility comes from skill metadata plus optional named profiles in <code>profiles.config.json</code>; remote clients should read through MCP instead of expecting local symlinks.</p>
+    <CodeBlock lang="bash"><span class="pmt">$</span> autovault sync-profiles <span class="arg">--discover</span></CodeBlock>
 
     <div class="access-table" aria-label="How agents read from the vault">
       <div class="access-row head">
@@ -214,7 +210,7 @@ const PREREQS = [
   { label: "macOS", detail: "13+" },
   { label: "Linux", detail: "x64 / arm64" },
   { label: "Windows", detail: "WSL2" },
-  { label: "Node", detail: "20+" },
+  { label: "Node", detail: "24+" },
   { label: "Disk", detail: "< 40 MB" }
 ];
 
@@ -285,14 +281,14 @@ const TerminalDemo = defineComponent({
       { type: "out", text: "    ~/.autojack/skills/autovault-skill → ~/.autovault/profiles/autojack/autovault-skill" },
       { type: "ok", text: "✓ vault ready · bundled skills bootstrapped · profiles synced" },
       { type: "blank", text: "" },
-      { type: "cmd", text: "autovault add url:https://autovault.dev/skills/skill-author/SKILL.md" },
-      { type: "out", text: "↳ fetching skill-author v1.0.0" },
+      { type: "cmd", text: "autovault add-local ./skills/skill-author --source vendor/skills --sync-profiles" },
+      { type: "out", text: "↳ scanning ./skills/skill-author" },
       { type: "out", text: "↳ [1/5] yaml-repair    : ok" },
       { type: "out", text: "↳ [2/5] denylist       : ok" },
       { type: "out", text: "↳ [3/5] cap/behavior   : ok" },
       { type: "out", text: "↳ [4/5] dedup          : ok" },
       { type: "out", text: "↳ [5/5] sign           : ed25519" },
-      { type: "ok", text: "✓ admitted to vault · scoped to: claude-code, codex" }
+      { type: "ok", text: "✓ admitted to vault · profiles refreshed" }
     ];
     const replay = useTerminalReplay(lines, { autoStart: true, scrollTarget: () => bodyRef.value });
 

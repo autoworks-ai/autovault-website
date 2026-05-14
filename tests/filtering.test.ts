@@ -38,19 +38,24 @@ describe("changelog helpers", () => {
 
     expect(counts.all).toBe(releases.length);
     expect(counts.security).toBeGreaterThan(0);
-    expect(counts.patch).toBe(0);
+    expect(counts.patch).toBe(1);
+    expect(releases.find((release) => release.version === "0.2.1")?.tag).toBe("patch");
   });
 
   it("filters releases by security section and query", () => {
-    const result = filterReleases(releases, "security", "OAuth");
+    const result = filterReleases(releases, "security", "unsigned");
 
     expect(result).toHaveLength(1);
-    expect(result[0].version).toBe("Unreleased");
+    expect(result[0].version).toBe("0.3.0");
   });
 
   it("returns preview releases only when requested", () => {
     const result = filterReleases(releases, "preview");
 
     expect(result.every((release) => release.tag === "preview")).toBe(true);
+  });
+
+  it("uses commit-like release refs consistently", () => {
+    expect(releases.every((release) => /^[0-9a-f]{7,40}$/.test(release.commit))).toBe(true);
   });
 });
