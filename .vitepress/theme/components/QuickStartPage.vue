@@ -47,8 +47,11 @@
     </section>
 
     <h2 id="install">Step 1 — Install the local vault</h2>
-    <p>The installer writes <code>~/.autovault</code>, installs the local CLI shim, preserves the folder as user-owned storage, and bootstraps bundled skills unless <code>AUTOVAULT_NO_BOOTSTRAP=1</code> is set. Nothing runs as a background daemon; local MCP hosts spawn stdio on demand.</p>
-    <CodeBlock lang="bash"><span class="pmt">$</span> curl <span class="arg">-fsSL</span> https://autovault.sh <span class="muted">|</span> sh<br />
+    <p>The installer writes <code>~/.autovault</code>, installs the local CLI shim, preserves the folder as user-owned storage, and bootstraps bundled skills unless <code>AUTOVAULT_NO_BOOTSTRAP=1</code> is set. Pick any channel; the published release is identical across all three. Nothing runs as a background daemon; local MCP hosts spawn stdio on demand.</p>
+    <CodeBlock lang="bash"><span class="yaml-comment"># Node 24+: install the published npm package</span><br />
+<span class="pmt">$</span> npm install <span class="arg">-g</span> @autoworks-ai/autovault<br />
+<span class="yaml-comment"># Or run the installer script end-to-end</span><br />
+<span class="pmt">$</span> curl <span class="arg">-fsSL</span> https://autovault.sh <span class="muted">|</span> sh<br />
 <span class="yaml-comment"># macOS: also available through the tap</span><br />
 <span class="pmt">$</span> brew install autoworks-ai/tap/autovault<br />
 <span class="pmt">$</span> autovault skill list</CodeBlock>
@@ -186,18 +189,19 @@ import AvDocBreadcrumb from "./AvDocBreadcrumb.vue";
 import CodeBlock from "./CodeBlock.vue";
 import { useTerminalReplay, type TerminalReplayLine } from "../composables/useTerminalReplay";
 import { PRODUCT_VERSION, PRODUCT_VERSION_BADGE } from "../data/product";
-import { AUTOVAULT_AGENT_SETUP_PROMPT, AUTOVAULT_INSTALL_COMMAND } from "../../shared/bootstrap";
+import { AUTOVAULT_AGENT_SETUP_PROMPT, AUTOVAULT_INSTALL_COMMAND, AUTOVAULT_NPM_INSTALL_COMMAND } from "../../shared/bootstrap";
 import { copyText } from "../utils/clipboard";
 
-type Method = "curl" | "brew";
+type Method = "npm" | "curl" | "brew";
 type VaultRow = { depth: number; label: string; kind: "dir" | "file" | "sig"; id?: string };
 
-const INSTALL_METHODS: Method[] = ["curl", "brew"];
+const INSTALL_METHODS: Method[] = ["npm", "curl", "brew"];
 const INSTALL_COMMANDS: Record<Method, string> = {
+  npm: AUTOVAULT_NPM_INSTALL_COMMAND,
   curl: AUTOVAULT_INSTALL_COMMAND,
   brew: "brew install autoworks-ai/tap/autovault"
 };
-const selectedMethod = ref<Method>("curl");
+const selectedMethod = ref<Method>("npm");
 const copied = ref(false);
 const AGENT_SETUP_PROMPT = AUTOVAULT_AGENT_SETUP_PROMPT;
 

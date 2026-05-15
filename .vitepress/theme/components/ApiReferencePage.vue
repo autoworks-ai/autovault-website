@@ -20,7 +20,7 @@
         <h1>Current surfaces. <span class="ital">Clear boundaries.</span></h1>
         <p class="lede">Current v0.3.0 surfaces are the local CLI, source ESM library exports, local stdio MCP, and remote Streamable HTTP MCP at <code>/mcp</code>. There is no public REST API or separately published SDK package yet; MCP tools are the agent-facing API.</p>
         <div class="api-versions">
-          <div class="v"><div class="lbl">CLI</div><div class="val">autovault@{{ PRODUCT_VERSION_SHORT }} <span class="meta">source · brew · GHCR</span></div></div>
+          <div class="v"><div class="lbl">CLI</div><div class="val">autovault@{{ PRODUCT_VERSION_SHORT }} <span class="meta">npm · brew · GHCR</span></div></div>
           <div class="v"><div class="lbl">Library</div><div class="val">source ESM exports <span class="meta">Node/TypeScript</span></div></div>
           <div class="v"><div class="lbl">Remote</div><div class="val">/mcp <span class="meta">Streamable HTTP MCP</span></div></div>
         </div>
