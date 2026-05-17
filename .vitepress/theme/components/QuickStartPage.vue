@@ -47,15 +47,15 @@
     </section>
 
     <h2 id="install">Step 1 — Install the local vault</h2>
-    <p>The installer writes <code>~/.autovault</code>, installs the local CLI shim, preserves the folder as user-owned storage, and bootstraps bundled skills unless <code>AUTOVAULT_NO_BOOTSTRAP=1</code> is set. Pick any channel; the published release is identical across all three. Nothing runs as a background daemon; local MCP hosts spawn stdio on demand.</p>
+    <p>Pick any channel; each installs the same published CLI release. npm is the fastest path for Node 24+ environments, Homebrew is convenient on macOS, and the shell installer additionally provisions <code>~/.autovault</code>, preserves it as user-owned storage, and bootstraps bundled skills unless <code>AUTOVAULT_NO_BOOTSTRAP=1</code> is set. Nothing runs as a background daemon; local MCP hosts spawn stdio on demand.</p>
     <CodeBlock lang="bash"><span class="yaml-comment"># Node 24+: install the published npm package</span><br />
-<span class="pmt">$</span> npm install <span class="arg">-g</span> @autoworks-ai/autovault<br />
+<span class="pmt">$</span> {{ INSTALL_COMMANDS.npm }}<br />
 <span class="yaml-comment"># Or run the installer script end-to-end</span><br />
 <span class="pmt">$</span> curl <span class="arg">-fsSL</span> https://autovault.sh <span class="muted">|</span> sh<br />
 <span class="yaml-comment"># macOS: also available through the tap</span><br />
 <span class="pmt">$</span> brew install autoworks-ai/tap/autovault<br />
 <span class="pmt">$</span> autovault skill list</CodeBlock>
-    <div class="callout tip"><div class="callout-dot" /><div><strong>Bundled skills.</strong> The installer seeds first-party bundled skills through the same validation path used by remote installs and proposals, then refreshes discovered host profiles.</div></div>
+    <div class="callout tip"><div class="callout-dot" /><div><strong>Bundled skills.</strong> Installer and setup flows seed first-party bundled skills through the same validation path used by remote installs and proposals, then refresh discovered host profiles.</div></div>
 
     <h2 id="agent-assisted">Agent-assisted setup</h2>
     <p>If you want Claude Code to configure its own AutoVault bootstrap skill, give it this prompt. The hosted skill is a raw <code>SKILL.md</code>; the agent should fetch it, show you the behavior, install it locally only after approval, then run it.</p>

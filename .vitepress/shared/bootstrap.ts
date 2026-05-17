@@ -10,5 +10,3 @@ export const AUTOVAULT_INSTALL_COMMAND = "curl -fsSL https://autovault.sh | sh";
 export const AUTOVAULT_NPM_PACKAGE = "@autoworks-ai/autovault";
 
 export const AUTOVAULT_NPM_INSTALL_COMMAND = `npm install -g ${AUTOVAULT_NPM_PACKAGE}`;
-
-export const AUTOVAULT_NPM_URL = `https://www.npmjs.com/package/${AUTOVAULT_NPM_PACKAGE}`;

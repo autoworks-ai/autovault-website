@@ -105,7 +105,7 @@ brew install autoworks-ai/tap/autovault
 autovault skill list
 \`\`\`
 
-Any of the three channels works: npm publishes the same release as ${AUTOVAULT_NPM_PACKAGE} for Node 24+ environments, the installer script provisions ~/.autovault and the local CLI shim end-to-end, and the Homebrew tap is convenient for macOS workstations. The installer writes ~/.autovault, places the local CLI shim, preserves the folder as user-owned storage, and bootstraps bundled skills unless AUTOVAULT_NO_BOOTSTRAP=1 is set. The current public package is ${PRODUCT_VERSION}; AutoVault remains pre-1.0.
+Any of the three channels works: npm publishes the same release as ${AUTOVAULT_NPM_PACKAGE} for Node 24+ environments, the Homebrew tap is convenient for macOS workstations, and the installer script additionally provisions ~/.autovault end-to-end. Installer and setup flows preserve the vault as user-owned storage and bootstrap bundled skills unless AUTOVAULT_NO_BOOTSTRAP=1 is set. The current public package is ${PRODUCT_VERSION}; AutoVault remains pre-1.0.
 
 ## Agent-assisted setup
 
