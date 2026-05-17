@@ -17,7 +17,7 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "devDependencies": {
-    "@types/node": "^25.6.2",
+    "@types/node": "^25.8.0",
     "@vitejs/plugin-vue": "^6.0.6",
     "vitepress": "^1.6.4",
     "vitest": "^4.1.6",
