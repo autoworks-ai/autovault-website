@@ -26,8 +26,8 @@
     "wrangler": "^4.90.0"
   },
   "dependencies": {
-    "@clerk/backend": "^3.4.7",
-    "@clerk/vue": "^2.2.2",
-    "yaml": "^2.8.4"
+    "@clerk/backend": "^3.4.8",
+    "@clerk/vue": "^2.2.3",
+    "yaml": "^2.9.0"
   }
 }
