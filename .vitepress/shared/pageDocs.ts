@@ -1,5 +1,5 @@
 import { PRODUCT_VERSION } from "../theme/data/product";
-import { AUTOVAULT_AGENT_SETUP_PROMPT, AUTOVAULT_BOOTSTRAP_INSTALL_PATH, AUTOVAULT_BOOTSTRAP_SKILL_URL, AUTOVAULT_INSTALL_COMMAND } from "./bootstrap";
+import { AUTOVAULT_AGENT_SETUP_PROMPT, AUTOVAULT_BOOTSTRAP_INSTALL_PATH, AUTOVAULT_BOOTSTRAP_SKILL_URL, AUTOVAULT_INSTALL_COMMAND, AUTOVAULT_NPM_INSTALL_COMMAND, AUTOVAULT_NPM_PACKAGE } from "./bootstrap";
 import { MANUAL_GHCR_IMAGE, RAILWAY_TEMPLATE_URL } from "./deploy";
 
 export const SITE_URL = "https://autovault.dev";
@@ -99,12 +99,13 @@ Install AutoVault, verify the local vault, add a local signed skill bundle, sync
 ## Install
 
 \`\`\`bash
+${AUTOVAULT_NPM_INSTALL_COMMAND}
 ${AUTOVAULT_INSTALL_COMMAND}
 brew install autoworks-ai/tap/autovault
 autovault skill list
 \`\`\`
 
-The installer writes ~/.autovault, places the local CLI shim, preserves the folder as user-owned storage, and bootstraps bundled skills unless AUTOVAULT_NO_BOOTSTRAP=1 is set. The current public package is ${PRODUCT_VERSION}; AutoVault remains pre-1.0.
+Any of the three channels works: npm publishes the same release as ${AUTOVAULT_NPM_PACKAGE} for Node 24+ environments, the Homebrew tap is convenient for macOS workstations, and the installer script additionally provisions ~/.autovault end-to-end. Installer and setup flows preserve the vault as user-owned storage and bootstrap bundled skills unless AUTOVAULT_NO_BOOTSTRAP=1 is set. The current public package is ${PRODUCT_VERSION}; AutoVault remains pre-1.0.
 
 ## Agent-assisted setup
 
