@@ -1,5 +1,5 @@
-export const PRODUCT_VERSION = "v0.3.0";
-export const PRODUCT_VERSION_SHORT = "0.3.0";
+export const PRODUCT_VERSION = "v0.4.0";
+export const PRODUCT_VERSION_SHORT = "0.4.0";
 export const PRODUCT_STATUS = "pre-1.0";
 export const PRODUCT_VERSION_BADGE = `${PRODUCT_VERSION} · ${PRODUCT_STATUS} · MIT`;
 export const PRODUCT_RELEASE_LABEL = `${PRODUCT_VERSION} · 2026-05`;

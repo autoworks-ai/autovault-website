@@ -12,12 +12,12 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 describe("v1 content guardrails", () => {
   it("keeps primary product version copy centralized", () => {
     expect(PRODUCT_VERSION).toBe(`v${PRODUCT_VERSION_SHORT}`);
-    expect(PRODUCT_VERSION).toBe("v0.3.0");
+    expect(PRODUCT_VERSION).toBe("v0.4.0");
     expect(PRODUCT_STATUS).toBe("pre-1.0");
     expect(PRODUCT_VERSION_BADGE).toContain(PRODUCT_VERSION);
     expect(PRODUCT_VERSION_BADGE).not.toContain("Unreleased May 2026");
     const changelogMarkdown = pageDocs.find((doc) => doc.key === "changelog")?.markdown ?? "";
-    expect(changelogMarkdown).toContain("## v0.3.0");
+    expect(changelogMarkdown).toContain("## v0.4.0");
     expect(changelogMarkdown).not.toContain("## Unreleased");
 
     const primarySurfaces = [
@@ -97,7 +97,7 @@ describe("v1 content guardrails", () => {
     const apiMarkdown = pageDocs.find((doc) => doc.key === "api")?.markdown ?? "";
     const deployMarkdown = pageDocs.find((doc) => doc.key === "deploy")?.markdown ?? "";
 
-    expect(apiCurrentSurface).toContain("Current v0.3.0 surfaces");
+    expect(apiCurrentSurface).toContain("Current v0.4.0 surfaces");
     expect(apiCurrentSurface).toContain("MCP tools are the agent-facing API");
     expect(apiCurrentSurface).toContain("autovault add-local");
     expect(apiCurrentSurface).not.toMatch(/@autovault\/sdk|\/api\/v1|autovault init|MCP 2024-11-05/);
@@ -129,7 +129,7 @@ describe("v1 content guardrails", () => {
     expect(deploy).not.toContain("statusLines");
     expect(compare).toContain("--source https://github.com/owner/skills");
     expect(compare).not.toContain("--source github:");
-    expect(apiMarkdown).toContain("Current v0.3.0 surfaces");
+    expect(apiMarkdown).toContain("Current v0.4.0 surfaces");
   });
 
   it("keeps hidden hosted copy reservation-only", () => {

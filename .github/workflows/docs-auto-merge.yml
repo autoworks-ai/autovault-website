@@ -1,0 +1,43 @@
+name: Docs Auto-Merge
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  enable-auto-merge:
+    if: >-
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'docs/audit-') &&
+      startsWith(github.event.pull_request.title, 'docs:')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create docs drift app token
+        id: docs_token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.DOCS_DRIFT_APP_ID }}
+          private-key: ${{ secrets.DOCS_DRIFT_APP_PRIVATE_KEY }}
+          owner: autoworks-ai
+          repositories: autovault-website
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Mark docs PR ready
+        if: github.event.pull_request.draft
+        env:
+          GH_TOKEN: ${{ steps.docs_token.outputs.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr ready "$PR_URL"
+
+      - name: Enable squash auto-merge
+        env:
+          GH_TOKEN: ${{ steps.docs_token.outputs.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: gh pr merge "$PR_URL" --auto --squash --match-head-commit "$HEAD_SHA"

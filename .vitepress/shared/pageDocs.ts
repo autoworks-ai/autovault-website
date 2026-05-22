@@ -141,7 +141,7 @@ autovault add-local ~/.agents/skills/copilot-review --source native:agents --syn
 autovault add-local ./my-skill --source https://github.com/org/repo/tree/main/skills/my-skill
 \`\`\`
 
-The \`autovault add-local\` command hands raw skill content and sibling resources to the same gate used by MCP install paths: frontmatter repair, schema validation, denylist scan, capability/behavior check, deduplication, and Ed25519 signing. In v0.3.0, \`--source\` is required so provenance is explicit.
+The \`autovault add-local\` command hands raw skill content and sibling resources to the same gate used by MCP install paths: frontmatter repair, schema validation, denylist scan, capability/behavior check, deduplication, and Ed25519 signing. In v0.4.0, \`--source\` remains required so provenance is explicit.
 
 ## Vault anatomy
 
@@ -306,9 +306,9 @@ Agents should use get_skill for vault inventory lookup, fetch full content only 
 
 const apiMarkdown = `# AutoVault API Reference
 
-Current v0.3.0 surfaces are the local CLI, source ESM library exports, local stdio MCP, and remote Streamable HTTP MCP at /mcp. There is no public REST API or separately published SDK package yet. MCP tools are the agent-facing API.
+Current v0.4.0 surfaces are the local CLI, source ESM library exports, local stdio MCP, and remote Streamable HTTP MCP at /mcp. There is no public REST API or separately published SDK package yet. MCP tools are the agent-facing API.
 
-## Current v0.3.0 surfaces
+## Current v0.4.0 surfaces
 
 - CLI commands for add-local install, remove/uninstall cleanup, profile sync, doctor checks, local skill search/list/which, repo audit, setup, capability resolve, and remote service startup.
 - Source ESM library exports for resolveCapabilities, syncProfiles, addSkill, updateSkill, deleteSkill, proposeSkill, transforms, auditRepo, and profile discovery.
@@ -327,7 +327,7 @@ autovault add-local ~/.agents/skills/copilot-review --source native:agents --syn
 autovault add-local ./my-skill --source https://github.com/org/repo/tree/main/skills/my-skill
 \`\`\`
 
-\`--source\` is required in v0.3.0. Use a repository, URL, or native-root label that explains where the local bundle came from. \`--sync-profiles\` refreshes visible agent roots.`;
+\`--source\` is required in v0.4.0. Use a repository, URL, or native-root label that explains where the local bundle came from. \`--sync-profiles\` refreshes visible agent roots.`;
 
 const deployMarkdown = `# Deploy A Remote AutoVault
 
@@ -523,7 +523,7 @@ AutoVault is brought to you by Jack Arturo, Jason Coleman, Flint, Zack Katz, and
 
 const changelogMarkdown = `# AutoVault Changelog
 
-AutoVault is currently pre-1.0. The public source package is MIT licensed and the current source README identifies v0.3.0 as the release status, including bundled skills, bootstrap flow, signing, removal cleanup, and installer polish.
+AutoVault is currently pre-1.0. The public source package is MIT licensed and the current source README identifies v0.4.0 as the release status, including setup review UX, public output standardization, local import fixes, community skills, bundled skills, signing, and profile cleanup.
 
 ## Current source sync
 
@@ -536,6 +536,10 @@ AutoVault is currently pre-1.0. The public source package is MIT licensed and th
 - scripts/bootstrap-skills.mjs to seed bundled skills through the real validation path and refresh discovered host profiles.
 - get_skill agent rendering and include_resources for transformed variants and packaged resources.
 - check_updates for upstream drift and transform review state.
+
+## v0.4.0
+
+Released May 22, 2026. Improves install and setup review UX, adds the agentgonewild-publisher community skill, smooths add-local local imports, standardizes public CLI output, retries Dependabot automerge after CI, and aligns Node typings with the runtime policy.
 
 ## v0.3.0
 
