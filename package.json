@@ -31,6 +31,8 @@
     "yaml": "^2.9.0"
   },
   "overrides": {
-    "js-cookie": "3.0.7"
+    "@clerk/shared": {
+      "js-cookie": "3.0.7"
+    }
   }
 }
