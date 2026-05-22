@@ -10,7 +10,6 @@
     "INSTALL.md": ["quick-start"],
     "CHANGELOG.md": ["changelog"],
     "package.json": ["quick-start", "changelog"],
-    "package-lock.json": ["quick-start"],
     ".env.example": ["quick-start"],
 
     "src/cli.ts": ["quick-start", "api", "troubleshooting", "changelog"],

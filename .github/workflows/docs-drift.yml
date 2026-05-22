@@ -24,12 +24,46 @@ jobs:
   update-docs:
     runs-on: ubuntu-latest
     steps:
+      - name: Verify docs drift app credentials
+        env:
+          DOCS_DRIFT_APP_ID: ${{ secrets.DOCS_DRIFT_APP_ID }}
+          DOCS_DRIFT_APP_PRIVATE_KEY: ${{ secrets.DOCS_DRIFT_APP_PRIVATE_KEY }}
+        run: |
+          if [ -z "$DOCS_DRIFT_APP_ID" ] || [ -z "$DOCS_DRIFT_APP_PRIVATE_KEY" ]; then
+            echo "::error::DOCS_DRIFT_APP_ID and DOCS_DRIFT_APP_PRIVATE_KEY are required for docs drift automation."
+            exit 1
+          fi
+
+      - name: Create website docs app token
+        id: website_token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.DOCS_DRIFT_APP_ID }}
+          private-key: ${{ secrets.DOCS_DRIFT_APP_PRIVATE_KEY }}
+          owner: autoworks-ai
+          repositories: autovault-website
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Create source docs app token
+        id: source_token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.DOCS_DRIFT_APP_ID }}
+          private-key: ${{ secrets.DOCS_DRIFT_APP_PRIVATE_KEY }}
+          owner: autoworks-ai
+          repositories: autovault
+          permission-contents: read
+
       - uses: actions/checkout@v6
+        with:
+          token: ${{ steps.website_token.outputs.token }}
+          persist-credentials: false
 
       - name: Resolve source payload
         id: resolve
         env:
-          GH_TOKEN: ${{ secrets.DOCS_DRIFT_TOKEN || github.token }}
+          GH_TOKEN: ${{ steps.source_token.outputs.token }}
         run: |
           SOURCE_REPO="${{ github.event.client_payload.source_repo || 'autoworks-ai/autovault' }}"
           SOURCE_REF="${{ github.event.client_payload.source_sha || inputs.source_sha || 'main' }}"
@@ -57,7 +91,8 @@ jobs:
           repository: ${{ steps.resolve.outputs.source_repo }}
           ref: ${{ steps.resolve.outputs.source_sha }}
           path: .source-repo
-          token: ${{ secrets.DOCS_DRIFT_TOKEN || github.token }}
+          token: ${{ steps.source_token.outputs.token }}
+          persist-credentials: false
 
       - uses: actions/setup-node@v6
         with:
@@ -70,7 +105,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          github_token: ${{ secrets.DOCS_DRIFT_TOKEN || github.token }}
+          github_token: ${{ steps.website_token.outputs.token }}
           branch_prefix: docs/audit-
           prompt: |
             Read .github/prompts/update-docs.md for full instructions.
@@ -103,25 +138,3 @@ jobs:
             --allowedTools 'Bash(npm run typecheck)'
             --allowedTools 'Bash(npm test)'
             --allowedTools 'Bash(npm run docs:build)'
-
-      - name: Enable auto-merge on docs PRs created by this run
-        if: success()
-        env:
-          GH_TOKEN: ${{ secrets.DOCS_DRIFT_TOKEN || github.token }}
-        run: |
-          RUN_STARTED_AT=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}" -q '.created_at')
-          PRS=$(gh pr list \
-            --state open \
-            --limit 200 \
-            --json number,headRefName,createdAt,isCrossRepository \
-            --jq "[.[] | select(.isCrossRepository == false) | select(.headRefName | startswith(\"docs/audit-\")) | select(.createdAt >= \"$RUN_STARTED_AT\")] | .[].number")
-
-          if [ -z "$PRS" ]; then
-            echo "No docs/audit-* PRs created during this run."
-            exit 0
-          fi
-
-          for pr in $PRS; do
-            gh pr merge "$pr" --auto --squash \
-              || echo "Skipped PR #$pr; it may have conflicts, missing checks, or already be merged."
-          done

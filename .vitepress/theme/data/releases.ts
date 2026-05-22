@@ -28,15 +28,45 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: "0.4.0",
+    date: "May 22, 2026",
+    type: "minor",
+    tag: "minor",
+    codename: "Review",
+    featured: true,
+    title: "Setup review, public output, and community skills",
+    summary:
+      "The current source release improves install and setup review UX, adds a community publisher skill, smooths local imports, standardizes public CLI output, and retries Dependabot automerge after CI.",
+    sections: [
+      {
+        kind: "added",
+        items: [
+          "Install and setup review flows now give operators clearer choices before adopting local skill bundles",
+          "The agentgonewild-publisher community skill is available as a vaulted skill bundle",
+        ],
+      },
+      {
+        kind: "fixed",
+        items: [
+          "add-local imports are smoother for local bundles and native skill roots",
+          "Public CLI output is standardized so automation can rely on cleaner stdout/stderr behavior",
+          "Dependabot automerge retries after CI and Node typings stay aligned with the runtime policy",
+        ],
+      },
+    ],
+    commit: "493153f",
+    author: "jack",
+    contributors: 4,
+  },
+  {
     version: "0.3.0",
     date: "May 14, 2026",
     type: "minor",
     tag: "minor",
     codename: "Cleanup",
-    featured: true,
     title: "Skill removal, profile filters, and installer polish",
     summary:
-      "The current source release adds vaulted skill removal, doctor repair, tag-filtered profiles, migration hardening, and smoother setup/serve UX.",
+      "Adds vaulted skill removal, doctor repair, tag-filtered profiles, migration hardening, and smoother setup/serve UX.",
     sections: [
       {
         kind: "added",
