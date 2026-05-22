@@ -97,7 +97,7 @@ describe("v1 content guardrails", () => {
     const apiMarkdown = pageDocs.find((doc) => doc.key === "api")?.markdown ?? "";
     const deployMarkdown = pageDocs.find((doc) => doc.key === "deploy")?.markdown ?? "";
 
-    expect(apiCurrentSurface).toContain("Current v0.4.0 surfaces");
+    expect(apiCurrentSurface).toContain("Current {{ PRODUCT_VERSION }} surfaces");
     expect(apiCurrentSurface).toContain("MCP tools are the agent-facing API");
     expect(apiCurrentSurface).toContain("autovault add-local");
     expect(apiCurrentSurface).not.toMatch(/@autovault\/sdk|\/api\/v1|autovault init|MCP 2024-11-05/);

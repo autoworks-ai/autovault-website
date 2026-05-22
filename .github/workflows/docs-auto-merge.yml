@@ -5,8 +5,8 @@ on:
     types: [opened, reopened, synchronize, ready_for_review]
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
+  pull-requests: read
 
 jobs:
   enable-auto-merge:
@@ -17,6 +17,16 @@ jobs:
       startsWith(github.event.pull_request.title, 'docs:')
     runs-on: ubuntu-latest
     steps:
+      - name: Verify docs drift app credentials
+        env:
+          DOCS_DRIFT_APP_ID: ${{ secrets.DOCS_DRIFT_APP_ID }}
+          DOCS_DRIFT_APP_PRIVATE_KEY: ${{ secrets.DOCS_DRIFT_APP_PRIVATE_KEY }}
+        run: |
+          if [ -z "$DOCS_DRIFT_APP_ID" ] || [ -z "$DOCS_DRIFT_APP_PRIVATE_KEY" ]; then
+            echo "::error::DOCS_DRIFT_APP_ID and DOCS_DRIFT_APP_PRIVATE_KEY are required for docs auto-merge."
+            exit 1
+          fi
+
       - name: Create docs drift app token
         id: docs_token
         uses: actions/create-github-app-token@v2
@@ -27,6 +37,31 @@ jobs:
           repositories: autovault-website
           permission-contents: write
           permission-pull-requests: write
+
+      - name: Validate docs-only PR scope
+        env:
+          GH_TOKEN: ${{ steps.docs_token.outputs.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -euo pipefail
+
+          changed_files="$(gh pr diff "$PR_URL" --name-only)"
+          echo "Changed files:"
+          printf '%s\n' "$changed_files"
+
+          disallowed="$(
+            printf '%s\n' "$changed_files" | awk '
+              NF && $0 !~ /^(\.vitepress\/|docs\/|public\/|scripts\/file-doc-map\.json$|tests\/v1Content\.test\.ts$|README\.md$|CHANGELOG\.md$)/ {
+                print
+              }
+            '
+          )"
+
+          if [ -n "$disallowed" ]; then
+            echo "::error::Docs auto-merge only allows documentation and documentation-test paths."
+            printf '%s\n' "$disallowed"
+            exit 1
+          fi
 
       - name: Mark docs PR ready
         if: github.event.pull_request.draft
@@ -39,5 +74,29 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.docs_token.outputs.token }}
           PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: gh pr merge "$PR_URL" --auto --squash --match-head-commit "$HEAD_SHA"
+        run: |
+          set -euo pipefail
+
+          pr_state="$(
+            gh api graphql \
+              -f owner="${GITHUB_REPOSITORY%/*}" \
+              -f repo="${GITHUB_REPOSITORY#*/}" \
+              -F number="$PR_NUMBER" \
+              -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$number){isMergeQueueEnabled isInMergeQueue}}}' \
+              --jq '.data.repository.pullRequest'
+          )"
+          queue_enabled="$(jq -r '.isMergeQueueEnabled' <<<"$pr_state")"
+          in_queue="$(jq -r '.isInMergeQueue' <<<"$pr_state")"
+
+          if [ "$in_queue" = "true" ]; then
+            echo "Pull request is already in the merge queue."
+            exit 0
+          fi
+
+          if [ "$queue_enabled" = "true" ]; then
+            gh pr merge "$PR_URL" --auto --match-head-commit "$HEAD_SHA"
+          else
+            gh pr merge "$PR_URL" --auto --squash --match-head-commit "$HEAD_SHA"
+          fi

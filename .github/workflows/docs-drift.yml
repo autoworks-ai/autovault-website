@@ -24,6 +24,16 @@ jobs:
   update-docs:
     runs-on: ubuntu-latest
     steps:
+      - name: Verify docs drift app credentials
+        env:
+          DOCS_DRIFT_APP_ID: ${{ secrets.DOCS_DRIFT_APP_ID }}
+          DOCS_DRIFT_APP_PRIVATE_KEY: ${{ secrets.DOCS_DRIFT_APP_PRIVATE_KEY }}
+        run: |
+          if [ -z "$DOCS_DRIFT_APP_ID" ] || [ -z "$DOCS_DRIFT_APP_PRIVATE_KEY" ]; then
+            echo "::error::DOCS_DRIFT_APP_ID and DOCS_DRIFT_APP_PRIVATE_KEY are required for docs drift automation."
+            exit 1
+          fi
+
       - name: Create website docs app token
         id: website_token
         uses: actions/create-github-app-token@v2
