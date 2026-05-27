@@ -143,11 +143,13 @@ jobs:
               -f owner="$owner" \
               -f repo="$repo" \
               -F number="$PR_NUMBER" \
-              -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$number){isMergeQueueEnabled isInMergeQueue}}}' \
+              -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$number){isMergeQueueEnabled isInMergeQueue mergeStateStatus autoMergeRequest{enabledAt}}}}' \
               --jq '.data.repository.pullRequest'
           )"
           queue_enabled="$(jq -r '.isMergeQueueEnabled' <<<"$pr_state")"
           in_queue="$(jq -r '.isInMergeQueue' <<<"$pr_state")"
+          merge_state="$(jq -r '.mergeStateStatus' <<<"$pr_state")"
+          auto_merge_enabled="$(jq -r '.autoMergeRequest != null' <<<"$pr_state")"
 
           if [ "$in_queue" = "true" ]; then
             echo "Pull request is already in the merge queue."
@@ -160,7 +162,18 @@ jobs:
           fi
 
           if [ "$queue_enabled" = "true" ]; then
-            gh pr merge --auto --match-head-commit "$HEAD_SHA" "$PR_URL"
+            if [ "$merge_state" != "CLEAN" ]; then
+              echo "Merge queue is enabled but merge state is $merge_state; keeping auto-merge enabled until requirements pass."
+              gh pr merge --auto --match-head-commit "$HEAD_SHA" "$PR_URL"
+              exit 0
+            fi
+
+            if [ "$auto_merge_enabled" = "true" ]; then
+              echo "Clearing stale auto-merge before enqueueing clean pull request."
+              gh pr merge --disable-auto "$PR_URL"
+            fi
+
+            gh pr merge --match-head-commit "$HEAD_SHA" "$PR_URL"
           else
             gh pr merge --auto --squash --match-head-commit "$HEAD_SHA" "$PR_URL"
           fi
