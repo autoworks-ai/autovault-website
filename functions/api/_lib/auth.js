@@ -163,8 +163,8 @@ async function getClerkSessionUser(request, env) {
 
 function clerkBearerToken(request) {
   const authorization = request.headers.get("authorization") || "";
-  const [scheme, token] = authorization.split(" ", 2);
-  return scheme === "Bearer" && token ? token : null;
+  const match = authorization.match(/^\s*Bearer\s+(.+?)\s*$/i);
+  return match?.[1] || null;
 }
 
 function clerkModeEnabled(env) {

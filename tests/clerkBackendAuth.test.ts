@@ -82,6 +82,21 @@ describe("Clerk-backed Pages Function auth", () => {
     expect(payload.error).toMatch(/invalid clerk session/i);
   });
 
+  it("recognizes invalid Bearer tokens with case-insensitive schemes and extra whitespace", async () => {
+    clerkMocks.authenticateRequest.mockResolvedValue(clerkRequestState(null));
+
+    const response = await getMe({
+      request: new Request("https://autovault.dev/api/me", {
+        headers: { authorization: "bearer    invalid-session-token" }
+      }),
+      env: createClerkEnv()
+    });
+    const payload = await response.json() as { error: string };
+
+    expect(response.status).toBe(401);
+    expect(payload.error).toMatch(/invalid clerk session/i);
+  });
+
   it("creates checkout for the authenticated Clerk-backed user", async () => {
     clerkMocks.authenticateRequest.mockResolvedValue(clerkRequestState("user_123"));
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({

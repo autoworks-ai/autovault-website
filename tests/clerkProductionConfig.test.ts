@@ -28,6 +28,18 @@ describe("Clerk production deployment configuration", () => {
     expect(workflow).toContain("scripts/verify-clerk-production-key.mjs production");
   });
 
+  it("scans the exact Pages deployment URL after production deploys", () => {
+    const ciWorkflow = read(".github/workflows/ci.yml");
+    const deployWorkflow = read(".github/workflows/deploy.yml");
+
+    expect(ciWorkflow).toContain("id: production_deploy");
+    expect(ciWorkflow).toContain("steps.production_deploy.outputs['deployment-url']");
+    expect(deployWorkflow).toContain("id: pages_deploy");
+    expect(deployWorkflow).toContain("steps.pages_deploy.outputs['deployment-url']");
+    expect(ciWorkflow).not.toContain("scan-clerk-production-url.mjs https://autovault.dev/cloud --verify-fapi");
+    expect(deployWorkflow).not.toContain("scan-clerk-production-url.mjs https://autovault.dev/cloud --verify-fapi");
+  });
+
   it("rejects development Clerk hosts from production builds", () => {
     const testKey = publishableKey("test", "arriving-yak-2.clerk.accounts.dev");
     const result = verifyKey("production", testKey);
