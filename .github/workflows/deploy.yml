@@ -66,3 +66,6 @@ jobs:
             --project-name "${{ env.PAGES_PROJECT_NAME }}"
             --branch "${{ env.DEPLOY_BRANCH }}"
             --commit-hash "${{ steps.deploy_ref.outputs.sha }}"
+
+      - name: Verify production Clerk Frontend API
+        run: node scripts/scan-clerk-production-url.mjs https://autovault.dev/cloud --verify-fapi

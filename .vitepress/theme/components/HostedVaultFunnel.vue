@@ -36,6 +36,7 @@
           cta-label="Create your account"
           signed-in-label="Continue onboarding"
           @click.capture="persistDraft"
+          @signed-in-action="startFlow"
         />
         <button v-else-if="stageFocus.action === 'checkout'" class="hosted-primary" type="button" :disabled="busy" @click="startFlow">
           {{ checkoutStarted ? "Opening Checkout..." : "Open test checkout" }}
@@ -94,11 +95,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import BrandMark from "./BrandMark.vue";
 import ClerkAuthControls from "./ClerkAuthControls.vue";
 import { skills } from "../data/skills";
 import type { GateEvaluation } from "../utils/skillGate";
+import { useClerkApiAuth } from "../utils/clerkApi";
 import { AUTOVAULT_INSTALL_COMMAND } from "../../shared/bootstrap";
 
 const PENDING_DRAFT_KEY = "autovault.hostedVault.pendingDraft";
@@ -143,12 +145,13 @@ const pendingSaved = ref(false);
 const checkoutStarted = ref(false);
 const staticPreview = ref(false);
 const queuedSkillNames = ref<string[]>(skills.filter((skill) => skill.featured).slice(0, 2).map((skill) => skill.name));
+const { authHeaders, isClerkLoaded, isClerkSignedIn, clerkUserLabel, clerkUserSlugSeed } = useClerkApiAuth();
 
 const starterSkills = computed(() => skills.filter((skill) => skill.featured).slice(0, 4));
-const signedIn = computed(() => Boolean(me.value?.user));
+const signedIn = computed(() => Boolean(me.value?.user) || isClerkSignedIn.value);
 const paid = computed(() => Boolean(me.value?.subscription?.active));
 const vault = computed(() => me.value?.vault ?? null);
-const teamSlug = computed(() => vault.value?.slug ?? slugify(me.value?.user?.email || me.value?.user?.name || "your-team"));
+const teamSlug = computed(() => vault.value?.slug ?? slugify(me.value?.user?.email || me.value?.user?.name || clerkUserSlugSeed.value || "your-team"));
 const hostedEndpoint = computed(() => vault.value?.public_url ?? `https://vault.autovault.dev/${teamSlug.value}`);
 const headline = computed(() => props.entry === "playground" ? "Reserve a namespace for this passing skill" : "Reserve a hosted AutoVault namespace");
 const primaryLabel = computed(() => props.entry === "playground" ? "Reserve namespace" : "Start paid onboarding");
@@ -237,13 +240,20 @@ const provisionSteps = computed(() => [
 
 const userLabel = computed(() => {
   const user = me.value?.user;
-  return user?.email || user?.name || "Signed in";
+  return user?.email || user?.name || clerkUserLabel.value || "Signed in";
 });
 
 onMounted(async () => {
   staticPreview.value = canUseBrowser() && window.location.port === "5173";
   await loadMe();
   resumeCheckoutReturn();
+});
+
+watch([isClerkLoaded, isClerkSignedIn], ([loaded]) => {
+  if (!loaded) return;
+  void loadMe().then(() => {
+    resumeCheckoutReturn();
+  });
 });
 
 async function startFlow() {
@@ -326,14 +336,14 @@ async function startCheckout() {
     headers: await authHeaders({ "content-type": "application/json", accept: "application/json" }),
     body: JSON.stringify({ return_to: currentReturnPath(), source: props.entry })
   });
+  const payload = await response.json().catch(() => ({}));
 
   if (response.status === 401) {
-    notice.value = { kind: "warn", text: "Your session expired. Sign in again to resume." };
+    notice.value = { kind: "warn", text: payload.error || "Your session expired. Sign in again to resume." };
     checkoutStarted.value = false;
     return;
   }
 
-  const payload = await response.json().catch(() => ({}));
   if (!response.ok || !payload.url) {
     checkoutStarted.value = false;
     notice.value = { kind: "fail", text: payload.error || "Stripe Checkout is not configured for this environment yet." };
@@ -446,16 +456,5 @@ function slugify(value: string) {
 
 function canUseBrowser() {
   return typeof window !== "undefined";
-}
-
-async function authHeaders(headers: Record<string, string>) {
-  const token = await clerkSessionToken();
-  return token ? { ...headers, authorization: `Bearer ${token}` } : headers;
-}
-
-async function clerkSessionToken() {
-  if (!canUseBrowser()) return null;
-  const clerk = (window as unknown as { Clerk?: { session?: { getToken?: () => Promise<string | null> } } }).Clerk;
-  return await clerk?.session?.getToken?.() ?? null;
 }
 </script>

@@ -168,10 +168,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import HostedVaultFunnel from "./HostedVaultFunnel.vue";
 import { skills } from "../data/skills";
 import { copyText as copyToClipboard } from "../utils/clipboard";
+import { useClerkApiAuth } from "../utils/clerkApi";
 import { AUTOVAULT_INSTALL_COMMAND } from "../../shared/bootstrap";
 
 type CloudUser = { id: string; email?: string | null; name?: string | null; avatar_url?: string | null };
@@ -189,6 +190,7 @@ const simulationMode = ref<SimulationMode>("live");
 const queuedSkillNames = ref<string[]>(skills.filter((skill) => skill.featured).slice(0, 2).map((skill) => skill.name));
 const pendingImportSaved = ref(false);
 const mcpPinged = ref(false);
+const { authHeaders, isClerkLoaded, isClerkSignedIn, clerkUserLabel, clerkUserSlugSeed } = useClerkApiAuth();
 
 const simulationModes: Array<{ id: SimulationMode; label: string; detail: string }> = [
   { id: "live", label: "Live", detail: "/api/me" },
@@ -203,9 +205,10 @@ const dashboardState = computed(() => simulationMode.value === "live" ? cloudSta
 const user = computed(() => dashboardState.value.user);
 const subscription = computed(() => dashboardState.value.subscription);
 const vault = computed(() => dashboardState.value.vault);
-const signedIn = computed(() => Boolean(user.value));
+const liveClerkSignedIn = computed(() => simulationMode.value === "live" && isClerkSignedIn.value);
+const signedIn = computed(() => Boolean(user.value) || liveClerkSignedIn.value);
 const paid = computed(() => Boolean(subscription.value?.active));
-const plannedSlug = computed(() => slugify(user.value?.email || user.value?.name || "your-team"));
+const plannedSlug = computed(() => slugify(user.value?.email || user.value?.name || clerkUserSlugSeed.value || "your-team"));
 const hostedEndpoint = computed(() => vault.value?.public_url ?? `https://vault.autovault.dev/${plannedSlug.value}`);
 const mcpEndpoint = computed(() => `${hostedEndpoint.value}/mcp`);
 const vaultTitle = computed(() => vault.value ? vault.value.slug : `${plannedSlug.value} preview`);
@@ -217,7 +220,7 @@ const pendingImportCopy = computed(() => {
 });
 
 const statusStrip = computed(() => [
-  { label: "Account", value: user.value?.email || user.value?.name || "anonymous", state: signedIn.value ? "done" : "pending" },
+  { label: "Account", value: user.value?.email || user.value?.name || (liveClerkSignedIn.value ? clerkUserLabel.value || "signed in" : "anonymous"), state: signedIn.value ? "done" : "pending" },
   { label: "Billing", value: paid.value ? subscription.value?.status || "active" : signedIn.value ? "checkout needed" : "sign in first", state: paid.value ? "done" : signedIn.value ? "ready" : "pending" },
   { label: "Namespace", value: vault.value ? "reserved" : paid.value ? "ready to reserve" : "planned", state: vault.value ? "done" : paid.value ? "ready" : "pending" },
   { label: "Runtime", value: runtimeState.value, state: "pending" }
@@ -226,7 +229,7 @@ const statusStrip = computed(() => [
 const lifecycle = computed<Array<{ label: string; detail: string; state: StatusState }>>(() => [
   {
     label: "Clerk account",
-    detail: signedIn.value ? user.value?.email || user.value?.name || "Signed in" : "Create or sign in to an AutoVault account.",
+    detail: signedIn.value ? user.value?.email || user.value?.name || clerkUserLabel.value || "Signed in" : "Create or sign in to an AutoVault account.",
     state: signedIn.value ? "done" : "ready"
   },
   {
@@ -272,6 +275,11 @@ const commandBlock = computed(() => [
 ].join("\n"));
 
 onMounted(() => {
+  void loadCloudState();
+});
+
+watch([isClerkLoaded, isClerkSignedIn], ([loaded]) => {
+  if (!loaded || simulationMode.value !== "live") return;
   void loadCloudState();
 });
 
@@ -348,16 +356,5 @@ async function copyText(text: string) {
 function slugify(value: string) {
   const slug = value.split("@")[0].toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   return slug || "your-team";
-}
-
-async function authHeaders(headers: Record<string, string>) {
-  const token = await clerkSessionToken();
-  return token ? { ...headers, authorization: `Bearer ${token}` } : headers;
-}
-
-async function clerkSessionToken() {
-  if (typeof window === "undefined") return null;
-  const clerk = (window as unknown as { Clerk?: { session?: { getToken?: () => Promise<string | null> } } }).Clerk;
-  return await clerk?.session?.getToken?.() ?? null;
 }
 </script>
