@@ -36,11 +36,52 @@ npm run pages:functions:build           # compile Cloudflare Functions
 npm run ci                              # full local check (typecheck + test + functions + docs)
 
 npx wrangler pages deploy .vitepress/dist --project-name autovault-website
-npx wrangler d1 migrations apply autovault-hosted --local   # local D1
-npx wrangler pages dev .vitepress/dist                       # local end-to-end
 ```
 
 `npm run ci` is the gate before opening a PR.
+
+## Local hosted-vault flow (two terminals)
+
+The funnel (Clerk → Stripe Checkout → vault provisioning → pending skills)
+only runs end-to-end under `wrangler pages dev`. `npm run dev` (port 5173)
+is fine for VitePress/CSS work but does **not** execute Pages Functions, so
+`/api/*` 404s there. Use `http://127.0.0.1:8788/cloud` for E2E.
+
+**One-time setup**
+
+```bash
+cp .dev.vars.example .dev.vars       # fill in Clerk + Stripe + price + session secret
+npm run dev:bootstrap                # apply migrations/0001_hosted_vault.sql to local D1
+```
+
+`.dev.vars` is gitignored; `.dev.vars.example` documents every required key.
+Clerk keys can be pulled via `clerk env pull --file .dev.vars`. Stripe values
+come from `stripe config --list` and `stripe listen --print-secret`. The
+webhook secret is stable per Stripe account in test mode — don't re-roll it
+casually; just rerun `stripe listen --print-secret` if `.dev.vars` ever
+drifts.
+
+**Per-session — two terminals**
+
+```bash
+# terminal A — Pages Functions + static site on :8788
+npm run dev:pages
+
+# terminal B — forward live Stripe events to the local webhook
+npm run dev:stripe
+```
+
+For iteration on the funnel UI itself, use `npm run dev:pages:live` instead
+of `dev:pages` — it puts Wrangler in front of the live VitePress dev server,
+so component/CSS edits hot-reload without a rebuild.
+
+**Test-mode helpers**
+
+- Clerk dev sign-ups skip real email by using `<anything>+clerk_test@<anything>`
+  with verification code `424242`.
+- Stripe Checkout accepts card `4242 4242 4242 4242` with any future expiry
+  and any CVC.
+- Reset local DB + KV state: `rm -rf .wrangler/state && npm run dev:bootstrap`.
 
 ## Architecture
 
