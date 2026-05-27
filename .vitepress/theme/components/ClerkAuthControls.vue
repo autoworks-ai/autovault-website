@@ -99,6 +99,7 @@ const hostedPath = clerkBrand.cloudPath;
 const hydrated = ref(false);
 const clerkFailed = ref(false);
 let clerkLoadTimer: number | undefined;
+let clerkReadyInterval: number | undefined;
 const returnPath = computed(() => {
   if (typeof window === "undefined") return "/";
   return `${window.location.pathname}${window.location.search}${window.location.hash || ""}`;
@@ -110,9 +111,11 @@ onMounted(() => {
 
   window.addEventListener("error", handleWindowError);
   window.addEventListener("unhandledrejection", handleUnhandledRejection);
+  markClerkReady();
   clerkLoadTimer = window.setTimeout(() => {
     if (!(window as unknown as { Clerk?: unknown }).Clerk) clerkFailed.value = true;
   }, 8000);
+  clerkReadyInterval = window.setInterval(markClerkReady, 500);
 });
 
 onBeforeUnmount(() => {
@@ -120,6 +123,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("error", handleWindowError);
   window.removeEventListener("unhandledrejection", handleUnhandledRejection);
   if (clerkLoadTimer) window.clearTimeout(clerkLoadTimer);
+  if (clerkReadyInterval) window.clearInterval(clerkReadyInterval);
 });
 
 function handleWindowError(event: ErrorEvent) {
@@ -137,5 +141,12 @@ function handleUnhandledRejection(event: PromiseRejectionEvent) {
 function isClerkLoadFailure(value: unknown) {
   const message = value instanceof Error ? value.message : String(value ?? "");
   return /failed_to_load_clerk|failed to load clerk/i.test(message);
+}
+
+function markClerkReady() {
+  if (!(window as unknown as { Clerk?: unknown }).Clerk) return;
+  clerkFailed.value = false;
+  if (clerkLoadTimer) window.clearTimeout(clerkLoadTimer);
+  if (clerkReadyInterval) window.clearInterval(clerkReadyInterval);
 }
 </script>

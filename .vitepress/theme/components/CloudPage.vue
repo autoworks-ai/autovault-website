@@ -191,6 +191,7 @@ const queuedSkillNames = ref<string[]>(skills.filter((skill) => skill.featured).
 const pendingImportSaved = ref(false);
 const mcpPinged = ref(false);
 const { authHeaders, isClerkLoaded, isClerkSignedIn, clerkUserLabel, clerkUserSlugSeed } = useClerkApiAuth();
+let cloudStateRequestSeq = 0;
 
 const simulationModes: Array<{ id: SimulationMode; label: string; detail: string }> = [
   { id: "live", label: "Live", detail: "/api/me" },
@@ -284,18 +285,21 @@ watch([isClerkLoaded, isClerkSignedIn], ([loaded]) => {
 });
 
 async function loadCloudState() {
+  const requestSeq = ++cloudStateRequestSeq;
   loading.value = true;
   try {
     const response = await fetch("/api/me", { credentials: "include", headers: await authHeaders({ accept: "application/json" }) });
+    if (requestSeq !== cloudStateRequestSeq) return;
     if (!response.ok) {
       cloudState.value = { user: null, subscription: null, vault: null };
       return;
     }
     cloudState.value = normalizeCloudState(await response.json() as CloudStatePayload);
   } catch {
+    if (requestSeq !== cloudStateRequestSeq) return;
     cloudState.value = { user: null, subscription: null, vault: null };
   } finally {
-    loading.value = false;
+    if (requestSeq === cloudStateRequestSeq) loading.value = false;
   }
 }
 

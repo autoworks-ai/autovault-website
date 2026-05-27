@@ -146,6 +146,7 @@ const checkoutStarted = ref(false);
 const staticPreview = ref(false);
 const queuedSkillNames = ref<string[]>(skills.filter((skill) => skill.featured).slice(0, 2).map((skill) => skill.name));
 const { authHeaders, isClerkLoaded, isClerkSignedIn, clerkUserLabel, clerkUserSlugSeed } = useClerkApiAuth();
+let meRequestSeq = 0;
 
 const starterSkills = computed(() => skills.filter((skill) => skill.featured).slice(0, 4));
 const signedIn = computed(() => Boolean(me.value?.user) || isClerkSignedIn.value);
@@ -313,8 +314,10 @@ function hasDraft() {
 }
 
 async function loadMe() {
+  const requestSeq = ++meRequestSeq;
   try {
     const response = await fetch("/api/me", { credentials: "include", headers: await authHeaders({ accept: "application/json" }) });
+    if (requestSeq !== meRequestSeq) return;
     if (!response.ok) {
       me.value = { user: null };
       emit("stateChange", me.value);
@@ -323,6 +326,7 @@ async function loadMe() {
     me.value = await response.json() as MeResponse;
     emit("stateChange", me.value);
   } catch {
+    if (requestSeq !== meRequestSeq) return;
     me.value = { user: null };
     emit("stateChange", me.value);
   }

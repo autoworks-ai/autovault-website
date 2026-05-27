@@ -173,6 +173,26 @@ describe("Clerk production deployment configuration", () => {
     expect(cloudPage).toContain("clerkUserLabel");
     expect(cloudPage).toContain("clerkUserSlugSeed");
   });
+
+  it("prevents stale anonymous Clerk refreshes from overwriting newer signed-in state", () => {
+    const funnel = read(".vitepress/theme/components/HostedVaultFunnel.vue");
+    const cloudPage = read(".vitepress/theme/components/CloudPage.vue");
+
+    expect(funnel).toContain("let meRequestSeq = 0");
+    expect(funnel).toContain("const requestSeq = ++meRequestSeq");
+    expect(funnel).toContain("if (requestSeq !== meRequestSeq) return;");
+    expect(cloudPage).toContain("let cloudStateRequestSeq = 0");
+    expect(cloudPage).toContain("const requestSeq = ++cloudStateRequestSeq");
+    expect(cloudPage).toContain("if (requestSeq !== cloudStateRequestSeq) return;");
+  });
+
+  it("allows the Clerk auth controls to recover after a slow Clerk script load", () => {
+    const controls = read(".vitepress/theme/components/ClerkAuthControls.vue");
+
+    expect(controls).toContain("clerkReadyInterval");
+    expect(controls).toContain("markClerkReady");
+    expect(controls).toContain("clerkFailed.value = false");
+  });
 });
 
 function read(path: string) {
