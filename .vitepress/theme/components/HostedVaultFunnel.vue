@@ -9,8 +9,8 @@
           <div class="mono-label">hosted vault</div>
           <h3>{{ headline }}</h3>
           <p>
-            AutoVault reserves a paid tenant namespace and stores pending onboarding drafts.
-            Cloud sync is not enabled yet; your local CLI remains the source of truth for gated, signed files.
+            Reserve your hosted namespace, stage starter skills, and keep your local CLI as the
+            source of truth for signing and serving.
           </p>
         </div>
       </div>
@@ -194,7 +194,7 @@ const stageFocus = computed(() => {
     return {
       kicker: "Step 3 of 4",
       title: "Reserve your namespace",
-      body: "AutoVault will create the stable hosted URL now. Cloud sync stays disabled until the CLI commands ship.",
+      body: "AutoVault assigns your stable hosted URL and queues your starter skills.",
       action: "reserve",
       state: provisioning.value ? "active" : "ready"
     };
@@ -202,7 +202,7 @@ const stageFocus = computed(() => {
   return {
     kicker: "Step 4 of 4",
     title: "Namespace reserved",
-    body: `${hostedEndpoint.value} is held for this account. Keep using the local CLI for signing and profile sync while hosted sync is in progress.`,
+    body: `${hostedEndpoint.value} is yours. Keep signing and serving with the local CLI — hosted sync ships next.`,
     action: "local",
     state: "done"
   };
@@ -236,7 +236,7 @@ const provisionSteps = computed(() => [
   { label: "Confirm paid access from webhook state", done: paid.value, active: signedIn.value && !paid.value },
   { label: "Reserve tenant namespace", done: Boolean(vault.value), active: provisioning.value },
   { label: "Save pending onboarding import", done: pendingSaved.value, active: Boolean(vault.value) && !pendingSaved.value },
-  { label: "Cloud CLI sync coming soon", done: false, active: Boolean(vault.value) }
+  { label: "Cloud CLI sync coming soon", done: false, active: false }
 ]);
 
 const userLabel = computed(() => {
@@ -383,7 +383,7 @@ async function provisionVault() {
   emit("stateChange", me.value);
   await savePendingImport();
   provisioning.value = false;
-  notice.value = { kind: "ok", text: "Hosted namespace reserved. Cloud sync is not enabled yet; keep signing and serving skills locally for now." };
+  notice.value = { kind: "ok", text: "Hosted namespace reserved. Keep signing and serving skills locally — hosted sync ships next." };
 }
 
 async function savePendingImport() {

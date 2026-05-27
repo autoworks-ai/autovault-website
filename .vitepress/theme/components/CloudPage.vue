@@ -5,7 +5,7 @@
         <div class="eyebrow"><span class="dash" /> Internal cloud prototype</div>
         <h1>Managed vault dashboard.</h1>
         <p class="lede">
-          Reserve a paid hosted AutoVault namespace and inspect the future managed-vault surface. Runtime provisioning and cloud sync are not enabled yet.
+          Claim a paid hosted AutoVault namespace, queue starter skills, and preview the managed-vault surface. Hosted sync ships next; signing and serving stay on the local CLI today.
         </p>
       </div>
       <div class="cloud-status-strip" aria-label="Cloud account status">
