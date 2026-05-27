@@ -204,6 +204,7 @@ jobs:
       - run: npm ci
 
       - name: Deploy production to Cloudflare Pages
+        id: production_deploy
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -215,3 +216,13 @@ jobs:
             --project-name "${{ env.PAGES_PROJECT_NAME }}"
             --branch "${{ env.DEPLOY_BRANCH }}"
             --commit-hash "${{ env.DEPLOY_SHA }}"
+
+      - name: Verify production Clerk Frontend API
+        env:
+          DEPLOYMENT_URL: ${{ steps.production_deploy.outputs['deployment-url'] }}
+        run: |
+          if [ -z "$DEPLOYMENT_URL" ]; then
+            echo "Cloudflare Pages deploy did not return deployment-url." >&2
+            exit 1
+          fi
+          node scripts/scan-clerk-production-url.mjs "${DEPLOYMENT_URL%/}/cloud" --verify-fapi

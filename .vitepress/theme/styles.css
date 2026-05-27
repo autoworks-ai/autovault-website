@@ -423,6 +423,19 @@ body {
   color: var(--accent);
 }
 
+.clerk-auth-unavailable {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  border: 1px solid color-mix(in srgb, var(--warn) 55%, var(--line-2));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+  color: var(--warn);
+  padding: 7px 12px;
+  font: 500 12px var(--sans);
+  white-space: nowrap;
+}
+
 .clerk-auth-controls [data-clerk-user-button] {
   display: inline-flex;
 }

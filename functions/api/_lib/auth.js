@@ -133,23 +133,38 @@ async function getClerkSessionUser(request, env) {
   const secretKey = env.CLERK_SECRET_KEY;
   const publishableKey = clerkPublishableKey(env);
   if (!secretKey || !publishableKey) return null;
+  const hasBearerToken = Boolean(clerkBearerToken(request));
 
   try {
     const client = createClerkClient({ secretKey, publishableKey });
     const requestState = await client.authenticateRequest(request, {
       authorizedParties: authorizedPartiesFor(request, env)
     });
-    if (!requestState.isAuthenticated) return null;
+    if (!requestState.isAuthenticated) {
+      if (hasBearerToken) throw new ApiError(401, "Invalid Clerk session.");
+      return null;
+    }
 
     const auth = requestState.toAuth();
     const clerkUserId = auth?.userId;
-    if (!clerkUserId) return null;
+    if (!clerkUserId) {
+      if (hasBearerToken) throw new ApiError(401, "Invalid Clerk session.");
+      return null;
+    }
 
     const profile = await clerkProfile(client, clerkUserId);
     return upsertUser(env, "clerk", profile);
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (hasBearerToken) throw new ApiError(401, "Invalid Clerk session.");
     return null;
   }
+}
+
+function clerkBearerToken(request) {
+  const authorization = request.headers.get("authorization") || "";
+  const match = authorization.match(/^\s*Bearer\s+(.+?)\s*$/i);
+  return match?.[1] || null;
 }
 
 function clerkModeEnabled(env) {
