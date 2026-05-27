@@ -417,9 +417,10 @@ function resumeCheckoutReturn() {
   }
   if (hosted !== "success") return;
 
-  notice.value = { kind: "warn", text: "Checkout returned. Waiting for Stripe webhook state before reserving the namespace." };
   if (paid.value) {
     void provisionVault();
+  } else {
+    notice.value = { kind: "warn", text: "Checkout returned. Waiting for Stripe webhook state before reserving the namespace." };
   }
 }
 
