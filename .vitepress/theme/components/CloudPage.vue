@@ -14,92 +14,102 @@
       </div>
     </div>
 
-    <div class="cloud-layout">
-      <main class="cloud-main">
-        <section v-if="vault" class="cloud-panel cloud-vault-panel">
-          <div class="cloud-panel-head">
-            <div>
-              <div class="mono-label">vault namespace</div>
-              <h2>{{ vault.slug }}</h2>
-            </div>
-            <span class="cloud-chip reserved">reserved</span>
-          </div>
-          <div class="cloud-endpoint">
-            <span>{{ hostedEndpoint }}</span>
-            <button type="button" @click="copyEndpoint">{{ endpointCopied ? "Copied" : "Copy" }}</button>
-          </div>
-        </section>
+    <div class="cloud-layout" :class="vault ? 'has-vault' : 'pre-vault'">
+      <template v-if="!vault">
+        <main class="cloud-main">
+          <HostedVaultFunnel entry="deploy" @state-change="syncCloudState" />
+        </main>
 
-        <section v-else class="cloud-panel cloud-preview-panel">
-          <div class="cloud-panel-head compact">
-            <div>
-              <div class="mono-label">what subscribing gets you</div>
-              <h2>Reserve your AutoVault namespace</h2>
+        <aside class="cloud-side">
+          <section class="cloud-panel cloud-preview-panel">
+            <div class="cloud-panel-head compact">
+              <div>
+                <div class="mono-label">what subscribing gets you</div>
+                <h2>Reserve your AutoVault namespace</h2>
+              </div>
             </div>
-          </div>
-          <ul class="cloud-preview-list">
-            <li>
-              <strong>A stable hosted URL</strong>
-              <span>Reserve a paid hosted AutoVault namespace at <code>{{ hostedEndpoint }}</code>.</span>
-            </li>
-            <li>
-              <strong>A tenant row in D1</strong>
-              <span>Your team gets its own reserved namespace, ready when hosted sync ships.</span>
-            </li>
-            <li>
-              <strong>Starter-skill drafts</strong>
-              <span>Queue starter skills now; they attach to your vault and import once hosted sync arrives.</span>
-            </li>
-          </ul>
-        </section>
+            <ul class="cloud-preview-list">
+              <li>
+                <strong>A stable hosted URL</strong>
+                <span>Reserve a paid hosted AutoVault namespace at <code>{{ hostedEndpoint }}</code>.</span>
+              </li>
+              <li>
+                <strong>A tenant row in D1</strong>
+                <span>Your team gets its own reserved namespace, ready when hosted sync ships.</span>
+              </li>
+              <li>
+                <strong>Starter-skill drafts</strong>
+                <span>Queue starter skills now; they attach to your vault and import once hosted sync arrives.</span>
+              </li>
+            </ul>
+          </section>
+        </aside>
+      </template>
 
-        <section v-if="vault" class="cloud-grid">
-          <article class="cloud-mini-panel">
-            <div class="cloud-mini-top">
-              <span class="mono-label">starter skills</span>
-              <span class="cloud-chip pending">{{ queuedSkillNames.length }} queued</span>
+      <template v-else>
+        <main class="cloud-main">
+          <section class="cloud-panel cloud-vault-panel">
+            <div class="cloud-panel-head">
+              <div>
+                <div class="mono-label">vault namespace</div>
+                <h2>{{ vault.slug }}</h2>
+              </div>
+              <span class="cloud-chip reserved">reserved</span>
             </div>
-            <h3>Queued starter skills</h3>
-            <p>Toggle starter skills to attach drafts to your vault row. They import once hosted sync ships.</p>
-            <div class="cloud-skill-list">
-              <button
-                v-for="skill in starterSkills"
-                :key="skill.name"
-                type="button"
-                :class="{ queued: queuedSkillNames.includes(skill.name) }"
-                @click="toggleSkill(skill.name)"
-              >
-                <span>{{ queuedSkillNames.includes(skill.name) ? "queued" : "queue" }}</span>
-                <strong>{{ skill.name }}</strong>
-              </button>
+            <div class="cloud-endpoint">
+              <span>{{ hostedEndpoint }}</span>
+              <button type="button" @click="copyEndpoint">{{ endpointCopied ? "Copied" : "Copy" }}</button>
             </div>
-          </article>
+          </section>
 
-          <article class="cloud-mini-panel">
-            <div class="cloud-mini-top">
-              <span class="mono-label">drafts in this vault</span>
-              <span class="cloud-chip pending">coming soon</span>
-            </div>
-            <h3>Pending imports</h3>
-            <p>Drafts attached through the funnel land here and import when hosted sync ships. Until then your local CLI stays the source of truth for signing and serving.</p>
-          </article>
-        </section>
-      </main>
+          <section class="cloud-grid">
+            <article class="cloud-mini-panel">
+              <div class="cloud-mini-top">
+                <span class="mono-label">starter skills</span>
+                <span class="cloud-chip pending">{{ queuedSkillNames.length }} queued</span>
+              </div>
+              <h3>Queued starter skills</h3>
+              <p>Toggle starter skills to attach drafts to your vault row. They import once hosted sync ships.</p>
+              <div class="cloud-skill-list">
+                <button
+                  v-for="skill in starterSkills"
+                  :key="skill.name"
+                  type="button"
+                  :class="{ queued: queuedSkillNames.includes(skill.name) }"
+                  @click="toggleSkill(skill.name)"
+                >
+                  <span>{{ queuedSkillNames.includes(skill.name) ? "queued" : "queue" }}</span>
+                  <strong>{{ skill.name }}</strong>
+                </button>
+              </div>
+            </article>
 
-      <aside class="cloud-side">
-        <HostedVaultFunnel entry="deploy" @state-change="syncCloudState" />
+            <article class="cloud-mini-panel">
+              <div class="cloud-mini-top">
+                <span class="mono-label">drafts in this vault</span>
+                <span class="cloud-chip pending">coming soon</span>
+              </div>
+              <h3>Pending imports</h3>
+              <p>Drafts attached through the funnel land here and import when hosted sync ships. Until then your local CLI stays the source of truth for signing and serving.</p>
+            </article>
+          </section>
+        </main>
 
-        <section v-if="vault" class="cloud-panel cloud-command-panel">
-          <div class="cloud-panel-head compact">
-            <div>
-              <div class="mono-label">local handoff</div>
-              <h2>Copy-safe CLI handoff</h2>
+        <aside class="cloud-side">
+          <HostedVaultFunnel entry="deploy" @state-change="syncCloudState" />
+
+          <section class="cloud-panel cloud-command-panel">
+            <div class="cloud-panel-head compact">
+              <div>
+                <div class="mono-label">local handoff</div>
+                <h2>Copy-safe CLI handoff</h2>
+              </div>
             </div>
-          </div>
-          <pre><code>{{ commandBlock }}</code></pre>
-          <button class="cloud-copy-command" type="button" @click="copyCommands">{{ commandsCopied ? "Copied" : "Copy commands" }}</button>
-        </section>
-      </aside>
+            <pre><code>{{ commandBlock }}</code></pre>
+            <button class="cloud-copy-command" type="button" @click="copyCommands">{{ commandsCopied ? "Copied" : "Copy commands" }}</button>
+          </section>
+        </aside>
+      </template>
     </div>
   </section>
 </template>
