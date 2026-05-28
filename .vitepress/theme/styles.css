@@ -5877,9 +5877,7 @@ body {
   padding: 12px 14px;
 }
 
-.cloud-status-pill span,
-.cloud-vault-meta span,
-.cloud-timeline-row > span:last-child {
+.cloud-status-pill span {
   color: var(--ink-3);
   font-family: var(--mono);
   font-size: 10.5px;
@@ -5903,65 +5901,6 @@ body {
 
 .cloud-status-pill.ready {
   border-color: rgba(252, 196, 96, 0.36);
-}
-
-.cloud-sim-strip {
-  display: grid;
-  grid-template-columns: minmax(260px, 0.42fr) minmax(0, 1fr);
-  gap: 14px;
-  align-items: center;
-  border-bottom: 1px solid var(--line);
-  padding: 16px 0;
-}
-
-.cloud-sim-strip p {
-  margin: 6px 0 0;
-  color: var(--ink-3);
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.cloud-sim-controls {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.cloud-sim-controls button {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--panel);
-  color: var(--ink-2);
-  cursor: pointer;
-  padding: 10px 11px;
-  text-align: left;
-}
-
-.cloud-sim-controls button.active {
-  border-color: rgba(90, 214, 192, 0.48);
-  background: rgba(90, 214, 192, 0.08);
-  color: var(--ink);
-}
-
-.cloud-sim-controls span {
-  overflow: hidden;
-  font-size: 13px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cloud-sim-controls small {
-  overflow: hidden;
-  color: var(--ink-3);
-  font-family: var(--mono);
-  font-size: 10px;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
 }
 
 .cloud-layout {
@@ -6061,9 +6000,7 @@ body {
 }
 
 .cloud-endpoint button,
-.cloud-link-btn,
-.cloud-copy-command,
-.cloud-panel-action {
+.cloud-copy-command {
   border: 1px solid var(--line-2);
   border-radius: 6px;
   background: transparent;
@@ -6076,82 +6013,48 @@ body {
   padding: 7px 10px;
 }
 
-.cloud-link-btn,
-.cloud-copy-command,
-.cloud-panel-action {
+.cloud-copy-command {
   padding: 8px 11px;
 }
 
-.cloud-link-btn:disabled,
-.cloud-panel-action:disabled {
-  cursor: default;
-  opacity: 0.55;
-}
-
-.cloud-vault-meta {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.cloud-vault-meta div {
-  border-top: 1px solid var(--line);
-  padding-top: 12px;
-}
-
-.cloud-vault-meta strong {
-  display: block;
-  margin-top: 6px;
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.cloud-timeline {
-  display: grid;
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.cloud-timeline-row {
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: start;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 12px;
-}
-
-.cloud-timeline-dot {
-  width: 8px;
-  height: 8px;
-  margin-top: 5px;
-  border-radius: 999px;
-  background: var(--ink-4);
-}
-
-.cloud-timeline-row.done .cloud-timeline-dot {
-  background: var(--accent);
-}
-
-.cloud-timeline-row.ready .cloud-timeline-dot {
-  background: var(--warn);
-}
-
-.cloud-timeline-row strong {
-  color: var(--ink);
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.cloud-timeline-row p,
 .cloud-mini-panel p {
   margin: 5px 0 0;
   color: var(--ink-2);
   font-size: 13px;
   line-height: 1.45;
+}
+
+.cloud-preview-list {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cloud-preview-list li {
+  display: grid;
+  gap: 4px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.cloud-preview-list li strong {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.cloud-preview-list li span {
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.cloud-preview-list code {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink);
 }
 
 .cloud-grid {
@@ -6206,38 +6109,6 @@ body {
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.cloud-panel-action {
-  width: 100%;
-  margin-top: 14px;
-}
-
-.cloud-audit-list {
-  display: grid;
-  gap: 8px;
-  margin-top: 14px;
-}
-
-.cloud-audit-list div {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
-  border-top: 1px solid var(--line);
-  padding-top: 8px;
-}
-
-.cloud-audit-list span {
-  color: var(--ink-3);
-  font-family: var(--mono);
-  font-size: 10px;
-}
-
-.cloud-audit-list strong {
-  color: var(--ink-2);
-  font-size: 12px;
-  font-weight: 500;
 }
 
 .cloud-side .hosted-funnel {
@@ -6317,8 +6188,7 @@ body {
   }
 
   .cloud-dashboard-head,
-  .cloud-layout,
-  .cloud-sim-strip {
+  .cloud-layout {
     grid-template-columns: 1fr;
   }
 
@@ -6447,7 +6317,6 @@ body {
   }
 
   .cloud-dashboard-head,
-  .cloud-sim-strip,
   .cloud-layout,
   .cloud-main,
   .cloud-side {
@@ -6464,7 +6333,6 @@ body {
   .about-hero .lede,
   .cloud-hero .lede,
   .cloud-dashboard-head .lede,
-  .cloud-sim-strip p,
   .about-note p,
   .cloud-section-head .sub,
   .about-team-head .sub {
@@ -6474,8 +6342,7 @@ body {
     overflow-wrap: break-word;
   }
 
-  .cloud-dashboard-head .lede,
-  .cloud-sim-strip p {
+  .cloud-dashboard-head .lede {
     max-width: min(310px, calc(100vw - 80px)) !important;
   }
 
@@ -6501,8 +6368,6 @@ body {
   }
 
   .cloud-status-strip,
-  .cloud-sim-controls,
-  .cloud-vault-meta,
   .cloud-grid {
     grid-template-columns: 1fr;
   }
@@ -6511,14 +6376,6 @@ body {
   .cloud-panel-head.compact {
     display: grid;
     grid-template-columns: 1fr;
-  }
-
-  .cloud-timeline-row {
-    grid-template-columns: 14px minmax(0, 1fr);
-  }
-
-  .cloud-timeline-row > span:last-child {
-    grid-column: 2;
   }
 
   .about-note-grid div {
