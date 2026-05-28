@@ -141,12 +141,14 @@ const busy = ref(false);
 const me = ref<MeResponse | null>(null);
 const notice = ref<Notice | null>(null);
 const provisioning = ref(false);
+const reconciling = ref(false);
 const pendingSaved = ref(false);
 const checkoutStarted = ref(false);
 const staticPreview = ref(false);
 const queuedSkillNames = ref<string[]>(skills.filter((skill) => skill.featured).slice(0, 2).map((skill) => skill.name));
 const { authHeaders, isClerkLoaded, isClerkSignedIn, clerkUserLabel, clerkUserSlugSeed } = useClerkApiAuth();
 let meRequestSeq = 0;
+let reconcileAttempted = false;
 
 const starterSkills = computed(() => skills.filter((skill) => skill.featured).slice(0, 4));
 const signedIn = computed(() => Boolean(me.value?.user) || isClerkSignedIn.value);
@@ -247,14 +249,12 @@ const userLabel = computed(() => {
 onMounted(async () => {
   staticPreview.value = canUseBrowser() && window.location.port === "5173";
   await loadMe();
-  resumeCheckoutReturn();
+  await resumeCheckoutReturn();
 });
 
 watch([isClerkLoaded, isClerkSignedIn], ([loaded]) => {
   if (!loaded) return;
-  void loadMe().then(() => {
-    resumeCheckoutReturn();
-  });
+  void loadMe().then(() => resumeCheckoutReturn());
 });
 
 async function startFlow() {
@@ -407,21 +407,74 @@ async function savePendingImport() {
   if (response.ok) pendingSaved.value = true;
 }
 
-function resumeCheckoutReturn() {
+async function resumeCheckoutReturn() {
   if (!canUseBrowser()) return;
   const params = new URLSearchParams(window.location.search);
   const hosted = params.get("hosted");
+  const sessionId = params.get("session_id");
+
   if (hosted === "cancelled") {
     notice.value = { kind: "warn", text: "Checkout was cancelled. The browser draft is still available here." };
+    clearCheckoutReturnParams();
     return;
   }
   if (hosted !== "success") return;
-
-  if (paid.value) {
-    void provisionVault();
-  } else {
-    notice.value = { kind: "warn", text: "Checkout returned. Waiting for Stripe webhook state before reserving the namespace." };
+  if (vault.value) {
+    clearCheckoutReturnParams();
+    return;
   }
+
+  if (!paid.value && sessionId && signedIn.value && !reconcileAttempted && !reconciling.value) {
+    reconcileAttempted = true;
+    await reconcileCheckout(sessionId);
+  }
+
+  if (paid.value && !vault.value) {
+    await provisionVault();
+    clearCheckoutReturnParams();
+  } else if (!paid.value) {
+    notice.value = {
+      kind: "warn",
+      text: "Checkout returned. Waiting for Stripe to confirm your subscription before reserving the namespace."
+    };
+  }
+}
+
+async function reconcileCheckout(sessionId: string) {
+  reconciling.value = true;
+  try {
+    const response = await fetch("/api/billing/reconcile", {
+      method: "POST",
+      credentials: "include",
+      headers: await authHeaders({ "content-type": "application/json", accept: "application/json" }),
+      body: JSON.stringify({ session_id: sessionId })
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      notice.value = {
+        kind: "warn",
+        text: payload.error || "Could not confirm the checkout session yet. Refresh in a moment."
+      };
+      return;
+    }
+    await loadMe();
+  } catch {
+    notice.value = {
+      kind: "warn",
+      text: "Could not reach the reconcile endpoint. Refresh in a moment."
+    };
+  } finally {
+    reconciling.value = false;
+  }
+}
+
+function clearCheckoutReturnParams() {
+  if (!canUseBrowser()) return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("hosted") && !url.searchParams.has("session_id")) return;
+  url.searchParams.delete("hosted");
+  url.searchParams.delete("session_id");
+  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
 function currentReturnPath() {

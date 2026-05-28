@@ -67,13 +67,7 @@ export async function handleStripeEvent(env, event) {
     const userId = session?.client_reference_id || session?.metadata?.user_id;
     if (!userId || !session?.customer) return { stored: false };
 
-    await run(env, `
-      insert into customers (user_id, stripe_customer_id, created_at, updated_at)
-      values (?, ?, ?, ?)
-      on conflict(user_id) do update set
-        stripe_customer_id = excluded.stripe_customer_id,
-        updated_at = excluded.updated_at
-    `, userId, asId(session.customer), nowIso(), nowIso());
+    await upsertCustomer(env, { userId, customerId: asId(session.customer) });
     return { stored: true };
   }
 
@@ -82,22 +76,69 @@ export async function handleStripeEvent(env, event) {
     const userId = subscription?.metadata?.user_id || await userIdForCustomer(env, asId(subscription?.customer));
     if (!userId || !subscription?.id) return { stored: false };
 
-    await run(env, `
-      insert into subscriptions (user_id, stripe_subscription_id, stripe_customer_id, status, price_id, current_period_end, created_at, updated_at)
-      values (?, ?, ?, ?, ?, ?, ?, ?)
-      on conflict(user_id) do update set
-        stripe_subscription_id = excluded.stripe_subscription_id,
-        stripe_customer_id = excluded.stripe_customer_id,
-        status = excluded.status,
-        price_id = excluded.price_id,
-        current_period_end = excluded.current_period_end,
-        updated_at = excluded.updated_at
-    `, userId, subscription.id, asId(subscription.customer), subscription.status, priceIdForSubscription(subscription), subscription.current_period_end || null, nowIso(), nowIso());
+    await upsertSubscription(env, {
+      userId,
+      subscriptionId: subscription.id,
+      customerId: asId(subscription.customer),
+      status: subscription.status,
+      priceId: priceIdForSubscription(subscription),
+      currentPeriodEnd: subscription.current_period_end || null
+    });
     return { stored: true };
   }
 
   return { stored: false };
 }
+
+export async function upsertCustomer(env, { userId, customerId }) {
+  if (!userId || !customerId) return false;
+  await run(env, `
+    insert into customers (user_id, stripe_customer_id, created_at, updated_at)
+    values (?, ?, ?, ?)
+    on conflict(user_id) do update set
+      stripe_customer_id = excluded.stripe_customer_id,
+      updated_at = excluded.updated_at
+  `, userId, customerId, nowIso(), nowIso());
+  return true;
+}
+
+export async function upsertSubscription(env, { userId, subscriptionId, customerId, status, priceId, currentPeriodEnd }) {
+  if (!userId || !subscriptionId) return false;
+  await run(env, `
+    insert into subscriptions (user_id, stripe_subscription_id, stripe_customer_id, status, price_id, current_period_end, created_at, updated_at)
+    values (?, ?, ?, ?, ?, ?, ?, ?)
+    on conflict(user_id) do update set
+      stripe_subscription_id = excluded.stripe_subscription_id,
+      stripe_customer_id = excluded.stripe_customer_id,
+      status = excluded.status,
+      price_id = excluded.price_id,
+      current_period_end = excluded.current_period_end,
+      updated_at = excluded.updated_at
+  `, userId, subscriptionId, customerId || null, status || null, priceId || null, currentPeriodEnd || null, nowIso(), nowIso());
+  return true;
+}
+
+export async function retrieveCheckoutSession(env, sessionId, fetcher = fetch) {
+  if (!env.STRIPE_SECRET_KEY) throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
+  if (!sessionId) throw new ApiError(400, "session_id is required.");
+
+  const url = new URL(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`);
+  url.searchParams.append("expand[]", "subscription");
+  url.searchParams.append("expand[]", "customer");
+
+  const response = await fetcher(url.toString(), {
+    method: "GET",
+    headers: {
+      authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+      "stripe-version": STRIPE_API_VERSION
+    }
+  });
+  const payload = await response.json();
+  if (!response.ok) throw new ApiError(response.status === 404 ? 404 : 502, payload.error?.message || "Stripe session lookup failed.");
+  return payload;
+}
+
+export { asId, priceIdForSubscription };
 
 function applyBranding(params, env) {
   params.set("branding_settings[display_name]", env.STRIPE_BRAND_DISPLAY_NAME || "AutoVault");
