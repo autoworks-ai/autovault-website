@@ -1,6 +1,6 @@
 <template>
   <section class="hosted-funnel" :data-entry="entry">
-    <div class="hosted-funnel-head">
+    <div v-if="!vault" class="hosted-funnel-head">
       <div class="hosted-heading">
         <span class="hosted-vault-lock" :class="`is-${hostedVaultPhase}`">
           <BrandMark :size="34" :state="hostedVaultState" show-depth />
@@ -158,7 +158,7 @@ const teamSlug = computed(() => vault.value?.slug ?? slugify(me.value?.user?.ema
 const hostedEndpoint = computed(() => vault.value?.public_url ?? `https://vault.autovault.dev/${teamSlug.value}`);
 const headline = computed(() => props.entry === "playground" ? "Reserve a namespace for this passing skill" : "Reserve a hosted AutoVault namespace");
 const primaryLabel = computed(() => props.entry === "playground" ? "Reserve namespace" : "Start paid onboarding");
-const showSetupDetails = computed(() => signedIn.value || paid.value || Boolean(vault.value) || props.entry === "playground");
+const showSetupDetails = computed(() => !vault.value && (signedIn.value || paid.value || props.entry === "playground"));
 const showLocalHandoff = computed(() => signedIn.value || Boolean(vault.value));
 const namespaceStatusLabel = computed(() => vault.value ? "Hosted namespace reserved:" : "Planned namespace:");
 const hostedVaultState = computed<"locked" | "unlocked">(() => (vault.value || provisioning.value ? "unlocked" : "locked"));
@@ -431,13 +431,14 @@ async function resumeCheckoutReturn() {
 
   if (paid.value && !vault.value) {
     await provisionVault();
-    clearCheckoutReturnParams();
   } else if (!paid.value) {
     notice.value = {
       kind: "warn",
       text: "Checkout returned. Waiting for Stripe to confirm your subscription before reserving the namespace."
     };
   }
+
+  if (vault.value) clearCheckoutReturnParams();
 }
 
 async function reconcileCheckout(sessionId: string) {
