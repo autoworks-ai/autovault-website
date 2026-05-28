@@ -97,17 +97,6 @@
 
         <aside class="cloud-side">
           <HostedVaultFunnel entry="deploy" @state-change="syncCloudState" />
-
-          <section class="cloud-panel cloud-command-panel">
-            <div class="cloud-panel-head compact">
-              <div>
-                <div class="mono-label">local handoff</div>
-                <h2>Copy-safe CLI handoff</h2>
-              </div>
-            </div>
-            <pre><code>{{ commandBlock }}</code></pre>
-            <button class="cloud-copy-command" type="button" @click="copyCommands">{{ commandsCopied ? "Copied" : "Copy commands" }}</button>
-          </section>
         </aside>
       </template>
     </div>
@@ -120,7 +109,6 @@ import HostedVaultFunnel from "./HostedVaultFunnel.vue";
 import { skills } from "../data/skills";
 import { copyText as copyToClipboard } from "../utils/clipboard";
 import { useClerkApiAuth } from "../utils/clerkApi";
-import { AUTOVAULT_INSTALL_COMMAND } from "../../shared/bootstrap";
 
 type CloudUser = { id: string; email?: string | null; name?: string | null; avatar_url?: string | null };
 type CloudSubscription = { active: boolean; status?: string | null } | null;
@@ -131,7 +119,6 @@ type StatusState = "done" | "ready" | "pending";
 
 const cloudState = ref<CloudState>({ user: null, subscription: null, vault: null });
 const endpointCopied = ref(false);
-const commandsCopied = ref(false);
 const queuedSkillNames = ref<string[]>(skills.filter((skill) => skill.featured).slice(0, 2).map((skill) => skill.name));
 const { authHeaders, isClerkLoaded, isClerkSignedIn, clerkUserLabel, clerkUserSlugSeed } = useClerkApiAuth();
 let cloudStateRequestSeq = 0;
@@ -169,16 +156,6 @@ const statusStrip = computed<Array<{ label: string; value: string; state: Status
     state: vault.value ? "done" : paid.value ? "ready" : "pending"
   }
 ]);
-
-const commandBlock = computed(() => [
-  AUTOVAULT_INSTALL_COMMAND,
-  ". \"$HOME/.autovault/env\"",
-  "autovault skill list",
-  "",
-  `# Reserved namespace: ${hostedEndpoint.value}`,
-  "# Cloud sync is not enabled yet.",
-  "# Keep signing and serving skills from the local AutoVault CLI."
-].join("\n"));
 
 onMounted(() => {
   void loadCloudState();
@@ -222,14 +199,6 @@ async function copyEndpoint() {
   endpointCopied.value = true;
   setTimeout(() => {
     endpointCopied.value = false;
-  }, 1600);
-}
-
-async function copyCommands() {
-  await copyToClipboard(commandBlock.value);
-  commandsCopied.value = true;
-  setTimeout(() => {
-    commandsCopied.value = false;
   }, 1600);
 }
 

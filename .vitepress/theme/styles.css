@@ -5999,22 +5999,14 @@ body {
   white-space: nowrap;
 }
 
-.cloud-endpoint button,
-.cloud-copy-command {
+.cloud-endpoint button {
   border: 1px solid var(--line-2);
   border-radius: 6px;
   background: transparent;
   color: var(--ink-2);
   cursor: pointer;
   font-size: 12px;
-}
-
-.cloud-endpoint button {
   padding: 7px 10px;
-}
-
-.cloud-copy-command {
-  padding: 8px 11px;
 }
 
 .cloud-mini-panel p {
@@ -6114,24 +6106,6 @@ body {
 .cloud-main > .hosted-funnel,
 .cloud-side .hosted-funnel {
   margin: 0;
-}
-
-.cloud-command-panel pre {
-  margin: 14px 0 0;
-  overflow-x: auto;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: #080c10;
-  padding: 14px;
-  color: var(--ink);
-  font-family: var(--mono);
-  font-size: 12px;
-  line-height: 1.7;
-}
-
-.cloud-copy-command {
-  width: 100%;
-  margin-top: 10px;
 }
 
 @media (max-width: 1120px) {
