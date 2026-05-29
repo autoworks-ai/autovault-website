@@ -82,9 +82,8 @@
               Point your machine at the reserved namespace. This is what works today — everything
               else unlocks as you go.
             </p>
-            <div class="cv-cmd">
-              <pre><code>{{ linkCommands }}</code></pre>
-              <button type="button" class="cv-cmd-copy" @click="copyCommands">{{ commandsCopied ? "Copied" : "Copy" }}</button>
+            <div class="cv-connect-terminal">
+              <ConnectTerminal :slug="vaultSlug" />
             </div>
             <div class="cv-focal-actions">
               <button type="button" class="cv-btn" :disabled="busy" @click="markProgress('cli_linked')">
@@ -191,12 +190,55 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, defineComponent, h, nextTick, onMounted, ref, watch } from "vue";
 import HostedVaultFunnel from "./HostedVaultFunnel.vue";
 import BrandMark from "./BrandMark.vue";
 import { copyText as copyToClipboard } from "../utils/clipboard";
 import { useClerkApiAuth } from "../utils/clerkApi";
+import { useTerminalReplay, type TerminalReplayLine } from "../composables/useTerminalReplay";
 import { AUTOVAULT_INSTALL_COMMAND } from "../../shared/bootstrap";
+
+const ConnectTerminal = defineComponent({
+  props: {
+    slug: { type: String, required: true }
+  },
+  setup(props) {
+    const bodyRef = ref<HTMLElement | null>(null);
+    const copied = ref(false);
+    const lines = computed<TerminalReplayLine[]>(() => [
+      { type: "cmd", text: AUTOVAULT_INSTALL_COMMAND },
+      { type: "out", text: "↳ downloading autovault-installer" },
+      { type: "ok", text: "✓ signature ok" },
+      { type: "cmd", text: '. "$HOME/.autovault/env"' },
+      { type: "cmd", text: `autovault link ${props.slug}` },
+      { type: "out", text: "↳ verifying local environment" },
+      { type: "ok", text: "✓ namespace linked successfully" }
+    ]);
+    const replay = useTerminalReplay(lines.value, { autoStart: true, scrollTarget: () => bodyRef.value });
+
+    async function handleCopy() {
+      await copyToClipboard([
+        AUTOVAULT_INSTALL_COMMAND,
+        '. "$HOME/.autovault/env"',
+        `autovault link ${props.slug}`
+      ].join("\n"));
+      copied.value = true;
+      setTimeout(() => (copied.value = false), 1600);
+    }
+
+    return () => h("div", { class: "cv-terminal-wrapper" }, [
+      h("div", { class: "terminal-body cv-terminal-body", ref: bodyRef }, [
+        ...replay.visibleLines.value.map((line, index) => 
+          line.type === "cmd" 
+            ? h("div", { class: "line terminal-line", key: index }, [h("span", { class: "pmt cv-pmt" }, "$ "), h("span", line.text)]) 
+            : h("div", { class: line.type, key: index }, line.text)
+        ),
+        !replay.complete.value ? h("span", { class: "cur cursor cv-cur" }) : null
+      ]),
+      h("button", { class: "cv-cmd-copy", type: "button", onClick: handleCopy }, copied.value ? "Copied" : "Copy")
+    ]);
+  }
+});
 
 type CloudUser = { id: string; email?: string | null; name?: string | null; avatar_url?: string | null };
 type CloudSubscription = { active: boolean; status?: string | null } | null;
@@ -227,7 +269,6 @@ const cloudState = ref<CloudState>({ user: null, subscription: null, vault: null
 const hydrated = ref(false);
 const busy = ref(false);
 const notice = ref<{ kind: "ok" | "warn"; text: string } | null>(null);
-const commandsCopied = ref(false);
 const focusedCard = ref<"preview" | "billing" | null>(null);
 const previewCard = ref<HTMLElement | null>(null);
 const billingCard = ref<HTMLElement | null>(null);
@@ -269,9 +310,6 @@ const setupLede = computed(() =>
     : "Create your account, reserve a stable namespace, and keep your local CLI as the source of truth. Hosted sync ships next."
 );
 
-const linkCommands = computed(() =>
-  [AUTOVAULT_INSTALL_COMMAND, '. "$HOME/.autovault/env"', `autovault link ${vaultSlug.value}`].join("\n")
-);
 const installDocsHref = "/quick-start#install";
 
 const earlyAccessDate = computed(() => formatDate(vault.value?.early_access_at));
@@ -394,12 +432,6 @@ async function focusCard(name: "preview" | "billing", el: HTMLElement | null) {
   setTimeout(() => {
     if (focusedCard.value === name) focusedCard.value = null;
   }, 1400);
-}
-
-async function copyCommands() {
-  await copyToClipboard(linkCommands.value);
-  commandsCopied.value = true;
-  setTimeout(() => (commandsCopied.value = false), 1600);
 }
 
 function revealDelay(index: number) {
@@ -571,13 +603,14 @@ const ICON = {
 .cv-focal h2 { margin: 6px 0 6px; font-size: 22px; font-weight: 500; letter-spacing: -0.02em; }
 .cv-focal-body { margin: 0 0 16px; color: var(--ink-2); font-size: 14px; line-height: 1.55; max-width: 520px; }
 
-.cv-cmd { position: relative; }
-.cv-cmd pre {
+.cv-terminal-wrapper { position: relative; }
+.cv-terminal-body {
   margin: 0; padding: 14px 16px; overflow-x: auto;
   border: 1px solid var(--line-2); border-radius: var(--cv-radius-sm);
   background: #0a0f13;
+  min-height: auto; max-height: none;
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.7; color: var(--ink); white-space: pre;
 }
-.cv-cmd code { font-family: var(--mono); font-size: 12.5px; line-height: 1.7; color: var(--ink); white-space: pre; }
 .cv-cmd-copy {
   position: absolute; top: 10px; right: 10px;
   border: 1px solid var(--line-2); border-radius: 6px;

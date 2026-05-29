@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import BrandMark from "./BrandMark.vue";
 import UiIcon from "./UiIcon.vue";
+import ClerkAuthControls from "./ClerkAuthControls.vue";
 import { PRODUCT_VERSION } from "../data/product";
 import { searchResults } from "../data/searchResults";
 
@@ -97,6 +98,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="av-topbar-right">
+        <ClerkAuthControls variant="topbar" ctaLabel="Sign in" />
         <a class="av-icon-btn" href="https://github.com/autoworks-ai/autovault" title="GitHub"><UiIcon name="github" /></a>
       </div>
     </div>
