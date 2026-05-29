@@ -171,7 +171,10 @@ describe("Clerk production deployment configuration", () => {
     expect(funnel).toContain("clerkUserLabel");
     expect(funnel).toContain("clerkUserSlugSeed");
     expect(cloudPage).toContain("clerkUserLabel");
-    expect(cloudPage).toContain("clerkUserSlugSeed");
+    // The redesigned dashboard derives its namespace from the provisioned vault row,
+    // so slug-seed fallback now lives in the funnel; CloudPage still reflects the live
+    // Clerk identity reactively via isClerkSignedIn.
+    expect(cloudPage).toContain("isClerkSignedIn");
   });
 
   it("prevents stale anonymous Clerk refreshes from overwriting newer signed-in state", () => {

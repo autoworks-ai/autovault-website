@@ -11,3 +11,4 @@ coverage/
 wrangler.json
 .DS_Store
 /.claude
+.superpowers/

@@ -14,10 +14,36 @@ export async function getSubscription(env, userId) {
 
 export async function getCurrentVault(env, userId) {
   return first(env, `
-    select id, user_id, slug, status, public_url, created_at, provisioned_at
+    select id, user_id, slug, status, public_url, created_at, provisioned_at, cli_linked_at, early_access_at
     from vaults
     where user_id = ?
   `, userId);
+}
+
+// Onboarding steps the dashboard can mark complete, mapped to their vault
+// timestamp columns. Values come from this fixed allowlist only — never from
+// request input — so interpolating the column name into SQL below is safe.
+const VAULT_PROGRESS_COLUMNS = {
+  cli_linked: "cli_linked_at",
+  early_access: "early_access_at"
+};
+
+export async function markVaultProgress(env, user, step) {
+  const column = VAULT_PROGRESS_COLUMNS[step];
+  if (!column) throw new ApiError(400, "Unknown onboarding step.");
+
+  const vault = await getCurrentVault(env, user.id);
+  if (!vault) throw new ApiError(409, "Reserve a hosted vault before recording onboarding progress.");
+
+  // Idempotent: only stamp the first time. The `is null` guard also keeps
+  // concurrent requests from clobbering an existing timestamp.
+  if (!vault[column]) {
+    const at = nowIso();
+    await run(env, `update vaults set ${column} = ? where user_id = ? and ${column} is null`, at, user.id);
+    vault[column] = at;
+  }
+
+  return vault;
 }
 
 export async function provisionVault(env, user) {
@@ -35,7 +61,9 @@ export async function provisionVault(env, user) {
     status: "reserved",
     public_url: `https://vault.autovault.dev/${slug}`,
     created_at: nowIso(),
-    provisioned_at: nowIso()
+    provisioned_at: nowIso(),
+    cli_linked_at: null,
+    early_access_at: null
   };
 
   await run(env, `

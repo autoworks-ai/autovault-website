@@ -140,9 +140,9 @@ describe("v1 content guardrails", () => {
     ].map(read).join("\n");
 
     expect(hostedCopy).toContain("Cloud sync is not enabled yet");
-    expect(hostedCopy).toContain("Reserve a paid hosted AutoVault namespace");
+    expect(hostedCopy).toContain("Reserve a hosted AutoVault namespace");
     expect(hostedCopy).toContain("Hosted vault");
-    expect(hostedCopy).toContain("Reserve your AutoVault namespace");
+    expect(hostedCopy).toContain("Reserve a stable hosted URL");
     expect(hostedCopy).toContain("hosted sync ships");
     expect(hostedCopy).toContain("coming soon");
     expect(hostedCopy).toContain("reserved");

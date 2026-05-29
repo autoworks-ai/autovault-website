@@ -1,6 +1,6 @@
 <template>
-  <section class="hosted-funnel" :data-entry="entry">
-    <div v-if="!vault" class="hosted-funnel-head">
+  <section class="hosted-funnel" :class="{ 'is-provisioned': vault }" :data-entry="entry">
+    <div v-if="!vault && entry === 'playground'" class="hosted-funnel-head">
       <div class="hosted-heading">
         <span class="hosted-vault-lock" :class="`is-${hostedVaultPhase}`">
           <BrandMark :size="34" :state="hostedVaultState" show-depth />
@@ -14,9 +14,6 @@
           </p>
         </div>
       </div>
-      <button class="hosted-primary" type="button" :disabled="busy" @click="startFlow">
-        {{ busy ? "Working..." : primaryLabel }}
-      </button>
     </div>
 
     <div v-if="staticPreview" class="hosted-notice warn">
@@ -25,7 +22,7 @@
 
     <div v-if="notice" class="hosted-notice" :class="notice.kind">{{ notice.text }}</div>
 
-    <div class="hosted-stage-card" :class="stageFocus.state">
+    <div v-if="!vault" class="hosted-stage-card" :class="stageFocus.state">
       <div class="hosted-stage-kicker">{{ stageFocus.kicker }}</div>
       <h4>{{ stageFocus.title }}</h4>
       <p>{{ stageFocus.body }}</p>
@@ -47,7 +44,7 @@
       </div>
     </div>
 
-    <div class="hosted-flow hosted-flow--compact" aria-label="Hosted onboarding steps">
+    <div v-if="!vault" class="hosted-flow hosted-flow--compact" aria-label="Hosted onboarding steps">
       <div v-for="(item, index) in flowItems" :key="item.label" class="hosted-flow-item" :class="item.state" :style="{ '--step-index': index }">
         <span class="hosted-dot" />
         <span class="hosted-flow-copy">
@@ -83,7 +80,7 @@
     </div>
 
     <div v-if="showLocalHandoff" class="hosted-command-card">
-      <div class="panel-title">Local handoff</div>
+      <div class="panel-title">{{ vault ? "Get started on the local CLI" : "Local handoff" }}</div>
       <pre><code>{{ commandBlock }}</code></pre>
       <div class="hosted-copy-row">
         <button type="button" @click="copyCommands">Copy local commands</button>
@@ -109,7 +106,7 @@ type Notice = { kind: "ok" | "warn" | "fail"; text: string };
 type MeResponse = {
   user: { id: string; email?: string | null; name?: string | null; avatar_url?: string | null } | null;
   subscription?: { active: boolean; status?: string | null } | null;
-  vault?: { id?: string; slug: string; status: string; public_url: string } | null;
+  vault?: { id?: string; slug: string; status: string; public_url: string; cli_linked_at?: string | null; early_access_at?: string | null } | null;
 };
 
 type PendingDraft = {
@@ -157,7 +154,6 @@ const vault = computed(() => me.value?.vault ?? null);
 const teamSlug = computed(() => vault.value?.slug ?? slugify(me.value?.user?.email || me.value?.user?.name || clerkUserSlugSeed.value || "your-team"));
 const hostedEndpoint = computed(() => vault.value?.public_url ?? `https://vault.autovault.dev/${teamSlug.value}`);
 const headline = computed(() => props.entry === "playground" ? "Reserve a namespace for this passing skill" : "Reserve a hosted AutoVault namespace");
-const primaryLabel = computed(() => props.entry === "playground" ? "Reserve namespace" : "Start paid onboarding");
 const showSetupDetails = computed(() => !vault.value && (signedIn.value || paid.value || props.entry === "playground"));
 const showLocalHandoff = computed(() => signedIn.value || Boolean(vault.value));
 const namespaceStatusLabel = computed(() => vault.value ? "Hosted namespace reserved:" : "Planned namespace:");
@@ -358,32 +354,34 @@ async function startCheckout() {
 }
 
 async function provisionVault() {
+  if (provisioning.value) return;
   provisioning.value = true;
-  const response = await fetch("/api/vaults/provision", {
-    method: "POST",
-    credentials: "include",
-    headers: await authHeaders({ "content-type": "application/json", accept: "application/json" }),
-    body: JSON.stringify({ queued_skills: queuedSkillNames.value })
-  });
-  const payload = await response.json().catch(() => ({}));
+  try {
+    const response = await fetch("/api/vaults/provision", {
+      method: "POST",
+      credentials: "include",
+      headers: await authHeaders({ "content-type": "application/json", accept: "application/json" }),
+      body: JSON.stringify({ queued_skills: queuedSkillNames.value })
+    });
+    const payload = await response.json().catch(() => ({}));
 
-  if (response.status === 402) {
-    notice.value = { kind: "warn", text: "Checkout completed, but the Stripe webhook has not marked the subscription active yet. Refresh in a moment." };
+    if (response.status === 402) {
+      notice.value = { kind: "warn", text: "Checkout completed, but the Stripe webhook has not marked the subscription active yet. Refresh in a moment." };
+      return;
+    }
+
+    if (!response.ok || !payload.vault) {
+      notice.value = { kind: "fail", text: payload.error || "Could not provision the hosted namespace." };
+      return;
+    }
+
+    me.value = { ...(me.value ?? { user: null }), vault: payload.vault };
+    emit("stateChange", me.value);
+    await savePendingImport();
+    notice.value = { kind: "ok", text: "Hosted namespace reserved. Keep signing and serving skills locally — hosted sync ships next." };
+  } finally {
     provisioning.value = false;
-    return;
   }
-
-  if (!response.ok || !payload.vault) {
-    notice.value = { kind: "fail", text: payload.error || "Could not provision the hosted namespace." };
-    provisioning.value = false;
-    return;
-  }
-
-  me.value = { ...(me.value ?? { user: null }), vault: payload.vault };
-  emit("stateChange", me.value);
-  await savePendingImport();
-  provisioning.value = false;
-  notice.value = { kind: "ok", text: "Hosted namespace reserved. Keep signing and serving skills locally — hosted sync ships next." };
 }
 
 async function savePendingImport() {
