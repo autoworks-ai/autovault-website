@@ -17,8 +17,11 @@ export async function onRequestPost({ request, env }) {
     if (!sessionId) return apiError(400, "session_id is required.");
 
     const session = await retrieveCheckoutSession(env, sessionId);
+    // Sessions created by this app always carry the owner's id, so treat a
+    // missing identifier the same as a mismatch — an unbound or leaked session
+    // ID must not be claimable by the current account (fail closed).
     const sessionUserId = session.client_reference_id || session.metadata?.user_id || null;
-    if (sessionUserId && sessionUserId !== user.id) {
+    if (sessionUserId !== user.id) {
       return apiError(403, "Checkout session does not belong to current user.");
     }
 

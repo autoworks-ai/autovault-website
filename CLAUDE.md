@@ -51,7 +51,7 @@ is fine for VitePress/CSS work but does **not** execute Pages Functions, so
 
 ```bash
 cp .dev.vars.example .dev.vars       # fill in Clerk + Stripe + price + session secret
-npm run dev:bootstrap                # apply migrations/0001_hosted_vault.sql to local D1
+npm run dev:bootstrap                # apply all pending D1 migrations to local D1
 ```
 
 `.dev.vars` is gitignored; `.dev.vars.example` documents every required key.

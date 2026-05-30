@@ -35,12 +35,13 @@ export async function markVaultProgress(env, user, step) {
   const vault = await getCurrentVault(env, user.id);
   if (!vault) throw new ApiError(409, "Reserve a hosted vault before recording onboarding progress.");
 
-  // Idempotent: only stamp the first time. The `is null` guard also keeps
-  // concurrent requests from clobbering an existing timestamp.
+  // Idempotent: only the first request stamps the column. The `is null` guard
+  // keeps concurrent requests from clobbering an existing timestamp.
   if (!vault[column]) {
-    const at = nowIso();
-    await run(env, `update vaults set ${column} = ? where user_id = ? and ${column} is null`, at, user.id);
-    vault[column] = at;
+    await run(env, `update vaults set ${column} = ? where user_id = ? and ${column} is null`, nowIso(), user.id);
+    // Re-read so the response reflects the actually-persisted timestamp, even if
+    // a concurrent request won the guarded update with a different value.
+    return (await getCurrentVault(env, user.id)) ?? vault;
   }
 
   return vault;

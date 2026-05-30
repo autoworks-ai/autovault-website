@@ -57,7 +57,7 @@ honest and simple; the provision/sync API can auto-detect later.
 - **`migrations/0002_vault_progress.sql`** — `alter table vaults add column
   cli_linked_at text` + `early_access_at text` (both nullable).
 - **`_lib/vault.js`** — `getCurrentVault` select includes the two columns;
-  new idempotent `markVaultProgress(env, user, { step })` (step ∈
+  new idempotent `markVaultProgress(env, user, step)` (step ∈
   `cli_linked` | `early_access`) that only sets a timestamp if currently null,
   returns the updated vault.
 - **`functions/api/vaults/current/progress.js`** (POST) — requires user +
