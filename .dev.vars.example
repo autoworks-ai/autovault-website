@@ -8,6 +8,15 @@
 # Clerk dev instance keys.
 #   Get them with:    clerk env pull --file .dev.vars
 #   …or copy from .env.local if already populated.
+#
+#   IMPORTANT — these two keys load through different channels:
+#     • CLERK_SECRET_KEY is a Functions runtime secret; `wrangler pages dev`
+#       reads it from .dev.vars (here).
+#     • VITE_CLERK_PUBLISHABLE_KEY is a BUILD-TIME Vite var. The VitePress
+#       build/dev server (docs:build, docs:dev — used by dev:pages and
+#       dev:pages:live) reads VITE_* from .env.local or the shell, NOT from
+#       .dev.vars. Mirror it into .env.local (or export it) too, or the local
+#       frontend builds without the Clerk plugin and auth never loads.
 CLERK_SECRET_KEY=sk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
