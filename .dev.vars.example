@@ -1,0 +1,39 @@
+# Template for .dev.vars — local-only secrets that wrangler pages dev loads
+# into Cloudflare Pages Functions. Copy to .dev.vars and fill in real values.
+#
+#   cp .dev.vars.example .dev.vars
+#
+# .dev.vars is gitignored. Strict test mode — no sk_live_*, no pk_live_*.
+
+# Clerk dev instance keys.
+#   Get them with:    clerk env pull --file .dev.vars
+#   …or copy from .env.local if already populated.
+#
+#   IMPORTANT — these two keys load through different channels:
+#     • CLERK_SECRET_KEY is a Functions runtime secret; `wrangler pages dev`
+#       reads it from .dev.vars (here).
+#     • VITE_CLERK_PUBLISHABLE_KEY is a BUILD-TIME Vite var. The VitePress
+#       build/dev server (docs:build, docs:dev — used by dev:pages and
+#       dev:pages:live) reads VITE_* from .env.local or the shell, NOT from
+#       .dev.vars. Mirror it into .env.local (or export it) too, or the local
+#       frontend builds without the Clerk plugin and auth never loads.
+CLERK_SECRET_KEY=sk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Stripe test mode keys.
+#   STRIPE_SECRET_KEY:      copy from `stripe config --list` (test_mode_api_key).
+#   STRIPE_WEBHOOK_SECRET:  capture from `stripe listen --print-secret`.
+#                           Stable per Stripe account in test mode — only changes
+#                           on CLI upgrade or explicit re-roll.
+#   AUTOVAULT_HOSTED_PRICE_ID: id of a recurring price on the AutoVault Hosted
+#                              product (test mode). Create with:
+#                                stripe products create --name "AutoVault Hosted (test)"
+#                                stripe prices create --product <id> --currency usd \
+#                                  --unit-amount 1500 --recurring interval=month
+STRIPE_SECRET_KEY=sk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+AUTOVAULT_HOSTED_PRICE_ID=price_xxxxxxxxxxxxxxxxxxxxxxxx
+
+# HMAC for the legacy session cookie path in functions/api/_lib/auth.js.
+# Generate one with:  openssl rand -hex 32
+SESSION_SECRET=replace_with_32_byte_hex

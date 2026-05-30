@@ -1,6 +1,6 @@
 <template>
-  <section class="hosted-funnel" :data-entry="entry">
-    <div class="hosted-funnel-head">
+  <section class="hosted-funnel" :class="{ 'is-provisioned': vault }" :data-entry="entry">
+    <div v-if="!vault && entry === 'playground'" class="hosted-funnel-head">
       <div class="hosted-heading">
         <span class="hosted-vault-lock" :class="`is-${hostedVaultPhase}`">
           <BrandMark :size="34" :state="hostedVaultState" show-depth />
@@ -9,14 +9,11 @@
           <div class="mono-label">hosted vault</div>
           <h3>{{ headline }}</h3>
           <p>
-            AutoVault reserves a paid tenant namespace and stores pending onboarding drafts.
-            Cloud sync is not enabled yet; your local CLI remains the source of truth for gated, signed files.
+            Reserve your hosted namespace, stage starter skills, and keep your local CLI as the
+            source of truth for signing and serving.
           </p>
         </div>
       </div>
-      <button class="hosted-primary" type="button" :disabled="busy" @click="startFlow">
-        {{ busy ? "Working..." : primaryLabel }}
-      </button>
     </div>
 
     <div v-if="staticPreview" class="hosted-notice warn">
@@ -25,7 +22,7 @@
 
     <div v-if="notice" class="hosted-notice" :class="notice.kind">{{ notice.text }}</div>
 
-    <div class="hosted-stage-card" :class="stageFocus.state">
+    <div v-if="!vault" class="hosted-stage-card" :class="stageFocus.state">
       <div class="hosted-stage-kicker">{{ stageFocus.kicker }}</div>
       <h4>{{ stageFocus.title }}</h4>
       <p>{{ stageFocus.body }}</p>
@@ -47,7 +44,7 @@
       </div>
     </div>
 
-    <div class="hosted-flow hosted-flow--compact" aria-label="Hosted onboarding steps">
+    <div v-if="!vault" class="hosted-flow hosted-flow--compact" aria-label="Hosted onboarding steps">
       <div v-for="(item, index) in flowItems" :key="item.label" class="hosted-flow-item" :class="item.state" :style="{ '--step-index': index }">
         <span class="hosted-dot" />
         <span class="hosted-flow-copy">
@@ -71,7 +68,7 @@
       <div class="hosted-panel">
         <div class="panel-title">Suggested starter skills</div>
         <div class="starter-skills">
-          <button v-for="skill in starterSkills" :key="skill.name" type="button" :class="{ queued: queuedSkillNames.includes(skill.name) }" @click="toggleSkill(skill.name)">
+          <button v-for="skill in starterSkills" :key="skill.name" type="button" :class="{ queued: queuedSkillNames.includes(skill.name) }" :aria-pressed="queuedSkillNames.includes(skill.name)" @click="toggleSkill(skill.name)">
             <span class="skill-icon">{{ skill.icon }}</span>
             <span>
               <strong>{{ skill.name }}</strong>
@@ -83,7 +80,7 @@
     </div>
 
     <div v-if="showLocalHandoff" class="hosted-command-card">
-      <div class="panel-title">Local handoff</div>
+      <div class="panel-title">{{ vault ? "Get started on the local CLI" : "Local handoff" }}</div>
       <pre><code>{{ commandBlock }}</code></pre>
       <div class="hosted-copy-row">
         <button type="button" @click="copyCommands">Copy local commands</button>
@@ -109,7 +106,7 @@ type Notice = { kind: "ok" | "warn" | "fail"; text: string };
 type MeResponse = {
   user: { id: string; email?: string | null; name?: string | null; avatar_url?: string | null } | null;
   subscription?: { active: boolean; status?: string | null } | null;
-  vault?: { id?: string; slug: string; status: string; public_url: string } | null;
+  vault?: { id?: string; slug: string; status: string; public_url: string; cli_linked_at?: string | null; early_access_at?: string | null } | null;
 };
 
 type PendingDraft = {
@@ -141,12 +138,14 @@ const busy = ref(false);
 const me = ref<MeResponse | null>(null);
 const notice = ref<Notice | null>(null);
 const provisioning = ref(false);
+const reconciling = ref(false);
 const pendingSaved = ref(false);
 const checkoutStarted = ref(false);
 const staticPreview = ref(false);
 const queuedSkillNames = ref<string[]>(skills.filter((skill) => skill.featured).slice(0, 2).map((skill) => skill.name));
 const { authHeaders, isClerkLoaded, isClerkSignedIn, clerkUserLabel, clerkUserSlugSeed } = useClerkApiAuth();
 let meRequestSeq = 0;
+let reconcileAttempted = false;
 
 const starterSkills = computed(() => skills.filter((skill) => skill.featured).slice(0, 4));
 const signedIn = computed(() => Boolean(me.value?.user) || isClerkSignedIn.value);
@@ -155,8 +154,7 @@ const vault = computed(() => me.value?.vault ?? null);
 const teamSlug = computed(() => vault.value?.slug ?? slugify(me.value?.user?.email || me.value?.user?.name || clerkUserSlugSeed.value || "your-team"));
 const hostedEndpoint = computed(() => vault.value?.public_url ?? `https://vault.autovault.dev/${teamSlug.value}`);
 const headline = computed(() => props.entry === "playground" ? "Reserve a namespace for this passing skill" : "Reserve a hosted AutoVault namespace");
-const primaryLabel = computed(() => props.entry === "playground" ? "Reserve namespace" : "Start paid onboarding");
-const showSetupDetails = computed(() => signedIn.value || paid.value || Boolean(vault.value) || props.entry === "playground");
+const showSetupDetails = computed(() => !vault.value && (signedIn.value || paid.value || props.entry === "playground"));
 const showLocalHandoff = computed(() => signedIn.value || Boolean(vault.value));
 const namespaceStatusLabel = computed(() => vault.value ? "Hosted namespace reserved:" : "Planned namespace:");
 const hostedVaultState = computed<"locked" | "unlocked">(() => (vault.value || provisioning.value ? "unlocked" : "locked"));
@@ -194,7 +192,7 @@ const stageFocus = computed(() => {
     return {
       kicker: "Step 3 of 4",
       title: "Reserve your namespace",
-      body: "AutoVault will create the stable hosted URL now. Cloud sync stays disabled until the CLI commands ship.",
+      body: "AutoVault assigns your stable hosted URL and queues your starter skills.",
       action: "reserve",
       state: provisioning.value ? "active" : "ready"
     };
@@ -202,7 +200,7 @@ const stageFocus = computed(() => {
   return {
     kicker: "Step 4 of 4",
     title: "Namespace reserved",
-    body: `${hostedEndpoint.value} is held for this account. Keep using the local CLI for signing and profile sync while hosted sync is in progress.`,
+    body: `${hostedEndpoint.value} is yours. Keep signing and serving with the local CLI — hosted sync ships next.`,
     action: "local",
     state: "done"
   };
@@ -236,7 +234,7 @@ const provisionSteps = computed(() => [
   { label: "Confirm paid access from webhook state", done: paid.value, active: signedIn.value && !paid.value },
   { label: "Reserve tenant namespace", done: Boolean(vault.value), active: provisioning.value },
   { label: "Save pending onboarding import", done: pendingSaved.value, active: Boolean(vault.value) && !pendingSaved.value },
-  { label: "Cloud CLI sync coming soon", done: false, active: Boolean(vault.value) }
+  { label: "Cloud CLI sync coming soon", done: false, active: false }
 ]);
 
 const userLabel = computed(() => {
@@ -247,14 +245,12 @@ const userLabel = computed(() => {
 onMounted(async () => {
   staticPreview.value = canUseBrowser() && window.location.port === "5173";
   await loadMe();
-  resumeCheckoutReturn();
+  await resumeCheckoutReturn();
 });
 
 watch([isClerkLoaded, isClerkSignedIn], ([loaded]) => {
   if (!loaded) return;
-  void loadMe().then(() => {
-    resumeCheckoutReturn();
-  });
+  void loadMe().then(() => resumeCheckoutReturn());
 });
 
 async function startFlow() {
@@ -358,32 +354,34 @@ async function startCheckout() {
 }
 
 async function provisionVault() {
+  if (provisioning.value) return;
   provisioning.value = true;
-  const response = await fetch("/api/vaults/provision", {
-    method: "POST",
-    credentials: "include",
-    headers: await authHeaders({ "content-type": "application/json", accept: "application/json" }),
-    body: JSON.stringify({ queued_skills: queuedSkillNames.value })
-  });
-  const payload = await response.json().catch(() => ({}));
+  try {
+    const response = await fetch("/api/vaults/provision", {
+      method: "POST",
+      credentials: "include",
+      headers: await authHeaders({ "content-type": "application/json", accept: "application/json" }),
+      body: JSON.stringify({ queued_skills: queuedSkillNames.value })
+    });
+    const payload = await response.json().catch(() => ({}));
 
-  if (response.status === 402) {
-    notice.value = { kind: "warn", text: "Checkout completed, but the Stripe webhook has not marked the subscription active yet. Refresh in a moment." };
+    if (response.status === 402) {
+      notice.value = { kind: "warn", text: "Checkout completed, but the Stripe webhook has not marked the subscription active yet. Refresh in a moment." };
+      return;
+    }
+
+    if (!response.ok || !payload.vault) {
+      notice.value = { kind: "fail", text: payload.error || "Could not provision the hosted namespace." };
+      return;
+    }
+
+    me.value = { ...(me.value ?? { user: null }), vault: payload.vault };
+    emit("stateChange", me.value);
+    await savePendingImport();
+    notice.value = { kind: "ok", text: "Hosted namespace reserved. Keep signing and serving skills locally — hosted sync ships next." };
+  } finally {
     provisioning.value = false;
-    return;
   }
-
-  if (!response.ok || !payload.vault) {
-    notice.value = { kind: "fail", text: payload.error || "Could not provision the hosted namespace." };
-    provisioning.value = false;
-    return;
-  }
-
-  me.value = { ...(me.value ?? { user: null }), vault: payload.vault };
-  emit("stateChange", me.value);
-  await savePendingImport();
-  provisioning.value = false;
-  notice.value = { kind: "ok", text: "Hosted namespace reserved. Cloud sync is not enabled yet; keep signing and serving skills locally for now." };
 }
 
 async function savePendingImport() {
@@ -407,20 +405,75 @@ async function savePendingImport() {
   if (response.ok) pendingSaved.value = true;
 }
 
-function resumeCheckoutReturn() {
+async function resumeCheckoutReturn() {
   if (!canUseBrowser()) return;
   const params = new URLSearchParams(window.location.search);
   const hosted = params.get("hosted");
+  const sessionId = params.get("session_id");
+
   if (hosted === "cancelled") {
     notice.value = { kind: "warn", text: "Checkout was cancelled. The browser draft is still available here." };
+    clearCheckoutReturnParams();
     return;
   }
   if (hosted !== "success") return;
-
-  notice.value = { kind: "warn", text: "Checkout returned. Waiting for Stripe webhook state before reserving the namespace." };
-  if (paid.value) {
-    void provisionVault();
+  if (vault.value) {
+    clearCheckoutReturnParams();
+    return;
   }
+
+  if (!paid.value && sessionId && signedIn.value && !reconcileAttempted && !reconciling.value) {
+    reconcileAttempted = true;
+    await reconcileCheckout(sessionId);
+  }
+
+  if (paid.value && !vault.value) {
+    await provisionVault();
+  } else if (!paid.value) {
+    notice.value = {
+      kind: "warn",
+      text: "Checkout returned. Waiting for Stripe to confirm your subscription before reserving the namespace."
+    };
+  }
+
+  if (vault.value) clearCheckoutReturnParams();
+}
+
+async function reconcileCheckout(sessionId: string) {
+  reconciling.value = true;
+  try {
+    const response = await fetch("/api/billing/reconcile", {
+      method: "POST",
+      credentials: "include",
+      headers: await authHeaders({ "content-type": "application/json", accept: "application/json" }),
+      body: JSON.stringify({ session_id: sessionId })
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      notice.value = {
+        kind: "warn",
+        text: payload.error || "Could not confirm the checkout session yet. Refresh in a moment."
+      };
+      return;
+    }
+    await loadMe();
+  } catch {
+    notice.value = {
+      kind: "warn",
+      text: "Could not reach the reconcile endpoint. Refresh in a moment."
+    };
+  } finally {
+    reconciling.value = false;
+  }
+}
+
+function clearCheckoutReturnParams() {
+  if (!canUseBrowser()) return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("hosted") && !url.searchParams.has("session_id")) return;
+  url.searchParams.delete("hosted");
+  url.searchParams.delete("session_id");
+  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
 function currentReturnPath() {

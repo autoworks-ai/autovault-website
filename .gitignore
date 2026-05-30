@@ -1,5 +1,7 @@
 node_modules/
 .env.local
+.dev.vars
+.clerk-env-temp
 .wrangler/
 .vitepress/cache/
 .vitepress/.temp/
@@ -9,3 +11,12 @@ coverage/
 wrangler.json
 .DS_Store
 /.claude
+.superpowers/
+
+# Local funnel walkthrough + demo capture — kept out of repo history
+/assets/
+/test.mp4
+/test_flow.mjs
+/walkthrough.js
+/run_walkthrough.sh
+/public/checkout-logo-animated.svg

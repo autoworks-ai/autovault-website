@@ -3,7 +3,7 @@ import { parseCookies, SESSION_COOKIE } from "../functions/api/_lib/auth.js";
 import { hmacSha256Hex } from "../functions/api/_lib/crypto.js";
 import { safeReturnTo } from "../functions/api/_lib/http.js";
 import { buildHostedVaultCheckoutParams, STRIPE_API_VERSION, verifyStripeSignature } from "../functions/api/_lib/stripe.js";
-import { provisionVault, savePendingSkill } from "../functions/api/_lib/vault.js";
+import { markVaultProgress, provisionVault, savePendingSkill } from "../functions/api/_lib/vault.js";
 
 describe("hosted vault auth helpers", () => {
   it("parses session cookies and constrains return paths", () => {
@@ -87,6 +87,35 @@ describe("hosted vault provisioning", () => {
     expect(env.state.kvWrites[0].key).toMatch(/^vaults\/.+\/pending\/.+\.md$/);
   });
 
+  it("stamps onboarding progress idempotently and only after a vault exists", async () => {
+    const env = createFakeEnv({ subscriptionStatus: "active" });
+    const user = { id: "github_1", email: "jack@example.com" };
+
+    await expect(markVaultProgress(env, user, "cli_linked")).rejects.toMatchObject({ status: 409 });
+
+    await provisionVault(env, user);
+
+    const afterLink = await markVaultProgress(env, user, "cli_linked");
+    expect(afterLink.cli_linked_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(afterLink.early_access_at).toBeNull();
+
+    // Idempotent: a second call must not overwrite the original timestamp.
+    const linkAgain = await markVaultProgress(env, user, "cli_linked");
+    expect(linkAgain.cli_linked_at).toBe(afterLink.cli_linked_at);
+
+    const afterEarlyAccess = await markVaultProgress(env, user, "early_access");
+    expect(afterEarlyAccess.cli_linked_at).toBe(afterLink.cli_linked_at);
+    expect(afterEarlyAccess.early_access_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it("rejects unknown onboarding steps", async () => {
+    const env = createFakeEnv({ subscriptionStatus: "active" });
+    const user = { id: "github_1", email: "jack@example.com" };
+    await provisionVault(env, user);
+
+    await expect(markVaultProgress(env, user, "delete_everything")).rejects.toMatchObject({ status: 400 });
+  });
+
   it("returns a clear configuration error when pending source storage lacks KV", async () => {
     const env = createFakeEnv({ subscriptionStatus: "active" });
     delete (env as { AUTOVAULT_VAULT_OBJECTS?: unknown }).AUTOVAULT_VAULT_OBJECTS;
@@ -137,8 +166,18 @@ function createFakeEnv({ subscriptionStatus }: { subscriptionStatus: string }) {
                     status: binds[3],
                     public_url: binds[4],
                     created_at: binds[5],
-                    provisioned_at: binds[6]
+                    provisioned_at: binds[6],
+                    cli_linked_at: null,
+                    early_access_at: null
                   });
+                }
+                if (sql.includes("update vaults")) {
+                  const vault = state.vaults.find((row) => row.user_id === binds[1]);
+                  if (vault) {
+                    const column = sql.includes("cli_linked_at") ? "cli_linked_at" : "early_access_at";
+                    // mirror the SQL `and <column> is null` guard
+                    if (vault[column] == null) vault[column] = binds[0];
+                  }
                 }
                 if (sql.includes("insert into pending_skills")) {
                   state.pendingSkills.push({

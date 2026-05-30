@@ -140,14 +140,14 @@ describe("v1 content guardrails", () => {
     ].map(read).join("\n");
 
     expect(hostedCopy).toContain("Cloud sync is not enabled yet");
-    expect(hostedCopy).toContain("Reserve a paid hosted AutoVault namespace");
-    expect(hostedCopy).toContain("pending provisioning");
-    expect(hostedCopy).toContain("Managed vault dashboard");
+    expect(hostedCopy).toContain("Reserve a hosted AutoVault namespace");
+    expect(hostedCopy).toContain("Hosted vault");
+    expect(hostedCopy).toContain("Reserve a stable hosted URL");
+    expect(hostedCopy).toContain("hosted sync ships");
     expect(hostedCopy).toContain("coming soon");
     expect(hostedCopy).toContain("reserved");
-    expect(hostedCopy).toContain("prototype mode");
-    expect(hostedCopy).toContain("Simulate MCP ping");
-    expect(hostedCopy).toContain("Simulate pending import");
+    expect(hostedCopy).not.toMatch(/prototype mode|Internal cloud prototype/i);
+    expect(hostedCopy).not.toMatch(/Simulate MCP ping|Simulate pending import/i);
     expect(hostedCopy).not.toMatch(/cloud sync is enabled|enabled cloud sync|sync now/i);
     expect(hostedCopy).not.toMatch(/live vault|provisioned runtime/i);
   });
