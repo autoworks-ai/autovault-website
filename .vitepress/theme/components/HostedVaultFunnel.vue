@@ -68,7 +68,7 @@
       <div class="hosted-panel">
         <div class="panel-title">Suggested starter skills</div>
         <div class="starter-skills">
-          <button v-for="skill in starterSkills" :key="skill.name" type="button" :class="{ queued: queuedSkillNames.includes(skill.name) }" @click="toggleSkill(skill.name)">
+          <button v-for="skill in starterSkills" :key="skill.name" type="button" :class="{ queued: queuedSkillNames.includes(skill.name) }" :aria-pressed="queuedSkillNames.includes(skill.name)" @click="toggleSkill(skill.name)">
             <span class="skill-icon">{{ skill.icon }}</span>
             <span>
               <strong>{{ skill.name }}</strong>
