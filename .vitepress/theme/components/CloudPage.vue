@@ -1541,6 +1541,18 @@ const ICON = {
   .cv-appskel {
     background: rgba(255, 255, 255, 0.08);
   }
+  /* Neutralize decorative hover motion too — keep state changes, drop the travel */
+  .cv-btn,
+  .cv-nav-item,
+  .cv-card,
+  .cv-preview,
+  .cv-cmd-copy {
+    transition: none;
+  }
+  .cv-btn:hover:not(:disabled),
+  .cv-btn:active:not(:disabled) {
+    transform: none;
+  }
 }
 
 /* responsive */
