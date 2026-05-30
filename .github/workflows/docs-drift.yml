@@ -36,7 +36,7 @@ jobs:
 
       - name: Create website docs app token
         id: website_token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.DOCS_DRIFT_APP_ID }}
           private-key: ${{ secrets.DOCS_DRIFT_APP_PRIVATE_KEY }}
@@ -47,7 +47,7 @@ jobs:
 
       - name: Create source docs app token
         id: source_token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.DOCS_DRIFT_APP_ID }}
           private-key: ${{ secrets.DOCS_DRIFT_APP_PRIVATE_KEY }}
