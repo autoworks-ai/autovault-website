@@ -296,7 +296,7 @@ import {
 import HostedVaultFunnel from "./HostedVaultFunnel.vue";
 import BrandMark from "./BrandMark.vue";
 import { copyText as copyToClipboard } from "../utils/clipboard";
-import { useClerkApiAuth } from "../utils/clerkApi";
+import { clerkAuthRecoveryMessage, isClerkApiAuthError, useClerkApiAuth } from "../utils/clerkApi";
 import {
   useTerminalReplay,
   type TerminalReplayLine,
@@ -426,7 +426,7 @@ const previewCard = ref<HTMLElement | null>(null);
 const billingCard = ref<HTMLElement | null>(null);
 const previewRows = [{ w: "55%" }, { w: "42%" }, { w: "60%" }];
 
-const { authHeaders, isClerkLoaded, isClerkSignedIn, clerkUserLabel } =
+const { authHeaders, clerkAuthEnabled, isClerkLoaded, isClerkSignedIn, clerkUserLabel } =
   useClerkApiAuth();
 let cloudStateRequestSeq = 0;
 
@@ -546,16 +546,26 @@ watch([isClerkLoaded, isClerkSignedIn], ([loaded]) => {
 async function loadCloudState(initial = false) {
   const requestSeq = ++cloudStateRequestSeq;
   try {
+    const headers = await authHeaders({ accept: "application/json" }, {
+      required: clerkAuthEnabled && isClerkSignedIn.value,
+      fresh: isClerkSignedIn.value,
+    });
     const response = await fetch("/api/me", {
       credentials: "include",
-      headers: await authHeaders({ accept: "application/json" }),
+      headers,
     });
     if (requestSeq !== cloudStateRequestSeq) return;
     cloudState.value = response.ok
       ? normalizeCloudState((await response.json()) as CloudStatePayload)
       : { user: null, subscription: null, vault: null };
-  } catch {
+  } catch (error) {
     if (requestSeq !== cloudStateRequestSeq) return;
+    if (isClerkApiAuthError(error)) {
+      if (error.reason !== "clerk-not-loaded") {
+        notice.value = { kind: "warn", text: clerkAuthRecoveryMessage(error) };
+      }
+      return;
+    }
     cloudState.value = { user: null, subscription: null, vault: null };
   } finally {
     if (requestSeq === cloudStateRequestSeq) hydrated.value = true;
@@ -581,13 +591,14 @@ async function markProgress(step: "cli_linked" | "early_access") {
   busy.value = true;
   notice.value = null;
   try {
+    const headers = await authHeaders({
+      "content-type": "application/json",
+      accept: "application/json",
+    }, { required: true, fresh: true });
     const response = await fetch("/api/vaults/current/progress", {
       method: "POST",
       credentials: "include",
-      headers: await authHeaders({
-        "content-type": "application/json",
-        accept: "application/json",
-      }),
+      headers,
       body: JSON.stringify({ step }),
     });
     const payload = await response.json().catch(() => ({}));
@@ -608,7 +619,11 @@ async function markProgress(step: "cli_linked" | "early_access") {
           ? "Nice — CLI linked. A few more details are unlocked below."
           : "You're on the early-access list. We'll be in touch.",
     };
-  } catch {
+  } catch (error) {
+    if (isClerkApiAuthError(error)) {
+      notice.value = { kind: "warn", text: clerkAuthRecoveryMessage(error) };
+      return;
+    }
     notice.value = {
       kind: "warn",
       text: "Couldn't reach the server — try again in a moment.",

@@ -160,6 +160,29 @@ describe("Clerk production deployment configuration", () => {
     expect(controls).toContain("signedInAction");
   });
 
+  it("requires ready Clerk auth before protected cloud funnel requests", () => {
+    const helper = read(".vitepress/theme/utils/clerkApi.ts");
+    const funnel = read(".vitepress/theme/components/HostedVaultFunnel.vue");
+
+    expect(helper).toContain("ClerkApiAuthError");
+    expect(helper).toContain("resolveClerkAuthHeaders");
+    expect(helper).toContain("required?: boolean");
+    expect(helper).toContain("fresh?: boolean");
+    expect(funnel).toContain("protectedAuthHeaders");
+    expect(funnel).toContain("clerkAuthRecoveryMessage");
+    expect(funnel).toContain("{ required: true, fresh: true }");
+  });
+
+  it("redirects Clerk sign-in and sign-up completions into the cloud funnel", () => {
+    const controls = read(".vitepress/theme/components/ClerkAuthControls.vue");
+
+    expect(controls).toContain("authReturnPath");
+    expect(controls).toContain("clerkBrand.cloudPath");
+    expect(controls).toContain(":force-redirect-url=\"authReturnPath\"");
+    expect(controls).toContain(":sign-up-force-redirect-url=\"authReturnPath\"");
+    expect(controls).toContain(":sign-in-force-redirect-url=\"authReturnPath\"");
+  });
+
   it("uses Clerk user reactivity as the live signed-in identity fallback", () => {
     const helper = read(".vitepress/theme/utils/clerkApi.ts");
     const funnel = read(".vitepress/theme/components/HostedVaultFunnel.vue");

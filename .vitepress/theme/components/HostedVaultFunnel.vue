@@ -97,7 +97,7 @@ import BrandMark from "./BrandMark.vue";
 import ClerkAuthControls from "./ClerkAuthControls.vue";
 import { skills } from "../data/skills";
 import type { GateEvaluation } from "../utils/skillGate";
-import { useClerkApiAuth } from "../utils/clerkApi";
+import { clerkAuthRecoveryMessage, isClerkApiAuthError, useClerkApiAuth } from "../utils/clerkApi";
 import { AUTOVAULT_INSTALL_COMMAND } from "../../shared/bootstrap";
 
 const PENDING_DRAFT_KEY = "autovault.hostedVault.pendingDraft";
@@ -143,7 +143,7 @@ const pendingSaved = ref(false);
 const checkoutStarted = ref(false);
 const staticPreview = ref(false);
 const queuedSkillNames = ref<string[]>(skills.filter((skill) => skill.featured).slice(0, 2).map((skill) => skill.name));
-const { authHeaders, isClerkLoaded, isClerkSignedIn, clerkUserLabel, clerkUserSlugSeed } = useClerkApiAuth();
+const { authHeaders, clerkAuthEnabled, isClerkLoaded, isClerkSignedIn, clerkUserLabel, clerkUserSlugSeed } = useClerkApiAuth();
 let meRequestSeq = 0;
 let reconcileAttempted = false;
 
@@ -244,6 +244,7 @@ const userLabel = computed(() => {
 
 onMounted(async () => {
   staticPreview.value = canUseBrowser() && window.location.port === "5173";
+  if (clerkAuthEnabled && !isClerkLoaded.value) return;
   await loadMe();
   await resumeCheckoutReturn();
 });
@@ -312,7 +313,11 @@ function hasDraft() {
 async function loadMe() {
   const requestSeq = ++meRequestSeq;
   try {
-    const response = await fetch("/api/me", { credentials: "include", headers: await authHeaders({ accept: "application/json" }) });
+    const headers = await authHeaders({ accept: "application/json" }, {
+      required: clerkAuthEnabled && isClerkSignedIn.value,
+      fresh: isClerkSignedIn.value
+    });
+    const response = await fetch("/api/me", { credentials: "include", headers });
     if (requestSeq !== meRequestSeq) return;
     if (!response.ok) {
       me.value = { user: null };
@@ -321,8 +326,14 @@ async function loadMe() {
     }
     me.value = await response.json() as MeResponse;
     emit("stateChange", me.value);
-  } catch {
+  } catch (error) {
     if (requestSeq !== meRequestSeq) return;
+    if (isClerkApiAuthError(error)) {
+      if (error.reason !== "clerk-not-loaded") {
+        notice.value = { kind: "warn", text: clerkAuthRecoveryMessage(error) };
+      }
+      return;
+    }
     me.value = { user: null };
     emit("stateChange", me.value);
   }
@@ -330,10 +341,15 @@ async function loadMe() {
 
 async function startCheckout() {
   checkoutStarted.value = true;
+  const headers = await protectedAuthHeaders({ "content-type": "application/json", accept: "application/json" });
+  if (!headers) {
+    checkoutStarted.value = false;
+    return;
+  }
   const response = await fetch("/api/checkout/hosted-vault", {
     method: "POST",
     credentials: "include",
-    headers: await authHeaders({ "content-type": "application/json", accept: "application/json" }),
+    headers,
     body: JSON.stringify({ return_to: currentReturnPath(), source: props.entry })
   });
   const payload = await response.json().catch(() => ({}));
@@ -357,10 +373,12 @@ async function provisionVault() {
   if (provisioning.value) return;
   provisioning.value = true;
   try {
+    const headers = await protectedAuthHeaders({ "content-type": "application/json", accept: "application/json" });
+    if (!headers) return;
     const response = await fetch("/api/vaults/provision", {
       method: "POST",
       credentials: "include",
-      headers: await authHeaders({ "content-type": "application/json", accept: "application/json" }),
+      headers,
       body: JSON.stringify({ queued_skills: queuedSkillNames.value })
     });
     const payload = await response.json().catch(() => ({}));
@@ -387,11 +405,13 @@ async function provisionVault() {
 async function savePendingImport() {
   const draft = buildDraft() || readDraft();
   if (!draft && queuedSkillNames.value.length === 0) return;
+  const headers = await protectedAuthHeaders({ "content-type": "application/json", accept: "application/json" });
+  if (!headers) return;
 
   const response = await fetch("/api/vaults/current/pending-skills", {
     method: "POST",
     credentials: "include",
-    headers: await authHeaders({ "content-type": "application/json", accept: "application/json" }),
+    headers,
     body: JSON.stringify({
       skill_name: draft?.skillName,
       version: draft?.version,
@@ -442,10 +462,12 @@ async function resumeCheckoutReturn() {
 async function reconcileCheckout(sessionId: string) {
   reconciling.value = true;
   try {
+    const headers = await protectedAuthHeaders({ "content-type": "application/json", accept: "application/json" });
+    if (!headers) return;
     const response = await fetch("/api/billing/reconcile", {
       method: "POST",
       credentials: "include",
-      headers: await authHeaders({ "content-type": "application/json", accept: "application/json" }),
+      headers,
       body: JSON.stringify({ session_id: sessionId })
     });
     if (!response.ok) {
@@ -464,6 +486,15 @@ async function reconcileCheckout(sessionId: string) {
     };
   } finally {
     reconciling.value = false;
+  }
+}
+
+async function protectedAuthHeaders(headers: Record<string, string>) {
+  try {
+    return await authHeaders(headers, { required: true, fresh: true });
+  } catch (error) {
+    notice.value = { kind: "warn", text: clerkAuthRecoveryMessage(error) };
+    return null;
   }
 }
 
