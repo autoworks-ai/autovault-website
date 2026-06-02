@@ -6,8 +6,10 @@
           <SignInButton
             mode="modal"
             :appearance="clerkSignInAppearance"
-            :fallback-redirect-url="returnPath"
-            :sign-up-fallback-redirect-url="returnPath"
+            :force-redirect-url="authReturnPath"
+            :fallback-redirect-url="authReturnPath"
+            :sign-up-force-redirect-url="authReturnPath"
+            :sign-up-fallback-redirect-url="authReturnPath"
           >
             <button class="clerk-auth-action" type="button">Sign in</button>
           </SignInButton>
@@ -15,8 +17,10 @@
             v-if="variant === 'funnel'"
             mode="modal"
             :appearance="clerkSignInAppearance"
-            :fallback-redirect-url="returnPath"
-            :sign-in-fallback-redirect-url="returnPath"
+            :force-redirect-url="authReturnPath"
+            :fallback-redirect-url="authReturnPath"
+            :sign-in-force-redirect-url="authReturnPath"
+            :sign-in-fallback-redirect-url="authReturnPath"
           >
             <button class="clerk-auth-action primary" type="button">{{ ctaLabel }}</button>
           </SignUpButton>
@@ -100,10 +104,7 @@ const hydrated = ref(false);
 const clerkFailed = ref(false);
 let clerkLoadTimer: number | undefined;
 let clerkReadyInterval: number | undefined;
-const returnPath = computed(() => {
-  if (typeof window === "undefined") return "/";
-  return `${window.location.pathname}${window.location.search}${window.location.hash || ""}`;
-});
+const authReturnPath = computed(() => clerkBrand.cloudPath);
 
 onMounted(() => {
   hydrated.value = true;
