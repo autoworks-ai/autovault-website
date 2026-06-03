@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseDocument } from "yaml";
 import { describe, expect, it } from "vitest";
-import { skills } from "../.vitepress/theme/data/skills";
+import { categories, skills } from "../.vitepress/theme/data/skills";
 import { extractFrontmatter } from "../.vitepress/theme/utils/skillGate";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -27,6 +27,9 @@ describe("skills catalog integrity", () => {
         const pinnedRef = skill.install.match(/@[0-9a-f]{40}:/)?.[0]?.slice(1, -1);
         expect(pinnedRef, `${skill.name} should pin GitHub source refs`).toBeTruthy();
         expect(skill.sourceUrl, `${skill.name} sourceUrl should match the pinned install ref`).toContain(`/blob/${pinnedRef}/`);
+        expect(skill.cliInstall, `${skill.name} github skill should expose a real CLI add-local command`).toMatch(/^autovault add-local \.\/\S+ --source \S+ --sync-profiles$/);
+      } else {
+        expect(skill.cliInstall, `${skill.name} url-hosted skill must not fabricate a CLI install (no clonable bundle)`).toBeUndefined();
       }
       expect(skill.sourceUrl).toMatch(/^https:\/\//);
       expect(skill.sourceUrl).not.toContain("autoworks-ai/skills/");
@@ -60,6 +63,29 @@ describe("skills catalog integrity", () => {
           }
         }
       }
+
+      const resources = frontmatter.resources;
+      if (Array.isArray(resources)) {
+        expect(Array.isArray(skill.resources), `${skill.name} declares resources but has no catalog resource metadata`).toBe(true);
+        const catalogResources = new Set((skill.resources ?? []).map((resource) => resource.path));
+        for (const resource of resources) {
+          expect(resource && typeof resource === "object", `${skill.name} has invalid resource entry`).toBe(true);
+          const path = (resource as { path?: unknown }).path;
+          const type = (resource as { type?: unknown }).type;
+          expect(type, `${skill.name} resource ${String(path)} should be a file`).toBe("file");
+          expect(typeof path, `${skill.name} resource path should be a string`).toBe("string");
+          expect(existsSync(resolve(dirname(rawFile), path as string)), `${skill.name} missing resource ${String(path)}`).toBe(true);
+          expect(catalogResources.has(path as string), `${skill.name} resource ${String(path)} is missing from catalog metadata`).toBe(true);
+        }
+
+        for (const resource of skill.resources ?? []) {
+          expect(resource.path.length, `${skill.name} resource path should be populated`).toBeGreaterThan(0);
+          expect(resource.title.length, `${skill.name} resource ${resource.path} title should be populated`).toBeGreaterThan(0);
+          expect(resource.summary.length, `${skill.name} resource ${resource.path} summary should be populated`).toBeGreaterThan(12);
+          expect(resource.group.length, `${skill.name} resource ${resource.path} group should be populated`).toBeGreaterThan(0);
+          expect(resource.kind).toMatch(/^(markdown|svg|css|ascii|yaml|script|file)$/);
+        }
+      }
     }
   });
 
@@ -84,13 +110,65 @@ describe("skills catalog integrity", () => {
     expect(secretSafe?.permissions.some((row) => row.label === "secrets")).toBe(true);
   });
 
-  it("makes the skill detail install CTA visibly copy the MCP add call", () => {
+  it("includes the AutoVault brand-system showcase skill with bundled assets", () => {
+    expect(categories.map((category) => category.id)).toContain("brand");
+    expect(skills.map((skill) => skill.name)).toContain("autovault-brand-system");
+
+    const brand = skills.find((skill) => skill.name === "autovault-brand-system");
+    expect(brand?.category).toBe("brand");
+    expect(brand?.sourceKind).toBe("first-party");
+    expect(brand?.admissionStatus).toBe("hosted-example");
+    expect(brand?.permissions.some((row) => row.label === "resources")).toBe(true);
+
+    const rawFile = resolve(repoRoot, "public", "skills", "autovault-brand-system", "SKILL.md");
+    const frontmatter = readFrontmatter(readFileSync(rawFile, "utf8"));
+    const resources = Array.isArray(frontmatter.resources) ? frontmatter.resources : [];
+    expect(resources.map((entry) => (entry as { path?: string }).path)).toEqual(expect.arrayContaining([
+      "agents/openai.yaml",
+      "references/identity.md",
+      "references/motion.md",
+      "references/surface-adaptation.md",
+      "assets/brand-mark.svg",
+      "assets/brand-mark-animated.svg",
+      "assets/autovault-brand.css",
+      "assets/ascii-vault.txt",
+      "assets/mascot-prompt.md",
+      "assets/usage-examples.md"
+    ]));
+  });
+
+  it("offers a CLI/MCP install toggle and copies the active command", () => {
     const detail = readFileSync(resolve(repoRoot, ".vitepress/theme/components/SkillDetailPage.vue"), "utf8");
 
-    expect(detail).toContain("Copy MCP add");
+    // Default to the AutoVault CLI command, fall back to the MCP add_skill call.
+    expect(detail).toContain('installMode = ref<"cli" | "mcp">("cli")');
+    expect(detail).toContain("activeCommand");
+    expect(detail).toContain("Copy CLI command");
+    expect(detail).toContain("Copy add_skill call");
     expect(detail).toContain('aria-live="polite"');
-    expect(detail).toContain("copyText(currentSkill.value.install)");
+    expect(detail).toContain("copyText(activeCommand.value)");
     expect(detail).not.toContain("/api/vaults/current/pending-skills");
+  });
+
+  it("renders bundled skill resources as an inspectable bundle", () => {
+    const detail = readFileSync(resolve(repoRoot, ".vitepress/theme/components/SkillDetailPage.vue"), "utf8");
+
+    expect(detail).toContain("Hosted skill bundle");
+    expect(detail).toContain("Bundle files");
+    expect(detail).toContain("Bundle");
+    expect(detail).toContain("bundleGroups");
+    expect(detail).toContain("resourcePreview");
+    expect(detail).toContain("resourceHref(resource)");
+    expect(detail).toContain("sd-asset-strip");
+    expect(detail).toContain("sd-resource-tree");
+    expect(detail).toContain("sd-resource-preview");
+  });
+
+  it("keeps bundled resource kind labels readable", () => {
+    const styles = readFileSync(resolve(repoRoot, ".vitepress/theme/styles.css"), "utf8");
+
+    expect(styles).toContain("grid-template-columns: minmax(76px, auto) minmax(0, 1fr) auto;");
+    expect(styles).toContain("grid-template-columns: minmax(76px, auto) minmax(0, 1fr);");
   });
 
   it("keeps fake historical example skills out of the public catalog", () => {
