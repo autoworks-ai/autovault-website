@@ -123,7 +123,7 @@ function stepStatus(i: number) {
           They leave <span class="ital">signed.</span>
         </h2>
         <p class="av-lede" style="margin-top: 16px">
-          Anything joining the folder — whether you ran <code class="inl">autovault add-local</code>, called MCP <code class="inl">add_skill</code>, or accepted an agent proposal mid-conversation — passes the same five-step gate first. YAML auto-repaired, denylisted patterns refused, behavior cross-checked against the frontmatter, dedup against what's already there, then signed on the way in.
+          Anything joining the folder — whether you ran <code class="inl">autovault add</code>, called MCP <code class="inl">add_skill</code>, or accepted an agent proposal mid-conversation — passes the same five-step gate first. YAML auto-repaired, denylisted patterns refused, behavior cross-checked against the frontmatter, dedup against what's already there, then signed on the way in.
         </p>
         <div class="av-gate-scenarios" aria-label="Gate demo scenarios">
           <button

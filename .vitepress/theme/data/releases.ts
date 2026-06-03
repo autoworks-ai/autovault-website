@@ -36,19 +36,19 @@ export const releases: Release[] = [
     featured: true,
     title: "Setup review, public output, and community skills",
     summary:
-      "The current source release improves install and setup review UX, adds a community publisher skill, smooths local imports, standardizes public CLI output, and retries Dependabot automerge after CI.",
+      "The current source release improves install and setup review UX, adds community skill examples, smooths local imports, standardizes public CLI output, and retries Dependabot automerge after CI.",
     sections: [
       {
         kind: "added",
         items: [
           "Install and setup review flows now give operators clearer choices before adopting local skill bundles",
-          "The agentgonewild-publisher community skill is available as a vaulted skill bundle",
+          "Curated community skill examples are available as vaulted skill bundles",
         ],
       },
       {
         kind: "fixed",
         items: [
-          "add-local imports are smoother for local bundles and native skill roots",
+          "Local add imports are smoother for local bundles and native skill roots",
           "Public CLI output is standardized so automation can rely on cleaner stdout/stderr behavior",
           "Dependabot automerge retries after CI and Node typings stay aligned with the runtime policy",
         ],
@@ -101,13 +101,13 @@ export const releases: Release[] = [
     tag: "patch",
     title: "Bundled skills, signing, and installer UX",
     summary:
-      "Patch release adding bundled skill bootstrap, expanded validation, signing sidecars, add-local installer flow, remote OAuth docs, and MIT license alignment.",
+      "Patch release adding bundled skill bootstrap, expanded validation, signing sidecars, local skill installer flow, remote OAuth docs, and MIT license alignment.",
     sections: [
       {
         kind: "added",
         items: [
           "Bundled skill bootstrap seeds source-tree skills through the real validation path",
-          "add-local, GitHub URL discovery imports, overlay transforms, and remote OAuth HTTP MCP docs expand the local skill workflow",
+          "Local skill imports, GitHub URL discovery, overlay transforms, and remote OAuth HTTP MCP docs expand the skill workflow",
           "Setup wizard and GHCR release publishing improve agent-mediated installs and deployment verification",
         ],
       },

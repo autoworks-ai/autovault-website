@@ -77,13 +77,13 @@
         <div class="ok">  ✓ ~/.autovault initialized · bundled skills indexed</div>
         <div class="ok">  ✓ local keypair available · ed25519</div>
         <div class="ok">  ✓ detected agents · claude-code, codex</div>
-        <div class="out">  ↳ next: autovault add-local &lt;skill-dir&gt; --source &lt;origin&gt;</div>
+        <div class="out">  ↳ next: autovault add &lt;source-or-path&gt;</div>
       </div>
     </div>
 
-    <h2 id="first">Step 4 — Add a local skill bundle</h2>
-    <p>Local bundles enter through <code>add-local</code>. Remote URLs and GitHub sources use the same gate through the MCP <code>add_skill</code> tool; the CLI path expects files already present on disk.</p>
-    <CodeBlock lang="bash"><span class="pmt">$</span> autovault add-local ./skills/skill-author <span class="arg">--source</span> vendor/skills <span class="arg">--sync-profiles</span></CodeBlock>
+    <h2 id="first">Step 4 — Add a skill source</h2>
+    <p><code>autovault add</code> accepts local paths, GitHub identifiers or URLs, agentskills slugs, and direct <code>SKILL.md</code> URLs. Every source runs through the same validation, signing, provenance, and profile-sync gate.</p>
+    <CodeBlock lang="bash"><span class="pmt">$</span> autovault add ./skills/skill-author <span class="arg">--sync-profiles</span> <span class="arg">--yes</span></CodeBlock>
     <div class="terminal static-terminal">
       <div class="terminal-head"><span class="dot live" /><span class="dot" /><span class="dot" /><span class="ttl">gate run · skill-author</span></div>
       <div class="terminal-body compact">
@@ -285,7 +285,7 @@ const TerminalDemo = defineComponent({
       { type: "out", text: "    ~/.autojack/skills/autovault-skill → ~/.autovault/profiles/autojack/autovault-skill" },
       { type: "ok", text: "✓ vault ready · bundled skills bootstrapped · profiles synced" },
       { type: "blank", text: "" },
-      { type: "cmd", text: "autovault add-local ./skills/skill-author --source vendor/skills --sync-profiles" },
+      { type: "cmd", text: "autovault add ./skills/skill-author --sync-profiles --yes" },
       { type: "out", text: "↳ scanning ./skills/skill-author" },
       { type: "out", text: "↳ [1/5] yaml-repair    : ok" },
       { type: "out", text: "↳ [2/5] denylist       : ok" },

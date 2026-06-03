@@ -43,20 +43,23 @@
         <div class="sd-install">
           <div class="sd-install-head">
             <span class="lbl">Install</span>
-            <div v-if="hasCli" class="sd-install-toggle" role="group" aria-label="Install method">
-              <button type="button" :class="{ active: activeMode === 'cli' }" @click="installMode = 'cli'">CLI</button>
-              <button type="button" :class="{ active: activeMode === 'mcp' }" @click="installMode = 'mcp'">MCP</button>
+            <span class="sd-install-tag">CLI + MCP</span>
+          </div>
+          <div class="sd-install-list">
+            <div v-for="row in installRows" :key="row.mode" class="sd-install-row">
+              <div class="sd-install-row-meta">
+                <span class="sd-install-method">{{ row.label }}</span>
+                <span>{{ row.help }}</span>
+              </div>
+              <div class="cmd">
+                <span class="pmt">{{ row.prompt }}</span>
+                <span class="cmd-text">{{ row.command }}</span>
+                <button class="copy" type="button" :aria-label="row.copyLabel" @click="copyInstall(row.command, row.mode)">
+                  {{ copiedCommand === row.mode ? "Copied" : copyFailedCommand === row.mode ? "Failed" : "Copy" }}
+                </button>
+              </div>
             </div>
-            <span v-else class="sd-install-tag">MCP add_skill</span>
           </div>
-          <div class="cmd">
-            <span class="pmt">{{ activeMode === "cli" ? "$" : ">" }}</span>
-            <span class="cmd-text">{{ activeCommand }}</span>
-          </div>
-          <button class="sd-installbtn" type="button" @click="copyInstall">
-            {{ copied ? "Copied" : copyFailed ? "Copy failed" : activeMode === "cli" ? "Copy CLI command" : "Copy add_skill call" }}
-            <UiIcon name="arrow" />
-          </button>
         </div>
         <div class="sd-copy-status" aria-live="polite">{{ copyStatus }}</div>
         <div class="sd-secondary-actions">
@@ -102,7 +105,7 @@
                 <li v-for="useCase in currentSkill.useCases" :key="useCase">{{ useCase }}</li>
               </ul>
               <h2>Install</h2>
-              <p><code>{{ currentSkill.install }}</code></p>
+              <p v-for="row in installRows" :key="`overview-${row.mode}`"><strong>{{ row.label }}:</strong> <code>{{ row.command }}</code></p>
               <h2>Provenance</h2>
               <p>{{ currentSkill.provenanceNote }}</p>
             </div>
@@ -264,20 +267,47 @@ import { copyText } from "../utils/clipboard";
 
 type TabId = "overview" | "bundle" | "perms" | "prov" | "versions";
 type BundleResource = SkillResource & { root?: boolean };
+type InstallMode = "cli" | "mcp";
+type InstallRow = {
+  mode: InstallMode;
+  label: "CLI" | "MCP";
+  prompt: "$" | ">";
+  command: string;
+  help: string;
+  copyLabel: string;
+};
 
 const props = defineProps<{ skillName?: string }>();
 const tab = ref<TabId>("overview");
-const copied = ref(false);
-const copyFailed = ref(false);
-const installMode = ref<"cli" | "mcp">("cli");
+const copiedCommand = ref<InstallMode | "">("");
+const copyFailedCommand = ref<InstallMode | "">("");
 const selectedResourcePath = ref("SKILL.md");
 const resourcePreview = ref({ path: "", status: "idle" as "idle" | "loading" | "loaded" | "error", content: "" });
 
 const currentSkill = computed(() => findSkillByName(props.skillName));
 
-const hasCli = computed(() => Boolean(currentSkill.value.cliInstall));
-const activeMode = computed<"cli" | "mcp">(() => (hasCli.value ? installMode.value : "mcp"));
-const activeCommand = computed(() => (activeMode.value === "cli" ? currentSkill.value.cliInstall ?? currentSkill.value.install : currentSkill.value.install));
+const installRows = computed(() => {
+  const rows: InstallRow[] = [];
+  if (currentSkill.value.cliInstall) {
+    rows.push({
+      mode: "cli" as const,
+      label: "CLI",
+      prompt: "$",
+      command: currentSkill.value.cliInstall,
+      help: "Run from your local shell.",
+      copyLabel: "Copy CLI install command"
+    });
+  }
+  rows.push({
+    mode: "mcp" as const,
+    label: "MCP",
+    prompt: ">",
+    command: currentSkill.value.install,
+    help: "Paste into an agent MCP tool call.",
+    copyLabel: "Copy MCP install command"
+  });
+  return rows;
+});
 
 const ORG_AUTHOR_PAGES: Record<string, string> = {
   "autoworks-ai": "/author-autoworks-ai"
@@ -407,26 +437,28 @@ const maintainers = computed(() => [
 ]);
 
 const copyStatus = computed(() => {
-  if (copied.value) return activeMode.value === "cli" ? "CLI command copied." : "MCP add_skill call copied.";
-  if (copyFailed.value) return "Copy failed. Select the command above to copy it manually.";
-  return activeMode.value === "cli"
-    ? "Copies the AutoVault CLI command. Run it from a clone of the source repo to admit the local bundle."
-    : "Copies the MCP add_skill call. Paste it to your agent to admit the skill from source.";
+  const copiedRow = installRows.value.find((row) => row.mode === copiedCommand.value);
+  if (copiedRow) return `${copiedRow.label} install command copied.`;
+  const failedRow = installRows.value.find((row) => row.mode === copyFailedCommand.value);
+  if (failedRow) return `${failedRow.label} copy failed. Select the command above to copy it manually.`;
+  return installRows.value.length > 1
+    ? "Choose CLI for a shell install or MCP for an agent tool call."
+    : "Copy the MCP add_skill call and paste it to your agent to admit the skill from source.";
 });
 
-async function copyInstall() {
-  copied.value = false;
-  copyFailed.value = false;
-  if (await copyText(activeCommand.value)) {
-    copied.value = true;
+async function copyInstall(command: string, mode: InstallMode) {
+  copiedCommand.value = "";
+  copyFailedCommand.value = "";
+  if (await copyText(command)) {
+    copiedCommand.value = mode;
     window.setTimeout(() => {
-      copied.value = false;
+      if (copiedCommand.value === mode) copiedCommand.value = "";
     }, 1200);
     return;
   }
-  copyFailed.value = true;
+  copyFailedCommand.value = mode;
   window.setTimeout(() => {
-    copyFailed.value = false;
+    if (copyFailedCommand.value === mode) copyFailedCommand.value = "";
   }, 1600);
 }
 

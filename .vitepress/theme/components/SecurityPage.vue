@@ -51,7 +51,7 @@
     <section class="sec-section">
       <div class="eyebrow"><span class="dash" /> The gate, in detail</div>
       <h2>What each of the five stages actually checks.</h2>
-      <p class="sub">Every skill installed, imported, proposed by an agent, or handed over through <code>add-local</code> runs through these stages in order. The source implementation keeps the denylist extensible and currently documents {{ activePatternCount }} active patterns.</p>
+      <p class="sub">Every skill installed, imported, proposed by an agent, or handed over through <code>autovault add</code> runs through these stages in order. The source implementation keeps the denylist extensible and currently documents {{ activePatternCount }} active patterns.</p>
 
       <div class="gate-stages-board panel">
         <div class="gsb-head">

@@ -1,6 +1,6 @@
 ---
 title: Changelog
-description: Read AutoVault release notes covering remote MCP, OAuth, add-local, bundled-skill bootstrap, transforms, resource reads, and drift checks.
+description: Read AutoVault release notes covering remote MCP, OAuth, skill install, bundled-skill bootstrap, transforms, resource reads, and drift checks.
 layout: false
 ---
 

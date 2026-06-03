@@ -69,11 +69,18 @@ const AUTOVAULT_WEBSITE_SKILL_REF = "457f238d0fd49425ac01ad7dad58c726624f1eaa";
 const AUTOVAULT_SOURCE_SKILL_REF = "85cea7424bfbc37901752600adf5eaab87e6b85a";
 
 function githubSkillSource(repo: string, ref: string, path: string) {
-  const bundleDir = path.replace(/\/SKILL\.md$/, "");
   return {
     install: `add_skill({ source: "github", identifier: "${repo}@${ref}:${path}" })`,
-    cliInstall: `autovault add-local ./${bundleDir} --source ${repo} --sync-profiles`,
+    cliInstall: `autovault add ${repo}@${ref}:${path} --sync-profiles`,
     sourceUrl: `https://github.com/${repo}/blob/${ref}/${path}`
+  };
+}
+
+function hostedUrlSkillSource(url: string) {
+  return {
+    install: `add_skill({ source: "url", identifier: "${url}" })`,
+    cliInstall: `autovault add ${url} --source url --sync-profiles`,
+    sourceUrl: url
   };
 }
 
@@ -134,10 +141,9 @@ export const skills: Skill[] = [
     references: 10,
     license: "MIT",
     size: "4,517 B",
-    install: "add_skill({ source: \"url\", identifier: \"https://autovault.dev/skills/autovault-brand-system/SKILL.md\" })",
+    ...hostedUrlSkillSource("https://autovault.dev/skills/autovault-brand-system/SKILL.md"),
     detailPath: "/skill/autovault-brand-system",
     rawPath: "/skills/autovault-brand-system/SKILL.md",
-    sourceUrl: "https://autovault.dev/skills/autovault-brand-system/SKILL.md",
     sourceLabel: "public/skills/autovault-brand-system/SKILL.md",
     sourceKind: "first-party",
     providerName: "AutoVault",
@@ -343,6 +349,7 @@ export const skills: Skill[] = [
     license: "MIT",
     size: "1,774 B",
     install: "add_skill({ source: \"url\", identifier: \"https://autovault.dev/skills/trusted-skill-import/SKILL.md\" })",
+    cliInstall: "autovault add https://autovault.dev/skills/trusted-skill-import/SKILL.md --source url --sync-profiles",
     detailPath: "/skill/trusted-skill-import",
     rawPath: "/skills/trusted-skill-import/SKILL.md",
     sourceUrl: "https://docs.claude.com/en/docs/agents-and-tools/agent-skills",
