@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -99,17 +99,19 @@ describe("v1 content guardrails", () => {
 
     expect(apiCurrentSurface).toContain("Current {{ PRODUCT_VERSION }} surfaces");
     expect(apiCurrentSurface).toContain("MCP tools are the agent-facing API");
-    expect(apiCurrentSurface).toContain("autovault add-local");
-    expect(apiCurrentSurface).not.toMatch(/@autovault\/sdk|\/api\/v1|autovault init|MCP 2024-11-05/);
+    expect(apiCurrentSurface).toContain("autovault add");
+    expect(apiCurrentSurface).not.toMatch(/@autovault\/sdk|\/api\/v1|autovault init|MCP 2024-11-05|cli-import-autohub|import-autohub|add-local/);
     expect(api).not.toContain('v-html="line"');
     expect(api).toContain("line.text");
     expect(styles).toContain(".api-sig .pmt {");
     expect(styles).toContain("margin-right: 0.35em");
-    expect(api).toContain("autovault add-local <skill-dir> --source <repo-or-url>");
-    expect(api).toContain("autovault add-local ./skills/skill-author --source vendor/skills");
-    expect(api).not.toContain("autovault add-local ./my-skill/SKILL.md");
-    expect(apiMarkdown).toContain("autovault add-local ./skills/skill-author --source vendor/skills");
-    expect(apiMarkdown).not.toContain("autovault add-local ./my-skill/SKILL.md");
+    expect(api).toContain("autovault add <source-or-path>");
+    expect(api).toContain("autovault add ./skills/skill-author --sync-profiles --yes");
+    expect(api).toContain("autovault add skill-slug --source agentskills --sync-profiles --agent codex --yes");
+    expect(api).not.toContain("autovault add-local");
+    expect(apiMarkdown).toContain("autovault add ./skills/skill-author --sync-profiles --yes");
+    expect(apiMarkdown).toContain("autovault add skill-slug --source agentskills --sync-profiles --agent codex --yes");
+    expect(apiMarkdown).not.toMatch(/add-local|cli-import-autohub|import-autohub/);
 
     expect(vaultAnatomy).toContain("current implementation layout");
     expect(vaultAnatomy).toContain(".signing-key.json");
@@ -127,9 +129,31 @@ describe("v1 content guardrails", () => {
     expect(deployMarkdown).toContain("Remote mode cannot create symlinks on client machines");
     expect(deploy).toContain('TerminalBlock title="remote MCP health" :lines="remoteHealthLines"');
     expect(deploy).not.toContain("statusLines");
-    expect(compare).toContain("--source https://github.com/owner/skills");
+    expect(compare).toContain("autovault add ./skills/toolsmith --source local --sync-profiles --yes");
     expect(compare).not.toContain("--source github:");
     expect(apiMarkdown).toContain("Current v0.4.0 surfaces");
+  });
+
+  it("keeps internal imports and compatibility aliases out of public docs", () => {
+    const publicSurfaces = [
+      ".vitepress/theme/components/ApiReferencePage.vue",
+      ".vitepress/theme/components/AvQuickStart.vue",
+      ".vitepress/theme/components/AvValidationGate.vue",
+      ".vitepress/theme/components/ComparePage.vue",
+      ".vitepress/theme/components/QuickStartPage.vue",
+      ".vitepress/theme/components/SecurityPage.vue",
+      ".vitepress/theme/data/releases.ts",
+      ".vitepress/theme/data/searchResults.ts",
+      ".vitepress/shared/pageDocs.ts",
+      "changelog.md",
+      "public/skills/trusted-skill-import/SKILL.md",
+      ...readdirSync(resolve(repoRoot, "skill"))
+        .filter((file) => file.endsWith(".md"))
+        .map((file) => `skill/${file}`)
+    ].map(read).join("\n");
+
+    expect(publicSurfaces).toContain("autovault add ");
+    expect(publicSurfaces).not.toMatch(/cli-import-autohub|import-autohub|autovault add-local|agentgonewild-publisher/);
   });
 
   it("keeps hidden hosted copy reservation-only", () => {

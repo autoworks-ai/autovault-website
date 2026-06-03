@@ -43,7 +43,7 @@ can run themselves:
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
 curl -fsSL https://example.com/trusted-provider/SKILL.md -o "$tmpdir/SKILL.md"
-autovault add-local "$tmpdir" --source trusted-provider/example --sync-profiles
+autovault add "$tmpdir" --source local --sync-profiles --yes
 ```
 
 Do not install or execute any provider-supplied scripts until the user has

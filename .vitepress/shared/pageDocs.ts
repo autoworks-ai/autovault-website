@@ -133,15 +133,16 @@ autovault doctor
 
 Doctor confirms the binary, vault folder, signing key, bundled skill index, and discovered agent profiles.
 
-## Add a local skill bundle
+## Add a skill source
 
 \`\`\`bash
-autovault add-local ./skills/skill-author --source vendor/skills --sync-profiles
-autovault add-local ~/.agents/skills/copilot-review --source native:agents --sync-profiles
-autovault add-local ./my-skill --source https://github.com/org/repo/tree/main/skills/my-skill
+autovault add ./skills/skill-author --sync-profiles --yes
+autovault add ~/.agents/skills/copilot-review --source local --sync-profiles --yes
+autovault add autoworks-ai/autovault:skills/skill-author/SKILL.md --sync-profiles --yes
+autovault add https://example.com/SKILL.md --source url --no-sync-profiles --yes
 \`\`\`
 
-The \`autovault add-local\` command hands raw skill content and sibling resources to the same gate used by MCP install paths: frontmatter repair, schema validation, denylist scan, capability/behavior check, deduplication, and Ed25519 signing. In ${PRODUCT_VERSION}, \`--source\` remains required so provenance is explicit.
+\`autovault add\` hands local paths, GitHub identifiers or URLs, agentskills slugs, and direct \`SKILL.md\` URLs to the same gate used by MCP install paths: frontmatter repair, schema validation, denylist scan, capability/behavior check, deduplication, and Ed25519 signing. Pass \`--source local\` when a path needs explicit local-source provenance and \`--agent\` when a remote skill does not declare target agents.
 
 ## Vault anatomy
 
@@ -310,7 +311,7 @@ Current ${PRODUCT_VERSION} surfaces are the local CLI, source ESM library export
 
 ## Current ${PRODUCT_VERSION} surfaces
 
-- CLI commands for add-local install, remove/uninstall cleanup, profile sync, doctor checks, local skill search/list/which, repo audit, setup, capability resolve, and remote service startup.
+- CLI commands for add install, remove/uninstall cleanup, profile sync, doctor checks, local skill search/list/which, repo audit, setup, capability resolve, and remote service startup.
 - Source ESM library exports for resolveCapabilities, syncProfiles, addSkill, updateSkill, deleteSkill, proposeSkill, transforms, auditRepo, and profile discovery.
 - MCP tools for discovery/full reads through get_skill, trusted adds, updates, deletes, proposals, and drift checks.
 - Remote Streamable HTTP MCP with OAuth and role-aware filtering at /mcp.
@@ -319,15 +320,16 @@ Current ${PRODUCT_VERSION} surfaces are the local CLI, source ESM library export
 
 Prefer inventory lookup first, full reads second, and get_skill with include_resources when packaged resources are needed. Use local sync-profiles when a filesystem-native host needs files under its local skill root.
 
-## add-local examples
+## add examples
 
 \`\`\`bash
-autovault add-local ./skills/skill-author --source vendor/skills --sync-profiles
-autovault add-local ~/.agents/skills/copilot-review --source native:agents --sync-profiles
-autovault add-local ./my-skill --source https://github.com/org/repo/tree/main/skills/my-skill
+autovault add ./skills/skill-author --sync-profiles --yes
+autovault add autoworks-ai/autovault:skills/skill-author/SKILL.md --sync-profiles --yes
+autovault add skill-slug --source agentskills --sync-profiles --agent codex --yes
+autovault add https://example.com/SKILL.md --source url --no-sync-profiles --yes
 \`\`\`
 
-\`--source\` is required in ${PRODUCT_VERSION}. Use a repository, URL, or native-root label that explains where the local bundle came from. \`--sync-profiles\` refreshes visible agent roots.`;
+\`autovault add\` infers the source for common local paths and GitHub inputs. Use \`--source\` when the input is ambiguous, \`--agent\` when a remote skill does not declare target agents, and \`--sync-profiles\` when visible agent roots should be refreshed.`;
 
 const deployMarkdown = `# Deploy A Remote AutoVault
 
@@ -492,7 +494,7 @@ After adoption the wizard runs sync-profiles, which reports restart_required: tr
 
 ## Move a skill into the vault without the wizard
 
-Use \`autovault add-local <skill-dir> --source native:claude-code --sync-profiles\`. Sync refuses to overwrite an existing user-managed native directory, so move the native dir aside first if you want the managed symlink in its place.
+Use \`autovault add <skill-dir> --source local --sync-profiles --yes\`. Sync refuses to overwrite an existing user-managed native directory, so move the native dir aside first if you want the managed symlink in its place.
 
 ## Removed skill still visible
 
@@ -529,7 +531,7 @@ AutoVault is currently pre-1.0. The public source package is MIT licensed and th
 
 - Local stdio MCP and remote Streamable HTTP MCP surfaces.
 - OAuth and role-aware access checks for remote mode.
-- add-local for third-party installers that already have a local skill bundle.
+- add for local paths, GitHub sources, agentskills slugs, and direct SKILL.md URLs.
 - remove for deleting a vaulted skill and pruning AutoVault-managed profile symlinks.
 - AUTOVAULT_SKILL_INSTALL vendor routing modes.
 - Bundled skills are installed from each skills/*/SKILL.md bundle.
@@ -539,7 +541,7 @@ AutoVault is currently pre-1.0. The public source package is MIT licensed and th
 
 ## v0.4.0
 
-Released May 22, 2026. Improves install and setup review UX, adds the agentgonewild-publisher community skill, smooths add-local local imports, standardizes public CLI output, retries Dependabot automerge after CI, and aligns Node typings with the runtime policy.
+Released May 22, 2026. Improves install and setup review UX, adds community skill examples, smooths the local add flow, standardizes public CLI output, retries Dependabot automerge after CI, and aligns Node typings with the runtime policy.
 
 ## v0.3.0
 
@@ -547,7 +549,7 @@ Released May 14, 2026. Adds vaulted skill removal, doctor repair for unsigned lo
 
 ## v0.2.1
 
-Bundled skill bootstrap, expanded validation, signing sidecars, add-local installer flow, remote OAuth docs, and MIT license alignment.
+Bundled skill bootstrap, expanded validation, signing sidecars, local skill installer flow, remote OAuth docs, and MIT license alignment.
 
 ## v0.2.0
 
@@ -685,7 +687,7 @@ export const pageDocs: PageDoc[] = [
     key: "changelog",
     file: "changelog.md",
     title: "AutoVault Changelog",
-    description: "Read AutoVault release notes covering remote MCP, OAuth, add-local, bundled-skill bootstrap, transforms, resource reads, and drift checks.",
+    description: "Read AutoVault release notes covering remote MCP, OAuth, skill install, bundled-skill bootstrap, transforms, resource reads, and drift checks.",
     route: "/changelog",
     agentPath: "/agents/changelog",
     markdown: changelogMarkdown

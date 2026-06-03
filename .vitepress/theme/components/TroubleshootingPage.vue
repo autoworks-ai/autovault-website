@@ -77,12 +77,12 @@
     <pre class="mono-block">$ autovault skill which &lt;name&gt;</pre>
     <p>That prints the resolved script path(s) — vault, bundled, or native — so you can verify the symlink actually exists.</p>
 
-    <h3 id="faq-add-local-skip-wizard">Can I move an existing skill into the vault without using the setup wizard?</h3>
-    <p>Yes. Use <code>add-local</code> directly:</p>
-    <pre class="mono-block">$ autovault add-local &lt;skill-dir&gt; --source native:claude-code --sync-profiles</pre>
+    <h3 id="faq-add-skip-wizard">Can I move an existing skill into the vault without using the setup wizard?</h3>
+    <p>Yes. Add the existing directory directly and mark it as a local source:</p>
+    <pre class="mono-block">$ autovault add &lt;skill-dir&gt; --source local --sync-profiles --yes</pre>
     <p>Sync refuses to overwrite an existing user-managed native directory, so move the native dir aside first if you want the managed symlink:</p>
     <pre class="mono-block">$ mv ~/.claude/skills/&lt;name&gt; ~/.claude/skills.bak/&lt;name&gt;
-$ autovault add-local ~/.claude/skills.bak/&lt;name&gt; --source native:claude-code --sync-profiles</pre>
+$ autovault add ~/.claude/skills.bak/&lt;name&gt; --source local --sync-profiles --yes</pre>
 
     <h3 id="faq-remove-still-visible">I removed a skill but it still shows up in an agent</h3>
     <p>Start with the normal removal path:</p>

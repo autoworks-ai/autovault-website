@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseDocument } from "yaml";
@@ -22,14 +22,18 @@ describe("skills catalog integrity", () => {
       expect(skill.detailPath).toBe(`/skill/${skill.name}`);
       expect(skill.rawPath).toBe(`/skills/${skill.name}/SKILL.md`);
       expect(skill.install).toContain(skill.rawPath.replace(/^\//, ""));
+      expect(skill.install).toContain("add_skill({");
+      expect(skill.install).not.toContain("add-local");
+      if (skill.cliInstall) {
+        expect(skill.cliInstall, `${skill.name} CLI install should use canonical add`).toMatch(/^autovault add \S+/);
+        expect(skill.cliInstall, `${skill.name} CLI install must not use compatibility alias`).not.toContain("add-local");
+      }
       if (skill.install.includes('source: "github"')) {
         expect(skill.install, `${skill.name} should use compact GitHub identifiers`).not.toContain("https://github.com/");
         const pinnedRef = skill.install.match(/@[0-9a-f]{40}:/)?.[0]?.slice(1, -1);
         expect(pinnedRef, `${skill.name} should pin GitHub source refs`).toBeTruthy();
         expect(skill.sourceUrl, `${skill.name} sourceUrl should match the pinned install ref`).toContain(`/blob/${pinnedRef}/`);
-        expect(skill.cliInstall, `${skill.name} github skill should expose a real CLI add-local command`).toMatch(/^autovault add-local \.\/\S+ --source \S+ --sync-profiles$/);
-      } else {
-        expect(skill.cliInstall, `${skill.name} url-hosted skill must not fabricate a CLI install (no clonable bundle)`).toBeUndefined();
+        expect(skill.cliInstall, `${skill.name} github skill should expose a canonical CLI add command`).toMatch(/^autovault add \S+ --sync-profiles$/);
       }
       expect(skill.sourceUrl).toMatch(/^https:\/\//);
       expect(skill.sourceUrl).not.toContain("autoworks-ai/skills/");
@@ -119,6 +123,8 @@ describe("skills catalog integrity", () => {
     expect(brand?.sourceKind).toBe("first-party");
     expect(brand?.admissionStatus).toBe("hosted-example");
     expect(brand?.permissions.some((row) => row.label === "resources")).toBe(true);
+    expect(brand?.install).toBe('add_skill({ source: "url", identifier: "https://autovault.dev/skills/autovault-brand-system/SKILL.md" })');
+    expect(brand?.cliInstall).toBe("autovault add https://autovault.dev/skills/autovault-brand-system/SKILL.md --source url --sync-profiles");
 
     const rawFile = resolve(repoRoot, "public", "skills", "autovault-brand-system", "SKILL.md");
     const frontmatter = readFrontmatter(readFileSync(rawFile, "utf8"));
@@ -137,17 +143,40 @@ describe("skills catalog integrity", () => {
     ]));
   });
 
-  it("offers a CLI/MCP install toggle and copies the active command", () => {
+  it("shows copyable CLI and MCP install command rows", () => {
     const detail = readFileSync(resolve(repoRoot, ".vitepress/theme/components/SkillDetailPage.vue"), "utf8");
 
-    // Default to the AutoVault CLI command, fall back to the MCP add_skill call.
-    expect(detail).toContain('installMode = ref<"cli" | "mcp">("cli")');
-    expect(detail).toContain("activeCommand");
-    expect(detail).toContain("Copy CLI command");
-    expect(detail).toContain("Copy add_skill call");
+    expect(detail).toContain("installRows");
+    expect(detail).toContain('label: "CLI"');
+    expect(detail).toContain('label: "MCP"');
+    expect(detail).toContain("Copy CLI install command");
+    expect(detail).toContain("Copy MCP install command");
+    expect(detail).toContain('installRows.length > 1 ? "CLI + MCP" : "MCP"');
     expect(detail).toContain('aria-live="polite"');
-    expect(detail).toContain("copyText(activeCommand.value)");
+    expect(detail).toContain("copyInstall(row.command, row.mode)");
+    expect(detail).not.toContain("installMode = ref");
+    expect(detail).not.toContain("autovault add-local");
     expect(detail).not.toContain("/api/vaults/current/pending-skills");
+  });
+
+  it("keeps static skill detail pages aligned with curated catalog entries", () => {
+    const staticPages = readdirSync(resolve(repoRoot, "skill"))
+      .filter((file) => file.endsWith(".md"))
+      .map((file) => file.replace(/\.md$/, ""))
+      .sort();
+    const catalogPages = skills.map((skill) => skill.name).sort();
+
+    expect(staticPages).toEqual(catalogPages);
+  });
+
+  it("keeps hosted skill asset headers scoped by extension", () => {
+    const headers = readFileSync(resolve(repoRoot, "public", "_headers"), "utf8");
+
+    expect(headers).not.toMatch(/^\/skills\/\*\s*$/m);
+    expect(headers).toContain("/skills/*.md");
+    expect(headers).toContain("Content-Type: text/markdown; charset=utf-8");
+    expect(headers).toContain("/skills/*.svg");
+    expect(headers).toContain("Content-Type: image/svg+xml; charset=utf-8");
   });
 
   it("renders bundled skill resources as an inspectable bundle", () => {

@@ -64,7 +64,7 @@ onBeforeUnmount(stop)
           <span class="av-qs-step-title">Add a validated skill</span>
         </div>
         <div class="av-qs-step-body">
-          <div class="row"><span class="pmt">$</span><span>autovault add-local ./skills/skill-author --source vendor/skills --sync-profiles</span></div>
+          <div class="row"><span class="pmt">$</span><span>autovault add ./skills/skill-author --sync-profiles --yes</span></div>
           <div class="out" style="margin-top: 6px">↳ scanning… 9.4kb</div>
           <div class="out">↳ <span class="ok">[1/5]</span> yaml-repair: ok</div>
           <div class="out">↳ <span class="ok">[2/5]</span> denylist: ok</div>

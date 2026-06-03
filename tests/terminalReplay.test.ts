@@ -4,7 +4,7 @@ import { getTerminalLineDelay, type TerminalReplayLine } from "../.vitepress/the
 describe("terminal replay helpers", () => {
   it("matches the prototype timing by terminal line type", () => {
     const cases: Array<[TerminalReplayLine, number]> = [
-      [{ type: "cmd", text: "autovault add-local" }, 700],
+      [{ type: "cmd", text: "autovault add" }, 700],
       [{ type: "ok", text: "signed" }, 250],
       [{ type: "out", text: "fetching" }, 130],
       [{ type: "err", text: "rejected" }, 130],
