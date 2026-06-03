@@ -1,7 +1,16 @@
 export type AgentId = "cc" | "cx" | "aj";
-export type SkillCategory = "setup" | "authoring" | "meta" | "provenance" | "transforms" | "security";
+export type SkillCategory = "setup" | "authoring" | "brand" | "meta" | "provenance" | "transforms" | "security";
 export type SkillSourceKind = "first-party" | "trusted-provider";
 export type SkillAdmissionStatus = "hosted-example" | "provenance-example";
+export type SkillResourceKind = "markdown" | "svg" | "css" | "ascii" | "yaml" | "script" | "file";
+
+export interface SkillResource {
+  path: string;
+  kind: SkillResourceKind;
+  group: string;
+  title: string;
+  summary: string;
+}
 
 export interface Skill {
   name: string;
@@ -15,6 +24,7 @@ export interface Skill {
   license: string;
   size: string;
   install: string;
+  cliInstall?: string;
   detailPath: string;
   rawPath: string;
   sourceUrl: string;
@@ -27,6 +37,7 @@ export interface Skill {
   frontmatter: string[];
   overview: string[];
   useCases: string[];
+  resources?: SkillResource[];
   permissions: Array<{ label: string; scope: string; kind: "ok" | "no" | "warn" }>;
   related: string[];
   featured?: boolean;
@@ -41,6 +52,7 @@ export const agents = [
 export const categories = [
   { id: "setup" as const, label: "Setup" },
   { id: "authoring" as const, label: "Authoring" },
+  { id: "brand" as const, label: "Brand" },
   { id: "meta" as const, label: "Meta" },
   { id: "provenance" as const, label: "Provenance" },
   { id: "transforms" as const, label: "Transforms" },
@@ -57,8 +69,10 @@ const AUTOVAULT_WEBSITE_SKILL_REF = "457f238d0fd49425ac01ad7dad58c726624f1eaa";
 const AUTOVAULT_SOURCE_SKILL_REF = "85cea7424bfbc37901752600adf5eaab87e6b85a";
 
 function githubSkillSource(repo: string, ref: string, path: string) {
+  const bundleDir = path.replace(/\/SKILL\.md$/, "");
   return {
     install: `add_skill({ source: "github", identifier: "${repo}@${ref}:${path}" })`,
+    cliInstall: `autovault add-local ./${bundleDir} --source ${repo} --sync-profiles`,
     sourceUrl: `https://github.com/${repo}/blob/${ref}/${path}`
   };
 }
@@ -107,6 +121,124 @@ export const skills: Skill[] = [
       { kind: "warn", label: "shell", scope: "installer execution requires explicit approval" }
     ],
     related: ["autovault-skill", "skill-author"],
+    featured: true
+  },
+  {
+    name: "autovault-brand-system",
+    org: "autovault.dev",
+    icon: "BS",
+    category: "brand",
+    agents: ["cc", "cx", "aj"],
+    desc: "Apply the AutoVault brand system across web SVG, terminal ASCII, illustrated mascot, social asset, and video-oriented surfaces.",
+    v: "0.1.0",
+    references: 10,
+    license: "MIT",
+    size: "4,517 B",
+    install: "add_skill({ source: \"url\", identifier: \"https://autovault.dev/skills/autovault-brand-system/SKILL.md\" })",
+    detailPath: "/skill/autovault-brand-system",
+    rawPath: "/skills/autovault-brand-system/SKILL.md",
+    sourceUrl: "https://autovault.dev/skills/autovault-brand-system/SKILL.md",
+    sourceLabel: "public/skills/autovault-brand-system/SKILL.md",
+    sourceKind: "first-party",
+    providerName: "AutoVault",
+    trustLabel: "First-party brand-system example",
+    admissionStatus: "hosted-example",
+    provenanceNote: "Shows how a skill can bundle brand identity, motion rules, SVG/CSS/ASCII assets, and raster prompt recipes as reusable AutoVault resources.",
+    frontmatter: [
+      "name: autovault-brand-system",
+      "version: 0.1.0",
+      "description: Apply the AutoVault brand system across web SVG, terminal ASCII, illustrated mascot, social asset, and video-oriented surfaces.",
+      "category: brand",
+      "resources: references, SVG, CSS, ASCII, prompt, OpenAI metadata",
+      "capabilities.filesystem: readwrite"
+    ],
+    overview: [
+      "Codifies AutoVault's current visual identity, mark anatomy, type, palette, motion states, and reduced-motion behavior.",
+      "Bundles reusable assets and adaptation notes for web SVG, terminal ASCII, mascot/raster, social, and video-style surfaces."
+    ],
+    useCases: [
+      "A surface needs to use the AutoVault mark, colors, type, or interaction states consistently.",
+      "An agent is adapting the vault brand between SVG, terminal, raster, and video constraints.",
+      "A showcase skill should demonstrate that AutoVault can ship rich reference material and assets, not just instructions."
+    ],
+    resources: [
+      {
+        path: "agents/openai.yaml",
+        kind: "yaml",
+        group: "agents",
+        title: "OpenAI agent metadata",
+        summary: "Interface labels, icon paths, brand color, and invocation policy for agent hosts."
+      },
+      {
+        path: "references/identity.md",
+        kind: "markdown",
+        group: "references",
+        title: "Identity reference",
+        summary: "Canonical brand scope, palette, type, mark anatomy, voice, layout, and accessibility rules."
+      },
+      {
+        path: "references/motion.md",
+        kind: "markdown",
+        group: "references",
+        title: "Motion reference",
+        summary: "Motion tokens, scan/admit/lock states, interaction triggers, reduced motion, and video timing."
+      },
+      {
+        path: "references/surface-adaptation.md",
+        kind: "markdown",
+        group: "references",
+        title: "Surface adaptation",
+        summary: "How to translate the brand across SVG, CSS, terminal, TUI, mascot, social, video, and checkout surfaces."
+      },
+      {
+        path: "assets/brand-mark.svg",
+        kind: "svg",
+        group: "assets",
+        title: "Static SVG mark",
+        summary: "Self-contained static AutoVault vault mark for small UI, docs, and badge contexts."
+      },
+      {
+        path: "assets/brand-mark-animated.svg",
+        kind: "svg",
+        group: "assets",
+        title: "Animated SVG mark",
+        summary: "Self-contained animated mark showing scan, dial close, and locked/admitted state with reduced-motion fallback."
+      },
+      {
+        path: "assets/autovault-brand.css",
+        kind: "css",
+        group: "assets",
+        title: "Brand CSS tokens",
+        summary: "Reusable CSS custom properties, state classes, scan animation, dial state hooks, and reduced-motion rules."
+      },
+      {
+        path: "assets/ascii-vault.txt",
+        kind: "ascii",
+        group: "assets",
+        title: "ASCII vault frames",
+        summary: "Terminal-safe locked, unlocked, scan, read, admit, and held states for logs and TUIs."
+      },
+      {
+        path: "assets/mascot-prompt.md",
+        kind: "markdown",
+        group: "assets",
+        title: "Mascot prompt",
+        summary: "Raster and video art direction for friendly mascot adaptations without making the mascot canonical."
+      },
+      {
+        path: "assets/usage-examples.md",
+        kind: "markdown",
+        group: "assets",
+        title: "Usage examples",
+        summary: "Copy-ready recipes for web SVG marks, CSS state hooks, terminal loaders, mascot prompts, and video bumpers."
+      }
+    ],
+    permissions: [
+      { kind: "no", label: "network", scope: "none" },
+      { kind: "ok", label: "filesystem", scope: "read/write for adapting local brand assets" },
+      { kind: "ok", label: "resources", scope: "SVG, CSS, ASCII, prompt, metadata, and reference files" }
+    ],
+    related: ["skill-author", "autovault-skill", "multi-agent-transform"],
     featured: true
   },
   {
@@ -354,7 +486,8 @@ export function filterSkills(input: Skill[], filters: SkillFilters): Skill[] {
   const orgSet = new Set(filters.orgs ?? []);
 
   return input.filter((skill) => {
-    const matchesQuery = !query || [skill.name, skill.org, skill.desc, skill.category, skill.providerName, skill.trustLabel, skill.provenanceNote].some((field) => field.toLowerCase().includes(query));
+    const resourceFields = (skill.resources ?? []).flatMap((resource) => [resource.path, resource.kind, resource.group, resource.title, resource.summary]);
+    const matchesQuery = !query || [skill.name, skill.org, skill.desc, skill.category, skill.providerName, skill.trustLabel, skill.provenanceNote, ...resourceFields].some((field) => field.toLowerCase().includes(query));
     const matchesAgents = agentSet.size === 0 || skill.agents.some((agent) => agentSet.has(agent));
     const matchesCategories = categorySet.size === 0 || categorySet.has(skill.category);
     const matchesOrgs = orgSet.size === 0 || orgSet.has(skill.org);

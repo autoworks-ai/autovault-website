@@ -16,7 +16,7 @@
           <div>
             <h1><span class="org">{{ currentSkill.org }} / </span>{{ currentSkill.name }}</h1>
             <div class="sub-row">
-              <span class="verified"><UiIcon name="check" /> Hosted SKILL.md</span>
+              <span class="verified"><UiIcon name="check" /> {{ bundleBadgeLabel }}</span>
               <span class="source-badge" :class="currentSkill.sourceKind">{{ currentSkill.trustLabel }}</span>
               <span>v{{ currentSkill.v }}</span><span class="dot" />
               <span>{{ currentSkill.license }}</span><span class="dot" />
@@ -26,18 +26,37 @@
           </div>
         </div>
         <p class="desc">{{ currentSkill.desc }}</p>
+        <div v-if="hasBundle" class="sd-asset-strip" aria-label="Bundle highlights">
+          <button v-for="asset in featuredAssets" :key="asset.path" type="button" class="sd-asset-chip" @click="openResource(asset.path)">
+            <span v-if="asset.kind === 'svg'" class="thumb"><img :src="resourceHref(asset)" :alt="asset.title" /></span>
+            <span v-else class="thumb mono">{{ asset.kind }}</span>
+            <span>
+              <span class="name">{{ asset.title }}</span>
+              <span class="path">{{ asset.path }}</span>
+            </span>
+          </button>
+        </div>
       </div>
       <div class="actions">
-        <button class="sd-installbtn" type="button" @click="copyInstall">Copy MCP add <UiIcon name="arrow" /></button>
-        <div class="sd-copy-status" aria-live="polite">{{ copyStatus }}</div>
         <div class="sd-install">
-          <div class="lbl">Via MCP add_skill</div>
-          <div class="cmd">
-            <span class="pmt">&gt;</span>
-            <span class="cmd-text">{{ currentSkill.install }}</span>
-            <button class="copy" type="button" @click="copyInstall">{{ copied ? "Copied" : copyFailed ? "Copy failed" : "Copy" }}</button>
+          <div class="sd-install-head">
+            <span class="lbl">Install</span>
+            <div v-if="hasCli" class="sd-install-toggle" role="group" aria-label="Install method">
+              <button type="button" :class="{ active: activeMode === 'cli' }" @click="installMode = 'cli'">CLI</button>
+              <button type="button" :class="{ active: activeMode === 'mcp' }" @click="installMode = 'mcp'">MCP</button>
+            </div>
+            <span v-else class="sd-install-tag">MCP add_skill</span>
           </div>
+          <div class="cmd">
+            <span class="pmt">{{ activeMode === "cli" ? "$" : ">" }}</span>
+            <span class="cmd-text">{{ activeCommand }}</span>
+          </div>
+          <button class="sd-installbtn" type="button" @click="copyInstall">
+            {{ copied ? "Copied" : copyFailed ? "Copy failed" : activeMode === "cli" ? "Copy CLI command" : "Copy add_skill call" }}
+            <UiIcon name="arrow" />
+          </button>
         </div>
+        <div class="sd-copy-status" aria-live="polite">{{ copyStatus }}</div>
         <div class="sd-secondary-actions">
           <a class="sd-sbtn" :href="currentSkill.sourceUrl"><UiIcon name="github" /> Source</a>
           <button class="sd-sbtn" type="button" @click="tab = 'prov'"><UiIcon name="shield" /> Verify</button>
@@ -94,6 +113,59 @@
                 <div class="desc">{{ skill.desc }}</div>
               </a>
             </div>
+          </div>
+        </section>
+
+        <section v-else-if="tab === 'bundle'" class="sd-bundle">
+          <div class="sd-bundle-head">
+            <div>
+              <h2>Bundle contents</h2>
+              <p>Every file declared by this skill is inspectable here. Static resources are previewed from same-origin hosted files; script-like files, when present, are shown as text only.</p>
+            </div>
+            <div class="sd-bundle-count">
+              <strong>{{ bundleFileCount }}</strong>
+              <span>files</span>
+            </div>
+          </div>
+          <div class="sd-bundle-grid">
+            <nav class="sd-resource-tree" aria-label="Bundle files">
+              <div v-for="group in bundleGroups" :key="group.name" class="sd-resource-group">
+                <div class="sd-resource-group-title">{{ group.label }}</div>
+                <div v-for="resource in group.items" :key="resource.path" :class="['sd-resource-row', selectedResource?.path === resource.path ? 'active' : '']">
+                  <button type="button" @click="selectResource(resource.path)">
+                    <span class="kind">{{ resource.kind }}</span>
+                    <span class="file">
+                      <span class="title">{{ resource.title }}</span>
+                      <span class="path">{{ resource.path }}</span>
+                    </span>
+                    <span v-if="resource.kind === 'script'" class="exec-badge">inspect only</span>
+                  </button>
+                  <a class="raw-link" :href="resourceHref(resource)">raw</a>
+                </div>
+              </div>
+            </nav>
+
+            <article v-if="selectedResource" class="sd-resource-preview">
+              <div class="sd-resource-preview-head">
+                <div>
+                  <span class="kind">{{ selectedResource.kind }}</span>
+                  <span class="filename">{{ selectedResource.path }}</span>
+                </div>
+                <a :href="resourceHref(selectedResource)">view raw →</a>
+              </div>
+              <div class="sd-resource-summary">
+                <h3>{{ selectedResource.title }}</h3>
+                <p>{{ selectedResource.summary }}</p>
+              </div>
+              <div v-if="selectedResource.kind === 'svg'" class="sd-resource-visual">
+                <img :src="resourceHref(selectedResource)" :alt="selectedResource.title" />
+              </div>
+              <div v-else class="sd-resource-code">
+                <pre v-if="resourcePreview.status === 'loaded'">{{ resourcePreview.content }}</pre>
+                <pre v-else-if="resourcePreview.status === 'loading'">Loading {{ selectedResource.path }}...</pre>
+                <pre v-else>{{ resourcePreview.content || "Preview unavailable. Open the raw file to inspect this resource." }}</pre>
+              </div>
+            </article>
           </div>
         </section>
 
@@ -182,40 +254,66 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import UiIcon from "./UiIcon.vue";
 import { PRODUCT_VERSION } from "../data/product";
-import { agents as catalogAgents, findSkillByName, skills } from "../data/skills";
+import { agents as catalogAgents, findSkillByName, skills, type SkillResource } from "../data/skills";
 import { copyText } from "../utils/clipboard";
 
-type TabId = "overview" | "perms" | "prov" | "versions";
+type TabId = "overview" | "bundle" | "perms" | "prov" | "versions";
+type BundleResource = SkillResource & { root?: boolean };
 
 const props = defineProps<{ skillName?: string }>();
 const tab = ref<TabId>("overview");
 const copied = ref(false);
 const copyFailed = ref(false);
+const installMode = ref<"cli" | "mcp">("cli");
+const selectedResourcePath = ref("SKILL.md");
+const resourcePreview = ref({ path: "", status: "idle" as "idle" | "loading" | "loaded" | "error", content: "" });
 
 const currentSkill = computed(() => findSkillByName(props.skillName));
+
+const hasCli = computed(() => Boolean(currentSkill.value.cliInstall));
+const activeMode = computed<"cli" | "mcp">(() => (hasCli.value ? installMode.value : "mcp"));
+const activeCommand = computed(() => (activeMode.value === "cli" ? currentSkill.value.cliInstall ?? currentSkill.value.install : currentSkill.value.install));
 
 const ORG_AUTHOR_PAGES: Record<string, string> = {
   "autoworks-ai": "/author-autoworks-ai"
 };
 const authorPath = computed(() => ORG_AUTHOR_PAGES[currentSkill.value.org] ?? null);
 
-const tabs = [
+const resourceCount = computed(() => currentSkill.value.resources?.length ?? 0);
+const hasBundle = computed(() => resourceCount.value > 0);
+const bundleFileCount = computed(() => resourceCount.value + 1);
+const bundleBadgeLabel = computed(() => hasBundle.value ? "Hosted skill bundle" : "Hosted SKILL.md");
+
+const tabs = computed(() => [
   { id: "overview" as const, label: "Overview" },
+  ...(hasBundle.value ? [{ id: "bundle" as const, label: "Bundle", count: bundleFileCount.value }] : []),
   { id: "perms" as const, label: "Permissions" },
   { id: "prov" as const, label: "Provenance" },
   { id: "versions" as const, label: "Source", count: 1 }
-];
-
-const stats = computed(() => [
-  { label: "Example type", value: "skill", trend: "hosted SKILL.md" },
-  { label: "Declared agents", value: String(currentSkill.value.agents.length), trend: "from frontmatter" },
-  { label: "Gate stages", value: "5", trend: "covered by tests" },
-  { label: "Permission rows", value: String(currentSkill.value.permissions.length), trend: "declared metadata", muted: true },
-  { label: "Source", value: currentSkill.value.providerName, trend: currentSkill.value.trustLabel }
 ]);
+
+const stats = computed(() => {
+  if (hasBundle.value) {
+    return [
+      { label: "Example type", value: "bundle", trend: "hosted skill bundle" },
+      { label: "Bundle files", value: String(bundleFileCount.value), trend: "SKILL.md + resources" },
+      { label: "Resources", value: String(resourceCount.value), trend: "declared in frontmatter" },
+      { label: "Declared agents", value: String(currentSkill.value.agents.length), trend: "from frontmatter" },
+      { label: "Source", value: currentSkill.value.providerName, trend: currentSkill.value.trustLabel }
+    ];
+  }
+
+  return [
+    { label: "Example type", value: "skill", trend: "hosted SKILL.md" },
+    { label: "Declared agents", value: String(currentSkill.value.agents.length), trend: "from frontmatter" },
+    { label: "Gate stages", value: "5", trend: "covered by tests" },
+    { label: "Permission rows", value: String(currentSkill.value.permissions.length), trend: "declared metadata", muted: true },
+    { label: "Source", value: currentSkill.value.providerName, trend: currentSkill.value.trustLabel }
+  ];
+});
 
 const agentRows = computed(() => catalogAgents.map((agent) => ({
   ...agent,
@@ -227,6 +325,51 @@ const relatedSkills = computed(() => currentSkill.value.related.map((name) => sk
 const permissionGroups = computed(() => [
   { title: "Declared capabilities", rows: currentSkill.value.permissions }
 ]);
+
+const bundleResources = computed<BundleResource[]>(() => [
+  {
+    path: "SKILL.md",
+    kind: "markdown",
+    group: "root",
+    title: "SKILL.md",
+    summary: "Primary agent instructions, frontmatter, workflow, and declared resource manifest.",
+    root: true
+  },
+  ...(currentSkill.value.resources ?? [])
+]);
+
+const bundleGroups = computed(() => {
+  const order = ["root", "references", "assets", "agents", "bin", "scripts"];
+  const labels: Record<string, string> = {
+    root: "Skill root",
+    references: "Reference docs",
+    assets: "Assets",
+    agents: "Agent metadata",
+    bin: "Commands",
+    scripts: "Scripts"
+  };
+  return order
+    .map((name) => ({
+      name,
+      label: labels[name] ?? name,
+      items: bundleResources.value.filter((resource) => resource.group === name)
+    }))
+    .filter((group) => group.items.length);
+});
+
+const selectedResource = computed(() => bundleResources.value.find((resource) => resource.path === selectedResourcePath.value) ?? bundleResources.value[0]);
+
+const featuredAssets = computed(() => {
+  const priority = [
+    "assets/brand-mark-animated.svg",
+    "assets/brand-mark.svg",
+    "assets/ascii-vault.txt",
+    "assets/autovault-brand.css"
+  ];
+  return priority
+    .map((path) => bundleResources.value.find((resource) => resource.path === path))
+    .filter((resource): resource is BundleResource => Boolean(resource));
+});
 
 type ProvenanceDetail =
   | { kind: "link"; href: string; text: string }
@@ -262,15 +405,17 @@ const maintainers = computed(() => [
 ]);
 
 const copyStatus = computed(() => {
-  if (copied.value) return "MCP add call copied.";
-  if (copyFailed.value) return "Copy failed. Use the MCP add call below.";
-  return "Copies the MCP add_skill call. Hosted vault queueing is not enabled from this page.";
+  if (copied.value) return activeMode.value === "cli" ? "CLI command copied." : "MCP add_skill call copied.";
+  if (copyFailed.value) return "Copy failed. Select the command above to copy it manually.";
+  return activeMode.value === "cli"
+    ? "Copies the AutoVault CLI command. Run it from a clone of the source repo to admit the local bundle."
+    : "Copies the MCP add_skill call. Paste it to your agent to admit the skill from source.";
 });
 
 async function copyInstall() {
   copied.value = false;
   copyFailed.value = false;
-  if (await copyText(currentSkill.value.install)) {
+  if (await copyText(activeCommand.value)) {
     copied.value = true;
     window.setTimeout(() => {
       copied.value = false;
@@ -282,4 +427,52 @@ async function copyInstall() {
     copyFailed.value = false;
   }, 1600);
 }
+
+function skillResourceBasePath() {
+  return currentSkill.value.rawPath.replace(/\/SKILL\.md$/, "");
+}
+
+function resourceHref(resource: Pick<BundleResource, "path" | "root">) {
+  if (resource.root || resource.path === "SKILL.md") return currentSkill.value.rawPath;
+  return `${skillResourceBasePath()}/${resource.path}`;
+}
+
+function selectResource(path: string) {
+  selectedResourcePath.value = path;
+}
+
+function openResource(path: string) {
+  selectedResourcePath.value = path;
+  tab.value = "bundle";
+}
+
+async function loadSelectedResource() {
+  const resource = selectedResource.value;
+  if (!resource || resource.kind === "svg" || typeof window === "undefined") return;
+
+  const href = resourceHref(resource);
+  resourcePreview.value = { path: resource.path, status: "loading", content: "" };
+  try {
+    const response = await fetch(href);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const content = await response.text();
+    if (selectedResource.value?.path !== resource.path) return;
+    resourcePreview.value = { path: resource.path, status: "loaded", content };
+  } catch {
+    if (selectedResource.value?.path !== resource.path) return;
+    resourcePreview.value = {
+      path: resource.path,
+      status: "error",
+      content: `Could not load ${href}. Open the raw file to inspect this resource.`
+    };
+  }
+}
+
+onMounted(() => {
+  void loadSelectedResource();
+});
+
+watch(selectedResource, () => {
+  void loadSelectedResource();
+});
 </script>

@@ -164,12 +164,15 @@ const SkillTile = defineComponent({
         h("div", { class: "stl-agents" }, skillAgents(props.skill).map((agent) => h("span", { class: "ag", style: agent.on ? { background: agent.color, color: "#0a0d11", borderColor: agent.color } : undefined }, agent.id)))
       ]),
       h("div", { class: "stl-meta" }, [
-        h("span", `v${props.skill.v}`),
-        h("span", props.skill.license),
-        h("span", props.skill.admissionStatus === "provenance-example" ? "provenance example" : "hosted example"),
-        h("span", { style: "flex:1" }),
-        h("a", { href: props.skill.rawPath }, "Raw"),
-        h("button", { class: "copy-btn", type: "button", onClick: () => copyInstall(props.skill.install) }, "Copy MCP add")
+        h("div", { class: "stl-meta-info" }, [
+          h("span", `v${props.skill.v}`),
+          h("span", props.skill.license),
+          h("span", props.skill.admissionStatus === "provenance-example" ? "provenance example" : "hosted example")
+        ]),
+        h("div", { class: "stl-meta-actions" }, [
+          h("a", { href: props.skill.rawPath }, "Raw"),
+          h("button", { class: "copy-btn", type: "button", onClick: () => copyInstall(props.skill.cliInstall ?? props.skill.install) }, "Copy install")
+        ])
       ])
     ]);
   }
