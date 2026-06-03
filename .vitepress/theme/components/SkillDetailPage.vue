@@ -43,7 +43,7 @@
         <div class="sd-install">
           <div class="sd-install-head">
             <span class="lbl">Install</span>
-            <span class="sd-install-tag">CLI + MCP</span>
+            <span class="sd-install-tag">{{ installRows.length > 1 ? "CLI + MCP" : "MCP" }}</span>
           </div>
           <div class="sd-install-list">
             <div v-for="row in installRows" :key="row.mode" class="sd-install-row">

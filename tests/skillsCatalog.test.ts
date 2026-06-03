@@ -151,6 +151,7 @@ describe("skills catalog integrity", () => {
     expect(detail).toContain('label: "MCP"');
     expect(detail).toContain("Copy CLI install command");
     expect(detail).toContain("Copy MCP install command");
+    expect(detail).toContain('installRows.length > 1 ? "CLI + MCP" : "MCP"');
     expect(detail).toContain('aria-live="polite"');
     expect(detail).toContain("copyInstall(row.command, row.mode)");
     expect(detail).not.toContain("installMode = ref");
