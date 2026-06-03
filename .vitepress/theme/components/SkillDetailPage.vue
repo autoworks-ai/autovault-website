@@ -256,7 +256,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import UiIcon from "./UiIcon.vue";
 import { PRODUCT_VERSION } from "../data/product";
 import { agents as catalogAgents, findSkillByName, skills, type SkillResource } from "../data/skills";
@@ -470,11 +470,16 @@ async function loadSelectedResource() {
   }
 }
 
-onMounted(() => {
-  void loadSelectedResource();
-});
-
-watch(selectedResource, () => {
-  void loadSelectedResource();
-});
+// Only fetch a resource preview while the Bundle tab is actually visible —
+// avoids a wasted SKILL.md fetch on mount and on non-bundle skills (which have
+// no Bundle tab at all). Reacts to both the tab switch and the selection, and
+// runs immediately so opening the tab loads the current selection.
+watch(
+  [tab, selectedResource],
+  () => {
+    if (tab.value !== "bundle") return;
+    void loadSelectedResource();
+  },
+  { immediate: true }
+);
 </script>
