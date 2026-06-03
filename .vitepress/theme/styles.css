@@ -5129,6 +5129,35 @@ body {
     border-bottom: 1px solid var(--line);
     padding-right: 0;
   }
+
+  /* Compact the count strip on phones: a full-width 1fr stack of four
+     stat boxes ate the top of the viewport. 2x2 + trimmed descriptor.
+     Wins over the .dir-stats 1fr rule above by source order. */
+  .cd-full-content .dir-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .cd-full-content .dir-stats .stat {
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    padding: 12px 14px;
+  }
+
+  .cd-full-content .dir-stats .stat:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .cd-full-content .dir-stats .stat:nth-last-child(-n + 2) {
+    border-bottom: 0;
+  }
+
+  .cd-full-content .dir-stats .stat .val {
+    font-size: 18px;
+  }
+
+  .cd-full-content .dir-stats .stat .arg {
+    display: none;
+  }
 }
 
 @media (max-width: 640px) {
@@ -8281,11 +8310,25 @@ body {
   color: var(--warn);
 }
 
-.sd-head .dot {
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: var(--ink-4);
+.sd-head .meta-facts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 4px;
+}
+
+.sd-head .meta-facts > span + span::before {
+  content: "·";
+  margin: 0 8px;
+  color: var(--ink-4);
+}
+
+.sd-head .src-path {
+  margin-top: 6px;
+  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
 }
 
 .sd-head .desc {
@@ -9986,6 +10029,10 @@ body {
   .au-head,
   .sd-head {
     grid-template-columns: 1fr;
+  }
+
+  .sd-head {
+    gap: 28px;
   }
 
   .providers {

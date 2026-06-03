@@ -18,11 +18,13 @@
             <div class="sub-row">
               <span class="verified"><UiIcon name="check" /> {{ bundleBadgeLabel }}</span>
               <span class="source-badge" :class="currentSkill.sourceKind">{{ currentSkill.trustLabel }}</span>
-              <span>v{{ currentSkill.v }}</span><span class="dot" />
-              <span>{{ currentSkill.license }}</span><span class="dot" />
-              <span>{{ currentSkill.size }}</span><span class="dot" />
-              <span>{{ currentSkill.sourceLabel }}</span>
+              <span class="meta-facts">
+                <span>v{{ currentSkill.v }}</span>
+                <span>{{ currentSkill.license }}</span>
+                <span>{{ currentSkill.size }}</span>
+              </span>
             </div>
+            <div class="src-path">{{ currentSkill.sourceLabel }}</div>
           </div>
         </div>
         <p class="desc">{{ currentSkill.desc }}</p>
