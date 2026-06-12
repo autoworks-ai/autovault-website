@@ -26,8 +26,8 @@
     "concurrently": "^10.0.0",
     "vitepress": "^1.6.4",
     "vitest": "^4.1.7",
-    "vue": "^3.5.35",
-    "vue-tsc": "^3.3.2",
+    "vue": "^3.5.38",
+    "vue-tsc": "^3.3.4",
     "wrangler": "^4.95.0"
   },
   "dependencies": {
