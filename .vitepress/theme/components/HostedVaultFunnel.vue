@@ -149,7 +149,11 @@ function trackPirsch(name: string, meta: Record<string, unknown> = {}) {
   try {
     if (typeof window !== "undefined") {
       const pirsch = (window as any).pirsch;
-      if (typeof pirsch === "function") pirsch(name, { meta });
+      if (typeof pirsch === "function") {
+        // pa.js uses a command dispatcher: first arg is the command ("event"),
+        // second arg is the event name, third is options containing meta.
+        pirsch("event", name, { meta });
+      }
     }
   } catch {}
 }
