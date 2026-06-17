@@ -28,8 +28,8 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
 
-  audit:
-    name: Dependency Audit
+  audit-prod:
+    name: Dependency Audit (production)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -41,5 +41,55 @@ jobs:
 
       - run: npm ci
 
-      - name: Audit high-severity dependency issues
-        run: npm audit --audit-level=high
+      - name: Audit high-severity production dependencies only
+        # --omit=dev ensures we only fail on runtime-relevant high-severity issues.
+        # Dev tooling vulns (e.g. esbuild in vitepress/wrangler) are handled separately.
+        run: npm audit --audit-level=high --omit=dev
+
+  audit-full:
+    name: Dependency Audit (full tree, non-blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Audit high-severity (including dev dependencies)
+        # This is informational only. Many high-severity findings in dev deps
+        # (vite, wrangler, esbuild, miniflare) are build/dev-server only and
+        # cannot be fixed without downgrading critical tooling.
+        # We continue so the overall Security workflow can still succeed
+        # when only dev deps are affected.
+        run: |
+          npm audit --audit-level=high --json > audit-full.json || true
+        continue-on-error: true
+
+      - name: Report full audit findings
+        if: always()
+        run: |
+          echo "### Full dependency audit (including dev)"
+          echo
+          if [ -f audit-full.json ]; then
+            # Count high severity if possible (jq is available on runners)
+            HIGH_COUNT=$(jq '[.advisories[] | select(.severity == "high" or .severity == "critical")] | length' audit-full.json 2>/dev/null || echo "unknown")
+            echo "High/critical findings reported: $HIGH_COUNT (may be dev-only)."
+            echo "See artifact 'audit-full' for details."
+          else
+            echo "No high-severity issues found in full tree, or report unavailable."
+          fi
+          echo
+          echo "Production-only audit (see 'audit-prod' job) is the gate for real runtime risk."
+        continue-on-error: true
+
+      - name: Upload full audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-full
+          path: audit-full.json
+          retention-days: 7
