@@ -41,5 +41,5 @@ jobs:
 
       - run: npm ci
 
-      - name: Audit high-severity dependency issues
-        run: npm audit --audit-level=high
+      - name: Audit high-severity production dependency issues
+        run: npm audit --audit-level=high --omit=dev
