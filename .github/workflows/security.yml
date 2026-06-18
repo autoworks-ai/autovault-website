@@ -28,8 +28,8 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
 
-  audit:
-    name: Dependency Audit
+  audit-prod:
+    name: Dependency Audit (production)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -39,7 +39,59 @@ jobs:
           node-version: "24"
           cache: npm
 
-      - run: npm ci
+      - run: npm ci --omit=dev
 
-      - name: Audit high-severity production dependency issues
+      - name: Audit high-severity production dependencies only
+        # --omit=dev ensures we only fail on runtime-relevant high-severity issues.
+        # Dev tooling vulns (e.g. esbuild in vitepress/wrangler) are handled separately.
         run: npm audit --audit-level=high --omit=dev
+
+  audit-full:
+    name: Dependency Audit (full tree, non-blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+
+      - run: npm ci --omit=dev
+
+      - name: Audit high-severity (including dev dependencies)
+        # This is informational only. Many high-severity findings in dev deps
+        # (vite, wrangler, esbuild, miniflare) are build/dev-server only and
+        # cannot be fixed without downgrading critical tooling.
+        # We continue so the overall Security workflow can still succeed
+        # when only dev deps are affected.
+        run: |
+          npm audit --audit-level=high --json > audit-full.json || true
+        continue-on-error: true
+
+      - name: Report full audit findings
+        if: always()
+        run: |
+          echo "### Full dependency audit (including dev)" >> $GITHUB_STEP_SUMMARY
+          echo >> $GITHUB_STEP_SUMMARY
+          if [ -f audit-full.json ]; then
+            # Modern npm audit --json uses metadata.vulnerabilities
+            HIGH=$(jq -r '.metadata.vulnerabilities.high // 0' audit-full.json 2>/dev/null || echo 0)
+            CRIT=$(jq -r '.metadata.vulnerabilities.critical // 0' audit-full.json 2>/dev/null || echo 0)
+            TOTAL=$(jq -r '.metadata.vulnerabilities.total // 0' audit-full.json 2>/dev/null || echo 0)
+            echo "High: $HIGH, Critical: $CRIT, Total: $TOTAL (may be dev-only)." >> $GITHUB_STEP_SUMMARY
+            echo "See artifact 'npm-audit-full' for full details." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No high-severity issues found in full tree, or report unavailable." >> $GITHUB_STEP_SUMMARY
+          fi
+          echo >> $GITHUB_STEP_SUMMARY
+          echo "Production-only audit (see 'audit-prod' job) is the gate for real runtime risk." >> $GITHUB_STEP_SUMMARY
+        continue-on-error: true
+
+      - name: Upload full audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-full
+          path: audit-full.json
+          retention-days: 7
