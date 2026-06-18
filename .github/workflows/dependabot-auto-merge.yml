@@ -11,6 +11,7 @@ permissions:
   contents: write
   issues: write
   pull-requests: write
+  checks: read
 
 jobs:
   dependabot:
@@ -115,6 +116,47 @@ jobs:
               repo,
               issue_number,
               labels: labels.map((label) => label.name)
+            });
+
+      - name: Note Security audit status for Dependabot PRs
+        if: steps.pr.outputs.skip != 'true' && github.event_name == 'pull_request_target'
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const MARKER = '<!-- security-audit-note -->';
+
+            // Deduplicate: skip if we already posted a note with this marker
+            const { data: existing } = await github.rest.issues.listComments({
+              owner, repo, issue_number
+            });
+            if (existing.some(c => c.body && c.body.includes(MARKER))) {
+              console.log('Security audit note already posted; skipping to avoid spam.');
+              return;
+            }
+
+            // Fetch the latest check runs for this PR to report on the new split audit
+            const checks = await github.rest.checks.listForRef({
+              owner,
+              repo,
+              ref: context.payload.pull_request.head.sha,
+              check_name: 'Security / Dependency Audit (production)'
+            });
+
+            const prodAudit = checks.data.check_runs.find(c => c.name.includes('Dependency Audit (production)'));
+            const status = prodAudit ? prodAudit.conclusion || prodAudit.status : 'unknown';
+
+            let body = `${MARKER}\n**Security audit status (production deps only):** ${status}\n\n`;
+            body += 'The full-tree audit (including dev tooling like vitepress/wrangler) is now non-blocking to avoid brittleness from known build-dep CVEs.\n';
+            body += 'Only high-severity issues affecting production/runtime will block auto-merge.';
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number,
+              body
             });
 
       - name: Enable auto-merge for non-major updates
