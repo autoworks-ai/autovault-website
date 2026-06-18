@@ -144,6 +144,19 @@ const checkoutStarted = ref(false);
 const staticPreview = ref(false);
 const queuedSkillNames = ref<string[]>(skills.filter((skill) => skill.featured).slice(0, 2).map((skill) => skill.name));
 const { authHeaders, clerkAuthEnabled, isClerkLoaded, isClerkSignedIn, clerkUserLabel, clerkUserSlugSeed } = useClerkApiAuth();
+
+function trackPirsch(name: string, meta: Record<string, unknown> = {}) {
+  try {
+    if (typeof window !== "undefined") {
+      const pirsch = (window as any).pirsch;
+      if (typeof pirsch === "function") {
+        // pa.js uses a command dispatcher: first arg is the command ("event"),
+        // second arg is the event name, third is options containing meta.
+        pirsch("event", name, { meta });
+      }
+    }
+  } catch {}
+}
 let meRequestSeq = 0;
 let reconcileAttempted = false;
 
@@ -261,6 +274,7 @@ async function startFlow() {
 
   try {
     await loadMe();
+    trackPirsch("Hosted Vault: Flow Started", { entry: props.entry, signedIn: signedIn.value });
     if (!signedIn.value) {
       notice.value = { kind: "warn", text: "Create your account first. The draft will stay in this browser through checkout." };
       return;
@@ -341,6 +355,7 @@ async function loadMe() {
 
 async function startCheckout() {
   checkoutStarted.value = true;
+  trackPirsch("Hosted Vault: Checkout Started", { entry: props.entry });
   const headers = await protectedAuthHeaders({ "content-type": "application/json", accept: "application/json" });
   if (!headers) {
     checkoutStarted.value = false;
@@ -372,6 +387,7 @@ async function startCheckout() {
 async function provisionVault() {
   if (provisioning.value) return;
   provisioning.value = true;
+  trackPirsch("Hosted Vault: Provision Requested", { entry: props.entry, skills: queuedSkillNames.value.length });
   try {
     const headers = await protectedAuthHeaders({ "content-type": "application/json", accept: "application/json" });
     if (!headers) return;
