@@ -6,6 +6,8 @@ const OG_IMAGE = `${SITE_URL}/og-1200x630.png`;
 const TWITTER_IMAGE = `${SITE_URL}/twitter-1200x600.png`;
 // Pirsch data-code is a public browser-side identifier. Keep a source default
 // so production builds track even when the Pages build environment omits it.
+// This value matches the identification_code registered for hostname autovault.dev
+// (also used for the pirsch-verify-domain TXT record in the Pirsch dashboard).
 const DEFAULT_PIRSCH_DATA_CODE = "ooKBAPbmvXCA4hyKwoBDBx66yNyNswJL";
 const PIRSCH_DATA_CODE = process.env.PIRSCH_DATA_CODE?.trim() || DEFAULT_PIRSCH_DATA_CODE;
 
