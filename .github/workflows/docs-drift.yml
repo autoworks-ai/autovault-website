@@ -55,7 +55,7 @@ jobs:
           repositories: autovault
           permission-contents: read
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           token: ${{ steps.website_token.outputs.token }}
           persist-credentials: false
@@ -86,7 +86,7 @@ jobs:
           echo "reason=$REASON" >> "$GITHUB_OUTPUT"
 
       - name: Checkout source repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ steps.resolve.outputs.source_repo }}
           ref: ${{ steps.resolve.outputs.source_sha }}
