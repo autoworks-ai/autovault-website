@@ -6,6 +6,8 @@ license: MIT
 tags: [autovault, brand, design, motion, svg, ascii, mascot, demo]
 agents: [claude-code, codex, autojack]
 category: brand
+metadata:
+  version: "0.1.0"
 tools_required: [Read, Edit, Write]
 capabilities:
   network: false
