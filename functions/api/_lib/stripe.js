@@ -1,5 +1,5 @@
 import { ApiError } from "./http.js";
-import { nowIso, run } from "./db.js";
+import { first, nowIso, run } from "./db.js";
 import { hmacSha256Hex, timingSafeEqualHex } from "./crypto.js";
 
 export const STRIPE_API_VERSION = "2026-02-25.clover";
@@ -61,7 +61,22 @@ export async function verifyStripeSignature(payload, signatureHeader, secret, no
   return parts.signatures.some((signature) => timingSafeEqualHex(signature, expected));
 }
 
+// Stripe guarantees at-least-once delivery, so the same event id can arrive
+// several times. Returns false when we have already applied this event.
+export async function claimStripeEvent(env, event) {
+  if (!event?.id) return false;
+  const result = await run(env, `
+    insert into stripe_events (event_id, event_type, created, received_at)
+    values (?, ?, ?, ?)
+    on conflict(event_id) do nothing
+  `, event.id, event.type || "unknown", Number(event.created) || 0, nowIso());
+  // D1 reports 0 changes when the conflict clause suppressed the insert.
+  return (result?.meta?.changes ?? 0) > 0;
+}
+
 export async function handleStripeEvent(env, event) {
+  if (!await claimStripeEvent(env, event)) return { stored: false, duplicate: true };
+
   if (event.type === "checkout.session.completed") {
     const session = event.data?.object;
     const userId = session?.client_reference_id || session?.metadata?.user_id;
@@ -82,7 +97,8 @@ export async function handleStripeEvent(env, event) {
       customerId: asId(subscription.customer),
       status: subscription.status,
       priceId: priceIdForSubscription(subscription),
-      currentPeriodEnd: subscription.current_period_end || null
+      currentPeriodEnd: currentPeriodEndFor(subscription),
+      eventCreated: Number(event.created) || null
     });
     return { stored: true };
   }
@@ -92,6 +108,19 @@ export async function handleStripeEvent(env, event) {
 
 export async function upsertCustomer(env, { userId, customerId }) {
   if (!userId || !customerId) return false;
+  // customers.stripe_customer_id is UNIQUE, but the upsert below resolves
+  // conflicts on user_id. If this Stripe customer is currently mapped to a
+  // DIFFERENT user row (duplicate Stripe customer, account switch, test/live
+  // crossover) the UNIQUE constraint raises an uncaught D1 error, handleApi
+  // turns it into a 500, and Stripe retries the webhook against the same 500
+  // forever. Release the stale mapping first — the incoming event is
+  // authoritative about who owns this customer.
+  await run(
+    env,
+    "delete from customers where stripe_customer_id = ? and user_id <> ?",
+    customerId,
+    userId
+  );
   await run(env, `
     insert into customers (user_id, stripe_customer_id, created_at, updated_at)
     values (?, ?, ?, ?)
@@ -102,19 +131,29 @@ export async function upsertCustomer(env, { userId, customerId }) {
   return true;
 }
 
-export async function upsertSubscription(env, { userId, subscriptionId, customerId, status, priceId, currentPeriodEnd }) {
+export async function upsertSubscription(env, { userId, subscriptionId, customerId, status, priceId, currentPeriodEnd, eventCreated = null }) {
   if (!userId || !subscriptionId) return false;
+  // The `where` on the conflict clause is the out-of-order guard. Stripe can
+  // deliver a stale `subscription.updated` (status "active") after a
+  // `subscription.deleted`; applying it would silently restore paid access to
+  // a cancelled account, because every 402 gate reads subscriptions.status.
+  // Rows written before 0003 have a null last_event_created and accept the
+  // next event of any age exactly once, then order normally from there.
   await run(env, `
-    insert into subscriptions (user_id, stripe_subscription_id, stripe_customer_id, status, price_id, current_period_end, created_at, updated_at)
-    values (?, ?, ?, ?, ?, ?, ?, ?)
+    insert into subscriptions (user_id, stripe_subscription_id, stripe_customer_id, status, price_id, current_period_end, last_event_created, created_at, updated_at)
+    values (?, ?, ?, ?, ?, ?, ?, ?, ?)
     on conflict(user_id) do update set
       stripe_subscription_id = excluded.stripe_subscription_id,
       stripe_customer_id = excluded.stripe_customer_id,
       status = excluded.status,
       price_id = excluded.price_id,
       current_period_end = excluded.current_period_end,
+      last_event_created = excluded.last_event_created,
       updated_at = excluded.updated_at
-  `, userId, subscriptionId, customerId || null, status || null, priceId || null, currentPeriodEnd || null, nowIso(), nowIso());
+    where excluded.last_event_created is null
+       or subscriptions.last_event_created is null
+       or excluded.last_event_created >= subscriptions.last_event_created
+  `, userId, subscriptionId, customerId || null, status || null, priceId || null, currentPeriodEnd || null, eventCreated, nowIso(), nowIso());
   return true;
 }
 
@@ -138,7 +177,7 @@ export async function retrieveCheckoutSession(env, sessionId, fetcher = fetch) {
   return payload;
 }
 
-export { asId, priceIdForSubscription };
+export { asId, currentPeriodEndFor, priceIdForSubscription };
 
 function applyBranding(params, env) {
   params.set("branding_settings[display_name]", env.STRIPE_BRAND_DISPLAY_NAME || "AutoVault");
@@ -177,12 +216,22 @@ function parseStripeSignatureHeader(header) {
 
 async function userIdForCustomer(env, customerId) {
   if (!customerId) return null;
-  const row = await env.AUTOVAULT_DB.prepare("select user_id from customers where stripe_customer_id = ?").bind(customerId).first();
+  const row = await first(env, "select user_id from customers where stripe_customer_id = ?", customerId);
   return row?.user_id ?? null;
 }
 
 function asId(value) {
   return typeof value === "string" ? value : value?.id || null;
+}
+
+// Stripe moved `current_period_end` off the subscription and onto each
+// subscription item. Read the item first and fall back to the legacy
+// top-level field so this works either side of that migration; returning null
+// silently (the previous behaviour) meant every subscriber stored a null
+// period end with nothing to notice it.
+function currentPeriodEndFor(subscription) {
+  const fromItem = subscription?.items?.data?.[0]?.current_period_end;
+  return fromItem ?? subscription?.current_period_end ?? null;
 }
 
 function priceIdForSubscription(subscription) {

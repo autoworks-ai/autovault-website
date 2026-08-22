@@ -3,6 +3,7 @@ import { apiError, handleApi, json, readJson } from "../_lib/http.js";
 import {
   ACTIVE_SUBSCRIPTION_STATUSES,
   asId,
+  currentPeriodEndFor,
   priceIdForSubscription,
   retrieveCheckoutSession,
   upsertCustomer,
@@ -39,14 +40,14 @@ export async function onRequestPost({ request, env }) {
         customerId,
         status: subscription.status,
         priceId: priceIdForSubscription(subscription),
-        currentPeriodEnd: subscription.current_period_end || null
+        currentPeriodEnd: currentPeriodEndFor(subscription)
       });
       reconciledSubscription = {
         active: ACTIVE_SUBSCRIPTION_STATUSES.has(subscription.status || ""),
         status: subscription.status || null,
         stripe_subscription_id: subscription.id,
         price_id: priceIdForSubscription(subscription),
-        current_period_end: subscription.current_period_end || null
+        current_period_end: currentPeriodEndFor(subscription)
       };
     }
 
