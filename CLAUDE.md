@@ -94,7 +94,7 @@ so component/CSS edits hot-reload without a rebuild.
 | API | `functions/api/` | Pages Functions — Clerk auth, Stripe checkout, vault provisioning |
 | API lib | `functions/api/_lib/` | `auth.js`, `db.js`, `stripe.js`, `vault.js`, `crypto.js`, `http.js` |
 | Middleware | `functions/_middleware.js` | Handles `autovault.sh` installer host redirect |
-| Schema | `migrations/0001_hosted_vault.sql` | users, sessions, oauth_states, customers, subscriptions, vaults |
+| Schema | `migrations/*.sql` | `0001` users, sessions, customers, subscriptions, vaults, pending_skills; `0002` vault progress columns; `0003` stripe_events dedupe + drops oauth_states |
 | Skill catalog content | `skill/` (rendered) + `public/skills/` (assets) | Static catalog pages |
 | Tests | `tests/*.test.ts` | Vitest, no browser yet |
 
@@ -133,10 +133,19 @@ GET/approve/reject not yet implemented).
    conventional commits (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`).
 8. **No console.* in `functions/api/*.js`** — they emit to Cloudflare logs
    indiscriminately. Use `ApiError` + structured responses.
-9. **Never commit secrets.** Clerk + Stripe keys live in Cloudflare Pages
-   env vars (set via the dashboard or `wrangler pages secret put`).
-10. **Stripe is test-mode by default.** Live keys gated by a deliberate
-    flip; no autonomous agent should set `STRIPE_SECRET_KEY=sk_live_*`.
+9. **Never commit secrets to git.** Keys live in Cloudflare Pages env vars
+   (`wrangler pages secret put`), `.dev.vars`, or `.env.local` — all
+   gitignored. Setting and rotating them is fine; committing them is not,
+   because git history is permanent and this repo is public.
+9b. **New Markdown is not automatically a page.** VitePress globs every `.md`
+   in the repo. Anything not meant to be public must be in `srcExclude` in
+   `.vitepress/config.ts` — `docs/**`, `README.md` and `public/**` are already
+   listed, and `tests/publicSurface.test.ts` asserts it.
+10. **Stripe test mode is the default working mode.** Test-mode work —
+    products, prices, webhook endpoints, checkout configuration,
+    `stripe listen`, `stripe trigger` — needs no permission. Live mode
+    moves real money, so say what you're about to do before the first
+    live-mode write in a session; after that, carry on.
 
 ## Environment / Secrets
 
@@ -152,17 +161,53 @@ Configured in Cloudflare Pages project settings (not `.env`):
 
 ## Active feature work
 
-See `.claude/FEATURE-PLAN.md` for the hosted-portal punch list and worktree
-split. See `.claude/KICKOFF.md` for the orchestrated-build entry prompt.
+The hosted-vault sync loop (signed catalog API + device enrollment) is the
+current build. Background on the client-side contract this server must match
+lives in `autoworks-ai/autovault` at `src/sync/contract.ts` and
+`src/sync/local.ts`.
+
+Migrations are NOT applied by CI. Run `npm run migrate:remote` before deploying
+any change that depends on a new migration, or the Functions will 500 against
+the old schema.
+
+## Operating scope
+
+Jack's standing instruction (2026-08-22): **do as much of the work as possible
+directly — in Clerk, Stripe, the live site, and the Cloudflare CLI — rather
+than handing back instructions to run.** All four CLIs are installed and
+authenticated: `wrangler`, `stripe`, `clerk`, `gh`.
+
+In scope, no permission needed:
+
+- **`wrangler.toml`** — including `[vars]`, bindings, and routes.
+- **Cloudflare** — Pages config and deploys, DNS records, D1 (`--remote`
+  included), KV, secrets via `wrangler pages secret put`.
+- **Clerk** — `clerk env pull`, instance and application configuration,
+  redirect and allowed-origin settings, appearance.
+- **Stripe test mode** — products, prices, webhook endpoints, checkout
+  configuration, `stripe listen`, `stripe trigger`.
+- **Remote D1 migrations** — `npm run migrate:remote`.
+- **Production deploys** — CI on merge to `main` is the normal path;
+  `npm run deploy:pages` for a break-glass deploy.
+
+Judgment still applies to things that are hard to undo: dropping a populated
+table, deleting DNS the live site depends on, the first live-mode Stripe
+write, rotating a secret that is in active use. Say what is about to happen,
+then do it. That is being a careful colleague, not asking for permission.
 
 ## Don't / Hard rules
 
-- Don't touch `migrations/0001_hosted_vault.sql` — add new migrations.
-- Don't auto-merge PRs. Stop at green review for human merge (the user's
-  validated `parallel-task-batch` contract).
-- Don't autonomously edit `wrangler.toml` `[vars]` or secrets bindings.
-- Don't add new top-level VitePress pages without adding to nav.
-- Don't introduce `console.log` in functions. Use the error response
-  helpers.
-- Don't widen Clerk publishable-key handling — preview vs production keys
-  are intentionally separate.
+- Don't commit secrets. Everything else about secrets is fair game.
+- Don't edit `migrations/0001_hosted_vault.sql`, or any migration already
+  applied to production — add a new numbered one. This is correctness, not
+  permission: editing an applied migration desynchronizes environments.
+- Don't auto-merge PRs. Stop at green review for human merge (Jack's
+  validated `parallel-task-batch` contract). This one was *not* part of the
+  2026-08-22 broadening — ask if you want it relaxed too.
+- Don't add new top-level VitePress pages without adding to nav, and don't
+  let non-public Markdown escape `srcExclude`.
+- Don't introduce bare `console.log` in functions — it emits to Cloudflare
+  logs indiscriminately. Structured logging through a deliberate sink
+  (Analytics Engine, Tail Worker) is wanted; the API has none today.
+- Don't collapse the Clerk preview and production publishable keys into one.
+  They are intentionally separate and CI verifies it.

@@ -17,7 +17,7 @@ permissions:
 env:
   NODE_VERSION: "24"
   PAGES_PROJECT_NAME: autovault-website
-  WRANGLER_VERSION: "4.93.1"
+  WRANGLER_VERSION: "4.95.0"
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
