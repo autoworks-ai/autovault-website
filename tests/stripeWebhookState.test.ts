@@ -35,7 +35,101 @@ function subscriptionEvent({
   };
 }
 
+// Wraps a D1 binding so the first prepare() matching `matchSql` throws once
+// (simulating a transient D1 failure) and every call after that behaves
+// normally. Used to prove an event is not marked "claimed" until its state
+// write actually succeeds.
+function failOnceOn(binding: any, matchSql: string) {
+  let failed = false;
+  return {
+    prepare(sql: string) {
+      if (!failed && sql.includes(matchSql)) {
+        failed = true;
+        return {
+          bind() {
+            return {
+              async run() {
+                throw new Error("simulated transient D1 failure");
+              },
+              async first() {
+                throw new Error("simulated transient D1 failure");
+              },
+              async all() {
+                throw new Error("simulated transient D1 failure");
+              }
+            };
+          }
+        };
+      }
+      return binding.prepare(sql);
+    }
+  };
+}
+
 describe("Stripe webhook state handling", () => {
+  it("does not claim an event whose state write fails, so a retry can succeed", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db);
+    const event = subscriptionEvent({ id: "evt_flaky", created: 1000, status: "active" });
+
+    const flakyEnv = { ...env, AUTOVAULT_DB: failOnceOn(env.AUTOVAULT_DB, "insert into subscriptions") };
+    await expect(handleStripeEvent(flakyEnv, event)).rejects.toThrow("simulated transient D1 failure");
+
+    // The write failed, so this must NOT be recorded as claimed -- otherwise
+    // Stripe's retry hits `isStripeEventClaimed` and the subscription state
+    // this event carried is permanently lost.
+    const claimed = db.prepare("select count(*) as n from stripe_events where event_id = ?").get("evt_flaky") as { n: number };
+    expect(claimed.n).toBe(0);
+
+    // The retry, against the real (non-flaky) binding, must succeed.
+    expect(await handleStripeEvent(env, event)).toEqual({ stored: true });
+    expect((await getSubscription(env, "clerk_1")).active).toBe(true);
+  });
+
+  it("drops a same-timestamp conflicting event instead of letting arrival order decide", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db);
+
+    // Two different events for the same subscription share a `created`
+    // second -- Stripe's timestamp resolution can't tell them apart.
+    await handleStripeEvent(env, subscriptionEvent({
+      id: "evt_cancel_tie",
+      type: "customer.subscription.deleted",
+      created: 5000,
+      status: "canceled"
+    }));
+    await handleStripeEvent(env, subscriptionEvent({
+      id: "evt_active_tie",
+      created: 5000,
+      status: "active"
+    }));
+
+    // On a tie, the update is dropped -- arrival order must not decide access.
+    const subscription = await getSubscription(env, "clerk_1");
+    expect(subscription.status).toBe("canceled");
+    expect(subscription.active).toBe(false);
+  });
+
+  it("still applies a same-timestamp cancellation that arrives after an active tie", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db);
+
+    // Opposite arrival order from the test above. A blanket "drop every tie"
+    // rule would fail this case: it would leave the account wrongly active
+    // forever, because the genuine cancellation never gets applied.
+    await handleStripeEvent(env, subscriptionEvent({ id: "evt_active_tie2", created: 6000, status: "active" }));
+    await handleStripeEvent(env, subscriptionEvent({
+      id: "evt_cancel_tie2",
+      type: "customer.subscription.deleted",
+      created: 6000,
+      status: "canceled"
+    }));
+
+    const subscription = await getSubscription(env, "clerk_1");
+    expect(subscription.status).toBe("canceled");
+    expect(subscription.active).toBe(false);
+  });
+
   it("applies an event once and ignores the redelivery", async () => {
     const { db, env } = createTestEnv();
     seedUser(db);

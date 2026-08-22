@@ -62,7 +62,21 @@ export async function verifyStripeSignature(payload, signatureHeader, secret, no
 }
 
 // Stripe guarantees at-least-once delivery, so the same event id can arrive
-// several times. Returns false when we have already applied this event.
+// several times.
+export async function isStripeEventClaimed(env, event) {
+  if (!event?.id) return false;
+  const row = await first(env, "select 1 from stripe_events where event_id = ?", event.id);
+  return Boolean(row);
+}
+
+// Insert-or-ignore. Called only AFTER the corresponding state write succeeds
+// (see handleStripeEvent) so a transient D1 failure mid-write cannot leave an
+// event permanently marked "claimed" with its effect never applied — Stripe's
+// retry would otherwise see the claim, skip reprocessing, and the subscription/
+// customer state loss would be permanent. `on conflict do nothing` still
+// matters here: two concurrent deliveries of the same event can both pass the
+// claimed-check, both apply the same idempotent write, and then race on this
+// insert; the second is a harmless no-op rather than an error.
 export async function claimStripeEvent(env, event) {
   if (!event?.id) return false;
   const result = await run(env, `
@@ -70,40 +84,44 @@ export async function claimStripeEvent(env, event) {
     values (?, ?, ?, ?)
     on conflict(event_id) do nothing
   `, event.id, event.type || "unknown", Number(event.created) || 0, nowIso());
-  // D1 reports 0 changes when the conflict clause suppressed the insert.
   return (result?.meta?.changes ?? 0) > 0;
 }
 
 export async function handleStripeEvent(env, event) {
-  if (!await claimStripeEvent(env, event)) return { stored: false, duplicate: true };
+  if (await isStripeEventClaimed(env, event)) return { stored: false, duplicate: true };
+
+  let stored = false;
 
   if (event.type === "checkout.session.completed") {
     const session = event.data?.object;
     const userId = session?.client_reference_id || session?.metadata?.user_id;
-    if (!userId || !session?.customer) return { stored: false };
-
-    await upsertCustomer(env, { userId, customerId: asId(session.customer) });
-    return { stored: true };
-  }
-
-  if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.created" || event.type === "customer.subscription.deleted") {
+    if (userId && session?.customer) {
+      await upsertCustomer(env, { userId, customerId: asId(session.customer) });
+      stored = true;
+    }
+  } else if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.created" || event.type === "customer.subscription.deleted") {
     const subscription = event.data?.object;
     const userId = subscription?.metadata?.user_id || await userIdForCustomer(env, asId(subscription?.customer));
-    if (!userId || !subscription?.id) return { stored: false };
-
-    await upsertSubscription(env, {
-      userId,
-      subscriptionId: subscription.id,
-      customerId: asId(subscription.customer),
-      status: subscription.status,
-      priceId: priceIdForSubscription(subscription),
-      currentPeriodEnd: currentPeriodEndFor(subscription),
-      eventCreated: Number(event.created) || null
-    });
-    return { stored: true };
+    if (userId && subscription?.id) {
+      await upsertSubscription(env, {
+        userId,
+        subscriptionId: subscription.id,
+        customerId: asId(subscription.customer),
+        status: subscription.status,
+        priceId: priceIdForSubscription(subscription),
+        currentPeriodEnd: currentPeriodEndFor(subscription),
+        eventCreated: Number(event.created) || null
+      });
+      stored = true;
+    }
   }
 
-  return { stored: false };
+  // Claim only after the write above has actually landed. If upsertCustomer/
+  // upsertSubscription throws, we never reach this line, the event stays
+  // unclaimed, and Stripe's retry reprocesses it correctly instead of hitting
+  // a permanently "already handled" no-op.
+  await claimStripeEvent(env, event);
+  return { stored };
 }
 
 export async function upsertCustomer(env, { userId, customerId }) {
@@ -139,6 +157,19 @@ export async function upsertSubscription(env, { userId, subscriptionId, customer
   // a cancelled account, because every 402 gate reads subscriptions.status.
   // Rows written before 0003 have a null last_event_created and accept the
   // next event of any age exactly once, then order normally from there.
+  //
+  // Strictly newer always wins; strictly older always loses. A genuine tie
+  // (Stripe's `created` has only second-level precision, so two DIFFERENT
+  // events for the same subscription — e.g. a cancellation and a stale
+  // reactivation retry — can share a timestamp) cannot be ordered by time
+  // alone, so break it on status instead of arrival order: a non-paid
+  // incoming status is allowed through (fail closed — prefer revoking access
+  // on ambiguity), a paid incoming status is rejected (does not grant access
+  // on ambiguity). A first plain "or" on time was tried and rejected here:
+  // unconditionally dropping every tie just moves the bug — a genuine
+  // same-second cancellation arriving after a same-second "active" would
+  // then itself be dropped, leaving the account wrongly active.
+  const incomingIsPaid = isPaidStatus(status) ? 1 : 0;
   await run(env, `
     insert into subscriptions (user_id, stripe_subscription_id, stripe_customer_id, status, price_id, current_period_end, last_event_created, created_at, updated_at)
     values (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -152,8 +183,9 @@ export async function upsertSubscription(env, { userId, subscriptionId, customer
       updated_at = excluded.updated_at
     where excluded.last_event_created is null
        or subscriptions.last_event_created is null
-       or excluded.last_event_created >= subscriptions.last_event_created
-  `, userId, subscriptionId, customerId || null, status || null, priceId || null, currentPeriodEnd || null, eventCreated, nowIso(), nowIso());
+       or excluded.last_event_created > subscriptions.last_event_created
+       or (excluded.last_event_created = subscriptions.last_event_created and ? = 0)
+  `, userId, subscriptionId, customerId || null, status || null, priceId || null, currentPeriodEnd || null, eventCreated, nowIso(), nowIso(), incomingIsPaid);
   return true;
 }
 
