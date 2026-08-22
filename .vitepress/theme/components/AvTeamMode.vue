@@ -31,7 +31,7 @@ import UiIcon from './UiIcon.vue'
             <div class="route-num">B</div>
             <div class="route-body">
               <div class="route-title">Hosted at autovault.dev <span class="route-tag">private beta</span></div>
-              <div class="route-desc">For teams who'd rather not run a server. Reserved namespace, enrolled devices, signed skill sync. Same engine, same gate.</div>
+              <div class="route-desc">For teams who'd rather not run a server. Reserved namespace today; device enrollment and signed skill sync are not enabled yet. Same engine, same gate once they ship.</div>
             </div>
           </div>
         </div>

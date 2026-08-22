@@ -102,7 +102,11 @@ function toggle() {
   running.value ? start() : stop()
 }
 onMounted(() => {
-  if (prefersReducedMotion()) return
+  // The reduced-motion guard and the settling of tick/running both already
+  // live one call away, inside the function invoked below. Checking the
+  // preference again here and returning early instead of delegating to it
+  // left `running` at its initial `true` and `tick` at 0 -- the demo stayed
+  // queued forever and the control read "Pause" for a scan that never ran.
   if (running.value) start()
 })
 onBeforeUnmount(stop)

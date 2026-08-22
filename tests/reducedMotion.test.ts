@@ -8,12 +8,18 @@ function stubMatchMedia(matches: boolean) {
   });
 }
 
+// AvValidationGate.vue is deliberately excluded: its guard lives entirely
+// inside start() (invoked from onMounted, a scenario click, and the pause/
+// resume toggle), never duplicated at the onMounted call site itself, so a
+// forward slice from `onMounted(` finds no guard to compare against a timer
+// position. Its own dedicated tests below cover both halves of the same
+// invariant -- the guard precedes the timer inside start(), and onMounted
+// delegates to it rather than re-checking and short-circuiting.
 const ANIMATED_COMPONENTS = [
   "AvSpecHero.vue",
   "AvFolderHero.vue",
   "AvQuickStart.vue",
-  "AvDriftDiagram.vue",
-  "AvValidationGate.vue"
+  "AvDriftDiagram.vue"
 ];
 
 describe("prefersReducedMotion", () => {
@@ -120,5 +126,22 @@ describe("reduced-motion interactive fixes", () => {
     expect(guard).toBeGreaterThan(-1);
     expect(timer).toBeGreaterThan(-1);
     expect(guard).toBeLessThan(timer);
+  });
+
+  it("AvValidationGate settles to a finished state on mount under reduced motion, instead of staying queued", () => {
+    const source = readFileSync(
+      new URL("../.vitepress/theme/components/AvValidationGate.vue", import.meta.url),
+      "utf-8"
+    );
+    // onMounted used to check prefersReducedMotion() itself and return early
+    // without calling start() at all -- `running` stayed at its initial
+    // `true` and `tick` at 0, so the demo showed every step QUEUED forever
+    // and the toggle read "Pause" for a scan that was never running. start()
+    // already has its own reduced-motion guard that settles both; onMounted
+    // must delegate to it, not duplicate (and shortcut) the check.
+    const hookAt = source.search(/onMounted\(/);
+    const mountBody = source.slice(hookAt, hookAt + 450);
+    expect(mountBody).not.toMatch(/if \(prefersReducedMotion\(\)\) return/);
+    expect(mountBody).toContain("if (running.value) start()");
   });
 });

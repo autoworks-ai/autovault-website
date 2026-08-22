@@ -536,9 +536,15 @@ const renewalLabel = computed(() => {
     month: "short",
     day: "numeric",
   });
+  // A subscription cancelled effective end-of-period keeps status "active"
+  // (and therefore tone "ok") right up until that date -- the API persists
+  // only status and current_period_end, not Stripe's cancel_at_period_end,
+  // so this computed cannot tell "will renew" from "will end" for an
+  // otherwise-active row. A neutral date label is accurate either way;
+  // "Renews" is not.
   return subscriptionState.value.tone === "bad"
     ? `Ends ${formatted}`
-    : `Renews ${formatted}`;
+    : `Current period ends ${formatted}`;
 });
 
 const vaultSlug = computed(() => vault.value?.slug ?? "your-vault");
