@@ -71,9 +71,24 @@ npm run dev:pages
 npm run dev:stripe
 ```
 
-For iteration on the funnel UI itself, use `npm run dev:pages:live` instead
-of `dev:pages` — it puts Wrangler in front of the live VitePress dev server,
-so component/CSS edits hot-reload without a rebuild.
+For iteration on the funnel UI itself, leave `dev:pages` running and rebuild
+in a third terminal — Wrangler picks the new bundle up without a restart, and
+`--live-reload` reloads the browser for you:
+
+```bash
+npm run docs:build      # ~2s, no restart needed
+```
+
+There used to be a `dev:pages:live` script promising true hot reload. It was
+removed because it silently lied: `wrangler pages dev --proxy 5173` is
+ignored whenever `wrangler.toml` sets `pages_build_output_dir`, so Wrangler
+served a stale `.vitepress/dist` while a VitePress dev server nobody proxied
+to ran alongside it. Verified against wrangler 4.125: edit a string, and
+:5173 shows it while :8788 still serves the previous build.
+
+**`npm run dev` (port 5173) cannot run this funnel at all.** It is VitePress
+only — no Pages Functions — so every `/api/*` call 404s and `/cloud` can
+never leave the signed-out state. The page detects port 5173 and says so.
 
 **Test-mode helpers**
 
