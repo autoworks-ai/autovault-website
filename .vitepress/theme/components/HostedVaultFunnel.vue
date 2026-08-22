@@ -132,8 +132,6 @@ const paid = computed(() => Boolean(me.value?.subscription?.active));
 const vault = computed(() => me.value?.vault ?? null);
 const teamSlug = computed(() => vault.value?.slug ?? slugify(me.value?.user?.email || me.value?.user?.name || clerkUserSlugSeed.value || "your-team"));
 const hostedEndpoint = computed(() => vault.value?.public_url ?? `https://vault.autovault.dev/${teamSlug.value}`);
-const showSetupDetails = computed(() => !vault.value && (signedIn.value || paid.value || props.entry === "playground"));
-const showLocalHandoff = computed(() => signedIn.value || Boolean(vault.value));
 const namespaceStatusLabel = computed(() => vault.value ? "Hosted namespace reserved:" : "Planned namespace:");
 const commandBlock = computed(() => [
   AUTOVAULT_INSTALL_COMMAND,
@@ -164,6 +162,22 @@ const actionKind = computed<"auth" | "checkout" | "reserve" | "local">(() => {
   if (!vault.value) return "reserve";
   return "local";
 });
+
+// Both panels are scoped to the reserve step only.
+//
+// They used to render from sign-in onward, which meant the "Finish checkout"
+// step showed a starter-skill picker and a block of install commands
+// alongside its one button -- neither of which has anything to do with
+// paying. The design spec's rule for this surface is "never show more than
+// the one thing that matters right now", and a checkout step carrying two
+// unrelated panels is exactly what that rule forbids.
+//
+// At the reserve step they are both on-topic: the skills are what gets
+// queued into the namespace being created, and the handoff is what to do
+// next locally.
+const atReserveStep = computed(() => actionKind.value === "reserve");
+const showSetupDetails = computed(() => atReserveStep.value);
+const showLocalHandoff = computed(() => atReserveStep.value);
 
 
 onMounted(async () => {

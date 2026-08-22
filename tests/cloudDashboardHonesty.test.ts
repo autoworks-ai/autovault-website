@@ -196,3 +196,23 @@ describe("provisioning transition", () => {
     expect(noticeAt).toBeLessThan(emitAt);
   });
 });
+
+describe("one thing at a time", () => {
+  const funnel = readFileSync(
+    new URL("../.vitepress/theme/components/HostedVaultFunnel.vue", import.meta.url),
+    "utf-8"
+  );
+
+  it("does not show starter skills or install commands during checkout", () => {
+    // Both panels used to render from sign-in onward, so "Finish checkout"
+    // carried a starter-skill picker and a block of install commands next to
+    // its one button — neither related to paying. The design spec's rule for
+    // this surface is "never show more than the one thing that matters right
+    // now"; they belong to the reserve step, where the skills are what gets
+    // queued and the handoff is the actual next action.
+    expect(funnel).toContain("const atReserveStep = computed");
+    expect(funnel).toContain("const showSetupDetails = computed(() => atReserveStep.value);");
+    expect(funnel).toContain("const showLocalHandoff = computed(() => atReserveStep.value);");
+    expect(funnel).not.toContain("signedIn.value || paid.value");
+  });
+});
