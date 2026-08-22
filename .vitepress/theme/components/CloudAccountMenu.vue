@@ -8,6 +8,7 @@ const props = defineProps<{
   email: string;
   statusText: string;
   avatarStyle: Record<string, string>;
+  signedIn: boolean;
 }>();
 
 const emit = defineEmits<{ billing: [] }>();
@@ -16,7 +17,12 @@ const { canManageAccount, openProfile, signOutOfVault } = useClerkAccount();
 
 type MenuItem = { key: string; label: string; danger?: boolean; run: () => void };
 
+// canManageAccount only reports whether the Clerk SDK loaded, which is true
+// for a signed-out visitor too -- so it cannot gate these on its own.
+// Offering Profile and Sign out to someone who has not signed in produces two
+// menu items that silently do nothing.
 const items = computed<MenuItem[]>(() => {
+  if (!props.signedIn) return [];
   const entries: MenuItem[] = [];
   if (canManageAccount.value) {
     entries.push({ key: "profile", label: "Profile", run: onProfile });
@@ -60,7 +66,18 @@ async function onSignOut() {
 
 <template>
   <div class="cv-acct">
+    <!-- Signed out there is no account to manage, so this is plain status
+         text rather than a button that opens an empty menu. -->
+    <div v-if="!props.signedIn" class="cv-side-foot static">
+      <span class="cv-avatar" aria-hidden="true" />
+      <span class="cv-who">
+        <strong>Not signed in</strong>
+        <small>Step 1 unlocks this panel</small>
+      </span>
+    </div>
+
     <button
+      v-else
       ref="triggerRef"
       id="cv-account-trigger"
       type="button"
@@ -139,6 +156,12 @@ async function onSignOut() {
 }
 .cv-side-foot:hover {
   background: rgba(90, 214, 192, 0.06);
+}
+.cv-side-foot.static {
+  cursor: default;
+}
+.cv-side-foot.static:hover {
+  background: none;
 }
 .cv-side-foot:focus-visible {
   outline: 2px solid var(--accent);

@@ -127,3 +127,15 @@ describe("account menu styling ownership", () => {
     expect(rm).toContain("animation: none");
   });
 });
+
+describe("signed-out account footer", () => {
+  it("does not offer Profile or Sign out to someone who is not signed in", () => {
+    // canManageAccount only reports whether the Clerk SDK loaded, which is
+    // true for a signed-out visitor too — so it cannot gate the items on its
+    // own. Without an explicit signedIn check the menu offered a signed-out
+    // visitor two items that silently did nothing.
+    expect(menu).toContain("if (!props.signedIn) return [];");
+    expect(menu).toContain("Not signed in");
+    expect(cloudPage).toContain(':signed-in="signedIn"');
+  });
+});

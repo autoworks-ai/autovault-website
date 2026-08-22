@@ -75,3 +75,124 @@ describe("team mode copy", () => {
     expect(teamMode).toContain("device enrollment and signed skill sync are not enabled yet");
   });
 });
+
+describe("unified shell", () => {
+  const funnel = readFileSync(
+    new URL("../.vitepress/theme/components/HostedVaultFunnel.vue", import.meta.url),
+    "utf-8"
+  );
+
+  it("renders one shell at every stage instead of swapping experiences", () => {
+    // Signup used to render as a bare .cv-setup page with its own visual
+    // language, then hard-switch to this shell once a vault existed. That
+    // switch is the whole complaint being fixed.
+    expect(cloudPage).not.toContain('class="cv-setup"');
+    expect(cloudPage.match(/class="cv-shell"/g)?.length).toBe(1);
+  });
+
+  it("derives one progress rail, not four", () => {
+    // stageFocus (a "Step N of 4" kicker), flowItems (four status cards) and
+    // provisionSteps (a five-row checklist) each re-derived the same
+    // booleans, inside a page that maintained a fourth model of its own.
+    // Anchor on declarations, not bare names: the comments explaining what
+    // was removed necessarily mention them.
+    expect(cloudPage).toContain("const onboardingSteps = computed");
+    expect(funnel).not.toContain("const flowItems = computed");
+    expect(funnel).not.toContain("const provisionSteps = computed");
+    expect(funnel).not.toContain("const stageFocus = computed");
+    expect(funnel).not.toMatch(/"Step \d of \d"/);
+    expect(cloudPage).not.toContain("Step 1 of 2");
+  });
+
+  it("does not bounce a lapsed subscriber with a vault back to checkout", () => {
+    // getSubscription derives `active` from isPaidStatus(status), so past_due
+    // flips `paid` false while the vault row survives. Checking `paid` first
+    // would show an existing customer the signup funnel again.
+    const body = cloudPage.slice(cloudPage.indexOf("const stage = computed<Stage>"));
+    expect(body.indexOf("if (vault.value)")).toBeLessThan(body.indexOf("paid.value"));
+  });
+
+  it("keeps Sync a locked destination rather than an onboarding step", () => {
+    // Hosted sync does not exist server-side. A step you cannot complete is
+    // not a step.
+    expect(cloudPage).toContain('"Sync log"');
+    const labels = cloudPage.slice(cloudPage.indexOf("ONBOARDING_STEP_LABELS"), cloudPage.indexOf("ONBOARDING_STEP_LABELS") + 300);
+    expect(labels).not.toContain("Sync");
+  });
+
+  it("reports every rail step as unknown when the load failed", () => {
+    // A failed /api/me leaves every downstream fact unknowable; ticking step
+    // one off isClerkSignedIn would claim knowledge we do not have.
+    expect(cloudPage).toContain('stage.value === "error"');
+    expect(cloudPage).toContain('"unknown"');
+  });
+
+  it("stacks the rail on narrow viewports instead of wrapping it per character", () => {
+    // Four labelled steps flexed across a 375px viewport wrap one character
+    // per line. Verified in a real browser before this was written.
+    const narrow = cloudPage.slice(cloudPage.indexOf("@media (max-width: 640px)"));
+    expect(narrow.slice(0, 600)).toContain("flex-direction: column");
+  });
+
+  it("server-renders the shell so there is no post-hydration layout jump", () => {
+    // The boot veil overlays the shell rather than replacing it.
+    const bootBlock = cloudPage.slice(cloudPage.indexOf(".cv-boot {"), cloudPage.indexOf(".cv-boot {") + 400);
+    expect(bootBlock).toContain("position: absolute");
+  });
+});
+
+describe("funnel/shell handoff", () => {
+  const funnel = readFileSync(
+    new URL("../.vitepress/theme/components/HostedVaultFunnel.vue", import.meta.url),
+    "utf-8"
+  );
+
+  it("surfaces funnel failures instead of swallowing them", () => {
+    // Stripping the funnel's chrome removed the element that rendered its own
+    // notice. Without lifting them, a cancelled Checkout or the expected
+    // webhook-delay 402 would leave the button merely re-enabling, with no
+    // reason and no retry guidance.
+    expect(funnel).toContain("watch(notice, (next) => emit(\"notice\", next));");
+    expect(funnel).toContain("notice: [notice: Notice | null];");
+    expect(cloudPage).toContain('@notice="setNotice"');
+    // And the third tone has to be styleable, or hard failures render bare.
+    expect(cloudPage).toContain(".cv-notice.fail");
+  });
+
+  it("invalidates an in-flight load when the funnel hands over new state", () => {
+    // On a Stripe return this page fires an /api/me before Clerk resolves, so
+    // it comes back anonymous and slow, while the funnel reconciles and
+    // provisions. Without bumping the sequence the stale response wins and
+    // drops a user who has just paid back to "Finish checkout".
+    const fn = cloudPage.slice(cloudPage.indexOf("function syncCloudState"));
+    expect(fn.slice(0, 900)).toContain("cloudStateRequestSeq += 1;");
+  });
+});
+
+describe("provisioning transition", () => {
+  const funnel = readFileSync(
+    new URL("../.vitepress/theme/components/HostedVaultFunnel.vue", import.meta.url),
+    "utf-8"
+  );
+
+  it("keeps the funnel mounted across the transition it triggers", () => {
+    // provisionVault emits stateChange the moment a vault comes back, which
+    // flips the pre-vault condition. Under v-if that destroyed the component
+    // mid-function, discarding its success notice and the savePendingImport
+    // still in flight. v-show keeps the instance alive.
+    const block = cloudPage.slice(cloudPage.indexOf("PRE-VAULT: account"));
+    expect(block.slice(0, 700)).toContain('v-show="!vault"');
+    expect(block.slice(0, 700)).not.toContain('v-else-if="!vault"');
+  });
+
+  it("sets the success notice before handing state to the shell", () => {
+    // Belt and braces for the same defect: emitting first meant the ok
+    // notice landed after the shell had already advanced, and any stale
+    // "waiting for the webhook" warn stayed on screen.
+    const fn = funnel.slice(funnel.indexOf("async function provisionVault"));
+    const noticeAt = fn.indexOf('kind: "ok"');
+    const emitAt = fn.indexOf('emit("stateChange"');
+    expect(noticeAt).toBeGreaterThan(-1);
+    expect(noticeAt).toBeLessThan(emitAt);
+  });
+});

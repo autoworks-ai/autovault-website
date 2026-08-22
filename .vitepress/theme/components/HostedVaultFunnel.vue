@@ -1,86 +1,52 @@
 <template>
-  <section class="hosted-funnel" :class="{ 'is-provisioned': vault }" :data-entry="entry">
-    <div v-if="!vault && entry === 'playground'" class="hosted-funnel-head">
-      <div class="hosted-heading">
-        <span class="hosted-vault-lock" :class="`is-${hostedVaultPhase}`">
-          <BrandMark :size="34" :state="hostedVaultState" show-depth />
-        </span>
-        <div>
-          <div class="mono-label">hosted vault</div>
-          <h3>{{ headline }}</h3>
-          <p>
-            Reserve your hosted namespace, stage starter skills, and keep your local CLI as the
-            source of truth for signing and serving.
-          </p>
-        </div>
-      </div>
-    </div>
+  <!--
+    Chrome-free by design. CloudPage owns the shell, the page heading, the
+    step kicker and the one progress rail; this component is now only the
+    transport plus the single action for the current pre-vault step.
 
+    It used to render a four-card status row, a five-row provisioning
+    checklist and its own "Step N of 4" kicker -- three separate derivations
+    of the same booleans, sitting inside a page that had a fourth. That is
+    what made the funnel announce four steps and then hand over to a
+    different two-step model partway through.
+  -->
+  <section class="hosted-funnel">
     <div v-if="staticPreview" class="hosted-notice warn">
       This preview can show Clerk, but the checkout and provisioning APIs run through Cloudflare Pages Functions. Use http://127.0.0.1:8788/cloud for an end-to-end local test.
     </div>
 
-    <div v-if="notice" class="hosted-notice" :class="notice.kind">{{ notice.text }}</div>
-
-    <div v-if="!vault" class="hosted-stage-card" :class="stageFocus.state">
-      <div class="hosted-stage-kicker">{{ stageFocus.kicker }}</div>
-      <h4>{{ stageFocus.title }}</h4>
-      <p>{{ stageFocus.body }}</p>
-      <div class="hosted-stage-action">
-        <ClerkAuthControls
-          v-if="stageFocus.action === 'auth'"
-          variant="funnel"
-          cta-label="Create your account"
-          signed-in-label="Continue onboarding"
-          @click.capture="persistDraft"
-          @signed-in-action="startFlow"
-        />
-        <button v-else-if="stageFocus.action === 'checkout'" class="hosted-primary" type="button" :disabled="busy" @click="startFlow">
-          {{ checkoutStarted ? "Opening Checkout..." : "Open checkout" }}
-        </button>
-        <button v-else-if="stageFocus.action === 'reserve'" class="hosted-primary" type="button" :disabled="busy" @click="startFlow">
-          {{ provisioning ? "Reserving..." : "Reserve namespace" }}
-        </button>
-      </div>
+    <div v-if="!vault" class="hosted-stage-action">
+      <ClerkAuthControls
+        v-if="actionKind === 'auth'"
+        variant="funnel"
+        cta-label="Create your account"
+        signed-in-label="Continue onboarding"
+        @click.capture="persistDraft"
+        @signed-in-action="startFlow"
+      />
+      <button v-else-if="actionKind === 'checkout'" class="hosted-primary" type="button" :disabled="busy" @click="startFlow">
+        {{ checkoutStarted ? "Opening Checkout..." : "Open checkout" }}
+      </button>
+      <button v-else-if="actionKind === 'reserve'" class="hosted-primary" type="button" :disabled="busy" @click="startFlow">
+        {{ provisioning ? "Reserving..." : "Reserve namespace" }}
+      </button>
     </div>
 
-    <div v-if="!vault" class="hosted-flow hosted-flow--compact" aria-label="Hosted onboarding steps">
-      <div v-for="(item, index) in flowItems" :key="item.label" class="hosted-flow-item" :class="item.state" :style="{ '--step-index': index }">
-        <span class="hosted-dot" />
-        <span class="hosted-flow-copy">
-          <strong>{{ item.label }}</strong>
-          <span>{{ item.detail }}</span>
-        </span>
-      </div>
-    </div>
-
-    <div v-if="showSetupDetails" class="hosted-provision-grid">
-      <div class="hosted-panel">
-        <div class="panel-title">Provisioning</div>
-        <div class="provision-list">
-          <div v-for="step in provisionSteps" :key="step.label" class="provision-step" :class="{ done: step.done, active: step.active }">
-            <span class="provision-mark">{{ step.done ? "ok" : step.active ? ".." : "--" }}</span>
-            <span>{{ step.label }}</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="hosted-panel">
-        <div class="panel-title">Suggested starter skills</div>
-        <div class="starter-skills">
-          <button v-for="skill in starterSkills" :key="skill.name" type="button" :class="{ queued: queuedSkillNames.includes(skill.name) }" :aria-pressed="queuedSkillNames.includes(skill.name)" @click="toggleSkill(skill.name)">
-            <span class="skill-icon">{{ skill.icon }}</span>
-            <span>
-              <strong>{{ skill.name }}</strong>
-              <small>{{ skill.desc }}</small>
-            </span>
-          </button>
-        </div>
+    <div v-if="showSetupDetails" class="hosted-panel">
+      <div class="panel-title">Starter skills to queue</div>
+      <div class="starter-skills">
+        <button v-for="skill in starterSkills" :key="skill.name" type="button" :class="{ queued: queuedSkillNames.includes(skill.name) }" :aria-pressed="queuedSkillNames.includes(skill.name)" @click="toggleSkill(skill.name)">
+          <span class="skill-icon">{{ skill.icon }}</span>
+          <span>
+            <strong>{{ skill.name }}</strong>
+            <small>{{ skill.desc }}</small>
+          </span>
+        </button>
       </div>
     </div>
 
     <div v-if="showLocalHandoff" class="hosted-command-card">
-      <div class="panel-title">{{ vault ? "Get started on the local CLI" : "Local handoff" }}</div>
+      <div class="panel-title">Local handoff</div>
       <pre><code>{{ commandBlock }}</code></pre>
       <div class="hosted-copy-row">
         <button type="button" @click="copyCommands">Copy local commands</button>
@@ -93,7 +59,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import BrandMark from "./BrandMark.vue";
 import ClerkAuthControls from "./ClerkAuthControls.vue";
 import { skills } from "../data/skills";
 import type { GateEvaluation } from "../utils/skillGate";
@@ -132,6 +97,7 @@ const props = withDefaults(defineProps<{
 });
 const emit = defineEmits<{
   stateChange: [state: MeResponse];
+  notice: [notice: Notice | null];
 }>();
 
 const busy = ref(false);
@@ -166,12 +132,9 @@ const paid = computed(() => Boolean(me.value?.subscription?.active));
 const vault = computed(() => me.value?.vault ?? null);
 const teamSlug = computed(() => vault.value?.slug ?? slugify(me.value?.user?.email || me.value?.user?.name || clerkUserSlugSeed.value || "your-team"));
 const hostedEndpoint = computed(() => vault.value?.public_url ?? `https://vault.autovault.dev/${teamSlug.value}`);
-const headline = computed(() => props.entry === "playground" ? "Reserve a namespace for this passing skill" : "Reserve a hosted AutoVault namespace");
 const showSetupDetails = computed(() => !vault.value && (signedIn.value || paid.value || props.entry === "playground"));
 const showLocalHandoff = computed(() => signedIn.value || Boolean(vault.value));
 const namespaceStatusLabel = computed(() => vault.value ? "Hosted namespace reserved:" : "Planned namespace:");
-const hostedVaultState = computed<"locked" | "unlocked">(() => (vault.value || provisioning.value ? "unlocked" : "locked"));
-const hostedVaultPhase = computed(() => (vault.value ? "ready" : provisioning.value ? "active" : "locked"));
 const commandBlock = computed(() => [
   AUTOVAULT_INSTALL_COMMAND,
   ". \"$HOME/.autovault/env\"",
@@ -182,78 +145,26 @@ const commandBlock = computed(() => [
   vault.value ? "# Cloud sync is not enabled yet." : "# Checkout must complete before this namespace is reserved."
 ].join("\n"));
 
-const stageFocus = computed(() => {
-  if (!signedIn.value) {
-    return {
-      kicker: "Step 1 of 4",
-      title: "Create your AutoVault account",
-      body: "Clerk will open a secure sign-up window. After it finishes, this page will unlock checkout without asking you to restart.",
-      action: "auth",
-      state: "ready"
-    };
-  }
-  if (!paid.value) {
-    return {
-      kicker: "Step 2 of 4",
-      title: "Finish checkout",
-      body: "Stripe Checkout records the subscription state through a webhook before AutoVault reserves your namespace.",
-      action: "checkout",
-      state: checkoutStarted.value ? "active" : "ready"
-    };
-  }
-  if (!vault.value) {
-    return {
-      kicker: "Step 3 of 4",
-      title: "Reserve your namespace",
-      body: "AutoVault assigns your stable hosted URL and queues your starter skills.",
-      action: "reserve",
-      state: provisioning.value ? "active" : "ready"
-    };
-  }
-  return {
-    kicker: "Step 4 of 4",
-    title: "Namespace reserved",
-    body: `${hostedEndpoint.value} is yours. Keep signing and serving with the local CLI — hosted sync ships next.`,
-    action: "local",
-    state: "done"
-  };
+// Which single action this step needs. CloudPage owns the kicker, heading
+// and body copy now, so all that survives here is the branch that decides
+// WHICH control renders -- not what it says about itself.
+//
+// Replaced stageFocus (a "Step N of 4" kicker), flowItems (four status
+// cards) and provisionSteps (a five-row checklist): three separate
+// derivations of signedIn/paid/vault that had to be kept in sync by hand,
+// inside a page that maintained a fourth.
+// Lift notices to the shell's single live region rather than rendering a
+// second one here. Two competing aria-live regions on one page is an a11y
+// defect the old split created.
+watch(notice, (next) => emit("notice", next));
+
+const actionKind = computed<"auth" | "checkout" | "reserve" | "local">(() => {
+  if (!signedIn.value) return "auth";
+  if (!paid.value) return "checkout";
+  if (!vault.value) return "reserve";
+  return "local";
 });
 
-const flowItems = computed(() => [
-  {
-    label: "Auth",
-    detail: signedIn.value ? userLabel.value : "Create an account or sign in",
-    state: signedIn.value ? "done" : "ready"
-  },
-  {
-    label: "Checkout",
-    detail: paid.value ? "Stripe subscription active" : checkoutStarted.value ? "Redirecting to Stripe Checkout" : "Stripe-hosted payment form",
-    state: paid.value ? "done" : signedIn.value ? "ready" : "pending"
-  },
-  {
-    label: "Namespace",
-    detail: vault.value ? `${hostedEndpoint.value} reserved` : "Reserved namespace anchor",
-    state: vault.value ? "done" : provisioning.value ? "active" : paid.value ? "ready" : "pending"
-  },
-  {
-    label: "Sync",
-    detail: pendingSaved.value ? "Pending import saved for later cloud sync" : "Cloud CLI sync is coming soon",
-    state: pendingSaved.value ? "done" : vault.value ? "ready" : "pending"
-  }
-]);
-
-const provisionSteps = computed(() => [
-  { label: props.entry === "playground" ? "Store browser draft in session" : "Queue selected starter skills", done: props.entry === "playground" ? hasDraft() : queuedSkillNames.value.length > 0, active: false },
-  { label: "Confirm paid access from webhook state", done: paid.value, active: signedIn.value && !paid.value },
-  { label: "Reserve tenant namespace", done: Boolean(vault.value), active: provisioning.value },
-  { label: "Save pending onboarding import", done: pendingSaved.value, active: Boolean(vault.value) && !pendingSaved.value },
-  { label: "Cloud CLI sync coming soon", done: false, active: false }
-]);
-
-const userLabel = computed(() => {
-  const user = me.value?.user;
-  return user?.email || user?.name || clerkUserLabel.value || "Signed in";
-});
 
 onMounted(async () => {
   staticPreview.value = canUseBrowser() && window.location.port === "5173";
@@ -409,10 +320,15 @@ async function provisionVault() {
       return;
     }
 
+    // Success notice FIRST. This also clears any stale warn from an earlier
+    // attempt ("waiting for the webhook") that would otherwise still be on
+    // screen when the shell advances to the connect step.
+    notice.value = { kind: "ok", text: "Hosted namespace reserved. Keep signing and serving skills locally — hosted sync ships next." };
     me.value = { ...(me.value ?? { user: null }), vault: payload.vault };
     emit("stateChange", me.value);
+    // Runs after the shell has already advanced. It only persists queued
+    // skills; nothing user-visible depends on its result.
     await savePendingImport();
-    notice.value = { kind: "ok", text: "Hosted namespace reserved. Keep signing and serving skills locally — hosted sync ships next." };
   } finally {
     provisioning.value = false;
   }
