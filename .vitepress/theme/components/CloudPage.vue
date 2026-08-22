@@ -169,6 +169,10 @@
             </div>
             <h2>{{ setupHeadline }}</h2>
             <p class="cv-focal-body">{{ setupLede }}</p>
+            <p v-if="hostedPriceLabel && !paid" class="cv-price">
+              <strong>{{ hostedPriceLabel }}</strong>
+              <span>Cancel any time from the billing portal.</span>
+            </p>
             <HostedVaultFunnel
               entry="deploy"
               @state-change="syncCloudState"
@@ -745,6 +749,36 @@ const onboardingSteps = computed<OnboardingStep[]>(() =>
   })),
 );
 
+type HostedPrice = { amount: number | null; currency: string | null; interval: string | null };
+const hostedPrice = ref<HostedPrice | null>(null);
+
+// What the plan costs, read from Stripe. The funnel previously sent people to
+// Checkout without naming a price anywhere -- the first number you saw was on
+// Stripe's own page, after committing. A literal here would be worse: it
+// drifts silently the moment the price changes in Stripe.
+const hostedPriceLabel = computed(() => {
+  const price = hostedPrice.value;
+  if (!price || price.amount === null || !price.currency) return null;
+  const money = new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: price.currency.toUpperCase(),
+    minimumFractionDigits: price.amount % 100 === 0 ? 0 : 2,
+  }).format(price.amount / 100);
+  return price.interval ? `${money} / ${price.interval}` : money;
+});
+
+async function loadPricing() {
+  // Never blocks or breaks the funnel: if Stripe is unreachable the price
+  // line simply does not render.
+  try {
+    const response = await fetch("/api/pricing", { headers: { accept: "application/json" } });
+    if (!response.ok) return;
+    hostedPrice.value = await response.json();
+  } catch {
+    /* leave hostedPrice null */
+  }
+}
+
 const onboardingComplete = computed(() => activeStepKey.value === null);
 const activeStepNumber = computed(() =>
   activeStepKey.value
@@ -838,6 +872,7 @@ const navItems = computed<NavItem[]>(() => {
 
 onMounted(() => {
   void loadCloudState(true);
+  void loadPricing();
 });
 
 watch([isClerkLoaded, isClerkSignedIn], ([loaded]) => {
@@ -1586,6 +1621,24 @@ const ICON = {
 .cv-shell.booting {
   pointer-events: none;
 }
+.cv-price {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 20px;
+}
+.cv-price strong {
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.cv-price span {
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
 .cv-brand-ns.pending {
   color: var(--ink-4);
 }
