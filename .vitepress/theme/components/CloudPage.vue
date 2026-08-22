@@ -78,13 +78,13 @@
           </button>
         </nav>
 
-        <div class="cv-side-foot">
-          <span class="cv-avatar" :style="avatarStyle" aria-hidden="true" />
-          <span class="cv-who">
-            <strong>{{ accountName }}</strong>
-            <small>Hosted · {{ subscriptionState.text }}</small>
-          </span>
-        </div>
+        <CloudAccountMenu
+          :name="accountName"
+          :email="accountEmailShort"
+          :status-text="subscriptionState.text"
+          :avatar-style="avatarStyle"
+          @billing="openBillingPortal"
+        />
       </aside>
 
       <main class="cv-content">
@@ -329,6 +329,7 @@ import {
 } from "vue";
 import HostedVaultFunnel from "./HostedVaultFunnel.vue";
 import BrandMark from "./BrandMark.vue";
+import CloudAccountMenu from "./CloudAccountMenu.vue";
 import { copyText as copyToClipboard } from "../utils/clipboard";
 import { clerkAuthRecoveryMessage, isClerkApiAuthError, useClerkApiAuth } from "../utils/clerkApi";
 import {
@@ -565,14 +566,19 @@ const accountEmailShort = computed(() => {
   const [name, domain] = email.split("@");
   return domain ? `${name}@${domain}` : email;
 });
-const avatarStyle = computed(() =>
-  user.value?.avatar_url
-    ? {
-        backgroundImage: `url(${user.value.avatar_url})`,
-        backgroundColor: "transparent",
-      }
-    : {},
-);
+// Typed rather than an inline `{}`: in a ternary/union position TS widens the
+// empty branch to `{ backgroundImage?: undefined }`, which then fails the
+// Record<string, string> index signature the menu prop expects.
+const NO_AVATAR_STYLE: Record<string, string> = {};
+
+const avatarStyle = computed<Record<string, string>>(() => {
+  const avatarUrl = user.value?.avatar_url;
+  if (!avatarUrl) return NO_AVATAR_STYLE;
+  return {
+    backgroundImage: `url(${avatarUrl})`,
+    backgroundColor: "transparent",
+  };
+});
 
 const setupLede = computed(() =>
   isClerkSignedIn.value
@@ -706,6 +712,45 @@ function normalizeCloudState(payload: CloudStatePayload): CloudState {
     subscription: payload.subscription ?? null,
     vault: payload.vault ?? null,
   };
+}
+
+async function openBillingPortal() {
+  if (busy.value) return;
+  busy.value = true;
+  notice.value = null;
+  try {
+    const headers = await authHeaders({
+      "content-type": "application/json",
+      accept: "application/json",
+    }, { required: true, fresh: true });
+    const response = await fetch("/api/billing/portal", {
+      method: "POST",
+      credentials: "include",
+      headers,
+      body: JSON.stringify({ return_to: "/cloud#launch-path" }),
+    });
+    const payload = await response.json().catch(() => ({})) as { url?: string; error?: string };
+    if (!response.ok || !payload.url) {
+      // Covers the 409 "no billing account yet" case as well as a Stripe
+      // outage — the server's own wording is more useful than anything
+      // generic we could invent here.
+      notice.value = {
+        kind: "warn",
+        text: payload.error || "Couldn't open billing just now. Try again in a moment.",
+      };
+      return;
+    }
+    window.location.assign(payload.url);
+  } catch (error) {
+    notice.value = {
+      kind: "warn",
+      text: isClerkApiAuthError(error)
+        ? clerkAuthRecoveryMessage(error)
+        : "Couldn't reach the server. Try again in a moment.",
+    };
+  } finally {
+    busy.value = false;
+  }
 }
 
 async function markProgress(step: "cli_linked" | "early_access") {
@@ -986,40 +1031,6 @@ const ICON = {
   opacity: 0.5;
 }
 
-.cv-side-foot {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 8px;
-  padding-top: 13px;
-  border-top: 1px solid var(--line-2);
-}
-.cv-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  flex: none;
-  background: linear-gradient(135deg, var(--blue), var(--violet));
-  background-size: cover;
-  background-position: center;
-}
-.cv-who {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.cv-who strong {
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.cv-who small {
-  font-size: 11px;
-  color: var(--ink-3);
-}
 
 /* main content */
 .cv-content {
@@ -1731,12 +1742,6 @@ const ICON = {
   .cv-nav-label {
     flex: none;
   }
-  .cv-side-foot {
-    margin: 0;
-    padding: 0 0 0 8px;
-    border-top: 0;
-    border-left: 1px solid var(--line-2);
-  }
   .cv-preview,
   .cv-two {
     grid-template-columns: 1fr;
@@ -1763,11 +1768,6 @@ const ICON = {
   .cv-nav {
     flex: none;
     gap: 6px;
-  }
-  .cv-side-foot {
-    padding: 10px 0 0;
-    border-top: 1px solid var(--line-2);
-    border-left: 0;
   }
 }
 

@@ -11,6 +11,11 @@ const teamMode = readFileSync(
   "utf-8"
 );
 
+const accountMenu = readFileSync(
+  new URL("../.vitepress/theme/components/CloudAccountMenu.vue", import.meta.url),
+  "utf-8"
+);
+
 describe("cloud dashboard stage machine", () => {
   it("routes an auth failure to an error stage, not to the sign-up funnel", () => {
     // A signed-in, paying, provisioned user whose /api/me call failed used to
@@ -32,8 +37,11 @@ describe("cloud dashboard stage machine", () => {
   });
 
   it("does not hardcode subscription status or price", () => {
-    expect(cloudPage).not.toContain("$12 / mo");
-    expect(cloudPage).not.toContain("Hosted · Active</small>");
+    // The sidebar footer markup moved into CloudAccountMenu.vue, so this
+    // guard has to read both files or it silently stops guarding anything.
+    const shell = `${cloudPage}\n${accountMenu}`;
+    expect(shell).not.toContain("$12 / mo");
+    expect(shell).not.toContain("Hosted · Active</small>");
     expect(cloudPage).toContain("subscriptionState");
   });
 
