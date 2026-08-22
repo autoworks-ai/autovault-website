@@ -241,7 +241,7 @@ const provenance = [
 
 const VerifierDemo = defineComponent({
   setup() {
-    const input = ref("autoworks-ai/skill-author v1.0.0");
+    const input = ref("skill-author");
     const phase = ref<Phase>("idle");
     const step = ref(0);
     let timer: ReturnType<typeof setInterval> | null = null;
@@ -261,7 +261,10 @@ const VerifierDemo = defineComponent({
     }
 
     function forged() {
-      input.value = "attacker/weather-skill v9.9.9";
+      // `autovault doctor [skill-name]` inspects an INSTALLED skill by its
+      // plain name — not a source/version pair, which isn't valid syntax and
+      // can't be replayed against the real CLI (ApiReferencePage.vue:137).
+      input.value = "weather-skill";
       run("fail");
     }
 
@@ -270,7 +273,7 @@ const VerifierDemo = defineComponent({
       timer = null;
       phase.value = "idle";
       step.value = 0;
-      input.value = "autoworks-ai/skill-author v1.0.0";
+      input.value = "skill-author";
     }
 
     onBeforeUnmount(() => {

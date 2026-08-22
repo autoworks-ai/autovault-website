@@ -8,6 +8,11 @@ const securityPage = readFileSync(
   "utf-8"
 );
 
+const comparePage = readFileSync(
+  new URL("../.vitepress/theme/components/ComparePage.vue", import.meta.url),
+  "utf-8"
+);
+
 describe("public surface", () => {
   it("excludes internal markdown from the VitePress build", () => {
     // VitePress globs every .md in the repo as a page. Without these, the
@@ -76,5 +81,30 @@ describe("security page claims", () => {
     // reader to "repair... it yourself" for that case advertises a
     // remediation doctor won't actually perform.
     expect(securityPage).not.toMatch(/repair or reject it yourself/i);
+  });
+
+  it("passes doctor a valid installed-skill-name argument, not a source/version pair", () => {
+    // ApiReferencePage.vue:137 documents the real syntax as
+    // `autovault doctor [skill-name] [--clean] [--repair] [--json]`, inspecting
+    // an INSTALLED skill by its plain name. "autoworks-ai/skill-author v1.0.0"
+    // and "attacker/weather-skill v9.9.9" are source/version pairs -- not
+    // valid doctor arguments, so the simulated command can't be replayed
+    // against the real CLI as instructed.
+    expect(securityPage).not.toMatch(/autoworks-ai\/skill-author v1\.0\.0/);
+    expect(securityPage).not.toMatch(/attacker\/weather-skill v9\.9\.9/);
+  });
+});
+
+describe("compare page claims", () => {
+  it("does not claim --dry-run reproduces the full admission gate", () => {
+    // Verified against autoworks-ai/autovault's src/cli/add.ts: --dry-run's
+    // preflight is source==="local" only (undefined for GitHub/URL/AgentSkills
+    // sources, which get no validation at all -- previewResult() defaults
+    // `success` to true when there's no preflight), and even the local
+    // preflight never touches dedup or signing. No CLI invocation actually
+    // reproduces the 5-stage verdict this row claims, so the row asserts the
+    // qualitative property (deterministic, pattern-based) instead of pointing
+    // readers at a command that can't back it up.
+    expect(comparePage).not.toMatch(/--dry-run/);
   });
 });
