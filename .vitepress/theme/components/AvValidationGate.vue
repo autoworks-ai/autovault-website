@@ -68,6 +68,18 @@ let timer: number | undefined
 
 function start() {
   stop()
+  // The mount-time reduced-motion guard only covers autoplay on load.
+  // chooseScenario() calls replay() -> start() on every scenario click,
+  // which used to ignore the preference entirely and resume the
+  // content-changing interval just from inspecting another scenario. Guard
+  // the single place the interval is created instead of every call site, and
+  // jump straight to the scenario's settled outcome so picking a scenario is
+  // still useful without animating through it.
+  if (prefersReducedMotion()) {
+    tick.value = activeScenario.value.failAt !== null ? activeScenario.value.failAt + 2 : STEPS.length + 1
+    running.value = false
+    return
+  }
   timer = window.setInterval(() => {
     const next = tick.value + 1
     if (activeScenario.value.failAt !== null && next > activeScenario.value.failAt + 1) {
