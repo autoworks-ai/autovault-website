@@ -34,6 +34,17 @@ STRIPE_SECRET_KEY=sk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 AUTOVAULT_HOSTED_PRICE_ID=price_xxxxxxxxxxxxxxxxxxxxxxxx
 
+# Optional. /api/billing/portal works without this as long as the Stripe
+# account has a DEFAULT customer-portal configuration — without one, Stripe
+# rejects every portal call and the endpoint surfaces that as a 502. Create a
+# configuration once per account:
+#   stripe billing_portal configuration create \
+#     --business-profile[headline]="AutoVault" \
+#     --features[invoice_history][enabled]=true
+# Set this to pin a specific configuration so portal branding can't drift from
+# the Checkout branding in wrangler.toml.
+# STRIPE_PORTAL_CONFIGURATION_ID=bpc_xxxxxxxxxxxxxxxxxxxxxxxx
+
 # HMAC for the legacy session cookie path in functions/api/_lib/auth.js.
 # Generate one with:  openssl rand -hex 32
 SESSION_SECRET=replace_with_32_byte_hex
