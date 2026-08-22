@@ -84,7 +84,21 @@ export default defineConfig({
   lang: "en-US",
   cleanUrls: true,
   lastUpdated: false,
-  srcExclude: ["autovault/**", "AutoVault.md", "CLAUDE.md", "AGENTS.md"],
+  // Only root-level product pages and skill/* are real VitePress pages. Anything
+  // else that happens to be Markdown in the repo must be excluded explicitly, or
+  // VitePress will build and index it: `docs/**` holds internal design specs,
+  // `README.md` is internal launch notes, and `public/**` skill bundles would be
+  // served twice (raw asset + rendered HTML page).
+  srcExclude: [
+    "autovault/**",
+    "AutoVault.md",
+    "CLAUDE.md",
+    "AGENTS.md",
+    "README.md",
+    "docs/**",
+    "public/**",
+    ".claude/**"
+  ],
   sitemap: {
     hostname: SITE_URL,
     transformItems: (items) => items.filter((item) => !isHiddenSitemapItem(item))
