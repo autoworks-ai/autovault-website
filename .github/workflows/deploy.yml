@@ -15,7 +15,7 @@ permissions:
 env:
   NODE_VERSION: "24"
   PAGES_PROJECT_NAME: autovault-website
-  WRANGLER_VERSION: "4.90.0"
+  WRANGLER_VERSION: "4.95.0"
 
 concurrency:
   group: pages-manual-${{ inputs.branch || github.ref_name }}
