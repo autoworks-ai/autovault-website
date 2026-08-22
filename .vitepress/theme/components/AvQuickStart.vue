@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { prefersReducedMotion } from '../utils/motion'
 import { AUTOVAULT_INSTALL_COMMAND } from '../../shared/bootstrap'
 
 const active = ref(0)
@@ -31,7 +32,12 @@ function toggle() {
   playing.value ? start() : stop()
 }
 
-onMounted(() => playing.value && start())
+onMounted(() => {
+  // Leave `playing` true so the play/pause control still reads correctly and
+  // the user can start it deliberately; just don't auto-run.
+  if (prefersReducedMotion()) return
+  if (playing.value) start()
+})
 onBeforeUnmount(stop)
 </script>
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
+import { prefersReducedMotion } from '../utils/motion'
 import UiIcon from './UiIcon.vue'
 import { homepageGateMetrics } from '../data/marketing'
 
@@ -88,7 +89,10 @@ function toggle() {
   running.value = !running.value
   running.value ? start() : stop()
 }
-onMounted(() => running.value && start())
+onMounted(() => {
+  if (prefersReducedMotion()) return
+  if (running.value) start()
+})
 onBeforeUnmount(stop)
 
 function stepState(i: number): StepState {

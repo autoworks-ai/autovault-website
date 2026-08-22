@@ -36,7 +36,7 @@
           @signed-in-action="startFlow"
         />
         <button v-else-if="stageFocus.action === 'checkout'" class="hosted-primary" type="button" :disabled="busy" @click="startFlow">
-          {{ checkoutStarted ? "Opening Checkout..." : "Open test checkout" }}
+          {{ checkoutStarted ? "Opening Checkout..." : "Open checkout" }}
         </button>
         <button v-else-if="stageFocus.action === 'reserve'" class="hosted-primary" type="button" :disabled="busy" @click="startFlow">
           {{ provisioning ? "Reserving..." : "Reserve namespace" }}
@@ -195,7 +195,7 @@ const stageFocus = computed(() => {
   if (!paid.value) {
     return {
       kicker: "Step 2 of 4",
-      title: "Finish test checkout",
+      title: "Finish checkout",
       body: "Stripe Checkout records the subscription state through a webhook before AutoVault reserves your namespace.",
       action: "checkout",
       state: checkoutStarted.value ? "active" : "ready"
@@ -227,7 +227,7 @@ const flowItems = computed(() => [
   },
   {
     label: "Checkout",
-    detail: paid.value ? "Stripe subscription active" : checkoutStarted.value ? "Redirecting to Stripe Checkout" : "Stripe-hosted test-mode payment form",
+    detail: paid.value ? "Stripe subscription active" : checkoutStarted.value ? "Redirecting to Stripe Checkout" : "Stripe-hosted payment form",
     state: paid.value ? "done" : signedIn.value ? "ready" : "pending"
   },
   {
@@ -541,7 +541,7 @@ async function copyCommands() {
 
 async function copyAgentHandoff(agent: "claude-code" | "cursor") {
   const label = agent === "claude-code" ? "Claude Code" : "Cursor";
-  await copyText(`# ${label} paid hosted AutoVault handoff\n${commandBlock.value}\n\nCloud sync commands are not enabled in this MVP. Keep using the local AutoVault CLI until hosted sync ships.\n`);
+  await copyText(`# ${label} paid hosted AutoVault handoff\n${commandBlock.value}\n\nHosted sync is not enabled yet. Keep using the local AutoVault CLI; this namespace and any skills carry over when it ships.\n`);
   notice.value = { kind: "ok", text: `${label} handoff copied.` };
 }
 

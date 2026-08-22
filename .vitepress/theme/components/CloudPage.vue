@@ -1,11 +1,37 @@
 <template>
-  <section class="cv-page" :class="`cv-stage-${stage}`" :aria-busy="!hydrated">
+  <!-- `#launch-path` is the fragment on the Stripe success_url/cancel_url
+       (functions/api/_lib/stripe.js), the Clerk post-auth redirect
+       (theme/clerk.ts) and safeReturnTo's fallback. Nothing on the page
+       carried the id, so every one of those returns landed on a dead
+       fragment and never scrolled to the funnel. -->
+  <section
+    id="launch-path"
+    class="cv-page"
+    :class="`cv-stage-${stage}`"
+    :aria-busy="!hydrated"
+  >
     <!-- Loading veil: avoids a flash of the setup funnel before /api/me resolves -->
     <div v-if="!hydrated" class="cv-boot">
       <span class="cv-boot-mark"
         ><BrandMark :size="30" state="locked" show-depth
       /></span>
       <p>Opening your hosted vault…</p>
+    </div>
+
+    <!-- Auth resolved to an error, not to "no vault". Showing the sign-up
+         funnel here would tell an existing paying customer to create an
+         account they already have. -->
+    <div v-else-if="stage === 'error'" class="cv-setup">
+      <header class="cv-setup-head">
+        <div class="cv-eyebrow"><span class="cv-spark" /> Hosted vault</div>
+        <h1>We couldn't load your vault</h1>
+        <p>{{ loadError }}</p>
+      </header>
+      <div class="cv-setup-body">
+        <button class="cv-btn" type="button" :disabled="busy" @click="retryLoad">
+          Try again
+        </button>
+      </div>
     </div>
 
     <!-- ============ PRE-VAULT: focused sign-up funnel ============ -->
@@ -56,7 +82,7 @@
           <span class="cv-avatar" :style="avatarStyle" aria-hidden="true" />
           <span class="cv-who">
             <strong>{{ accountName }}</strong>
-            <small>Hosted · Active</small>
+            <small>Hosted · {{ subscriptionState.text }}</small>
           </span>
         </div>
       </aside>
@@ -167,14 +193,22 @@
               <div class="cv-card-label">Subscription</div>
               <ul class="cv-kv">
                 <li><span>Plan</span><strong>Hosted</strong></li>
-                <li><span>Price</span><strong>$12 / mo</strong></li>
+                <li v-if="renewalLabel">
+                  <span>Billing</span><strong>{{ renewalLabel }}</strong>
+                </li>
                 <li>
                   <span>Status</span
-                  ><span class="cv-pill ok sm"
-                    ><span class="cv-dot" /> Active</span
+                  ><span
+                    class="cv-pill sm"
+                    :class="subscriptionState.tone"
+                    ><span class="cv-dot" /> {{ subscriptionState.text }}</span
                   >
                 </li>
               </ul>
+              <p v-if="subscriptionNeedsAttention" class="cv-muted cv-sub-warn">
+                Hosted access follows this status. If that looks wrong, reload
+                after Stripe finishes processing, or contact support.
+              </p>
               <ul class="cv-reserved">
                 <li>
                   <span class="cv-chk">✓</span> Public + private namespace
@@ -310,12 +344,17 @@ const ConnectTerminal = defineComponent({
   setup(props) {
     const bodyRef = ref<HTMLElement | null>(null);
     const copied = ref(false);
+    const commands = computed(() => [
+      AUTOVAULT_INSTALL_COMMAND,
+      '. "$HOME/.autovault/env"',
+      `autovault link ${props.slug}`,
+    ]);
     const lines = computed<TerminalReplayLine[]>(() => [
-      { type: "cmd", text: AUTOVAULT_INSTALL_COMMAND },
+      { type: "cmd", text: commands.value[0] },
       { type: "out", text: "↳ downloading autovault-installer" },
       { type: "ok", text: "✓ signature ok" },
-      { type: "cmd", text: '. "$HOME/.autovault/env"' },
-      { type: "cmd", text: `autovault link ${props.slug}` },
+      { type: "cmd", text: commands.value[1] },
+      { type: "cmd", text: commands.value[2] },
       { type: "out", text: "↳ verifying local environment" },
       { type: "ok", text: "✓ namespace linked successfully" },
     ]);
@@ -325,19 +364,21 @@ const ConnectTerminal = defineComponent({
     });
 
     async function handleCopy() {
-      await copyToClipboard(
-        [
-          AUTOVAULT_INSTALL_COMMAND,
-          '. "$HOME/.autovault/env"',
-          `autovault link ${props.slug}`,
-        ].join("\n"),
-      );
+      await copyToClipboard(commands.value.join("\n"));
       copied.value = true;
       setTimeout(() => (copied.value = false), 1600);
     }
 
     return () =>
       h("div", { class: "cv-terminal-wrapper" }, [
+        // The terminal replay below is aria-hidden because it types character
+        // by character; announcing that is noise. But it carried the only copy
+        // of the commands on the page, which left the single required action
+        // unreachable by screen readers. This static transcript is the
+        // accessible equivalent.
+        h("pre", { class: "visually-hidden" }, [
+          h("code", commands.value.join("\n")),
+        ]),
         h(
           "div",
           {
@@ -381,7 +422,11 @@ type CloudUser = {
   name?: string | null;
   avatar_url?: string | null;
 };
-type CloudSubscription = { active: boolean; status?: string | null } | null;
+type CloudSubscription = {
+  active: boolean;
+  status?: string | null;
+  current_period_end?: number | null;
+} | null;
 type CloudVault = {
   id?: string;
   slug: string;
@@ -401,7 +446,7 @@ type CloudStatePayload = {
   subscription?: CloudSubscription;
   vault?: CloudVault;
 };
-type Stage = "setup" | "connect" | "explore" | "ready";
+type Stage = "error" | "setup" | "connect" | "explore" | "ready";
 type NavItem = {
   key: string;
   label: string;
@@ -419,6 +464,11 @@ const cloudState = ref<CloudState>({
   vault: null,
 });
 const hydrated = ref(false);
+// Set when /api/me could not be resolved because auth failed — as opposed to
+// resolving successfully and reporting no vault. Without this the two cases
+// are indistinguishable downstream, and a signed-in, paying, provisioned user
+// whose token refresh blipped was shown "Set up your hosted vault".
+const loadError = ref<string | null>(null);
 const busy = ref(false);
 const notice = ref<{ kind: "ok" | "warn"; text: string } | null>(null);
 const focusedCard = ref<"preview" | "billing" | null>(null);
@@ -436,10 +486,59 @@ const cliLinked = computed(() => Boolean(vault.value?.cli_linked_at));
 const earlyAccess = computed(() => Boolean(vault.value?.early_access_at));
 
 const stage = computed<Stage>(() => {
+  if (loadError.value && !vault.value) return "error";
   if (!vault.value) return "setup";
   if (!cliLinked.value) return "connect";
   if (!earlyAccess.value) return "explore";
   return "ready";
+});
+
+const subscription = computed(() => cloudState.value.subscription);
+
+// The card used to render a hardcoded "Active" pill and a hardcoded monthly
+// price as static markup, while the real
+// subscription was fetched, typed, normalized — and then never read. A
+// past_due or canceled subscriber was told everything was fine. Price is not
+// rendered at all any more: the API does not expose the amount, and inventing
+// one is how the "$12" got there in the first place.
+const SUBSCRIPTION_LABELS: Record<string, { text: string; tone: "ok" | "warn" | "bad" }> = {
+  active: { text: "Active", tone: "ok" },
+  trialing: { text: "Trialing", tone: "ok" },
+  past_due: { text: "Past due", tone: "warn" },
+  unpaid: { text: "Unpaid", tone: "bad" },
+  incomplete: { text: "Incomplete", tone: "warn" },
+  incomplete_expired: { text: "Expired", tone: "bad" },
+  canceled: { text: "Canceled", tone: "bad" },
+  paused: { text: "Paused", tone: "warn" },
+};
+
+const subscriptionState = computed(() => {
+  const status = subscription.value?.status ?? null;
+  if (!status) {
+    return subscription.value?.active
+      ? { text: "Active", tone: "ok" as const }
+      : { text: "No subscription", tone: "warn" as const };
+  }
+  return SUBSCRIPTION_LABELS[status] ?? { text: status.replace(/_/g, " "), tone: "warn" as const };
+});
+
+const subscriptionNeedsAttention = computed(
+  () => subscriptionState.value.tone !== "ok",
+);
+
+const renewalLabel = computed(() => {
+  const seconds = subscription.value?.current_period_end;
+  if (!seconds) return null;
+  const date = new Date(seconds * 1000);
+  if (Number.isNaN(date.getTime())) return null;
+  const formatted = date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+  return subscriptionState.value.tone === "bad"
+    ? `Ends ${formatted}`
+    : `Renews ${formatted}`;
 });
 
 const vaultSlug = computed(() => vault.value?.slug ?? "your-vault");
@@ -558,23 +657,40 @@ async function loadCloudState(initial = false) {
     cloudState.value = response.ok
       ? normalizeCloudState((await response.json()) as CloudStatePayload)
       : { user: null, subscription: null, vault: null };
+    loadError.value = null;
   } catch (error) {
     if (requestSeq !== cloudStateRequestSeq) return;
     if (isClerkApiAuthError(error)) {
       if (error.reason !== "clerk-not-loaded") {
-        notice.value = { kind: "warn", text: clerkAuthRecoveryMessage(error) };
+        const message = clerkAuthRecoveryMessage(error);
+        notice.value = { kind: "warn", text: message };
+        loadError.value = message;
       }
       return;
     }
     cloudState.value = { user: null, subscription: null, vault: null };
+    loadError.value = null;
   } finally {
-    if (requestSeq === cloudStateRequestSeq) hydrated.value = true;
-    if (initial) hydrated.value = true;
+    // `initial` used to set hydrated outside the staleness guard, so a slow
+    // first request could un-veil the page using a superseded response.
+    if (requestSeq === cloudStateRequestSeq || initial) hydrated.value = true;
+  }
+}
+
+async function retryLoad() {
+  if (busy.value) return;
+  busy.value = true;
+  notice.value = null;
+  try {
+    await loadCloudState();
+  } finally {
+    busy.value = false;
   }
 }
 
 function syncCloudState(payload: CloudStatePayload) {
   cloudState.value = normalizeCloudState(payload);
+  loadError.value = null;
   hydrated.value = true;
 }
 
@@ -961,8 +1077,18 @@ const ICON = {
   border-color: rgba(232, 168, 102, 0.36);
   background: rgba(232, 168, 102, 0.08);
 }
+.cv-pill.bad {
+  color: var(--bad);
+  border-color: rgba(217, 113, 113, 0.36);
+  background: rgba(217, 113, 113, 0.08);
+}
 .cv-pill.mut {
   color: var(--ink-3);
+}
+
+.cv-sub-warn {
+  margin: 10px 0 0;
+  font-size: 12px;
 }
 
 .cv-notice {
@@ -1613,6 +1739,32 @@ const ICON = {
     order: 2;
   }
 }
+/* The 960px rule turns the sidebar into a horizontal strip. At phone widths
+   that strip has to wrap, and `flex: 1` on the nav pushed the items to the
+   right of the brand, leaving the vault name stranded on its own line. Stack
+   the three regions instead so everything stays left-aligned. */
+@media (max-width: 640px) {
+  .cv-side {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding-bottom: 12px;
+  }
+  .cv-brand {
+    padding: 0 0 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .cv-nav {
+    flex: none;
+    gap: 6px;
+  }
+  .cv-side-foot {
+    padding: 10px 0 0;
+    border-top: 1px solid var(--line-2);
+    border-left: 0;
+  }
+}
+
 @media (max-width: 560px) {
   .cv-content {
     padding: 20px 18px 32px;
