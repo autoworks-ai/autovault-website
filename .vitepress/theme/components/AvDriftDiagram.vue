@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { prefersReducedMotion } from '../utils/motion'
 
 // Three agents holding the "same" skill at three drifted states.
 // The visualization sits between Problems (text-only) and FolderHero (the answer),
@@ -59,6 +60,7 @@ const COLS = [
 const focus = ref(0)
 let timer: number | undefined
 onMounted(() => {
+  if (prefersReducedMotion()) return
   timer = window.setInterval(() => {
     focus.value = (focus.value + 1) % COLS.length
   }, 2200)
