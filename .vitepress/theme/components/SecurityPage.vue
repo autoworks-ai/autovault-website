@@ -133,7 +133,7 @@
             <div class="when">{{ link.when }}</div>
           </div>
         </div>
-        <div class="prov-caption">autovault doctor &lt;skill&gt; · any link broken = full rejection</div>
+        <div class="prov-caption">autovault doctor &lt;skill&gt; · reports every broken link, doesn't block on its own</div>
       </div>
     </section>
 
@@ -304,7 +304,7 @@ const VerifierDemo = defineComponent({
             step.value >= 5 ? line("gate run", "5/5 stages passed · 2026-04-28 14:21Z", "ok") : null,
             step.value >= 6 && phase.value !== "fail" ? line("isnad chain", "3 links · author → vault → mirror", "ok") : null,
             phase.value === "ok" ? verdict("ok", "Verified.", "Provenance chain intact, signature valid, gate stages all green.") : null,
-            phase.value === "fail" ? verdict("fail", "Rejected.", "Signature does not match the signing key for this artifact's signer. Do not install.") : null
+            phase.value === "fail" ? verdict("fail", "Signature mismatch.", "Does not match the signing key for this artifact's signer. doctor reports this — it does not itself block the skill from running. --repair only re-signs unsigned local skills; it refuses tampered metadata and remote sources like this one, so reject or remove it instead.") : null
           ])
     ]);
   }

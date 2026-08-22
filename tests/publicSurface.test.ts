@@ -58,4 +58,23 @@ describe("security page claims", () => {
     // `autovault doctor`.
     expect(securityPage).not.toContain("autovault verify");
   });
+
+  it("does not present doctor as an enforcing gate", () => {
+    // TroubleshootingPage.vue's own documented behavior: "the doctor logs
+    // mismatches but does not enforce; future versions may reject mismatched
+    // signatures at load time." The provenance widget previously simulated a
+    // "Rejected." verdict and captioned the section "any link broken = full
+    // rejection," both overstating what `doctor` actually does today.
+    expect(securityPage).not.toContain("full rejection");
+    expect(securityPage).not.toContain('"Rejected."');
+  });
+
+  it("does not suggest repairing a tampered or remote signature mismatch", () => {
+    // --repair only re-signs unsigned LOCAL skills; it refuses tampered
+    // metadata and remote sources (TroubleshootingPage.vue:70), which is
+    // exactly the forged-skill scenario this widget simulates. Telling the
+    // reader to "repair... it yourself" for that case advertises a
+    // remediation doctor won't actually perform.
+    expect(securityPage).not.toMatch(/repair or reject it yourself/i);
+  });
 });
