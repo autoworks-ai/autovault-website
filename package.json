@@ -14,7 +14,7 @@
     "migrate:local": "wrangler d1 migrations apply autovault-hosted --local",
     "migrate:remote": "wrangler d1 migrations apply autovault-hosted --remote",
     "dev:pages": "npm run docs:build && wrangler pages dev .vitepress/dist --port 8788 --live-reload --persist-to .wrangler/state",
-    "dev:stripe": "stripe listen --forward-to http://localhost:8788/api/billing/webhook",
+    "dev:stripe": "node scripts/stripe-listen.mjs",
     "deploy:pages": "npm run docs:build && wrangler pages deploy .vitepress/dist --project-name autovault-website",
     "pages:functions:build": "wrangler pages functions build functions --outdir .wrangler/tmp/pages-functions",
     "pages:preview-config": "node scripts/write-pages-preview-config.mjs",

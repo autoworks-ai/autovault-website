@@ -55,11 +55,20 @@ npm run dev:bootstrap                # apply all pending D1 migrations to local 
 ```
 
 `.dev.vars` is gitignored; `.dev.vars.example` documents every required key.
-Clerk keys can be pulled via `clerk env pull --file .dev.vars`. Stripe values
-come from `stripe config --list` and `stripe listen --print-secret`. The
-webhook secret is stable per Stripe account in test mode — don't re-roll it
-casually; just rerun `stripe listen --print-secret` if `.dev.vars` ever
-drifts.
+Clerk keys can be pulled via `clerk env pull --file .dev.vars`.
+
+**`STRIPE_SECRET_KEY` must come from the Stripe Dashboard** (Developers >
+API keys > Secret key, test mode) — *not* from `stripe config --list`.
+That CLI key is minted by `stripe login` and Stripe expires it 90 days
+later, at which point checkout starts failing with "Expired API Key
+provided: sk_test_***" and nothing points at the CLI as the cause. A
+dashboard key does not expire.
+
+`npm run dev:stripe` reads that same key and passes it to the Stripe CLI, so
+one credential covers both the app and webhook forwarding and `stripe login`
+is not required. It refuses to start on a live key. The webhook secret is
+stable per Stripe account in test mode — rerun `stripe listen --print-secret`
+if `.dev.vars` ever drifts.
 
 **Per-session — two terminals**
 
