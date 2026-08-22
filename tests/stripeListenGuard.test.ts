@@ -43,3 +43,26 @@ describe("stripe listen wrapper", () => {
     expect(script).toMatch(/expires that one 90 days/i);
   });
 });
+
+describe("set-dev-var helper", () => {
+  const setter = readFileSync(new URL("../scripts/set-dev-var.mjs", import.meta.url), "utf-8");
+
+  it("takes the secret from stdin or clipboard, never from argv", () => {
+    // A sed one-liner puts the credential in argv, where it lands in shell
+    // history, ps output, and any transcript of the session that ran it.
+    expect(setter).toContain("pbpaste");
+    expect(setter).toContain("readFileSync(0");
+    expect(setter).not.toMatch(/process\.argv\[3\]/);
+  });
+
+  it("refuses live keys and only writes known variable names", () => {
+    expect(setter).toMatch(/\^\(sk\|rk\)_live_/);
+    expect(setter).toContain("ALLOWED");
+    expect(setter).toContain("Refusing: that is a LIVE Stripe key");
+  });
+
+  it("prints only a masked confirmation", () => {
+    expect(setter).toContain("const masked");
+    expect(setter).not.toMatch(/console\.log\(\s*value\s*\)/);
+  });
+});
