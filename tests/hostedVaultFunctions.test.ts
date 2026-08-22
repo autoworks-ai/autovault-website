@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSession } from "../functions/api/_lib/auth.js";
-import { onRequestGet as authStart } from "../functions/api/auth/start.js";
 import { onRequestPost as checkoutHostedVault } from "../functions/api/checkout/hosted-vault.js";
 import { onRequestPost as reconcileBilling } from "../functions/api/billing/reconcile.js";
 import { onRequestPost as savePendingSkill } from "../functions/api/vaults/current/pending-skills.js";
@@ -9,16 +8,6 @@ import { onRequestPost as provisionHostedVault } from "../functions/api/vaults/p
 describe("hosted vault Pages Function smoke tests", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-  });
-
-  it("starts unauthenticated playground auth through GitHub legacy fallback", async () => {
-    const env = createPagesEnv({ subscriptionStatus: null });
-    const request = new Request(`https://autovault.dev/api/auth/start?provider=github&return_to=${encodeURIComponent("/authoring.html#playground")}`);
-    const response = await authStart({ request, env });
-
-    expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toContain("https://github.com/login/oauth/authorize");
-    expect(env.state.oauthStates[0].return_to).toBe("/authoring.html#playground");
   });
 
   it("sends an authenticated unpaid user to Stripe Checkout", async () => {

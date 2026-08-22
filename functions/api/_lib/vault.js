@@ -29,8 +29,17 @@ const VAULT_PROGRESS_COLUMNS = {
 };
 
 export async function markVaultProgress(env, user, step) {
+  // `step` is raw request input. Plain property access would resolve inherited
+  // keys — "__proto__", "constructor", "toString" and "valueOf" all return a
+  // truthy value and sail past a `if (!column)` guard, reaching the
+  // interpolated `update vaults set ${column}` below as e.g. "[object Object]".
+  // Not injectable (the attacker cannot place their own text there), but it
+  // turns a clean 400 into an opaque 500. hasOwn keeps the lookup on the
+  // allowlist's own keys.
+  if (typeof step !== "string" || !Object.hasOwn(VAULT_PROGRESS_COLUMNS, step)) {
+    throw new ApiError(400, "Unknown onboarding step.");
+  }
   const column = VAULT_PROGRESS_COLUMNS[step];
-  if (!column) throw new ApiError(400, "Unknown onboarding step.");
 
   const vault = await getCurrentVault(env, user.id);
   if (!vault) throw new ApiError(409, "Reserve a hosted vault before recording onboarding progress.");
@@ -67,12 +76,18 @@ export async function provisionVault(env, user) {
     early_access_at: null
   };
 
+  // vaults.user_id is UNIQUE, and the read above is not in a transaction with
+  // this write. Two concurrent provision requests both see `existing === null`
+  // and the loser used to raise an uncaught constraint error -> 500. `do
+  // nothing` makes the loser a no-op; the re-read below returns whichever row
+  // actually landed, so both callers get the same vault.
   await run(env, `
     insert into vaults (id, user_id, slug, status, public_url, created_at, provisioned_at)
     values (?, ?, ?, ?, ?, ?, ?)
+    on conflict(user_id) do nothing
   `, vault.id, vault.user_id, vault.slug, vault.status, vault.public_url, vault.created_at, vault.provisioned_at);
 
-  return vault;
+  return (await getCurrentVault(env, user.id)) ?? vault;
 }
 
 export async function savePendingSkill(env, user, vault, input) {
