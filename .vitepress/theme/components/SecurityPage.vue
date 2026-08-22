@@ -81,19 +81,22 @@
       <div class="deny-grid">
         <div class="deny-list">
           <div class="deny-list-head">
-            <span>Severity</span>
             <span>ID</span>
             <span>Pattern</span>
-            <span>Source</span>
-            <span>Age</span>
+            <span>What it catches</span>
             <span class="count">{{ denyRows.length }} shown</span>
           </div>
-          <button v-for="row in denyRows" :key="row.id" class="deny-row" type="button" @click="selectedDeny = row.id">
-            <span class="sev" :class="row.sev">{{ row.sev[0].toUpperCase() }}</span>
+          <button
+            v-for="row in denyRows"
+            :key="row.id"
+            class="deny-row"
+            type="button"
+            :aria-pressed="selectedDeny === row.id"
+            @click="selectedDeny = row.id"
+          >
             <span class="id">{{ row.id }}</span>
             <span class="pat">{{ row.pat }}</span>
-            <span class="src">{{ row.src }}</span>
-            <span class="age">{{ row.age }}</span>
+            <span class="reason">{{ row.reason }}</span>
           </button>
         </div>
         <aside class="deny-side">
@@ -102,16 +105,16 @@
             <div class="denynum">{{ activePatternCount }}<span class="of">/ extensible</span></div>
           </div>
           <div class="breakdown">
-            <h4>By severity</h4>
-            <div v-for="row in severityBreakdown" :key="row.label" class="bd-row">
-              <span class="lbl">{{ row.label }}</span>
-              <span class="bar"><span :style="{ width: row.width, background: row.color }" /></span>
-              <span class="num">{{ row.count }}</span>
-            </div>
+            <h4>Selected pattern</h4>
+            <div class="mono-block selected-pattern">{{ selectedPattern?.id }} · {{ selectedPattern?.pat }}</div>
+            <p class="deny-reason">{{ selectedPattern?.reason }}</p>
           </div>
           <div class="breakdown">
-            <h4>Selected pattern</h4>
-            <div class="mono-block selected-pattern">{{ selectedPattern?.id }} · {{ selectedPattern?.src }} · {{ selectedPattern?.pat }}</div>
+            <h4>Source</h4>
+            <p class="deny-reason">
+              Mirrored from <code>scripts/security/patterns.json</code> (schema
+              v{{ DENYLIST_SCHEMA_VERSION }}) in the AutoVault CLI.
+            </p>
           </div>
         </aside>
       </div>
@@ -130,24 +133,29 @@
             <div class="when">{{ link.when }}</div>
           </div>
         </div>
-        <div class="prov-caption">autovault verify --chain · any link broken = full rejection</div>
+        <div class="prov-caption">autovault doctor &lt;skill&gt; · any link broken = full rejection</div>
       </div>
     </section>
 
     <section class="sec-section">
       <div class="eyebrow"><span class="dash" /> Disclosure</div>
       <h2>Found something? Tell us.</h2>
-      <p class="sub">We treat skill-ecosystem vulnerabilities the way mature infrastructure projects do. Coordinated disclosure, public CVE assignment, advisory released with the patch.</p>
+      <p class="sub">Coordinated disclosure through GitHub Security Advisories. We work with you on the fix and credit you in the release notes if you want it.</p>
 
       <div class="disc-grid">
         <article class="disc-card">
           <h3>Report a vulnerability</h3>
-          <p>If you've found a vulnerability in the gate, CLI, renderer, remote OAuth flow, or a denylist bypass, please report it before public disclosure. We respond within 48 hours and ship critical fixes within 7 days.</p>
+          <p>If you've found a vulnerability in the gate, CLI, renderer, remote OAuth flow, or a denylist bypass, report it privately rather than opening a public issue.</p>
           <div class="kv">
-            <span class="k">Email</span><span class="v accent">security@autoworks-ai</span>
-            <span class="k">PGP</span><span class="v">0xC4F9 7E10 A2C8 1B3D</span>
-            <span class="k">Bounty</span><span class="v">case-by-case · max $5k</span>
-            <span class="k">Window</span><span class="v">90-day coordinated disclosure</span>
+            <span class="k">Report</span
+            ><span class="v accent"
+              ><a :href="SECURITY_ADVISORY_URL" rel="noopener"
+                >GitHub Security Advisories</a
+              ></span
+            >
+            <span class="k">Response</span><span class="v">within 3 business days</span>
+            <span class="k">Supported</span><span class="v">latest minor · pre-1.0</span>
+            <span class="k">Disclosure</span><span class="v">coordinated · credited</span>
           </div>
         </article>
         <article class="disc-card">
@@ -155,9 +163,9 @@
           <p>The CLI is MIT licensed and self-buildable from a tagged commit. The denylist is public and versioned. The gate is reproducible: given the same skill bytes you should always get the same verdict.</p>
           <div class="kv">
             <span class="k">License</span><span class="v">MIT</span>
-            <span class="k">Reproducible</span><span class="v accent">yes · gate v0.2+</span>
-            <span class="k">External audit</span><span class="v">scheduled · Q3 2026</span>
-            <span class="k">SBOM</span><span class="v">CycloneDX · per release</span>
+            <span class="k">Denylist</span><span class="v accent">public · schema v{{ DENYLIST_SCHEMA_VERSION }}</span>
+            <span class="k">Container</span><span class="v">multi-arch · GHCR</span>
+            <span class="k">SBOM</span><span class="v">SPDX + provenance · per release</span>
           </div>
         </article>
       </div>
@@ -169,7 +177,14 @@
 import { computed, defineComponent, h, onBeforeUnmount, ref } from "vue";
 import UiIcon from "./UiIcon.vue";
 import { PRODUCT_VERSION } from "../data/product";
-import { denyRows } from "../data/security";
+import { denyRows, DENYLIST_SCHEMA_VERSION } from "../data/security";
+
+// Matches .github/SECURITY.md in autoworks-ai/autovault, which is the
+// authoritative policy. The previous block advertised a security@ address with
+// no TLD, a PGP key, a bounty, a response/fix SLA and a scheduled external
+// audit — none of which appear in that policy.
+const SECURITY_ADVISORY_URL =
+  "https://github.com/autoworks-ai/autovault/security/advisories/new";
 
 type Phase = "idle" | "running" | "ok" | "fail";
 type RowKind = "ok" | "warn" | "bad";
@@ -216,27 +231,6 @@ const gateDetails = [
 
 const selectedDeny = ref(denyRows[0].id);
 const selectedPattern = computed(() => denyRows.find((row) => row.id === selectedDeny.value));
-const severityLabels = {
-  crit: "Critical",
-  high: "High",
-  med: "Medium"
-} as const;
-const severityColors = {
-  crit: "var(--bad)",
-  high: "var(--warn)",
-  med: "var(--ink-4)"
-} as const;
-const severityBreakdown = (Object.keys(severityLabels) as Array<keyof typeof severityLabels>).map((severity) => {
-  const count = denyRows.filter((row) => row.sev === severity).length;
-  const width = activePatternCount > 0 ? Math.round((count / activePatternCount) * 100) : 0;
-
-  return {
-    label: severityLabels[severity],
-    count,
-    width: `${width}%`,
-    color: severityColors[severity]
-  };
-});
 const provenance = [
   { role: "LINK / 01 · author", id: "@autoworks-ai", when: "2026-04-28 12:14Z" },
   { role: "LINK / 02 · gate", id: "vault.autoworks-ai", when: "2026-04-28 12:18Z" },
@@ -286,12 +280,12 @@ const VerifierDemo = defineComponent({
     return () => h("div", { class: "verifier" }, [
       h("div", { class: "verifier-head" }, [
         h("span", { class: "lights" }, [h("span", { class: "red" }), h("span", { class: "amber" }), h("span", { class: "green" })]),
-        h("span", { class: "ttl" }, "autovault verify · interactive")
+        h("span", { class: "ttl" }, "autovault doctor · simulated")
       ]),
       h("div", { class: "verifier-input" }, [
         h("label", { class: "row" }, [
           h("span", { class: "pmt" }, "$"),
-          h("span", { class: "muted" }, "autovault verify"),
+          h("span", { class: "muted" }, "autovault doctor"),
           h("input", { value: input.value, spellcheck: false, "aria-label": "Skill artifact", onInput: (event: Event) => { input.value = (event.target as HTMLInputElement).value; } })
         ]),
         h("div", { class: "actions" }, [
@@ -301,12 +295,12 @@ const VerifierDemo = defineComponent({
         ])
       ]),
       h("div", { class: "verifier-body" }, phase.value === "idle"
-        ? h("div", { class: "muted" }, [h("span", "Click "), h("strong", { class: "arg" }, "Verify"), h("span", " to walk the provenance chain for any skill in the public vault.")])
+        ? h("div", { class: "muted" }, [h("span", "Click "), h("strong", { class: "arg" }, "Verify"), h("span", " to simulate the provenance walk. Sample output — run the real check locally.")])
         : [
             step.value >= 1 ? line("artifact", input.value) : null,
             step.value >= 2 ? line("digest", "sha256:c4f9…e10a · 2,847 bytes", "dim") : null,
             step.value >= 3 ? line("signature", phase.value === "fail" ? "INVALID — keypair mismatch" : "ed25519 · 0x9af42c81…7e7e", phase.value === "fail" ? "err" : "ok") : null,
-            step.value >= 4 ? line("signer", "vault.autoworks-ai (key:0xC4F9…E10A) · trust: anchored") : null,
+            step.value >= 4 ? line("signer", "vault.example (key:ed25519:sample) · trust: anchored") : null,
             step.value >= 5 ? line("gate run", "5/5 stages passed · 2026-04-28 14:21Z", "ok") : null,
             step.value >= 6 && phase.value !== "fail" ? line("isnad chain", "3 links · author → vault → mirror", "ok") : null,
             phase.value === "ok" ? verdict("ok", "Verified.", "Provenance chain intact, signature valid, gate stages all green.") : null,
