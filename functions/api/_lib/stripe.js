@@ -141,21 +141,19 @@ export async function upsertCustomer(env, { userId, customerId }) {
   // DIFFERENT user row (duplicate Stripe customer, account switch, test/live
   // crossover) the UNIQUE constraint raises an uncaught D1 error, handleApi
   // turns it into a 500, and Stripe retries the webhook against the same 500
-  // forever. Release the stale mapping first — the incoming event is
-  // authoritative about who owns this customer.
+  // forever. The incoming event is authoritative about who owns this
+  // customer now, so the old mapping has to go -- but revoke the old
+  // owner's subscription first (below), not after.
   const stale = await first(env, "select user_id from customers where stripe_customer_id = ? and user_id <> ?", customerId, userId);
-  await run(
-    env,
-    "delete from customers where stripe_customer_id = ? and user_id <> ?",
-    customerId,
-    userId
-  );
   if (stale?.user_id) {
-    // The old owner's subscription is now orphaned from this customer: every
-    // future Stripe event for it resolves to the new owner via
-    // `userIdForCustomer`, so the stale row would otherwise sit at whatever
-    // status it last had — including "active" — and keep granting paid
-    // access forever with no event left that could ever revoke it.
+    // Revoke BEFORE releasing the stale mapping below, not after. A
+    // transient D1 failure between the two would otherwise leave the
+    // customers row deleted but the old owner's subscription untouched — on
+    // retry, this `select` finds nothing (the row is already gone), so
+    // revocation is silently skipped and paid access survives indefinitely.
+    // Revoking first means a failure between these two statements leaves the
+    // stale customers row in place, so a retry's `select` still finds it and
+    // re-applies the (idempotent) revoke.
     await run(
       env,
       "update subscriptions set status = 'canceled', updated_at = ? where user_id = ? and stripe_customer_id = ?",
@@ -164,6 +162,12 @@ export async function upsertCustomer(env, { userId, customerId }) {
       customerId
     );
   }
+  await run(
+    env,
+    "delete from customers where stripe_customer_id = ? and user_id <> ?",
+    customerId,
+    userId
+  );
   await run(env, `
     insert into customers (user_id, stripe_customer_id, created_at, updated_at)
     values (?, ?, ?, ?)

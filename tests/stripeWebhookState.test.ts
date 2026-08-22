@@ -241,6 +241,37 @@ describe("Stripe webhook state handling", () => {
     expect((await getSubscription(env, "clerk_1")).active).toBe(false);
   });
 
+  it("revokes the old owner's subscription before releasing the stale customer mapping, so a failed retry can't skip it", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db, { id: "clerk_1", email: "jack@example.com" });
+    seedUser(db, { id: "clerk_2", email: "other@example.com" });
+
+    await upsertCustomer(env, { userId: "clerk_1", customerId: "cus_shared" });
+    await upsertSubscription(env, { userId: "clerk_1", subscriptionId: "sub_shared", customerId: "cus_shared", status: "active", priceId: null, currentPeriodEnd: null });
+
+    // Simulate a transient D1 failure on the delete step, AFTER the revoke
+    // would have run. If revoke ran first (the fix), the failure below still
+    // leaves clerk_1 revoked even though the reassignment itself didn't
+    // finish -- proving the ordering, not just the end state of a clean run.
+    const flakyEnv = { ...env, AUTOVAULT_DB: failOnceOn(env.AUTOVAULT_DB, "delete from customers") };
+    await expect(upsertCustomer(flakyEnv, { userId: "clerk_2", customerId: "cus_shared" })).rejects.toThrow("simulated transient D1 failure");
+
+    expect((await getSubscription(env, "clerk_1")).active).toBe(false);
+    // The stale mapping is still in place (the delete never completed) --
+    // proving the retry below has something to find and re-revoke against,
+    // rather than the row already being gone with revocation silently
+    // skipped.
+    const staleRow = db.prepare("select user_id from customers where stripe_customer_id = ?").all("cus_shared");
+    expect(staleRow).toEqual([{ user_id: "clerk_1" }]);
+
+    // The retry, against the real (non-flaky) binding, completes the
+    // reassignment.
+    await expect(upsertCustomer(env, { userId: "clerk_2", customerId: "cus_shared" })).resolves.toBe(true);
+    const finalRows = db.prepare("select user_id from customers where stripe_customer_id = ?").all("cus_shared");
+    expect(finalRows).toEqual([{ user_id: "clerk_2" }]);
+    expect((await getSubscription(env, "clerk_1")).active).toBe(false);
+  });
+
   it("does not let a stale subscription's own metadata undo a customer reassignment", async () => {
     const { db, env } = createTestEnv();
     seedUser(db, { id: "clerk_1", email: "jack@example.com" });
