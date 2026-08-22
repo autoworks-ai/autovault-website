@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createTestEnv, seedUser } from "./support/d1.js";
-import { handleStripeEvent, upsertCustomer } from "../functions/api/_lib/stripe.js";
-import { upsertUser } from "../functions/api/_lib/auth.js";
+import { handleStripeEvent, upsertCustomer, upsertSubscription } from "../functions/api/_lib/stripe.js";
+import { createSession, upsertUser } from "../functions/api/_lib/auth.js";
+import { onRequestPost as reconcileBilling } from "../functions/api/billing/reconcile.js";
 import { getSubscription, markVaultProgress, provisionVault } from "../functions/api/_lib/vault.js";
 
 function subscriptionEvent({
@@ -222,6 +223,9 @@ describe("Stripe webhook state handling", () => {
     seedUser(db, { id: "clerk_2", email: "other@example.com" });
 
     await upsertCustomer(env, { userId: "clerk_1", customerId: "cus_shared" });
+    await upsertSubscription(env, { userId: "clerk_1", subscriptionId: "sub_shared", customerId: "cus_shared", status: "active", priceId: null, currentPeriodEnd: null });
+    expect((await getSubscription(env, "clerk_1")).active).toBe(true);
+
     // customers.stripe_customer_id is UNIQUE; the upsert conflict-resolves on
     // user_id, so this used to raise an uncaught constraint error -> 500 ->
     // Stripe retrying the same 500 forever.
@@ -230,6 +234,149 @@ describe("Stripe webhook state handling", () => {
     const rows = db.prepare("select user_id from customers where stripe_customer_id = ?").all("cus_shared");
     expect(rows).toHaveLength(1);
     expect((rows[0] as { user_id: string }).user_id).toBe("clerk_2");
+
+    // clerk_1's subscription for the reassigned customer must not be left
+    // "active" -- every future Stripe event for cus_shared now resolves to
+    // clerk_2 via userIdForCustomer, so nothing could ever revoke it again.
+    expect((await getSubscription(env, "clerk_1")).active).toBe(false);
+  });
+
+  it("does not let a stale subscription's own metadata undo a customer reassignment", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db, { id: "clerk_1", email: "jack@example.com" });
+    seedUser(db, { id: "clerk_2", email: "other@example.com" });
+
+    await upsertCustomer(env, { userId: "clerk_1", customerId: "cus_shared" });
+    await upsertSubscription(env, { userId: "clerk_1", subscriptionId: "sub_shared", customerId: "cus_shared", status: "active", priceId: null, currentPeriodEnd: null });
+    await upsertCustomer(env, { userId: "clerk_2", customerId: "cus_shared" });
+    expect((await getSubscription(env, "clerk_1")).active).toBe(false);
+
+    // A later webhook for the SAME subscription object still carries
+    // `metadata.user_id: "clerk_1"` -- Stripe never updates a subscription's
+    // metadata when our own customers table reassigns ownership. If metadata
+    // won this resolution, this event would re-associate itself with clerk_1
+    // and undo the revoke above.
+    await handleStripeEvent(env, {
+      id: "evt_stale_metadata",
+      type: "customer.subscription.updated",
+      created: 9000,
+      data: {
+        object: {
+          id: "sub_shared",
+          customer: "cus_shared",
+          status: "active",
+          metadata: { user_id: "clerk_1" },
+          items: { data: [{ price: { id: "price_1" }, current_period_end: 1800000000 }] }
+        }
+      }
+    });
+
+    expect((await getSubscription(env, "clerk_1")).active).toBe(false);
+    expect((await getSubscription(env, "clerk_2")).active).toBe(true);
+  });
+});
+
+describe("reconciliation vs. webhook ordering", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("does not reopen the door for a stale webhook after a live reconcile read", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db);
+
+    // A cancellation webhook lands first -- the ordering watermark is now 2000.
+    await handleStripeEvent(env, subscriptionEvent({
+      id: "evt_cancel",
+      type: "customer.subscription.deleted",
+      created: 2000,
+      status: "canceled"
+    }));
+    expect((await getSubscription(env, "clerk_1")).active).toBe(false);
+
+    // The customer returns to the Stripe success URL again (reload, second
+    // tab) and the client calls /api/billing/reconcile, which reads the
+    // session straight from Stripe -- a live read, already reflecting the
+    // cancellation, with no `event.created` of its own.
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      id: "cs_recon",
+      client_reference_id: "clerk_1",
+      customer: "cus_1",
+      payment_status: "paid",
+      subscription: {
+        id: "sub_1",
+        status: "canceled",
+        current_period_end: 1800000000,
+        items: { data: [{ price: { id: "price_1" } }] }
+      }
+    }), { status: 200, headers: { "content-type": "application/json" } })));
+
+    const cookie = await createSession(new Request("https://autovault.dev"), env, "clerk_1");
+    const request = new Request("https://autovault.dev/api/billing/reconcile", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ session_id: "cs_recon" })
+    });
+    const response = await reconcileBilling({ request, env });
+    expect(response.status).toBe(200);
+
+    // A stale retry of the earlier "active" update, generated before the
+    // cancellation, now lands. If reconcile had left the watermark null, this
+    // would pass unconditionally and resurrect paid access.
+    await handleStripeEvent(env, subscriptionEvent({ id: "evt_stale_active", created: 1000, status: "active" }));
+
+    const subscription = await getSubscription(env, "clerk_1");
+    expect(subscription.status).toBe("canceled");
+    expect(subscription.active).toBe(false);
+  });
+
+  it("does not let a stale reconcile read overwrite a webhook applied mid-request", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db);
+
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000 * 1000);
+
+    // The Stripe round-trip inside retrieveCheckoutSession is where the race
+    // lives: a real cancellation webhook is delivered and fully applied
+    // *during* that round-trip -- strictly after reconcile captured its
+    // read-start watermark, strictly before reconcile writes its (now stale)
+    // snapshot. A write-time watermark would make reconcile's write look
+    // newer than the webhook's; a read-start watermark must not.
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      vi.advanceTimersByTime(5000);
+      await handleStripeEvent(env, subscriptionEvent({
+        id: "evt_mid_flight_cancel",
+        type: "customer.subscription.deleted",
+        created: 1_000_003,
+        status: "canceled"
+      }));
+      return new Response(JSON.stringify({
+        id: "cs_recon",
+        client_reference_id: "clerk_1",
+        customer: "cus_1",
+        payment_status: "paid",
+        subscription: {
+          id: "sub_1",
+          status: "active", // stale: this snapshot was taken before the cancellation above
+          current_period_end: 1800000000,
+          items: { data: [{ price: { id: "price_1" } }] }
+        }
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }));
+
+    const cookie = await createSession(new Request("https://autovault.dev"), env, "clerk_1");
+    const request = new Request("https://autovault.dev/api/billing/reconcile", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ session_id: "cs_recon" })
+    });
+    await reconcileBilling({ request, env });
+
+    const subscription = await getSubscription(env, "clerk_1");
+    expect(subscription.status).toBe("canceled");
+    expect(subscription.active).toBe(false);
   });
 });
 
@@ -292,14 +439,15 @@ describe("user profile upserts", () => {
       avatarUrl: "https://img.example/a.png"
     });
 
-    // clerkProfile() degrades to all-nulls when the Clerk backend API fails,
-    // and this upsert runs on every authenticated request. A plain assignment
-    // would wipe the row.
+    // clerkProfile() degrades to all-nulls AND sets fetchFailed when the Clerk
+    // backend API fails, and this upsert runs on every authenticated request.
+    // A plain assignment would wipe the row on every transient hiccup.
     await upsertUser(env, "clerk", {
       providerUserId: "abc",
       email: null,
       name: null,
-      avatarUrl: null
+      avatarUrl: null,
+      fetchFailed: true
     });
 
     const row = db
@@ -308,6 +456,34 @@ describe("user profile upserts", () => {
     expect(row.email).toBe("jack@example.com");
     expect(row.name).toBe("Jack");
     expect(row.avatar_url).toBe("https://img.example/a.png");
+  });
+
+  it("clears a profile field when Clerk successfully reports it removed", async () => {
+    const { db, env } = createTestEnv();
+    await upsertUser(env, "clerk", {
+      providerUserId: "abc",
+      email: "jack@example.com",
+      name: "Jack",
+      avatarUrl: "https://img.example/a.png"
+    });
+
+    // Unlike the fetch-failure case above, this is a SUCCESSFUL lookup that
+    // legitimately reports the user cleared their name/avatar. Distinct from
+    // a failure (no `fetchFailed` flag), so it must actually take effect
+    // instead of being coalesced away forever.
+    await upsertUser(env, "clerk", {
+      providerUserId: "abc",
+      email: "jack@example.com",
+      name: null,
+      avatarUrl: null
+    });
+
+    const row = db
+      .prepare("select email, name, avatar_url from users where provider = ? and provider_user_id = ?")
+      .get("clerk", "abc") as { email: string; name: string | null; avatar_url: string | null };
+    expect(row.email).toBe("jack@example.com");
+    expect(row.name).toBeNull();
+    expect(row.avatar_url).toBeNull();
   });
 
   it("still applies real profile updates", async () => {

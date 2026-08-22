@@ -77,20 +77,30 @@ export async function destroySession(request, env) {
 
 export async function upsertUser(env, provider, profile) {
   const id = `${provider}_${profile.providerUserId}`;
-  await run(env, `
-    insert into users (id, provider, provider_user_id, email, name, avatar_url, created_at, updated_at)
-    values (?, ?, ?, ?, ?, ?, ?, ?)
-    on conflict(provider, provider_user_id) do update set
-      -- coalesce, not plain assignment: clerkProfile() degrades to all-nulls
-      -- when the Clerk backend API hiccups, and this upsert runs on EVERY
-      -- authenticated request. A plain assignment would let one transient
-      -- upstream failure wipe the stored email and name — which then silently
-      -- drops the Stripe checkout prefill and corrupts vault slug generation.
-      email = coalesce(excluded.email, users.email),
-      name = coalesce(excluded.name, users.name),
-      avatar_url = coalesce(excluded.avatar_url, users.avatar_url),
-      updated_at = excluded.updated_at
-  `, id, provider, profile.providerUserId, profile.email, profile.name, profile.avatarUrl, nowIso(), nowIso());
+  // `fetchFailed` distinguishes "clerkProfile() couldn't reach Clerk" (keep
+  // whatever we already had) from "Clerk answered and this field is really
+  // null" (a user who cleared their name/avatar). Both used to look identical
+  // — an all-null profile object — so a coalesce-always upsert also blocked
+  // legitimate clears. Callers that omit it (existing profile data, e.g.
+  // early tests) get the plain-overwrite path, which is the correct default:
+  // a fetch failure must opt into the preserve behavior explicitly.
+  if (profile.fetchFailed) {
+    await run(env, `
+      insert into users (id, provider, provider_user_id, email, name, avatar_url, created_at, updated_at)
+      values (?, ?, ?, null, null, null, ?, ?)
+      on conflict(provider, provider_user_id) do update set updated_at = excluded.updated_at
+    `, id, provider, profile.providerUserId, nowIso(), nowIso());
+  } else {
+    await run(env, `
+      insert into users (id, provider, provider_user_id, email, name, avatar_url, created_at, updated_at)
+      values (?, ?, ?, ?, ?, ?, ?, ?)
+      on conflict(provider, provider_user_id) do update set
+        email = excluded.email,
+        name = excluded.name,
+        avatar_url = excluded.avatar_url,
+        updated_at = excluded.updated_at
+    `, id, provider, profile.providerUserId, profile.email, profile.name, profile.avatarUrl, nowIso(), nowIso());
+  }
 
   return first(env, "select id, email, name, avatar_url, provider from users where provider = ? and provider_user_id = ?", provider, profile.providerUserId);
 }
@@ -185,7 +195,7 @@ async function clerkProfile(client, clerkUserId) {
       avatarUrl: user.imageUrl || null
     };
   } catch {
-    return { providerUserId: clerkUserId, email: null, name: null, avatarUrl: null };
+    return { providerUserId: clerkUserId, email: null, name: null, avatarUrl: null, fetchFailed: true };
   }
 }
 

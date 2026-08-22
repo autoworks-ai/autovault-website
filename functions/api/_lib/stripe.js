@@ -101,7 +101,17 @@ export async function handleStripeEvent(env, event) {
     }
   } else if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.created" || event.type === "customer.subscription.deleted") {
     const subscription = event.data?.object;
-    const userId = subscription?.metadata?.user_id || await userIdForCustomer(env, asId(subscription?.customer));
+    // `customers` is our live, current-owner mapping; `subscription.metadata`
+    // is baked in once at creation and never updated. If a Stripe customer is
+    // later reassigned to a different user (see upsertCustomer), the OLD
+    // subscription object keeps pointing at the ORIGINAL user forever via its
+    // metadata -- preferring metadata here would let any later event for that
+    // same subscription silently re-associate it with the old owner and undo
+    // the reassignment's revoke. The customer mapping is checked first for
+    // that reason; metadata is only the bootstrap fallback for the moment a
+    // brand-new subscription's webhook can race ahead of its own
+    // checkout.session.completed writing the customers row.
+    const userId = await userIdForCustomer(env, asId(subscription?.customer)) || subscription?.metadata?.user_id;
     if (userId && subscription?.id) {
       await upsertSubscription(env, {
         userId,
@@ -133,12 +143,27 @@ export async function upsertCustomer(env, { userId, customerId }) {
   // turns it into a 500, and Stripe retries the webhook against the same 500
   // forever. Release the stale mapping first — the incoming event is
   // authoritative about who owns this customer.
+  const stale = await first(env, "select user_id from customers where stripe_customer_id = ? and user_id <> ?", customerId, userId);
   await run(
     env,
     "delete from customers where stripe_customer_id = ? and user_id <> ?",
     customerId,
     userId
   );
+  if (stale?.user_id) {
+    // The old owner's subscription is now orphaned from this customer: every
+    // future Stripe event for it resolves to the new owner via
+    // `userIdForCustomer`, so the stale row would otherwise sit at whatever
+    // status it last had — including "active" — and keep granting paid
+    // access forever with no event left that could ever revoke it.
+    await run(
+      env,
+      "update subscriptions set status = 'canceled', updated_at = ? where user_id = ? and stripe_customer_id = ?",
+      nowIso(),
+      stale.user_id,
+      customerId
+    );
+  }
   await run(env, `
     insert into customers (user_id, stripe_customer_id, created_at, updated_at)
     values (?, ?, ?, ?)

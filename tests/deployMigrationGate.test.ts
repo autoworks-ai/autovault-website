@@ -37,4 +37,29 @@ describe("D1 migrations only apply against production", () => {
     // production database while only previewing its code.
     expect(migrateStep.if).toBe("env.DEPLOY_BRANCH == 'main'");
   });
+
+  it("ci.yml's deploy-preview job migrates the preview D1 database before deploying", () => {
+    const workflow = readWorkflow(".github/workflows/ci.yml");
+    const job = workflow.jobs["deploy-preview"];
+    const stepNames = job.steps.map((step: any) => step.name);
+    const configIndex = stepNames.indexOf("Write preview Pages config");
+    const migrateIndex = stepNames.indexOf("Migrate preview D1 database");
+    const deployIndex = stepNames.indexOf("Deploy preview to Cloudflare Pages");
+    const migrateStep = job.steps[migrateIndex];
+
+    // Order matters: wrangler.json must name the preview D1 binding (written
+    // by the config step) before `wrangler d1 migrations apply` can target it,
+    // and the schema must exist before Functions that depend on it deploy.
+    expect(configIndex).toBeGreaterThan(-1);
+    expect(migrateIndex).toBeGreaterThan(configIndex);
+    expect(deployIndex).toBeGreaterThan(migrateIndex);
+
+    expect(migrateStep.run).toContain("wrangler d1 migrations apply");
+    expect(migrateStep.run).toContain("--remote");
+    // Only runs when the preview bindings are actually configured -- same
+    // guard as every other step in this job that touches the preview D1/KV.
+    expect(migrateStep.if).toBe(
+      "${{ env.CLOUDFLARE_PREVIEW_D1_DATABASE_ID != '' && env.CLOUDFLARE_PREVIEW_KV_NAMESPACE_ID != '' }}"
+    );
+  });
 });
