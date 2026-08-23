@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
@@ -322,6 +322,111 @@ describe("Clerk production deployment configuration", () => {
     expect(controls).toContain("clerkReadyInterval");
     expect(controls).toContain("markClerkReady");
     expect(controls).toContain("clerkFailed.value = false");
+  });
+
+  // A2: the Cloud tab's content (ClerkCloudTab.vue) fetches /api/me and, if a
+  // vault exists, a device count. ClerkAuthControls mounts on every page of
+  // the site, signed in or not, so the P1 this repo already paid for once
+  // (commit 2a81d91: two independent owners of /api/me state, one of them
+  // unconditional) must not come back. The safety argument is not "the fetch
+  // lives in onMounted" -- a component's own onMounted always looks like
+  // that from inside the file. It is "the only thing that ever instantiates
+  // the fetching component is the lazily-routed Clerk custom page", which is
+  // what these two tests actually check.
+  it("never gives ClerkAuthControls itself a fetch, and only instantiates ClerkCloudTab from the lazily-routed Cloud custom page", () => {
+    const controls = read(".vitepress/theme/components/ClerkAuthControls.vue");
+
+    // The every-page component must own zero fetch calls, full stop -- not
+    // just "no /api/me", since any fetch here runs on every page load.
+    expect(controls).not.toContain("fetch(");
+
+    // ClerkCloudTab is referenced exactly once in this file.
+    const references = controls.match(/<ClerkCloudTab\b/g) ?? [];
+    expect(references).toHaveLength(1);
+
+    // ...and that one reference sits inside the "autovault-cloud" custom
+    // page's own slot, between its opening tag and its closing tag -- i.e.
+    // it is only ever created by Clerk's lazy custom-page mount. Verified in
+    // the browser while building this: opening the UserButton popover alone
+    // never puts this page's content in the DOM; only navigating into
+    // "Cloud namespace" does.
+    const pageStart = controls.indexOf('url="autovault-cloud"');
+    expect(pageStart).toBeGreaterThan(-1);
+    const pageEnd = controls.indexOf("</UserButton.UserProfilePage>", pageStart);
+    expect(pageEnd).toBeGreaterThan(pageStart);
+
+    const referenceIndex = controls.indexOf("<ClerkCloudTab");
+    expect(referenceIndex).toBeGreaterThan(pageStart);
+    expect(referenceIndex).toBeLessThan(pageEnd);
+  });
+
+  it("does not let ClerkCloudTab be reused anywhere outside ClerkAuthControls' Cloud custom page", () => {
+    const themeDir = resolve(repoRoot, ".vitepress/theme");
+    const offenders: string[] = [];
+
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = resolve(dir, entry.name);
+        if (entry.isDirectory()) {
+          walk(full);
+          continue;
+        }
+        if (!entry.isFile() || !entry.name.endsWith(".vue")) continue;
+        if (entry.name === "ClerkAuthControls.vue" || entry.name === "ClerkCloudTab.vue") continue;
+        if (readFileSync(full, "utf8").includes("ClerkCloudTab")) offenders.push(full);
+      }
+    };
+    walk(themeDir);
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("guards ClerkCloudTab's fetch against writes after the tab unmounts, and never treats a failed /api/me as 'no vault'", () => {
+    const tab = read(".vitepress/theme/components/ClerkCloudTab.vue");
+
+    expect(tab).toContain("onMounted(load)");
+    expect(tab).toContain('fetch("/api/me"');
+    expect(tab).toContain("onBeforeUnmount");
+    expect(tab).toContain("componentActive");
+
+    // The lesson from commit 2a81d91: a non-OK /api/me means "could not find
+    // out", not "signed out" or "no vault". Pin the behavior (a distinct
+    // error state, with its own template branch), not the implementation
+    // detail of how that state gets set.
+    expect(tab).toContain('loadState.value = "error"');
+    expect(tab).toContain("loadState === 'error'");
+  });
+
+  it("reuses CloudPage.vue's subscription vocabulary and billing-portal request shape in ClerkCloudTab instead of inventing new ones", () => {
+    const tab = read(".vitepress/theme/components/ClerkCloudTab.vue");
+    const cloudPage = read(".vitepress/theme/components/CloudPage.vue");
+
+    // Anchored to CloudPage.vue's actual SUBSCRIPTION_LABELS entries, not
+    // bare words like "Active" -- those appear all over a 2,800-line
+    // template for unrelated reasons and would keep passing even if the map
+    // itself were renamed or deleted.
+    const labelEntries = [
+      'active: { text: "Active", tone: "ok" }',
+      'trialing: { text: "Trialing", tone: "ok" }',
+      'past_due: { text: "Past due", tone: "warn" }',
+      'unpaid: { text: "Unpaid", tone: "bad" }',
+      'incomplete: { text: "Incomplete", tone: "warn" }',
+      'incomplete_expired: { text: "Expired", tone: "bad" }',
+      'canceled: { text: "Canceled", tone: "bad" }',
+      'paused: { text: "Paused", tone: "warn" }',
+    ];
+    for (const entry of labelEntries) {
+      expect(tab).toContain(entry);
+      expect(cloudPage).toContain(entry);
+    }
+
+    expect(tab).toContain('"/api/billing/portal"');
+    expect(tab).toContain('body: JSON.stringify({ return_to: "/cloud#launch-path" })');
+    expect(tab).toContain("{ required: true, fresh: true }");
+    expect(cloudPage).toContain('body: JSON.stringify({ return_to: "/cloud#launch-path" })');
+
+    expect(tab).toContain("clerkBrand.cloudPath");
+    expect(tab).toContain("clerkBrand.docsPath");
   });
 });
 

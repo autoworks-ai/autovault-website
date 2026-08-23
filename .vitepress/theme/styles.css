@@ -624,7 +624,8 @@ body {
   text-transform: uppercase;
 }
 
-.clerk-profile-page a {
+.clerk-profile-page a,
+.clerk-profile-action {
   width: max-content;
   border: 1px solid color-mix(in srgb, var(--accent) 68%, var(--line-2));
   border-radius: 4px;
@@ -633,6 +634,81 @@ body {
   color: var(--accent);
   font-weight: 600;
   text-decoration: none;
+}
+
+button.clerk-profile-action {
+  font: inherit;
+  cursor: pointer;
+}
+
+button.clerk-profile-action:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.clerk-profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.clerk-profile-slug {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.clerk-profile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+
+.clerk-profile-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.clerk-profile-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.clerk-profile-pill.is-ok {
+  color: var(--ok);
+  border-color: rgba(123, 216, 143, 0.36);
+  background: rgba(123, 216, 143, 0.08);
+}
+
+.clerk-profile-pill.is-warn {
+  color: var(--warn);
+  border-color: rgba(232, 168, 102, 0.36);
+  background: rgba(232, 168, 102, 0.08);
+}
+
+.clerk-profile-pill.is-bad {
+  color: var(--bad);
+  border-color: rgba(217, 113, 113, 0.36);
+  background: rgba(217, 113, 113, 0.08);
+}
+
+.clerk-profile-notice {
+  color: var(--warn);
+  font-size: 12px;
 }
 
 .status-dot {
