@@ -111,9 +111,35 @@
           </div>
         </header>
 
-        <!-- The single progress model. Present at every stage, so nothing
-             resets or re-numbers as the user advances. -->
+        <!-- Focal while the vault is shut. This is the element that changes
+             as you advance, which is why it earns the slot: it replaces a
+             finished rail that kept a row to say nothing, plus the status
+             pills that repeated it. Once the vault is open it shrinks into
+             the strip below and the dashboard becomes the content. -->
+        <!-- Held through the unlock. Admitting a machine flips the stage in
+             the same tick, so gating purely on `!vaultOpen` unmounted this and
+             played the celebration on the 34px strip mark instead — a gesture
+             performed by an icon that had just teleported. The mark stays big
+             for the ~700ms, then collapses. -->
+        <div v-if="!vaultOpen || vaultUnlocking" class="cv-vaulthead">
+        <div
+          class="cv-vaultfocal"
+          aria-hidden="true"
+        >
+          <BrandMark
+            :size="72"
+            :state="vaultOpen ? 'unlocked' : 'locked'"
+            :working="vaultWorking"
+            :unlocking="vaultUnlocking"
+            show-depth
+          />
+        </div>
+
+        <!-- The single progress model. One derivation, rendered two ways:
+             labelled while there is still something to do, and collapsed into
+             the vault strip once there is not. -->
         <ol
+          v-if="!vaultOpen"
           class="cv-rail"
           :class="{ complete: onboardingComplete }"
           aria-label="Hosted vault setup progress"
@@ -142,6 +168,7 @@
             />
           </li>
         </ol>
+        </div>
 
         <p
           v-if="notice"
@@ -201,9 +228,6 @@
 
         <!-- ---------- STAGE A: CONNECT ---------- -->
         <template v-if="stage === 'connect'">
-          <p class="cv-greeting">
-            Welcome — your vault is reserved. Here's the one thing to do now.
-          </p>
           <div class="cv-focal">
             <div class="cv-focal-glow" aria-hidden="true" />
             <div class="cv-focal-ns">
@@ -231,6 +255,19 @@
         <template v-if="stage === 'explore' || stage === 'ready'">
           <!-- progress summary card (collapses stage A) -->
           <div class="cv-status-card" :class="{ allset: stage === 'ready' }">
+            <!-- The same mark, compact. It carries the one fact this strip
+                 exists to state — the vault is open — so the pill beside it
+                 does not have to shout it. -->
+            <!-- Hidden while the focal mark above is mid-celebration, so
+                 there is never a moment with two vaults on screen. -->
+            <span v-show="!vaultUnlocking" class="cv-status-mark" aria-hidden="true">
+              <BrandMark
+                :size="34"
+                state="unlocked"
+                :working="vaultWorking"
+                show-depth
+              />
+            </span>
             <span class="cv-pill ok"
               ><span class="cv-dot" />
               {{ stage === "ready" ? "All set" : "CLI linked" }}</span
@@ -477,6 +514,7 @@ import HostedVaultFunnel from "./HostedVaultFunnel.vue";
 import BrandMark from "./BrandMark.vue";
 import CloudAccountMenu from "./CloudAccountMenu.vue";
 import { copyText as copyToClipboard } from "../utils/clipboard";
+import { prefersReducedMotion } from "../utils/motion";
 import { formatPriceLabel } from "../utils/money";
 import {
   admitHandshakeState,
@@ -1308,6 +1346,59 @@ const DEVICE_POLL_IDLE_MS = 30_000;
 let devicePollTimer: ReturnType<typeof setInterval> | undefined;
 let devicePollInterval = 0;
 
+// ---- vault motion --------------------------------------------------------
+//
+// The mark IS the progress indicator: shut while setup is unfinished, open
+// once a machine is linked. That is the whole reason it earns a focal slot —
+// it is the one element that changes as you advance, so it replaces a rail
+// that duplicated the status pills that duplicated the card contents.
+
+const VAULT_UNLOCK_MS = 700;
+
+const vaultOpen = computed(() => stage.value === "explore" || stage.value === "ready");
+
+// The dial sweeps only while something is genuinely in flight. Not a spinner:
+// a dial that turns forever reads as a component somebody forgot to stop.
+const vaultWorking = computed(
+  () =>
+    !hydrated.value ||
+    // Same predicate the poll uses. A stale, malformed, or wrong-account
+    // `?admit=` never matches a row, so `waiting` is permanent — and without
+    // this the dial advertised active work forever, long after the budget had
+    // expired, polling had dropped to idle, and the copy had already switched
+    // to explaining that nothing was coming.
+    (admitState.value === "waiting" && !admitWaitExpired.value) ||
+    deviceBusy.value !== null
+);
+
+const vaultUnlocking = ref(false);
+let vaultUnlockTimer: ReturnType<typeof setTimeout> | undefined;
+
+// Fired from exactly one place — see decideDevice.
+//
+// NOT from watch(stage), which is the obvious implementation and is wrong.
+// This page loads /api/me twice: once on mount, then again when Clerk
+// resolves. The first comes back anonymous and computes stage "setup"; the
+// second returns the real vault and jumps to "ready". So any guard of the
+// form "previous was non-null" celebrates on EVERY reload for EVERY returning
+// customer, which is exactly how an animation stops meaning anything.
+function celebrateUnlock() {
+  // Inside the handler, never at setup scope: this only ever runs from a user
+  // action, so it cannot contribute to a hydration mismatch the way a
+  // setup-time media query read would.
+  if (prefersReducedMotion()) return;
+  if (vaultUnlockTimer) clearTimeout(vaultUnlockTimer);
+  vaultUnlocking.value = true;
+  vaultUnlockTimer = setTimeout(() => {
+    vaultUnlocking.value = false;
+    vaultUnlockTimer = undefined;
+  }, VAULT_UNLOCK_MS);
+}
+
+onBeforeUnmount(() => {
+  if (vaultUnlockTimer) clearTimeout(vaultUnlockTimer);
+});
+
 const devicePollUrgent = computed(
   () =>
     stage.value === "connect" ||
@@ -1354,6 +1445,13 @@ async function decideDevice(deviceId: string, action: "admit" | "revoke") {
   if (deviceBusy.value) return;
   deviceBusy.value = deviceId;
   notice.value = null;
+  // Read before anything awaits. Captured after the request instead, the
+  // four-second device poll can land between the server committing the admit
+  // and this handler resuming — it sees the device already active, flips
+  // vaultOpen, and `wasOpen` then reads true, so the owner's *first* machine
+  // silently gets no celebration. This is also what the comment below means
+  // by the state the owner actually saw: the state at the moment they clicked.
+  const wasOpen = vaultOpen.value;
   try {
     const headers = await authHeaders({
       "content-type": "application/json",
@@ -1370,6 +1468,44 @@ async function decideDevice(deviceId: string, action: "admit" | "revoke") {
       notice.value = { kind: "warn", text: payload.error || "Couldn't update that device just now." };
       return;
     }
+    // Only a closed vault becoming open celebrates — admitting a second
+    // machine to an already-open vault is routine.
+    //
+    // Deliberately NOT gated on vaultOpen.value after the refresh. A 2xx from
+    // the admit endpoint means the server activated the device, so a vault
+    // that had no active machine before now has one — whether or not the
+    // follow-up list request succeeded. loadDevices() is silent on failure by
+    // design (it also runs on a timer), so reading state back from it made a
+    // transient network blip swallow the one celebration that matters, with
+    // no stage watcher to catch it later.
+    const opened = action === "admit" && !wasOpen;
+
+    // Apply what the server just confirmed, before the refresh and without
+    // depending on it. A 2xx means this device's status changed; holding that
+    // only in the response and re-deriving it from a separate request made the
+    // open state hostage to that request succeeding.
+    //
+    // Without this the previous fix traded one bug for a worse one: the
+    // celebration fired unconditionally, but `devices` still held the pending
+    // row, so the mark played the unlock and then dropped back to locked when
+    // the 700ms timer cleared. A vault that visibly opens and shuts again is
+    // worse than one that never animated.
+    //
+    // Safe in both directions because both reflect a confirmed write, and the
+    // poll reconciles either way a few seconds later.
+    devices.value = devices.value.map((device) =>
+      device.id === deviceId
+        ? { ...device, status: action === "admit" ? "active" : "revoked" }
+        : device
+    );
+
+    // Same tick as the write above, before anything yields. Awaiting first let
+    // Vue render once with vaultOpen already true and vaultUnlocking still
+    // false — the focal mark gone, the strip in its place — and then reverse
+    // that when the celebration finally started. A slow refresh made the
+    // teleport conspicuous; a hanging one meant no animation at all.
+    if (opened) celebrateUnlock();
+
     await loadDevices();
     notice.value = {
       kind: "ok",
@@ -2067,6 +2203,68 @@ const ICON = {
 .cv-cmd-copy:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* The vault, focal. Sized so it reads as the subject of the page rather than
+   an icon, and centered because at these stages there is exactly one thing to
+   do and nothing should compete with it. */
+/* Mark and progress as one unit rather than two stacked strangers. The
+   connect stage used to read as four separate things down the page — mark,
+   rail, a greeting that paraphrased the card under it, then the card. This is
+   the first two of those becoming one, and the greeting is gone. */
+.cv-vaulthead {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  margin-bottom: 26px;
+}
+/* Inside the head the rail is a caption, not a section: centered, quieter,
+   and it keeps its labels because they say what is left to do — which is the
+   whole reason it is still here rather than being reduced to dots. */
+.cv-vaulthead .cv-rail {
+  margin: 0;
+  justify-content: center;
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.cv-vaulthead .cv-rail-step {
+  font-size: 11.5px;
+}
+.cv-vaulthead .cv-rail-copy small {
+  display: none;
+}
+/* The detail line is the one thing that goes: it is per-step prose and turns
+   a caption back into a section. `active` keeps it, because that is the step
+   the reader is actually on. */
+.cv-vaulthead .cv-rail-step.active .cv-rail-copy small {
+  display: block;
+  /* The base rule caps this at 150px with nowrap + ellipsis, which is right
+     for a four-across row of fixed columns and wrong for a centered caption:
+     it clipped "Point your CLI at the namespace" to "…at the nama…". The one
+     line that is meant to tell you what to do next should be readable. */
+  max-width: none;
+  white-space: normal;
+  overflow: visible;
+  text-align: center;
+}
+
+.cv-vaultfocal {
+  display: grid;
+  place-items: center;
+  padding: 6px 0 18px;
+  color: var(--accent);
+}
+.cv-vaultfocal :deep(.brand-mark-svg),
+.cv-status-mark :deep(.brand-mark-svg) {
+  color: inherit;
+}
+/* Compact once the vault is open: it states the one fact this strip exists
+   for, so the pill beside it does not have to. */
+.cv-status-mark {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--accent);
 }
 
 .cv-rail {

@@ -235,6 +235,106 @@ body {
   opacity: 0.32;
 }
 
+/* ---- vault motion -------------------------------------------------------
+   The mark is a vault door with a dial, not a padlock: the two stubs are the
+   cabinet's feet and nothing hinges open. So the dial is the entire gesture,
+   and the dashed interior fading in is the door being open. */
+
+/* Working: the loading graphic. The dial sweeps while the shell hydrates or a
+   machine is checking in. Deliberately not a spinner — a dial that rotates
+   forever reads as a component someone forgot to stop. */
+.brand-mark-svg.is-working .brand-mark-dial {
+  animation: brand-mark-scan 2.2s ease-in-out infinite;
+}
+.brand-mark-svg.is-working .brand-mark-body {
+  animation: brand-mark-breathe 2.2s ease-in-out infinite;
+}
+
+/* Unlocking: one turn, then the dial retracts and the interior shows.
+   The 100% frame MUST equal `.is-unlocked .brand-mark-dial`'s resting state
+   (opacity 0, scale 0) or removing the class snaps. At scale(0) the rotation
+   is visually identity, which is what makes the two agree. */
+.brand-mark-svg.is-unlocking .brand-mark-dial {
+  animation: brand-mark-unlock 700ms cubic-bezier(0.34, 1.4, 0.64, 1) forwards;
+}
+.brand-mark-svg.is-unlocking .brand-mark-depth {
+  animation: brand-mark-open 700ms ease forwards;
+}
+
+@keyframes brand-mark-scan {
+  /* opacity and scale are restated on every frame on purpose. `.is-unlocked`
+     rests the dial at opacity 0 / scale 0, so a keyframe that animated only
+     rotation left the sweep invisible in exactly the open-and-working case
+     the separate boolean exists for — a second machine checking in against a
+     vault that is already open. Animated properties outrank the resting rule
+     while running, and the animation is not `forwards`, so dropping
+     `is-working` returns the dial to whatever its state rule says. */
+  0%,
+  100% {
+    opacity: 1;
+    transform: rotate(-32deg) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: rotate(32deg) scale(1);
+  }
+}
+
+@keyframes brand-mark-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes brand-mark-unlock {
+  0% {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
+  }
+  55% {
+    opacity: 1;
+    transform: rotate(140deg) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(140deg) scale(0);
+  }
+}
+
+@keyframes brand-mark-open {
+  0%,
+  55% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0.32;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Land on the destination rather than travelling to it. Belt and braces:
+     the site-wide reduced-motion block already zeroes durations, but these
+     use `forwards`, and a zeroed animation that never runs would leave the
+     dial at its pre-unlock state instead of its resting one. */
+  .brand-mark-svg.is-working .brand-mark-dial,
+  .brand-mark-svg.is-working .brand-mark-body,
+  .brand-mark-svg.is-unlocking .brand-mark-dial,
+  .brand-mark-svg.is-unlocking .brand-mark-depth {
+    animation: none;
+  }
+  .brand-mark-svg.is-unlocking .brand-mark-dial {
+    opacity: 0;
+    transform: rotate(140deg) scale(0);
+  }
+  .brand-mark-svg.is-unlocking .brand-mark-depth {
+    opacity: 0.32;
+  }
+}
+
 .ital {
   font-family: var(--serif);
   font-style: italic;
