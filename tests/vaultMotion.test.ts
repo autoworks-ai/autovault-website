@@ -48,9 +48,16 @@ describe("the unlock fires on the event, not on the render", () => {
     // admit and the vault never appears to have changed.
     const body = cloudPage.slice(cloudPage.indexOf("async function decideDevice"));
     const captured = body.indexOf("const wasOpen = vaultOpen.value;");
+    const firstAwait = body.indexOf("await ");
     const refreshed = body.indexOf("await loadDevices();");
     expect(captured).toBeGreaterThan(-1);
     expect(captured).toBeLessThan(refreshed);
+    // Before ANY await, not merely before the refresh. The four-second device
+    // poll can land while the admit request is in flight, see the device the
+    // server has already activated, and flip vaultOpen first — so a capture
+    // taken after the fetch reads true and the owner's first machine gets no
+    // celebration at all.
+    expect(captured).toBeLessThan(firstAwait);
   });
 
   it("reads the motion preference inside the handler", () => {

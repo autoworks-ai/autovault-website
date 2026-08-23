@@ -1437,6 +1437,13 @@ async function decideDevice(deviceId: string, action: "admit" | "revoke") {
   if (deviceBusy.value) return;
   deviceBusy.value = deviceId;
   notice.value = null;
+  // Read before anything awaits. Captured after the request instead, the
+  // four-second device poll can land between the server committing the admit
+  // and this handler resuming — it sees the device already active, flips
+  // vaultOpen, and `wasOpen` then reads true, so the owner's *first* machine
+  // silently gets no celebration. This is also what the comment below means
+  // by the state the owner actually saw: the state at the moment they clicked.
+  const wasOpen = vaultOpen.value;
   try {
     const headers = await authHeaders({
       "content-type": "application/json",
@@ -1453,10 +1460,8 @@ async function decideDevice(deviceId: string, action: "admit" | "revoke") {
       notice.value = { kind: "warn", text: payload.error || "Couldn't update that device just now." };
       return;
     }
-    // Captured before the refresh so the comparison is against the state the
-    // owner actually saw. Only a closed vault becoming open celebrates —
-    // admitting a second machine to an already-open vault is routine.
-    const wasOpen = vaultOpen.value;
+    // Only a closed vault becoming open celebrates — admitting a second
+    // machine to an already-open vault is routine.
     await loadDevices();
     if (action === "admit" && !wasOpen && vaultOpen.value) celebrateUnlock();
     notice.value = {

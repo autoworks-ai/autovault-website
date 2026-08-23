@@ -713,8 +713,12 @@ describe("selecting a machine is not admitting it", () => {
     // covering the one place that could actually admit.
     const focusAt = cloudPage.indexOf("button?.focus();", at);
     expect(focusAt, "focus watcher not found inside the handshake").toBeGreaterThan(at);
-    const end = cloudPage.indexOf(");", focusAt);
-    expect(end).toBeGreaterThan(focusAt);
+    // NOT indexOf(");", focusAt): that matches the `);` inside
+    // `button?.focus();` itself, ending the slice mid-statement so anything
+    // inserted after the focus call escaped the guard entirely. The watcher's
+    // options object is the real terminator, and it comes after the body.
+    const end = cloudPage.indexOf("{ immediate: true }", focusAt);
+    expect(end, "focus watcher options not found after the focus call").toBeGreaterThan(focusAt);
 
     // Comments stripped before judging. A guard that a comment can break — or
     // satisfy — is not guarding the code, and this one broke on a comment that
