@@ -69,13 +69,44 @@ export async function verifyDeviceSignature(publicKey, message, signature) {
   }
 }
 
+// Character class only, with a generous length bound.
+//
+// This started as the CLI's own CLOUD_SLUG_PATTERN, which caps at 63 -- but
+// vaultSlugForUser can mint longer slugs (it appends "-" plus six characters
+// without truncating the base), so that cap would have 404'd every sync route
+// for those users. The query is parameterised, so the length bound is only
+// here to stop an absurd path segment reaching D1, not to define validity.
+//
+// The real defect is upstream: provisioning can create a slug the CLI cannot
+// type. Tracked separately -- it predates this route and is not fixed by
+// loosening a regex here.
+const SLUG_SHAPE = /^[a-z0-9][a-z0-9-]{0,199}$/;
+
 export async function getVaultBySlug(env, slug) {
-  if (typeof slug !== "string" || !/^[a-z0-9][a-z0-9-]{0,62}$/.test(slug)) return null;
+  if (typeof slug !== "string" || !SLUG_SHAPE.test(slug)) return null;
   return first(env, `
     select id, user_id, slug, status, public_url
     from vaults
     where slug = ?
   `, slug);
+}
+
+// First contact is unauthenticated by design -- it has to be, the machine has
+// no credential yet and the slug is public. That means anyone who knows a slug
+// can mint keypairs in a loop and insert a row per key, growing D1 without
+// bound and burying the owner's real pending device in noise.
+//
+// A cap is the blunt version of a rate limiter and it is what beta gets: it
+// bounds the damage to something the owner can clear, and it cannot lock out a
+// legitimate machine, because admitting or denying anything frees a slot. A
+// real limiter belongs at the edge, not in a D1 count.
+export const MAX_PENDING_DEVICES_PER_VAULT = 20;
+
+export async function countPendingDevices(env, vaultId) {
+  const row = await first(env, `
+    select count(*) as pending from sync_devices where vault_id = ? and status = 'pending'
+  `, vaultId);
+  return Number(row?.pending ?? 0);
 }
 
 export async function getDeviceByKey(env, vaultId, publicKey) {

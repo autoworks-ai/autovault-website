@@ -1,5 +1,6 @@
 import { ApiError, handleApi } from "../../../api/_lib/http.js";
 import { authenticateDeviceRequest, bundleKey, touchDevice } from "../../../api/_lib/sync.js";
+import { getSubscription } from "../../../api/_lib/vault.js";
 
 // GET /v/<slug>/bundles/<bundle_hash>.json  ->  the signed bundle, verbatim
 //
@@ -21,13 +22,32 @@ export async function onRequestGet(context) {
       throw new ApiError(403, "This device is not admitted to that vault yet.");
     }
 
+    // Bundle content is the paid thing, and device status alone does not carry
+    // entitlement: when Stripe marks a subscription canceled the webhook
+    // updates `subscriptions` and nothing touches the devices, so an admitted
+    // device would go on downloading for ever. Provisioning and pending-skills
+    // already require this; content is a stranger place to omit it than either.
+    //
+    // Gated here and not on the catalog: reading the catalog is how a device
+    // pins the publishing key and how the CLI reports what it *would* pull, and
+    // a lapsed subscriber losing that reads as breakage rather than billing.
+    const subscription = await getSubscription(env, vault.user_id);
+    if (!subscription.active) {
+      throw new ApiError(402, "This vault's hosted subscription is not active.");
+    }
+
     const match = /^([a-f0-9]{64})\.json$/.exec(params.bundle ?? "");
     if (!match) throw new ApiError(404, "Bundles are addressed as <bundle_hash>.json.");
 
     if (!env.AUTOVAULT_VAULT_OBJECTS) {
       throw new ApiError(503, "AUTOVAULT_VAULT_OBJECTS binding is not configured.");
     }
-    const bundle = await env.AUTOVAULT_VAULT_OBJECTS.get(bundleKey(vault.id, match[1]));
+    // arrayBuffer, not the default text. KV's text mode UTF-8-decodes,
+    // and re-encoding that string into a Response can emit different
+    // bytes than were stored -- a BOM or a lone surrogate is enough. The
+    // whole contract here is byte-for-byte fidelity, because the hash and
+    // the signature are over the bytes.
+    const bundle = await env.AUTOVAULT_VAULT_OBJECTS.get(bundleKey(vault.id, match[1]), "arrayBuffer");
     if (!bundle) throw new ApiError(404, "No such bundle in this vault.");
 
     await touchDevice(env, device);

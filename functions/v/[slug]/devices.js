@@ -1,6 +1,12 @@
 import { nowIso, run } from "../../api/_lib/db.js";
 import { ApiError, handleApi, readJson } from "../../api/_lib/http.js";
-import { authenticateDeviceRequest, deviceJson, getDeviceByKey } from "../../api/_lib/sync.js";
+import {
+  authenticateDeviceRequest,
+  countPendingDevices,
+  deviceJson,
+  getDeviceByKey,
+  MAX_PENDING_DEVICES_PER_VAULT
+} from "../../api/_lib/sync.js";
 
 // POST /v/<slug>/devices  ->  { device_id, status }
 //
@@ -30,6 +36,13 @@ export async function onRequestPost(context) {
     // would make revocation a speed bump instead of a decision.
     if (device) {
       return deviceJson({ device_id: device.id, status: device.status });
+    }
+
+    // Checked only on the path that creates a row. An already-enrolled device
+    // returned above, so a full queue never locks out a machine that is
+    // already known -- and admitting or denying any of the queue frees a slot.
+    if (await countPendingDevices(env, vault.id) >= MAX_PENDING_DEVICES_PER_VAULT) {
+      throw new ApiError(429, "This vault has too many devices waiting to be admitted. Clear the queue and try again.");
     }
 
     const hostname = typeof body.hostname === "string" && body.hostname.trim()

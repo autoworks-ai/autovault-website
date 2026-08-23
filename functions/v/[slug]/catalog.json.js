@@ -22,7 +22,12 @@ export async function onRequestGet(context) {
     if (!env.AUTOVAULT_VAULT_OBJECTS) {
       throw new ApiError(503, "AUTOVAULT_VAULT_OBJECTS binding is not configured.");
     }
-    const catalog = await env.AUTOVAULT_VAULT_OBJECTS.get(catalogKey(vault.id));
+    // arrayBuffer, not the default text. KV's text mode UTF-8-decodes,
+    // and re-encoding that string into a Response can emit different
+    // bytes than were stored -- a BOM or a lone surrogate is enough. The
+    // whole contract here is byte-for-byte fidelity, because the hash and
+    // the signature are over the bytes.
+    const catalog = await env.AUTOVAULT_VAULT_OBJECTS.get(catalogKey(vault.id), "arrayBuffer");
     if (!catalog) throw new ApiError(404, "This vault has no published catalog yet.");
 
     await touchDevice(env, device);
