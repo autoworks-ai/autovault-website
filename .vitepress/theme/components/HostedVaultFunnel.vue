@@ -608,6 +608,8 @@ function canUseBrowser() {
   min-height: 180px;
   max-height: 180px;
   background: var(--panel);
+  font-family: var(--mono);
+  font-size: 12px;
 }
 
 .hosted-copy-row {
