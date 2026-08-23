@@ -176,6 +176,7 @@
             </p>
             <HostedVaultFunnel
               entry="deploy"
+              :state="cloudState"
               @state-change="syncCloudState"
               @notice="setNotice"
             />

@@ -58,7 +58,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import ClerkAuthControls from "./ClerkAuthControls.vue";
 import { skills } from "../data/skills";
 import type { GateEvaluation } from "../utils/skillGate";
@@ -89,11 +89,14 @@ const props = withDefaults(defineProps<{
   skillName?: string;
   sourceLabel?: string;
   evaluation?: GateEvaluation | null;
+  // The shell's authoritative /api/me. See `current` below.
+  state?: MeResponse | null;
 }>(), {
   skillSource: "",
   skillName: "",
   sourceLabel: "",
-  evaluation: null
+  evaluation: null,
+  state: null
 });
 const emit = defineEmits<{
   stateChange: [state: MeResponse];
@@ -127,10 +130,24 @@ let meRequestSeq = 0;
 let reconcileAttempted = false;
 
 const starterSkills = computed(() => skills.filter((skill) => skill.featured).slice(0, 4));
-const signedIn = computed(() => Boolean(me.value?.user) || isClerkSignedIn.value);
-const paid = computed(() => Boolean(me.value?.subscription?.active));
-const vault = computed(() => me.value?.vault ?? null);
-const teamSlug = computed(() => vault.value?.slug ?? slugify(me.value?.user?.email || me.value?.user?.name || clerkUserSlugSeed.value || "your-team"));
+
+// The shell owns /api/me; this component must not decide what to render from
+// its own copy.
+//
+// Both of them used to fetch the same endpoint independently, so the two could
+// disagree -- and the disagreement had a price. If the shell's request
+// succeeded and this one failed, the shell showed "Reserve your namespace"
+// while the button here still said "Open checkout", and clicking it opened a
+// second subscription-mode Stripe Checkout for somebody already paying.
+//
+// The local `me` survives only as a fallback for a mount with no shell around
+// it, and as the write target for the Stripe-return and provisioning paths
+// that then hand their result up. Whenever the shell has state, the shell wins.
+const current = computed<MeResponse | null>(() => props.state ?? me.value);
+const signedIn = computed(() => Boolean(current.value?.user) || isClerkSignedIn.value);
+const paid = computed(() => Boolean(current.value?.subscription?.active));
+const vault = computed(() => current.value?.vault ?? null);
+const teamSlug = computed(() => vault.value?.slug ?? slugify(current.value?.user?.email || current.value?.user?.name || clerkUserSlugSeed.value || "your-team"));
 const hostedEndpoint = computed(() => vault.value?.public_url ?? `https://vault.autovault.dev/${teamSlug.value}`);
 const namespaceStatusLabel = computed(() => vault.value ? "Hosted namespace reserved:" : "Planned namespace:");
 const commandBlock = computed(() => [
@@ -249,7 +266,16 @@ function hasDraft() {
   return Boolean(buildDraft() || readDraft());
 }
 
+// Every caller reads signedIn / paid / vault straight after awaiting this, and
+// those now come from a PROP, which only updates once the shell has re-rendered
+// with the state this hands up. Settle that round trip in one place rather than
+// making four call sites remember to.
 async function loadMe() {
+  await fetchMe();
+  await nextTick();
+}
+
+async function fetchMe() {
   const requestSeq = ++meRequestSeq;
   try {
     const headers = await authHeaders({ accept: "application/json" }, {
@@ -346,7 +372,12 @@ async function provisionVault() {
     // attempt ("waiting for the webhook") that would otherwise still be on
     // screen when the shell advances to the connect step.
     notice.value = { kind: "ok", text: "Hosted namespace reserved. Keep signing and serving skills locally — hosted sync ships next." };
-    me.value = { ...(me.value ?? { user: null }), vault: payload.vault };
+    // Merge onto `current`, not onto the local copy. If this component's own
+    // /api/me failed earlier the local copy is still null, and handing the
+    // shell { user: null, vault } would install an anonymous state over the
+    // good one it already has -- signing the user out at the exact moment
+    // their namespace was created.
+    me.value = { ...(current.value ?? { user: null }), vault: payload.vault };
     emit("stateChange", me.value);
     // Runs after the shell has already advanced. It only persists queued
     // skills; nothing user-visible depends on its result.

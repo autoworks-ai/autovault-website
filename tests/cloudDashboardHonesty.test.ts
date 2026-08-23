@@ -184,6 +184,49 @@ describe("funnel/shell handoff", () => {
     expect(body.split('emit("stateChange"').length - 1).toBe(1);
     expect(body).not.toContain("me.value = { user: null }");
   });
+
+  it("renders from the shell's state, not from its own copy of /api/me", () => {
+    // Two components fetching the same endpoint could disagree, and the
+    // disagreement had a price: with the shell's request succeeding and the
+    // funnel's failing, the shell showed "Reserve your namespace" while this
+    // button still said "Open checkout", and clicking it opened a SECOND
+    // subscription-mode Stripe Checkout for somebody already paying.
+    expect(cloudPage).toContain(':state="cloudState"');
+    expect(funnel).toContain("const current = computed<MeResponse | null>(() => props.state ?? me.value)");
+    for (const derived of [
+      "const signedIn = computed(() => Boolean(current.value?.user)",
+      "const paid = computed(() => Boolean(current.value?.subscription?.active))",
+      "const vault = computed(() => current.value?.vault ?? null)"
+    ]) {
+      expect(funnel).toContain(derived);
+    }
+    // A prop only updates once the parent has re-rendered, and every caller
+    // reads those computeds straight after awaiting loadMe.
+    expect(funnel).toContain("await nextTick();");
+    // And the provisioning hand-off must merge onto the authoritative state,
+    // or a failed local load turns "namespace reserved" into "signed out".
+    expect(funnel).toContain("{ ...(current.value ?? { user: null }), vault: payload.vault }");
+  });
+});
+
+describe("checkout cannot double-charge", () => {
+  const checkout = readFileSync(
+    new URL("../functions/api/checkout/hosted-vault.js", import.meta.url),
+    "utf-8"
+  );
+
+  it("refuses a second subscription for an already-active subscriber", () => {
+    // Defence in depth for the same defect: whatever the UI believes, Stripe
+    // will happily take a second subscription-mode session, so the money path
+    // must not depend on the client being right.
+    expect(checkout).toContain("getSubscription");
+    const handler = checkout.slice(checkout.indexOf("const user = await requireUser"));
+    const guard = handler.slice(0, handler.indexOf("buildHostedVaultCheckoutParams"));
+    expect(guard).toContain("subscription?.active");
+    expect(guard).toContain("409");
+    // The guard must sit BEFORE the session is built, not after.
+    expect(guard).toContain("ApiError");
+  });
 });
 
 describe("provisioning transition", () => {
