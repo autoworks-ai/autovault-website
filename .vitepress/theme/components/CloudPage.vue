@@ -3423,10 +3423,30 @@ const ICON = {
   padding: 14px 16px;
   overflow-x: auto;
   background: #0a0f13;
-  /* Beats the global .terminal-body 400px min/max, which sized this for a
-     full-screen demo terminal and left two thirds of it empty here. */
-  min-height: auto;
-  max-height: none;
+  /* Reserved, not grown. Beats the global .terminal-body 400px min/max, which
+     sized this for a full-screen demo terminal and left two thirds of it empty
+     -- but `auto`/`none` traded that for the opposite defect: the box started
+     one line tall and typed its way to seven, pushing the whole page down by
+     128px (measured, 1440px wide: .cv-nextstep 765 -> 893) with the Machines
+     card and its Admit button riding along. That is the control this stage
+     exists to send people to, moving while they reach for it.
+
+     180px is the number .hcc-terminal-body already uses in
+     HostedVaultFunnel.vue -- same mechanism, same value, one terminal language
+     on this site rather than two. It also happens to fit this transcript with
+     room to spare: 7 lines at 21.25px plus 28px of padding is 176.75px, and
+     the tallest transient is the same 7 line boxes (6 lines + the cursor,
+     which occupies one of its own), so nothing is ever clipped.
+
+     Seven logical lines stay seven visual lines at every width, so this holds
+     on a phone: `.cd-page .terminal-body` pins `white-space: pre` and gives
+     each line `width: max-content`, so commands scroll sideways rather than
+     wrapping, and `scrollbar-width: none` keeps that scrollbar out of the
+     layout. Anything that did overflow scrolls inside the box -- overflow-y
+     resolves to `auto` here, and the replay's `scrollTarget` already drives
+     scrollTop. */
+  min-height: 180px;
+  max-height: 180px;
   font-family: var(--mono);
   font-size: 12.5px;
   line-height: 1.7;
