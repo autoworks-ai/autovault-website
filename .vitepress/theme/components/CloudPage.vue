@@ -89,8 +89,24 @@
             <span v-if="vault" class="cv-pill ok"
               ><span class="cv-dot" /> Namespace reserved</span
             >
-            <span class="cv-pill mut"
-              ><span class="cv-dot" /> Cloud CLI sync is coming soon</span
+            <!-- Was a flat "Cloud CLI sync is coming soon". Device enrollment
+                 is real now, so this reports what is actually true of THIS
+                 vault rather than of the product. -->
+            <span v-if="activeDevices.length" class="cv-pill ok"
+              ><span class="cv-dot" />
+              {{ activeDevices.length }}
+              {{ activeDevices.length === 1 ? "machine" : "machines" }} linked</span
+            >
+            <span v-else-if="pendingDevices.length" class="cv-pill warn"
+              ><span class="cv-dot" />
+              {{ pendingDevices.length }} waiting to be admitted</span
+            >
+            <!-- v-else-if, not v-else: signed out, mid-checkout, or after a
+                 failed load there is no vault whose device state we know, and
+                 "no machines linked" states a fact about one that may not
+                 exist. -->
+            <span v-else-if="vault" class="cv-pill mut"
+              ><span class="cv-dot" /> No machines linked yet</span
             >
           </div>
         </header>
@@ -196,21 +212,14 @@
             </div>
             <h2>Connect your local CLI</h2>
             <p class="cv-focal-body">
-              Point your machine at the reserved namespace. This is what works
-              today — everything else unlocks as you go.
+              Run this on the machine you want to sync. It enrols that machine
+              and then waits here for you to admit it.
             </p>
             <div class="cv-connect-terminal">
               <ConnectTerminal :slug="vaultSlug" />
             </div>
+
             <div class="cv-focal-actions">
-              <button
-                type="button"
-                class="cv-btn"
-                :disabled="busy"
-                @click="markProgress('cli_linked')"
-              >
-                {{ busy ? "Saving…" : "I've linked my CLI ✓" }}
-              </button>
               <a class="cv-btn ghost" :href="installDocsHref"
                 >Installation guide</a
               >
@@ -367,6 +376,60 @@
             </article>
           </div>
         </template>
+        <!-- Enrolled machines. This list IS the link step: there is no
+             button to say a CLI is connected, because saying so was never
+             evidence of anything. A row appears here when a real machine
+             signs a real enrollment request. -->
+        <div v-if="vault" ref="devicesCard" class="cv-devices standalone" :class="{ focusflash: focusedCard === 'devices' }" role="region" aria-labelledby="cv-devices-title">
+          <h3 id="cv-devices-title" class="cv-devices-title">
+            Machines
+            <span v-if="pendingDevices.length" class="cv-devices-count">
+              {{ pendingDevices.length }} waiting
+            </span>
+          </h3>
+
+          <p v-if="!devices.length" class="cv-devices-empty">
+            Nothing enrolled yet. Run the command above and this machine
+            will appear here within a few seconds.
+          </p>
+
+          <ul v-else class="cv-device-list">
+            <li v-for="device in devices" :key="device.id" class="cv-device" :class="device.status">
+              <span class="cv-device-id">
+                <strong>{{ device.hostname || "Unnamed machine" }}</strong>
+                <!-- Matches what the CLI printed on that machine, so the
+                     owner can tell two pending devices apart. -->
+                <code>ed25519 {{ device.fingerprint }}</code>
+              </span>
+              <span class="cv-device-seen">
+                <span class="cv-pill" :class="device.status === 'active' ? 'ok' : ''">
+                  <span class="cv-dot" />{{ device.status }}
+                </span>
+                <small>first seen {{ formatWhen(device.first_seen_at) }}</small>
+              </span>
+              <span class="cv-device-actions">
+                <button
+                  v-if="device.status === 'pending'"
+                  type="button"
+                  class="cv-btn small"
+                  :disabled="deviceBusy === device.id"
+                  @click="decideDevice(device.id, 'admit')"
+                >
+                  {{ deviceBusy === device.id ? "Working…" : "Admit" }}
+                </button>
+                <button
+                  v-if="device.status !== 'revoked'"
+                  type="button"
+                  class="cv-btn ghost small"
+                  :disabled="deviceBusy === device.id"
+                  @click="decideDevice(device.id, 'revoke')"
+                >
+                  {{ device.status === "pending" ? "Deny" : "Revoke" }}
+                </button>
+              </span>
+            </li>
+          </ul>
+        </div>
       </main>
     </div>
   </section>
@@ -378,6 +441,7 @@ import {
   defineComponent,
   h,
   nextTick,
+  onBeforeUnmount,
   onMounted,
   ref,
   watch,
@@ -412,8 +476,12 @@ const ConnectTerminal = defineComponent({
       { type: "ok", text: "✓ signature ok" },
       { type: "cmd", text: commands.value[1] },
       { type: "cmd", text: commands.value[2] },
-      { type: "out", text: "↳ verifying local environment" },
-      { type: "ok", text: "✓ namespace linked successfully" },
+      { type: "out", text: "↳ enrolling this machine" },
+      // Not "✓ linked successfully". Linking ends PENDING and the CLI sits in
+      // a spinner until the owner admits it on this page. Showing a tick here
+      // taught people to expect something that does not happen, and then to
+      // wonder what they had done wrong.
+      { type: "out", text: "⧗ waiting for you to admit it below" },
     ]);
     const replay = useTerminalReplay(lines.value, {
       autoStart: true,
@@ -512,7 +580,7 @@ type NavItem = {
   locked: boolean;
   disabled: boolean;
   cls: Record<string, boolean>;
-  action: "none" | "preview" | "scroll-billing";
+  action: "none" | "preview" | "scroll-billing" | "scroll-devices";
 };
 
 const cloudState = ref<CloudState>({
@@ -537,18 +605,41 @@ const notice = ref<CloudNotice | null>(null);
 function setNotice(next: CloudNotice | null) {
   notice.value = next;
 }
-const focusedCard = ref<"preview" | "billing" | null>(null);
+const focusedCard = ref<"preview" | "billing" | "devices" | null>(null);
 const previewCard = ref<HTMLElement | null>(null);
 const billingCard = ref<HTMLElement | null>(null);
+const devicesCard = ref<HTMLElement | null>(null);
 const previewRows = [{ w: "55%" }, { w: "42%" }, { w: "60%" }];
 
 const { authHeaders, clerkAuthEnabled, isClerkLoaded, isClerkSignedIn, clerkUserLabel } =
   useClerkApiAuth();
 let cloudStateRequestSeq = 0;
 
+type SyncDevice = {
+  id: string;
+  fingerprint: string;
+  status: "pending" | "active" | "revoked";
+  hostname: string | null;
+  first_seen_at: string;
+  last_seen_at: string | null;
+};
+
+const devices = ref<SyncDevice[]>([]);
+const deviceBusy = ref<string | null>(null);
+let devicesRequestSeq = 0;
+
 const user = computed(() => cloudState.value.user);
 const vault = computed(() => cloudState.value.vault);
-const cliLinked = computed(() => Boolean(vault.value?.cli_linked_at));
+// A device the owner actually admitted, not a checkbox somebody ticked.
+//
+// `vaults.cli_linked_at` used to drive this: a button that said "I've linked
+// my CLI ✓" and wrote a timestamp. It proved nothing -- anyone could tick it
+// without a machine anywhere near the vault, and the dashboard would then
+// claim a CLI was connected. The column still exists (0002 is applied and
+// migrations are not edited after shipping) but nothing reads it now.
+const activeDevices = computed(() => devices.value.filter((device) => device.status === "active"));
+const pendingDevices = computed(() => devices.value.filter((device) => device.status === "pending"));
+const cliLinked = computed(() => activeDevices.value.length > 0);
 const earlyAccess = computed(() => Boolean(vault.value?.early_access_at));
 
 const subscription = computed(() => cloudState.value.subscription);
@@ -857,8 +948,14 @@ const navItems = computed<NavItem[]>(() => {
 
   return [
     item("overview", "Overview", ICON.grid, { active: true }),
-    item("skills", "Skills", ICON.book, { soon: true, action: "preview" }),
-    item("sync", "Sync log", ICON.sync, { soon: true, action: "preview" }),
+    // revealAt explore, not connect: this scrolls to previewCard, which only
+    // exists inside the explore/ready template. Enabled any earlier it is a
+    // live-looking nav item that silently does nothing.
+    item("skills", "Skills", ICON.book, { revealAt: "explore", action: "preview" }),
+    // Lands on the machines list. That IS the sync state today: which devices
+    // are enrolled, which are admitted, and when each was last seen. Fuller
+    // per-release history arrives with catalog publishing.
+    item("sync", "Sync log", ICON.sync, { revealAt: "connect", action: "scroll-devices" }),
     item("members", "Members", ICON.users, { soon: true, action: "preview" }),
     item("billing", "Billing", ICON.card, {
       revealAt: "explore",
@@ -877,6 +974,27 @@ watch([isClerkLoaded, isClerkSignedIn], ([loaded]) => {
   if (!loaded) return;
   void loadCloudState();
 });
+
+// Devices only exist once a vault does, and the list is what the connect step
+// renders, so start the moment a vault appears rather than on mount.
+watch(
+  () => vault.value?.id ?? null,
+  (vaultId) => {
+    if (!vaultId) {
+      // Bump the sequence, do not just clear. A list request already in flight
+      // for the OLD vault would otherwise pass both staleness checks and
+      // repopulate this, leaving a dashboard with no vault claiming machines
+      // are linked -- the same race the shell's own /api/me load guards.
+      devicesRequestSeq += 1;
+      devices.value = [];
+      return;
+    }
+    // Always load once; the watcher above decides whether to keep polling.
+    void loadDevices();
+    startDevicePolling();
+  },
+  { immediate: true }
+);
 
 async function loadCloudState(initial = false) {
   const requestSeq = ++cloudStateRequestSeq;
@@ -998,7 +1116,152 @@ async function openBillingPortal() {
   }
 }
 
-async function markProgress(step: "cli_linked" | "early_access") {
+// The console's live view of enrolled machines.
+//
+// Polled rather than pushed: `autovault link` sits in a spinner asking the
+// owner to admit it, so a pending row that only appears on reload is a
+// deadlock -- the person is looking at this page waiting for it. Four seconds
+// is well inside the CLI's own five-minute wait.
+// Relative for anything recent, absolute once it stops being "just now".
+// A device the owner is admitting right this second appeared seconds ago, and
+// "2026-08-23T01:44:02Z" is a worse answer than "just now" for that.
+function formatWhen(iso: string): string {
+  const when = Date.parse(iso);
+  if (!Number.isFinite(when)) return "recently";
+  const seconds = Math.max(0, Math.round((Date.now() - when) / 1000));
+  if (seconds < 45) return "just now";
+  if (seconds < 3600) return `${Math.round(seconds / 60)} min ago`;
+  if (seconds < 86_400) return `${Math.round(seconds / 3600)} h ago`;
+  return new Date(when).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+let deviceLoadInFlight = false;
+
+async function loadDevices() {
+  if (!vault.value) return;
+  deviceLoadInFlight = true;
+  const requestSeq = ++devicesRequestSeq;
+  try {
+    const headers = await authHeaders({ accept: "application/json" }, {
+      required: true,
+      fresh: false,
+    });
+    const response = await fetch("/api/vaults/current/devices", {
+      credentials: "include",
+      headers,
+    });
+    if (requestSeq !== devicesRequestSeq) return;
+    if (!response.ok) return;
+    const payload = (await response.json()) as { devices?: SyncDevice[] };
+    if (requestSeq !== devicesRequestSeq) return;
+    devices.value = payload.devices ?? [];
+  } catch {
+    // Silent on purpose. This runs on a timer; a transient failure must not
+    // stack up notices on a page the owner is reading.
+  } finally {
+    deviceLoadInFlight = false;
+  }
+}
+
+
+// Two speeds, never off.
+//
+// Fast while something is waiting on the owner -- the connect step, or a
+// pending device -- because `autovault link` is sitting in a spinner and four
+// seconds is well inside its five-minute wait.
+//
+// Slow the rest of the time, but NOT stopped. Stopping was the obvious
+// optimisation and it was wrong: a second machine running `autovault link`
+// against an already-set-up vault creates a pending row that only polling can
+// discover, so the condition would gate on the very thing it is meant to find.
+// The owner would sit looking at a dashboard that never mentions the machine
+// waiting on them.
+//
+// The cost is why this is throttled at all: /api/vaults/current/devices goes
+// through requireUser, which in Clerk mode calls client.users.getUser and
+// upserts the user on every request. Thirty seconds idle is ~120 of those an
+// hour rather than ~900. The real fix is caching that profile sync in
+// getClerkSessionUser, where it would benefit every endpoint; this is the
+// version that does not add a second auth path.
+const DEVICE_POLL_ACTIVE_MS = 4000;
+const DEVICE_POLL_IDLE_MS = 30_000;
+
+let devicePollTimer: ReturnType<typeof setInterval> | undefined;
+let devicePollInterval = 0;
+
+const devicePollUrgent = computed(
+  () => stage.value === "connect" || pendingDevices.value.length > 0
+);
+
+function stopDevicePolling() {
+  if (devicePollTimer) clearInterval(devicePollTimer);
+  devicePollTimer = undefined;
+  devicePollInterval = 0;
+}
+
+function startDevicePolling() {
+  if (typeof window === "undefined" || !vault.value) return;
+  const wanted = devicePollUrgent.value ? DEVICE_POLL_ACTIVE_MS : DEVICE_POLL_IDLE_MS;
+  if (devicePollTimer && devicePollInterval === wanted) return;
+  stopDevicePolling();
+  devicePollInterval = wanted;
+  devicePollTimer = setInterval(() => {
+    if (document.visibilityState === "hidden") return;
+    // Skip the tick rather than stacking a second request. Each call bumps
+    // devicesRequestSeq, so an overlapping poll invalidates the one already in
+    // flight -- and if latency stays above the interval, every response is
+    // superseded before it lands and the list never updates at all, while the
+    // backend takes the load of all of them. Explicit refreshes after an
+    // action still go through: those are newer on purpose.
+    if (deviceLoadInFlight) return;
+    void loadDevices();
+  }, wanted);
+}
+
+watch(devicePollUrgent, () => startDevicePolling());
+
+onBeforeUnmount(stopDevicePolling);
+
+async function decideDevice(deviceId: string, action: "admit" | "revoke") {
+  if (deviceBusy.value) return;
+  deviceBusy.value = deviceId;
+  notice.value = null;
+  try {
+    const headers = await authHeaders({
+      "content-type": "application/json",
+      accept: "application/json",
+    }, { required: true, fresh: true });
+    const response = await fetch(`/api/vaults/current/devices/${encodeURIComponent(deviceId)}`, {
+      method: "POST",
+      credentials: "include",
+      headers,
+      body: JSON.stringify({ action }),
+    });
+    const payload = await response.json().catch(() => ({})) as { error?: string };
+    if (!response.ok) {
+      notice.value = { kind: "warn", text: payload.error || "Couldn't update that device just now." };
+      return;
+    }
+    await loadDevices();
+    notice.value = {
+      kind: "ok",
+      text: action === "admit"
+        ? "Device admitted. Its CLI will pick that up within a couple of seconds."
+        : "Device revoked. It can no longer pull from this vault.",
+    };
+  } catch (error) {
+    notice.value = {
+      kind: "warn",
+      text: isClerkApiAuthError(error)
+        ? clerkAuthRecoveryMessage(error)
+        : "Couldn't reach the device endpoint just now.",
+    };
+  } finally {
+    deviceBusy.value = null;
+  }
+}
+
+async function markProgress(step: "early_access") {
   if (busy.value || !vault.value) return;
   busy.value = true;
   notice.value = null;
@@ -1026,10 +1289,7 @@ async function markProgress(step: "cli_linked" | "early_access") {
     cloudState.value = { ...cloudState.value, vault: payload.vault };
     notice.value = {
       kind: "ok",
-      text:
-        step === "cli_linked"
-          ? "Nice — CLI linked. A few more details are unlocked below."
-          : "You're on the early-access list. We'll be in touch.",
+      text: "You're on the early-access list. We'll be in touch.",
     };
   } catch (error) {
     if (isClerkApiAuthError(error)) {
@@ -1049,9 +1309,11 @@ function onNavClick(item: NavItem) {
   if (item.action === "preview") void focusCard("preview", previewCard.value);
   else if (item.action === "scroll-billing")
     void focusCard("billing", billingCard.value);
+  else if (item.action === "scroll-devices")
+    void focusCard("devices", devicesCard.value);
 }
 
-async function focusCard(name: "preview" | "billing", el: HTMLElement | null) {
+async function focusCard(name: "preview" | "billing" | "devices", el: HTMLElement | null) {
   await nextTick();
   el?.scrollIntoView({ behavior: "smooth", block: "center" });
   focusedCard.value = name;
@@ -1462,6 +1724,125 @@ const ICON = {
 }
 .cv-cmd-copy:hover {
   border-color: var(--accent);
+}
+
+.cv-devices {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+/* Inside the focal card it borrowed that card's frame. On its own it needs
+   one, and it is now the only route to revoking a machine. */
+.cv-devices.standalone {
+  margin-top: 20px;
+  padding: 16px 18px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--cv-radius);
+  background: var(--bg-1);
+}
+.cv-devices.standalone.focusflash {
+  border-color: var(--accent);
+}
+
+.cv-devices-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+}
+.cv-devices-count {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(230, 180, 90, 0.16);
+  color: #e6b45a;
+  font-size: 11px;
+  font-weight: 500;
+}
+.cv-devices-empty {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.cv-device-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cv-device {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--cv-radius-sm);
+  background: var(--bg-2);
+}
+.cv-device.pending {
+  border-color: rgba(230, 180, 90, 0.4);
+}
+.cv-device-id {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.cv-device-id strong {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cv-device-id code {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.cv-device-seen {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-end;
+  flex: 0 0 auto;
+}
+.cv-device-seen small {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.cv-device-actions {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.cv-btn.small {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+/* Below 640px the three columns stop fitting side by side; the actions want
+   to stay reachable rather than shrink to nothing. */
+@media (max-width: 640px) {
+  .cv-device {
+    flex-wrap: wrap;
+  }
+  .cv-device-seen {
+    align-items: flex-start;
+  }
+  .cv-device-actions {
+    width: 100%;
+  }
+  .cv-device-actions .cv-btn {
+    flex: 1 1 auto;
+  }
 }
 
 .cv-focal-actions {

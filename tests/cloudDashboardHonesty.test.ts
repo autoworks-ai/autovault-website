@@ -130,8 +130,20 @@ describe("unified shell", () => {
   it("stacks the rail on narrow viewports instead of wrapping it per character", () => {
     // Four labelled steps flexed across a 375px viewport wrap one character
     // per line. Verified in a real browser before this was written.
-    const narrow = cloudPage.slice(cloudPage.indexOf("@media (max-width: 640px)"));
-    expect(narrow.slice(0, 600)).toContain("flex-direction: column");
+    //
+    // Anchored on the rail's own rule rather than on the first 640px block in
+    // the file: this originally sliced from `indexOf("@media (max-width:
+    // 640px)")` and started reading somebody else's media query the moment a
+    // second one was added above it. The rule it guards had not changed.
+    // Anchored on the INDENTED rule, which only occurs nested inside a media
+    // query -- the top-level `.cv-rail {` sets the desktop row direction and
+    // matching that instead is how this assertion first went wrong. Slicing
+    // from `indexOf("@media (max-width: 640px)")` was the original bug: it
+    // read whichever 640px block came first, so adding an unrelated one above
+    // broke a rule that had not changed.
+    const nested = cloudPage.indexOf("  .cv-rail {");
+    expect(nested, "no nested .cv-rail rule").toBeGreaterThan(-1);
+    expect(cloudPage.slice(nested, nested + 200)).toContain("flex-direction: column");
   });
 
   it("server-renders the shell so there is no post-hydration layout jump", () => {
