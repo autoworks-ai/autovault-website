@@ -1,4 +1,4 @@
-import { ApiError } from "./http.js";
+import { ApiError, safeReturnTo } from "./http.js";
 import { first, nowIso, run } from "./db.js";
 import { hmacSha256Hex, timingSafeEqualHex } from "./crypto.js";
 
@@ -48,6 +48,58 @@ export async function createCheckoutSession(env, params, fetcher = fetch) {
   });
   const payload = await response.json();
   if (!response.ok || !payload.url) throw new ApiError(502, payload.error?.message || "Stripe Checkout Session creation failed.");
+  return payload;
+}
+
+// The Stripe customer id for a user, or null when they have never had a
+// billing relationship.
+//
+// This reads `customers` and DELIBERATELY does not fall back to
+// `subscriptions.stripe_customer_id`, even though that column often holds the
+// same value. When a Stripe customer is reassigned between users,
+// upsertCustomer (below) revokes the stale owner by forcing their
+// subscriptions.status to 'canceled' -- which leaves their
+// subscriptions.stripe_customer_id populated -- and then deletes their
+// `customers` row. A fallback would therefore hand a revoked owner a live
+// billing-portal session for a Stripe customer that now belongs to somebody
+// else: their invoices, their saved cards, and the ability to cancel their
+// subscription. `customers` is the only table whose ABSENCE of a row
+// correctly means "no live billing relationship".
+export async function getStripeCustomerId(env, userId) {
+  if (!userId) return null;
+  const row = await first(env, "select stripe_customer_id from customers where user_id = ?", userId);
+  return row?.stripe_customer_id ?? null;
+}
+
+export function buildBillingPortalParams({ request, env, customerId, returnTo }) {
+  const origin = new URL(request.url).origin;
+  const params = new URLSearchParams();
+  params.set("customer", customerId);
+  // safeReturnTo pins to autovault.dev and hands back a PATH; re-basing that
+  // path on the live request origin is what keeps the return correct on
+  // *.pages.dev previews and on 127.0.0.1:8788 as well as in production.
+  params.set("return_url", new URL(safeReturnTo(returnTo), origin).toString());
+  if (env.STRIPE_PORTAL_CONFIGURATION_ID) {
+    params.set("configuration", env.STRIPE_PORTAL_CONFIGURATION_ID);
+  }
+  return params;
+}
+
+export async function createBillingPortalSession(env, params, fetcher = fetch) {
+  if (!env.STRIPE_SECRET_KEY) throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
+  const response = await fetcher("https://api.stripe.com/v1/billing_portal/sessions", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+      "content-type": "application/x-www-form-urlencoded",
+      "stripe-version": STRIPE_API_VERSION
+    },
+    body: params
+  });
+  const payload = await response.json();
+  if (!response.ok || !payload.url) {
+    throw new ApiError(502, payload.error?.message || "Stripe billing portal session creation failed.");
+  }
   return payload;
 }
 
