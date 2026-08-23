@@ -219,17 +219,20 @@ describe("the arrival cannot disturb the first-machine celebration", () => {
     expect(cloudPage).toContain("watch(ambientVault, (visible) => {");
     expect(cloudPage).not.toContain("watch(vaultOpen");
     expect(cloudPage).not.toContain("watch(() => vaultOpen");
-    // The gate is the moment the veil ACTUALLY lifts, which stopped being
-    // `hydrated` when the loading stage landed: `hydrated` now means only that
-    // some /api/me response arrived, and the first one is anonymous and lands
-    // while the veil is still up. Keyed to it, the arrival would start behind
-    // an opaque overlay and consumeVaultArrival would spend the occasion on a
-    // frame nobody saw — once per session, so it would not come back.
+    // The gate is the moment the veil ACTUALLY lifts, and that moved twice.
+    // `hydrated` now means only that some /api/me response arrived, and the
+    // first one is anonymous and lands while the veil is still up. `settled`
+    // means the data is in, which is when the boot vault STARTS its unlock.
+    // Keyed to either, consumeVaultArrival would spend the once-per-session
+    // occasion behind the veil or underneath the foreground gesture.
     expect(cloudPage).toContain(
-      "const ambientVault = computed(() => settled.value && signedIn.value);"
+      "const ambientVault = computed(() => revealed.value && signedIn.value);"
     );
     expect(cloudPage).toContain('const settled = computed(() => stage.value !== "loading");');
-    expect(cloudPage).toContain('<div v-if="!settled" class="cv-boot">');
+    expect(cloudPage).toContain(
+      'const revealed = computed(() => settled.value && bootPhase.value === "open");'
+    );
+    expect(cloudPage).toContain('<div v-if="!revealed" class="cv-boot"');
   });
 
   it("consumes the occasion rather than peeking at it", () => {

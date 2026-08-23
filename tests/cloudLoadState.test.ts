@@ -213,8 +213,8 @@ describe("the stage machine has a state for not knowing", () => {
 describe("the boot veil is what makes 'not for one frame' true", () => {
   it("is driven by the stage, not by a flag that only means a response arrived", () => {
     expect(cloudPage).toContain('const settled = computed(() => stage.value !== "loading");');
-    expect(cloudPage).toContain('<div v-if="!settled" class="cv-boot">');
-    expect(cloudPage).toContain(':aria-busy="!settled"');
+    expect(cloudPage).toContain('<div v-if="!revealed" class="cv-boot"');
+    expect(cloudPage).toContain(':aria-busy="!revealed"');
     // `hydrated` must no longer gate anything the visitor can perceive: it now
     // means only that some response landed, and the first one is anonymous.
     expect(cloudPage).not.toContain('v-if="!hydrated"');
@@ -238,8 +238,8 @@ describe("the boot veil is what makes 'not for one frame' true", () => {
     // A token, not a transparent or alpha value: the veil has to hide what is
     // behind it, not tint it.
     expect(rule).toMatch(/background: var\(--bg[^,)]*\);/);
-    expect(cloudPage).toContain(':inert="!settled"');
-    expect(cloudPage).toContain("booting: !settled");
+    expect(cloudPage).toContain(':inert="!revealed"');
+    expect(cloudPage).toContain("booting: !revealed");
   });
 
   it("does not let the rail or the heading name a step it has not established", () => {
@@ -350,6 +350,129 @@ describe("the wait is bounded", () => {
     const known = cloudPage.indexOf("const cloudStateKnown = computed(");
     const block = cloudPage.slice(known, cloudPage.indexOf("\n);", known));
     expect(block).toContain("patienceExpired: loadPatienceExpired.value,");
+  });
+});
+
+describe("the load screen is the vault, not a new graphic", () => {
+  it("reuses BrandMark's two documented transient props and authors no new mark motion", () => {
+    // `working` is BrandMark's own loading graphic ("the dial sweeps"), and
+    // `unlocking` is its one 700ms turn-and-retract. Its doc comment says to
+    // apply that in the same tick the state flips -- all three bindings read
+    // the same ref, so they cannot disagree and the keyframe lands exactly on
+    // the `unlocked` resting state instead of snapping.
+    const at = cloudPage.indexOf('<div v-if="!revealed" class="cv-boot"');
+    expect(at, "no boot veil").toBeGreaterThan(-1);
+    const veil = cloudPage.slice(at, cloudPage.indexOf("</div>\n    </div>", at));
+    expect(veil).toContain(":state=\"bootOpening ? 'unlocked' : 'locked'\"");
+    expect(veil).toContain(':working="!bootOpening"');
+    expect(veil).toContain(':unlocking="bootOpening"');
+    // Same 72px as the focal mark, so it reads as one object moving between
+    // two places rather than two different vaults.
+    expect(veil).toContain(':size="72"');
+    // And no second definition of the mark's own gestures.
+    const style = cloudPage.slice(cloudPage.indexOf("<style scoped>"));
+    expect(style).not.toContain("@keyframes brand-mark");
+  });
+
+  it("keeps the boot gesture off the first-machine celebration's ref and timer", () => {
+    // PR #106: celebrateUnlock owns vaultUnlocking and vaultUnlockTimer, has
+    // one call site inside decideDevice, and captures wasOpen before any
+    // await. The boot gesture must not borrow any of that -- sharing a flag
+    // is what would let a page load reorder an admit.
+    const at = cloudPage.indexOf("async function openBoot()");
+    expect(at, "no openBoot").toBeGreaterThan(-1);
+    const body = cloudPage.slice(at, cloudPage.indexOf("\n}", at));
+    expect(body).not.toContain("vaultUnlocking");
+    expect(body).not.toContain("vaultUnlockTimer");
+    expect(body).not.toContain("celebrateUnlock");
+    expect(body).not.toContain("vaultArriving");
+    expect(cloudPage).toContain("const BOOT_UNLOCK_MS = 700;");
+  });
+
+  it("never runs at the same time as the ambient arrival", () => {
+    // Structural, not a rule to remember: `revealed` is false for the whole
+    // of the boot gesture and ambientVault reads `revealed`, so the arrival
+    // cannot start until the unlock has finished. Sequential by construction.
+    expect(cloudPage).toContain(
+      'const revealed = computed(() => settled.value && bootPhase.value === "open");'
+    );
+    expect(cloudPage).toContain(
+      "const ambientVault = computed(() => revealed.value && signedIn.value);"
+    );
+  });
+
+  it("does not make a fast page feel slower", () => {
+    // If the veil was up for less than the threshold the visitor never
+    // registered a wait, so there is no beat to resolve -- adding 700ms to a
+    // page that was already ready is the regression this guards.
+    expect(cloudPage).toContain("const BOOT_MIN_VISIBLE_MS = 350;");
+    const body = cloudPage.slice(
+      cloudPage.indexOf("async function openBoot()"),
+      cloudPage.indexOf("watch(settled, (isSettled)")
+    );
+    expect(body).toContain("Date.now() - bootMountedAt < BOOT_MIN_VISIBLE_MS");
+    // The skip sets the phase straight to open rather than falling through
+    // into the gesture.
+    expect(body.indexOf('bootPhase.value = "open";')).toBeLessThan(
+      body.indexOf('bootPhase.value = "opening";')
+    );
+  });
+
+  it("waits for the settled layout to be painted, not merely fetched", () => {
+    // "Settled" is a stronger claim than "fetched". Revealing on promise
+    // resolution and letting the layout reflow in front of the visitor is the
+    // same defect as the flash, in better clothes.
+    const body = cloudPage.slice(
+      cloudPage.indexOf("async function openBoot()"),
+      cloudPage.indexOf("watch(settled, (isSettled)")
+    );
+    expect(body).toContain("await nextTick();");
+    expect(body).toContain("await afterNextPaint();");
+    expect(cloudPage).toContain(
+      "requestAnimationFrame(() => requestAnimationFrame(() => resolve()));"
+    );
+  });
+
+  it("does not celebrate a failed load, and does not move under reduced motion", () => {
+    const body = cloudPage.slice(
+      cloudPage.indexOf("async function openBoot()"),
+      cloudPage.indexOf("watch(settled, (isSettled)")
+    );
+    expect(body).toContain('stage.value === "error"');
+    expect(body).toContain("prefersReducedMotion()");
+    // Read inside the callback, never at setup scope: the PR #88 hydration
+    // class. Both existing gestures place their guard the same way.
+    expect(cloudPage).not.toContain("watch(settled, (isSettled) => {\n  if (prefersReducedMotion");
+    // CSS half, independent of the JS half: the rings stop, and the reveal
+    // lands on its destination rather than freezing an opaque veil in place.
+    const style = cloudPage.slice(cloudPage.indexOf("@media (prefers-reduced-motion: reduce)"));
+    const list = style.slice(0, style.indexOf("animation: none;"));
+    expect(list).toContain(".cv-boot-ring.mid,");
+    expect(list).toContain(".cv-boot-ring.outer,");
+    expect(style).toContain(".cv-boot.opening {\n    animation: none;\n    opacity: 0;\n  }");
+  });
+
+  it("leaves the phase alone if the answer is lost again mid-decision", () => {
+    const body = cloudPage.slice(
+      cloudPage.indexOf("async function openBoot()"),
+      cloudPage.indexOf("watch(settled, (isSettled)")
+    );
+    expect(body).toContain('if (!settled.value || bootPhase.value !== "waiting") return;');
+    // And the watcher itself only ever starts from "waiting", so the gesture
+    // is once per mount however many times `settled` flips.
+    expect(cloudPage).toContain('if (!isSettled || bootPhase.value !== "waiting") return;');
+  });
+
+  it("clears its timer on unmount and leaves no dead keyframes behind", () => {
+    expect(cloudPage).toContain("if (bootOpenTimer) clearTimeout(bootOpenTimer);");
+    const style = cloudPage.slice(cloudPage.indexOf("<style scoped>"));
+    // cv-pulse drove the mark this replaced. An unused @keyframes is the same
+    // dead weight as the unused rules Task A found by compiling.
+    expect(style).not.toContain("@keyframes cv-pulse");
+    for (const name of ["cv-boot-open", "cv-boot-turn", "cv-boot-breathe"]) {
+      expect(style, `${name} defined`).toContain(`@keyframes ${name}`);
+      expect(style, `${name} used`).toContain(`animation: ${name}`);
+    }
   });
 });
 

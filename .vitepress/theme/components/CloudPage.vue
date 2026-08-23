@@ -8,23 +8,42 @@
     id="launch-path"
     class="cv-page"
     :class="`cv-stage-${stage}`"
-    :aria-busy="!settled"
+    :aria-busy="!revealed"
   >
-    <!-- Loading veil. An OVERLAY rather than a branch, so the shell below is
-         present in the prerendered HTML and there is no layout jump when
-         /api/me resolves.
+    <!-- The load screen IS the vault. An OVERLAY rather than a branch, so the
+         shell below is present in the prerendered HTML and there is no layout
+         jump when /api/me resolves.
 
-         It is also what makes stage "loading" safe: the shell underneath is
-         still rendering the pre-vault card, funnel and all, because keeping
-         that component mounted across provisioning is load-bearing (see the
-         v-show below). This veil is opaque and covers the whole shell, and
-         `inert` takes the shell out of the focus and accessibility trees, so
-         a checkout button behind it is unreachable rather than merely
-         unpainted. Both of those properties are pinned by a test. -->
-    <div v-if="!settled" class="cv-boot">
-      <span class="cv-boot-mark"
-        ><BrandMark :size="30" state="locked" show-depth
-      /></span>
+         That overlay is also what makes stage "loading" safe: the shell
+         underneath is still rendering the pre-vault card, funnel and all,
+         because keeping that component mounted across provisioning is
+         load-bearing (see the v-show below). This veil is opaque and covers
+         the whole shell, and `inert` takes the shell out of the focus and
+         accessibility trees, so a checkout button behind it is unreachable
+         rather than merely unpainted. Both properties are pinned by a test.
+
+         The mark is the SAME 72px vault the focal card uses, with the same
+         two documented props doing the work: `working` is BrandMark's own
+         loading graphic (the dial sweeps; it is deliberately not a spinner),
+         and `unlocking` is its one 700ms turn-and-retract. Its doc comment
+         says to apply that in the same tick the state flips, which is why all
+         three bindings read the same ref -- they cannot disagree. Nothing new
+         is animated on the mark itself. -->
+    <div v-if="!revealed" class="cv-boot" :class="{ opening: bootOpening }">
+      <div class="cv-boot-vault" aria-hidden="true">
+        <span class="cv-boot-halo" />
+        <span class="cv-boot-ring inner" />
+        <span class="cv-boot-ring mid" />
+        <span class="cv-boot-ring outer" />
+        <span class="cv-boot-mark"
+          ><BrandMark
+            :size="72"
+            :state="bootOpening ? 'unlocked' : 'locked'"
+            :working="!bootOpening"
+            :unlocking="bootOpening"
+            show-depth
+        /></span>
+      </div>
       <p>Opening your hosted vault…</p>
     </div>
 
@@ -34,8 +53,8 @@
          Only the main area changes now; the chrome never moves. -->
     <div
       class="cv-shell"
-      :class="{ locked: !signedIn, booting: !settled }"
-      :inert="!settled">
+      :class="{ locked: !signedIn, booting: !revealed }"
+      :inert="!revealed">
       <aside class="cv-side" aria-label="Vault navigation">
         <div class="cv-brand">
           <span class="cv-brand-mark"
@@ -1256,6 +1275,114 @@ const stage = computed<Stage>(() => {
 // button on it. Veiling that would be the permanent spinner.
 const settled = computed(() => stage.value !== "loading");
 
+/* ---------------------------------------------------------------------------
+ * The load screen is the vault opening
+ *
+ * `settled` says the data is in. This says the page is on screen. Between the
+ * two sits one gesture: the boot vault, which has been sweeping its dial while
+ * the page had nothing to show, turns and retracts, and the settled dashboard
+ * is behind it.
+ *
+ * Three separate vault gestures now exist on this page and they must not be
+ * confused with each other. Each has its own ref and its own timer:
+ *
+ *   celebrateUnlock   the owner admits their first machine. One call site,
+ *                     inside decideDevice, with the pre-await `wasOpen`
+ *                     capture (PR #106). Not touched by any of this -- the
+ *                     shell is `inert` for the whole of the boot gesture, so
+ *                     there is no click that could reach it.
+ *   vaultArriving     this page arrived, in the background. Spent once per
+ *                     occasion (Task D). Gated on `revealed` below, so it can
+ *                     neither run under the veil nor overlap the boot unlock.
+ *   bootOpening       this. At most once per mount, and only when the wait was
+ *                     long enough to have registered as a wait.
+ *
+ * The precedence between the last two is structural rather than a rule anyone
+ * has to remember: `revealed` is false for the whole of the boot gesture, and
+ * `ambientVault` reads `revealed`, so the arrival cannot start until the boot
+ * unlock has finished. They are sequential by construction, never concurrent.
+ * ------------------------------------------------------------------------ */
+
+// Matches brand-mark-unlock's own 700ms in styles.css. Kept as its own
+// constant rather than reusing VAULT_UNLOCK_MS so the admit celebration's
+// timing cannot be changed from here by accident.
+const BOOT_UNLOCK_MS = 700;
+// Below this, skip the gesture entirely and reveal at once.
+//
+// A brand moment that makes a fast page feel slower is a regression, and this
+// is the line: under ~350ms the veil is a flicker rather than a state, so the
+// visitor never registered a wait and there is nothing to resolve. Completing
+// a beat nobody heard just adds 700ms to a page that was ready. Above it they
+// have seen the vault and it should open rather than vanish.
+const BOOT_MIN_VISIBLE_MS = 350;
+
+// Three phases, not two booleans. `settled` flipping true is not the same
+// moment as the veil lifting, and a plain `settled && !opening` would have
+// been true for the frame between them -- the veil would vanish, the gesture
+// would start, and it would come back. "waiting" holds that gap.
+type BootPhase = "waiting" | "opening" | "open";
+const bootPhase = ref<BootPhase>("waiting");
+let bootOpenTimer: ReturnType<typeof setTimeout> | undefined;
+let bootMountedAt = 0;
+
+const bootOpening = computed(() => bootPhase.value === "opening");
+
+// The veil is gone and the real page is on screen. Not a latch on `settled`:
+// if the session is lost later the page honestly veils again, and what stops
+// a second celebration is the arrival ledger, not this.
+const revealed = computed(() => settled.value && bootPhase.value === "open");
+
+// "Ready and settled", which is a stronger claim than "fetched". Vue has to
+// have flushed the render that `settled` triggers AND the browser has to have
+// painted a frame of it -- behind an opaque veil, where a reflow costs
+// nothing -- before the veil starts to lift. Revealing on promise resolution
+// and letting the layout settle in front of the visitor is the same defect
+// this task exists to fix, wearing better clothes.
+//
+// Two frames: the first is the style and layout pass Vue's flush schedules,
+// the second is evidence it was painted rather than merely scheduled.
+function afterNextPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
+
+async function openBoot() {
+  await nextTick();
+  await afterNextPaint();
+  // Lost the answer again while we waited; leave the phase alone so the next
+  // flip retries.
+  if (!settled.value || bootPhase.value !== "waiting") return;
+  if (
+    // A failed load did not open anything. Playing an unlock over "We couldn't
+    // load your vault" would be the page celebrating its own error.
+    stage.value === "error" ||
+    // Read inside the callback, never at setup scope: the PR #88 hydration
+    // class, and the same placement the two existing gestures use.
+    prefersReducedMotion() ||
+    Date.now() - bootMountedAt < BOOT_MIN_VISIBLE_MS
+  ) {
+    bootPhase.value = "open";
+    return;
+  }
+  bootPhase.value = "opening";
+  if (bootOpenTimer) clearTimeout(bootOpenTimer);
+  bootOpenTimer = setTimeout(() => {
+    bootPhase.value = "open";
+    bootOpenTimer = undefined;
+  }, BOOT_UNLOCK_MS);
+}
+
+watch(settled, (isSettled) => {
+  if (!isSettled || bootPhase.value !== "waiting") return;
+  void openBoot();
+});
+
+onBeforeUnmount(() => {
+  if (bootOpenTimer) clearTimeout(bootOpenTimer);
+  bootOpenTimer = undefined;
+});
+
 // The card used to render a hardcoded "Active" pill and a hardcoded monthly
 // price as static markup, while the real
 // subscription was fetched, typed, normalized — and then never read. A
@@ -1688,6 +1815,7 @@ onMounted(() => {
   // /api/me -- later than that. See arrivalSearch.
   arrivalSearch.value = window.location.search;
   armLoadPatience();
+  bootMountedAt = Date.now();
 });
 
 watch([isClerkLoaded, isClerkSignedIn], ([loaded]) => {
@@ -2054,20 +2182,28 @@ const VAULT_ARRIVAL_MS = 1800;
 // window.location.search then would miss the one arrival the ask named first.
 const arrivalSearch = ref("");
 
-// Signed up, and past the boot veil. `settled` is false in the prerendered
+// Signed up, and past the boot veil. `revealed` is false in the prerendered
 // HTML and in the client's first render -- `hydrated` starts false on both
-// sides, which makes stage "loading" -- so this element is absent from both
-// and cannot contribute a hydration mismatch.
+// sides, which makes stage "loading", which makes `settled` false -- so this
+// element is absent from both and cannot contribute a hydration mismatch.
 //
-// It gates on `settled` rather than on `hydrated` for a reason worth stating,
-// because the two used to be the same moment and are not any more. The
-// arrival is spent once per occasion (consumeVaultArrival), and the watcher
-// below fires the instant this flips. Keyed to `hydrated` it would flip while
-// the boot veil was still up -- the veil is opaque, so the whole 1800ms swell
-// would run behind it and the occasion would be spent on a frame nobody saw.
-// Keyed to `settled` it flips in the same tick the veil is removed, which is
-// the first frame of the real page.
-const ambientVault = computed(() => settled.value && signedIn.value);
+// It gates on `revealed` rather than on `hydrated`, and the distance between
+// those two grew twice in one change, so it is worth stating what each one
+// would have cost. The arrival is spent once per occasion
+// (consumeVaultArrival) and the watcher below fires the instant this flips:
+//
+//   `hydrated`  flips on the anonymous mount response, while the veil is
+//               still up. The whole 1800ms swell would run behind an opaque
+//               overlay and the occasion would be spent on a frame nobody
+//               saw -- once per session, so it would not come back.
+//   `settled`   flips when the data lands, which is when the boot vault
+//               STARTS its unlock. The background arrival would then swell
+//               underneath the foreground gesture: two vaults moving at once,
+//               which is the defect `v-show="!vaultUnlocking"` on the status
+//               mark exists to prevent one layer forward.
+//   `revealed`  flips in the tick the veil is removed, which is the first
+//               frame of the real page and the only honest place for it.
+const ambientVault = computed(() => revealed.value && signedIn.value);
 
 const vaultArriving = ref(false);
 let vaultArrivalTimer: ReturnType<typeof setTimeout> | undefined;
@@ -2356,7 +2492,9 @@ const ICON = {
 
 /* ---------------- boot veil ---------------- */
 /* Overlays the shell rather than replacing it, so the prerendered HTML
-   already contains the real layout and nothing jumps when /api/me lands. */
+   already contains the real layout and nothing jumps when /api/me lands.
+   The background is an opaque token, not an alpha: this has to hide the
+   pre-vault card underneath, not tint it. */
 .cv-boot {
   position: absolute;
   inset: 24px 0 0;
@@ -2364,15 +2502,67 @@ const ICON = {
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 14px;
+  gap: 26px;
   border-radius: var(--cv-radius);
   background: var(--bg);
   color: var(--ink-3);
   font-size: 14px;
 }
+/* The reveal, and the reason it is 700ms with a hold: opacity stays at 1
+   through the dial's 140deg turn and clears only as the dial retracts. 55% is
+   the exact frame brand-mark-unlock changes direction on, so the dashboard
+   appears from behind a vault that is opening rather than after one that has
+   already opened. Perceived cost is the tail, not the whole gesture. */
+.cv-boot.opening {
+  animation: cv-boot-open 700ms var(--ease) forwards;
+  pointer-events: none;
+}
+
+.cv-boot-vault {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 232px;
+  height: 232px;
+}
+/* Concentric rings, in the mark's own vocabulary rather than a new one: the
+   middle ring is dashed because the vault's interior is (brand-mark-depth),
+   and the outer breathes on brand-mark-breathe's 2.2s so the whole
+   composition pulses as one object instead of two. */
+.cv-boot-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  pointer-events: none;
+}
+.cv-boot-ring.inner {
+  width: 124px;
+  height: 124px;
+  border-color: var(--line-2);
+}
+.cv-boot-ring.mid {
+  width: 176px;
+  height: 176px;
+  border-style: dashed;
+  border-color: rgba(90, 214, 192, 0.22);
+  animation: cv-boot-turn 16s linear infinite;
+}
+.cv-boot-ring.outer {
+  width: 232px;
+  height: 232px;
+  animation: cv-boot-breathe 2.2s ease-in-out infinite;
+}
+.cv-boot-halo {
+  position: absolute;
+  width: 232px;
+  height: 232px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(90, 214, 192, 0.1), transparent 68%);
+  pointer-events: none;
+}
 .cv-boot-mark {
-  opacity: 0.7;
-  animation: cv-pulse 1.8s var(--ease) infinite;
+  position: relative;
+  color: var(--accent);
 }
 
 /* Eyebrow + spark moved from the deleted pre-vault header into the topbar,
@@ -3169,6 +3359,7 @@ const ICON = {
 }
 .cv-vaultfocal :deep(.brand-mark-svg),
 .cv-status-mark :deep(.brand-mark-svg),
+.cv-boot-mark :deep(.brand-mark-svg),
 .cv-ambient-mark :deep(.brand-mark-svg) {
   color: inherit;
 }
@@ -3662,13 +3853,41 @@ const ICON = {
     transform: none;
   }
 }
-@keyframes cv-pulse {
+/* cv-pulse used to live here, driving the old 30px boot mark. The mark's own
+   `working` prop is the loading graphic now, so the wrapper animation went
+   with it -- and an unused @keyframes is the same dead weight as the unused
+   rules Task A found by compiling the stylesheet. */
+
+/* The reveal. See .cv-boot.opening for why the hold runs to 55%. */
+@keyframes cv-boot-open {
+  0%,
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes cv-boot-turn {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* Restates its resting values at 0/100% rather than only travelling from
+   them, so `animation: none` under reduced motion lands on a ring that is
+   present and still -- the hazard styles.css documents for the mark itself. */
+@keyframes cv-boot-breathe {
   0%,
   100% {
-    opacity: 0.5;
+    opacity: 1;
+    transform: scale(1);
   }
   50% {
-    opacity: 1;
+    opacity: 0.55;
+    transform: scale(1.035);
   }
 }
 @keyframes cv-shimmer {
@@ -3749,7 +3968,12 @@ const ICON = {
   .cv-reveal,
   .cv-nav-item.revealed,
   .cv-nav-new,
-  .cv-boot-mark,
+  /* The load screen's rings. The mark inside them needs nothing here: its own
+     `is-working` and `is-unlocking` rules are already handled in styles.css,
+     which lands them on their resting states rather than freezing them
+     mid-travel. */
+  .cv-boot-ring.mid,
+  .cv-boot-ring.outer,
   .cv-status-card,
   .cv-appsync,
   .cv-focal-glow,
@@ -3766,6 +3990,14 @@ const ICON = {
   }
   .cv-appskel {
     background: rgba(255, 255, 255, 0.08);
+  }
+  /* Belt and braces, exactly as brand-mark's own reduced-motion rule does it:
+     openBoot never sets the phase that applies this class under the
+     preference, but if it somehow did, land on the destination rather than
+     freezing an opaque veil over the page forever. */
+  .cv-boot.opening {
+    animation: none;
+    opacity: 0;
   }
   /* Neutralize decorative hover motion too — keep state changes, drop the travel */
   .cv-btn,
