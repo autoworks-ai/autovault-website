@@ -7723,8 +7723,7 @@ button.clerk-profile-action:disabled {
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
 }
 
-.hosted-panel,
-.hosted-command-card {
+.hosted-panel {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--bg);
@@ -7815,21 +7814,6 @@ button.clerk-profile-action:disabled {
   -webkit-line-clamp: 2;
 }
 
-.hosted-command-card {
-  margin-top: 12px;
-}
-
-.hosted-command-card pre {
-  overflow: auto;
-  margin: 0;
-  border-radius: 6px;
-  background: var(--panel);
-  padding: 12px;
-  color: var(--ink-2);
-  font-size: 12px;
-  white-space: pre;
-}
-
 .hosted-funnel[data-entry="playground"] {
   padding: 14px;
 }
@@ -7864,8 +7848,7 @@ button.clerk-profile-action:disabled {
   gap: 8px;
 }
 
-.hosted-funnel[data-entry="playground"] .hosted-panel,
-.hosted-funnel[data-entry="playground"] .hosted-command-card {
+.hosted-funnel[data-entry="playground"] .hosted-panel {
   padding: 12px;
 }
 
