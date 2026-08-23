@@ -121,8 +121,8 @@
              played the celebration on the 34px strip mark instead — a gesture
              performed by an icon that had just teleported. The mark stays big
              for the ~700ms, then collapses. -->
+        <div v-if="!vaultOpen || vaultUnlocking" class="cv-vaulthead">
         <div
-          v-if="!vaultOpen || vaultUnlocking"
           class="cv-vaultfocal"
           aria-hidden="true"
         >
@@ -168,6 +168,7 @@
             />
           </li>
         </ol>
+        </div>
 
         <p
           v-if="notice"
@@ -227,9 +228,6 @@
 
         <!-- ---------- STAGE A: CONNECT ---------- -->
         <template v-if="stage === 'connect'">
-          <p class="cv-greeting">
-            Welcome — your vault is reserved. Here's the one thing to do now.
-          </p>
           <div class="cv-focal">
             <div class="cv-focal-glow" aria-hidden="true" />
             <div class="cv-focal-ns">
@@ -2162,6 +2160,46 @@ const ICON = {
 /* The vault, focal. Sized so it reads as the subject of the page rather than
    an icon, and centered because at these stages there is exactly one thing to
    do and nothing should compete with it. */
+/* Mark and progress as one unit rather than two stacked strangers. The
+   connect stage used to read as four separate things down the page — mark,
+   rail, a greeting that paraphrased the card under it, then the card. This is
+   the first two of those becoming one, and the greeting is gone. */
+.cv-vaulthead {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  margin-bottom: 26px;
+}
+/* Inside the head the rail is a caption, not a section: centered, quieter,
+   and it keeps its labels because they say what is left to do — which is the
+   whole reason it is still here rather than being reduced to dots. */
+.cv-vaulthead .cv-rail {
+  margin: 0;
+  justify-content: center;
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.cv-vaulthead .cv-rail-step {
+  font-size: 11.5px;
+}
+.cv-vaulthead .cv-rail-copy small {
+  display: none;
+}
+/* The detail line is the one thing that goes: it is per-step prose and turns
+   a caption back into a section. `active` keeps it, because that is the step
+   the reader is actually on. */
+.cv-vaulthead .cv-rail-step.active .cv-rail-copy small {
+  display: block;
+  /* The base rule caps this at 150px with nowrap + ellipsis, which is right
+     for a four-across row of fixed columns and wrong for a centered caption:
+     it clipped "Point your CLI at the namespace" to "…at the nama…". The one
+     line that is meant to tell you what to do next should be readable. */
+  max-width: none;
+  white-space: normal;
+  overflow: visible;
+  text-align: center;
+}
+
 .cv-vaultfocal {
   display: grid;
   place-items: center;

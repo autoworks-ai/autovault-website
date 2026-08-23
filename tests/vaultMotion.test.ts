@@ -118,3 +118,46 @@ describe("BrandMark exposes the states without losing the resting one", () => {
     expect(brandMark).toContain("'is-unlocking': unlocking");
   });
 });
+
+// The connect stage used to read as four stacked strangers: the mark, the
+// rail, a greeting that paraphrased the card beneath it, then the card. Two of
+// those are now one unit and one is gone.
+describe("the connect stage is one thing, not four", () => {
+  it("groups the mark and the progress rail", () => {
+    expect(cloudPage).toContain('class="cv-vaulthead"');
+    const head = cloudPage.slice(
+      cloudPage.indexOf('class="cv-vaulthead"'),
+      cloudPage.indexOf("</ol>")
+    );
+    expect(head).toContain("cv-vaultfocal");
+    expect(head).toContain("cv-rail");
+  });
+
+  it("drops the greeting the focal card already said", () => {
+    // The card carries a "Reserved" pill, the endpoint, and the heading this
+    // sentence was paraphrasing.
+    expect(cloudPage).not.toContain("Welcome — your vault is reserved");
+  });
+
+  it("lets the current step's detail line be read in full", () => {
+    // The base rule caps it at 150px with nowrap + ellipsis, which is right
+    // for a four-across row and clipped "Point your CLI at the namespace" to
+    // "…at the nama…" once the rail became a centered caption.
+    const rule = cloudPage.slice(
+      cloudPage.indexOf(".cv-vaulthead .cv-rail-step.active .cv-rail-copy small {")
+    );
+    const body = rule.slice(0, rule.indexOf("}"));
+    expect(body).toContain("max-width: none");
+    expect(body).toContain("white-space: normal");
+  });
+
+  it("keeps the rail's accessible state text", () => {
+    // Only the per-step detail line is hidden, never the state label — the
+    // rail must not convey progress by colour and position alone.
+    expect(cloudPage).toContain("RAIL_STATE_LABEL[step.state]");
+    expect(cloudPage).toContain('class="visually-hidden"');
+    const hide = cloudPage.slice(cloudPage.indexOf(".cv-vaulthead .cv-rail-copy small {"));
+    expect(hide.slice(0, hide.indexOf("}"))).toContain("display: none");
+    expect(hide.slice(0, hide.indexOf("}"))).not.toContain("visually-hidden");
+  });
+});
