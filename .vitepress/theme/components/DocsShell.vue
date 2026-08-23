@@ -97,13 +97,13 @@ const configs: Record<PageKey, { active: string; sidebarActive: string; variant:
     sidebarActive: "Quick start",
     variant: "docs",
     toc: [
-      { label: "Install the local vault", id: "install" },
-      { label: "Run the setup wizard", id: "setup" },
-      { label: "Verify the install", id: "verify" },
+      { label: "Install", id: "install" },
+      { label: "Finish setup", id: "setup" },
+      { label: "Check it worked", id: "verify" },
       { label: "Add your first skill", id: "first" },
       { label: "Vault anatomy", id: "vault-anatomy" },
-      { label: "Scope it", id: "scope" },
-      { label: "Run it", id: "run" },
+      { label: "Reaching each agent", id: "scope" },
+      { label: "Run it from your agent", id: "run" },
       { label: "Where next", id: "next" }
     ]
   },
