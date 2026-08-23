@@ -1390,6 +1390,13 @@ async function openBoot() {
     // A failed load did not open anything. Playing an unlock over "We couldn't
     // load your vault" would be the page celebrating its own error.
     stage.value === "error" ||
+    // Neither did a visit by someone who has no vault to open. Measured on a
+    // signed-out load: the gesture put 700ms between them and the sign-up
+    // button, on the page that IS the public sign-up entry point -- and the
+    // mark would have been claiming that something of theirs had just opened.
+    // The dial still sweeps behind the veil while the page loads; there is
+    // simply nothing to unlock at the end of it.
+    !signedIn.value ||
     // Read inside the callback, never at setup scope: the PR #88 hydration
     // class, and the same placement the two existing gestures use.
     prefersReducedMotion() ||
@@ -1901,7 +1908,21 @@ async function loadCloudState(initial = false) {
     cloudState.value = response.ok
       ? normalizeCloudState((await response.json()) as CloudStatePayload)
       : { user: null, subscription: null, vault: null };
-    loadError.value = null;
+    // A 5xx is the server saying it could not answer, and the empty state
+    // above is a placeholder, not a report. Reading it as "no subscription,
+    // no vault" is the same conflation the loading stage exists to end -- and
+    // it lands in the same place: watched live, an /api/me returning 500
+    // showed a paying, provisioned owner "Finish checkout". The error stage
+    // and its Try again button are for exactly this, and they were reachable
+    // only from an auth failure.
+    //
+    // Deliberately 5xx only. A 4xx here is auth-shaped, and the signed-out
+    // path is not one: /api/me answers an anonymous request with 200 and a
+    // null user, so no ordinary visitor can reach this branch.
+    loadError.value =
+      response.status >= 500
+        ? "We couldn't reach your vault just now. Nothing has changed on your account."
+        : null;
   } catch (error) {
     if (requestSeq !== cloudStateRequestSeq) return;
     if (isClerkApiAuthError(error)) {

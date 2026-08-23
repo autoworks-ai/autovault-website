@@ -288,6 +288,25 @@ describe("the auth context is recorded honestly", () => {
     );
   });
 
+  it("routes a server failure to the error stage instead of guessing", () => {
+    // Watched live: /api/me returning 500 left loadError null, so the empty
+    // placeholder state was read as "no subscription, no vault" and a paying,
+    // provisioned owner was shown "Finish checkout". The empty object is a
+    // placeholder, not a report -- the same conflation the loading stage
+    // exists to end, landing in the same place.
+    const body = fnBody("loadCloudState");
+    expect(body).toContain("response.status >= 500");
+    const at = body.indexOf("loadError.value =");
+    expect(at).toBeGreaterThan(-1);
+    expect(body.slice(at, at + 200)).toContain("We couldn't reach your vault");
+    // 5xx only. A 4xx here is auth-shaped, and no ordinary visitor reaches it:
+    // /api/me answers an anonymous request with 200 and a null user.
+    expect(body).not.toContain("!response.ok\n      ?");
+    // And the error stage un-veils, because `settled` is derived from `stage`
+    // rather than from cloudStateKnown -- otherwise Try again sits behind it.
+    expect(cloudPage).toContain('const settled = computed(() => stage.value !== "loading");');
+  });
+
   it("lets a provisioning payload settle the page on its own", () => {
     // syncCloudState bumps the request sequence, so the /api/me this page has
     // in flight bails out. Without recording the context here the page would
@@ -467,12 +486,17 @@ describe("the load screen is the vault, not a new graphic", () => {
     expect(body).toContain("if (done) return;");
   });
 
-  it("does not celebrate a failed load, and does not move under reduced motion", () => {
+  it("does not celebrate a failed load, a stranger, or a reduced-motion visitor", () => {
     const body = cloudPage.slice(
       cloudPage.indexOf("async function openBoot()"),
       cloudPage.indexOf("watch(settled, (isSettled)")
     );
     expect(body).toContain('stage.value === "error"');
+    // Measured, not assumed: on a signed-out load the gesture put 700ms
+    // between the visitor and the sign-up button on the page that is the
+    // public sign-up entry point -- and claimed something of theirs had
+    // opened when they have no vault at all.
+    expect(body).toContain("!signedIn.value");
     expect(body).toContain("prefersReducedMotion()");
     // Read inside the callback, never at setup scope: the PR #88 hydration
     // class. Both existing gestures place their guard the same way.
