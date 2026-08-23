@@ -1061,17 +1061,34 @@ function armLoadPatience() {
 // also fire mid-way through the first device request, which is the same
 // defect a few hundred milliseconds later.
 //
-// Same duration, and for the same reason: the list polls every four seconds,
-// so twenty seconds is five failed attempts. A failure signal, not a
-// slowness budget.
-const devicePatienceExpired = ref(false);
+// Same duration, for the same reason -- with one correction. "Twenty seconds
+// is five failed attempts" is only true if five attempts actually happened,
+// and startDevicePolling skips every tick while a request is in flight. A
+// first request that stalls therefore burns the whole window having completed
+// ZERO attempts, and giving up then is giving up on nothing: `stage` reads
+// the still-empty array and the connect terminal replays at the owner this
+// gate exists to protect. So the clock elapsing is not the same event as the
+// page giving up, and they need separate names.
+//
+// `deviceWaitOver` is the one `stage` reads. It is latched -- the wait ends
+// once and does not restart -- because a gate that re-closed on every poll
+// tick would toggle the whole page between the boot veil and the connect
+// stage every four seconds, which is worse than either answer alone.
+let devicePatienceElapsed = false;
+const deviceWaitOver = ref(false);
 let devicePatienceTimer: ReturnType<typeof setTimeout> | undefined;
 
 function armDevicePatience() {
   if (devicePatienceTimer) clearTimeout(devicePatienceTimer);
+  devicePatienceElapsed = false;
+  deviceWaitOver.value = false;
   devicePatienceTimer = setTimeout(() => {
-    devicePatienceExpired.value = true;
     devicePatienceTimer = undefined;
+    devicePatienceElapsed = true;
+    // Mid-attempt: hand the decision to loadDevices' finally, which runs when
+    // that attempt is over. The request is bounded (see loadDevices), so the
+    // worst case is this window plus one request bound rather than forever.
+    if (deviceLoadsInFlight === 0) deviceWaitOver.value = true;
   }, LOAD_PATIENCE_MS);
 }
 // Set when /api/me could not be resolved because auth failed — as opposed to
@@ -1269,11 +1286,30 @@ const devicesKnown = ref(false);
 // from null to a row, which resets devicesKnown, which would veil the owner
 // who has just paid.
 const devicesGateArmed = ref(false);
-let devicesGateDecided = false;
+// Which auth answer the gate was decided under -- null until it has been.
+//
+// Latched per answer rather than per mount, and the difference is a whole
+// class of visitor. Clerk's modal finishes on the same document (see
+// ClerkAuthControls, which reconciles the session in place rather than
+// reloading), so signing in on /cloud never remounts this component. Someone
+// who arrived signed out has already decided the gate against an anonymous
+// payload -- no vault, so nothing armed -- and a "decided once, ever" latch
+// would never let the vault arriving with the authenticated /api/me re-arm
+// it. The connect terminal then replays at an owner who signed in on this
+// very page. Signing out is the same in reverse.
+//
+// Keyed to Clerk's own flag, not to `signedIn`: that ORs the live flag in, so
+// it turns true a whole request before the payload lands and would re-decide
+// the gate against state still in flight. And both signals are watched in ONE
+// watcher rather than two, because two would have an order between them --
+// on a session blip that flips both in the same flush, a separate reset
+// watcher running second would clear a decision the first had just made
+// correctly, with no further change left to re-decide on.
+let devicesGateDecidedFor: boolean | null = null;
 
-watch(cloudStateKnown, (known) => {
-  if (!known || devicesGateDecided) return;
-  devicesGateDecided = true;
+watch([cloudStateKnown, isClerkSignedIn], ([known, clerkSignedIn]) => {
+  if (!known || devicesGateDecidedFor === clerkSignedIn) return;
+  devicesGateDecidedFor = clerkSignedIn;
   devicesGateArmed.value = Boolean(vault.value);
   // Only an armed gate is waiting for anything, and this is the first moment
   // the page knows it is one. A vault provisioned during this session never
@@ -1302,7 +1338,7 @@ const stage = computed<Stage>(() => {
       !deviceListIsKnown({
         gateArmed: devicesGateArmed.value,
         listAnswered: devicesKnown.value,
-        patienceExpired: devicePatienceExpired.value,
+        patienceExpired: deviceWaitOver.value,
       })
     ) {
       return "loading";
@@ -2315,20 +2351,38 @@ function formatWhen(iso: string): string {
   return new Date(when).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-let deviceLoadInFlight = false;
+// A count rather than a flag, and for the same reason cloudLoadsInFlight is
+// one. Two requests can overlap -- an auth change re-decides the gate and
+// starts a fresh list load while the previous vault's request is still out --
+// and a shared boolean lets the OLD one's finally report "idle" while the new
+// one is still running. The window would then end mid-request on a still-empty
+// array, which is the replay this gate exists to stop.
+let deviceLoadsInFlight = 0;
 
 async function loadDevices() {
   if (!vault.value) return;
-  deviceLoadInFlight = true;
+  deviceLoadsInFlight += 1;
   const requestSeq = ++devicesRequestSeq;
+  // The same bound as /api/me, and needed here for a sharper reason. The poll
+  // skips every tick while the count above is non-zero, and the device window
+  // can only end on a finished attempt, so a request that never settles
+  // stops the retries AND stops the page ever giving up: the veil stays for
+  // the life of the tab. Covers the token step as well as the fetch, because
+  // Clerk's getToken is its own network call with its own way to stall.
+  const abort = new AbortController();
+  const abortTimer = setTimeout(() => abort.abort(), LOAD_PATIENCE_MS);
   try {
-    const headers = await authHeaders({ accept: "application/json" }, {
-      required: true,
-      fresh: false,
-    });
+    const headers = await Promise.race([
+      authHeaders({ accept: "application/json" }, {
+        required: true,
+        fresh: false,
+      }),
+      abortRejection(abort.signal),
+    ]);
     const response = await fetch("/api/vaults/current/devices", {
       credentials: "include",
       headers,
+      signal: abort.signal,
     });
     if (requestSeq !== devicesRequestSeq) return;
     if (!response.ok) return;
@@ -2347,7 +2401,16 @@ async function loadDevices() {
     // Silent on purpose. This runs on a timer; a transient failure must not
     // stack up notices on a page the owner is reading.
   } finally {
-    deviceLoadInFlight = false;
+    clearTimeout(abortTimer);
+    deviceLoadsInFlight -= 1;
+    // The other half of armDevicePatience's decision. If the window ran out
+    // while this attempt was running, the page gives up here -- on a finished
+    // attempt -- rather than in the timer, which would have given up in the
+    // middle of one. Only once nothing is outstanding: an overlapping request
+    // is still an attempt in progress.
+    if (devicePatienceElapsed && deviceLoadsInFlight === 0) {
+      deviceWaitOver.value = true;
+    }
   }
 }
 
@@ -2596,7 +2659,7 @@ function startDevicePolling() {
     // superseded before it lands and the list never updates at all, while the
     // backend takes the load of all of them. Explicit refreshes after an
     // action still go through: those are newer on purpose.
-    if (deviceLoadInFlight) return;
+    if (deviceLoadsInFlight > 0) return;
     void loadDevices();
   }, wanted);
 }

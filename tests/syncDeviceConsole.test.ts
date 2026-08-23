@@ -568,13 +568,19 @@ describe("polls do not trip over each other", () => {
     // pending machine never appears, and the backend carries all of it.
     const at = cloudPage.indexOf("devicePollTimer = setInterval");
     expect(at).toBeGreaterThan(-1);
-    expect(cloudPage.slice(at, at + 700)).toContain("if (deviceLoadInFlight) return;");
-    // The flag has to clear on the failure path too, or one error stops
-    // polling for the life of the page.
+    expect(cloudPage.slice(at, at + 700)).toContain("if (deviceLoadsInFlight > 0) return;");
+    // A count, not a flag: two requests can overlap when an auth change
+    // re-decides the gate mid-load, and a shared boolean would let the older
+    // one's finally report "idle" while the newer one is still running.
     const load = cloudPage.indexOf("async function loadDevices");
     const body = cloudPage.slice(load, cloudPage.indexOf("function stopDevicePolling", load));
+    expect(body).toContain("deviceLoadsInFlight += 1;");
+    // And it has to come back down on the failure path too, or one error
+    // stops polling for the life of the page.
     expect(body).toContain("finally {");
-    expect(body).toContain("deviceLoadInFlight = false;");
+    expect(body.indexOf("deviceLoadsInFlight -= 1;")).toBeGreaterThan(
+      body.indexOf("} finally {")
+    );
   });
 });
 

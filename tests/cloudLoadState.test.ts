@@ -321,9 +321,13 @@ describe("the auth context is recorded honestly", () => {
 });
 
 describe("the device gate is latched and guarded", () => {
-  it("is armed once, from whether a vault predates the first known state", () => {
-    expect(cloudPage).toContain("watch(cloudStateKnown, (known) => {");
-    expect(cloudPage).toContain("if (!known || devicesGateDecided) return;");
+  it("is armed from whether a vault predates the state it was decided under", () => {
+    expect(cloudPage).toContain(
+      "watch([cloudStateKnown, isClerkSignedIn], ([known, clerkSignedIn]) => {"
+    );
+    expect(cloudPage).toContain(
+      "if (!known || devicesGateDecidedFor === clerkSignedIn) return;"
+    );
     expect(cloudPage).toContain("devicesGateArmed.value = Boolean(vault.value);");
   });
 
@@ -374,7 +378,7 @@ describe("the wait is bounded", () => {
     // "connect", and the typed terminal replays at somebody who linked months
     // ago. The list waits on its own clock.
     const body = stageBody();
-    expect(body).toContain("patienceExpired: devicePatienceExpired.value,");
+    expect(body).toContain("patienceExpired: deviceWaitOver.value,");
     expect(body).not.toContain("patienceExpired: loadPatienceExpired.value,");
     const known = cloudPage.indexOf("const cloudStateKnown = computed(");
     const block = cloudPage.slice(known, cloudPage.indexOf("\n);", known));
@@ -382,13 +386,11 @@ describe("the wait is bounded", () => {
   });
 
   it("does not start the device window before there is a list to wait for", () => {
-    const arm = fnBody("armDevicePatience");
-    expect(arm).toContain("devicePatienceExpired.value = true;");
     // Armed from the gate-arming watcher, and only when the gate actually
     // armed: a vault provisioned during this session is not waiting for a
     // list whose answer is already known to be empty.
     const gate = cloudPage.slice(
-      cloudPage.indexOf("watch(cloudStateKnown, (known) => {"),
+      cloudPage.indexOf("watch([cloudStateKnown, isClerkSignedIn],"),
       cloudPage.indexOf("const stage = computed<Stage>")
     );
     expect(gate).toContain("if (devicesGateArmed.value) armDevicePatience();");
@@ -396,6 +398,72 @@ describe("the wait is bounded", () => {
     expect(cloudPage).toContain(
       "if (devicePatienceTimer) clearTimeout(devicePatienceTimer);"
     );
+  });
+
+  it("does not end the device window in the middle of an attempt", () => {
+    // "Twenty seconds is five failed attempts" is only true if five attempts
+    // happened, and startDevicePolling skips every tick while a request is in
+    // flight. A first request that stalls burns the whole window having
+    // completed ZERO attempts -- so the clock elapsing and the page giving up
+    // are two events, and only the second one opens the gate.
+    const arm = fnBody("armDevicePatience");
+    expect(arm).toContain("devicePatienceElapsed = true;");
+    expect(arm).toContain("if (deviceLoadsInFlight === 0) deviceWaitOver.value = true;");
+    // The other half: an attempt that finishes after the clock ran out ends
+    // the wait from its own finally -- and only once nothing else is still
+    // outstanding, because an overlapping request is an attempt in progress.
+    const load = fnBody("loadDevices");
+    expect(load).toContain(
+      "if (devicePatienceElapsed && deviceLoadsInFlight === 0) {"
+    );
+    expect(load.indexOf("if (devicePatienceElapsed")).toBeGreaterThan(
+      load.indexOf("} finally {")
+    );
+    // Latched: re-closing the gate on each poll tick would toggle the page
+    // between the boot veil and the connect stage every four seconds.
+    expect(fnBody("armDevicePatience")).toContain("deviceWaitOver.value = false;");
+    const stage = stageBody();
+    expect(stage).not.toContain("devicePatienceElapsed");
+  });
+
+  it("bounds the device request the give-up waits on", () => {
+    // Without this the two guards above deadlock: the poll skips every tick
+    // while a request is in flight and the wait can only end on a finished
+    // attempt, so one request that never settles stops the retries and stops
+    // the page giving up -- the veil stays for the life of the tab.
+    const load = fnBody("loadDevices");
+    expect(load).toContain("const abort = new AbortController();");
+    expect(load).toContain("setTimeout(() => abort.abort(), LOAD_PATIENCE_MS)");
+    expect(load).toContain("signal: abort.signal,");
+    // The token step too, for the same reason it was needed on /api/me.
+    expect(load).toContain("abortRejection(abort.signal),");
+    expect(load.indexOf("clearTimeout(abortTimer);")).toBeGreaterThan(
+      load.indexOf("} finally {")
+    );
+  });
+
+  it("re-decides the device gate when the auth answer changes", () => {
+    // Clerk's modal finishes on the same document, so signing in on /cloud
+    // never remounts this component. A visitor who arrived signed out decided
+    // the gate against an anonymous payload -- no vault, nothing armed -- and
+    // a decided-once-ever latch would never let the vault arriving with the
+    // authenticated /api/me re-arm it, replaying the connect terminal at an
+    // owner who signed in right here.
+    const at = cloudPage.indexOf("watch([cloudStateKnown, isClerkSignedIn],");
+    expect(at, "the gate is never re-decided on an auth change").toBeGreaterThan(-1);
+    const body = cloudPage.slice(at, cloudPage.indexOf("\n});", at));
+    expect(body).toContain("devicesGateDecidedFor = clerkSignedIn;");
+    // A boolean-or-null, so "not decided yet" is distinguishable from
+    // "decided while signed out" -- the two states this whole file exists to
+    // stop conflating.
+    expect(cloudPage).toContain("let devicesGateDecidedFor: boolean | null = null;");
+    // One watcher, not two: two would have an order between them, and on a
+    // session blip that flips both in the same flush a separate reset watcher
+    // running second would clear a decision just made correctly.
+    expect(cloudPage).not.toContain("watch(isClerkSignedIn, () => {");
+    // Clerk's flag, not `signedIn` -- that ORs the live flag in and would
+    // re-decide the gate against a payload still in flight.
+    expect(cloudPage).not.toContain("watch(signedIn, () => {");
   });
 
   it("bounds the request that the in-flight guard trusts", () => {
