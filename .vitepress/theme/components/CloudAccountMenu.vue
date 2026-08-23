@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import { useDisclosureMenu } from "../composables/useDisclosureMenu";
 import { useClerkAccount } from "../utils/clerkAccount";
 
@@ -41,13 +41,32 @@ const items = computed<MenuItem[]>(() => {
 });
 
 const menu = useDisclosureMenu(() => items.value.length);
-const { open, triggerRef, menuRef, placement, toggle, closeMenu, onTriggerKeydown, onMenuKeydown, setItemRef } = menu;
+const { open, activeIndex, triggerRef, menuRef, placement, toggle, closeMenu, onTriggerKeydown, onMenuKeydown, setItemRef } = menu;
+
+// Clerk finishes loading after first paint, so this list can GROW while the
+// menu is open: Billing on its own becomes Profile / Billing / Sign out. Vue
+// keeps DOM focus on the keyed button it was already on, but the composable's
+// roving index still points at the old position -- so the next ArrowDown from
+// Billing would refocus Billing, and ArrowUp would jump to Sign out. Re-resolve
+// the index from the key that is actually focused. Only the index needs
+// correcting; the DOM focus is already right, so nothing is re-focused here.
+watch(
+  () => items.value.map((item) => item.key).join("|"),
+  (next, previous) => {
+    if (!open.value || !previous || next === previous) return;
+    const focusedKey = previous.split("|")[activeIndex.value];
+    if (!focusedKey) return;
+    const moved = next.split("|").indexOf(focusedKey);
+    if (moved !== -1) activeIndex.value = moved;
+  }
+);
 
 const menuStyle = computed(() => ({
   position: "fixed" as const,
   top: `${placement.value?.top ?? 0}px`,
   left: `${placement.value?.left ?? 0}px`,
   minWidth: `${placement.value?.minWidth ?? 0}px`,
+  maxWidth: `${placement.value?.maxWidth ?? 0}px`,
   visibility: placement.value ? ("visible" as const) : ("hidden" as const)
 }));
 
@@ -240,6 +259,8 @@ async function onSignOut() {
   flex-direction: column;
   gap: 2px;
   padding: 8px 10px 10px;
+  /* Lets the nowrap email actually ellipsize once the menu is width-capped. */
+  min-width: 0;
 }
 .cv-acct-head strong {
   font-size: 12.5px;
