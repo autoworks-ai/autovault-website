@@ -19,6 +19,10 @@ const accountMenu = readFileSync(
   new URL("../.vitepress/theme/components/CloudAccountMenu.vue", import.meta.url),
   "utf-8"
 );
+const clerkConfig = readFileSync(
+  new URL("../.vitepress/theme/clerk.ts", import.meta.url),
+  "utf-8"
+);
 
 /** The `section:` a nav item selects, read off its own item() call. */
 function sectionOf(key: string): string | null {
@@ -26,6 +30,13 @@ function sectionOf(key: string): string | null {
   expect(at, `no nav item named ${key}`).toBeGreaterThan(-1);
   const call = cloudPage.slice(at, cloudPage.indexOf("\n", at));
   return /section: "([a-z]+)"/.exec(call)?.[1] ?? null;
+}
+
+/** Collapses hand-wrapped template prose to one space between words, so a
+ * content assertion can match a sentence as written instead of as indented
+ * across several physical lines. */
+function flatten(text: string): string {
+  return text.replace(/\s+/g, " ");
 }
 
 /** The stage SECTION_REVEAL gates a section behind, or null for "always". */
@@ -79,6 +90,7 @@ describe("the sidebar selects a panel", () => {
       ["skills", "skills"],
       ["sync", "machines"],
       ["billing", "billing"],
+      ["catalog", "catalog"],
     ];
     const table = revealTable();
     for (const [key, section] of wiring) {
@@ -103,7 +115,8 @@ describe("the sidebar selects a panel", () => {
       overview: null,
       machines: "connect",
       skills: "explore",
-      billing: "explore"
+      billing: "explore",
+      catalog: "explore"
     });
     expect(cloudPage).toContain(
       "const revealAt = opts.revealAt ?? (opts.section ? SECTION_REVEAL[opts.section] : null);"
@@ -244,6 +257,158 @@ describe("the Billing panel", () => {
     expect(overview).not.toContain("subscriptionState");
     expect(overview).not.toContain("renewalLabel");
     expect(overview).not.toContain("hostedPriceLabel");
+  });
+
+  it("gives the dead 'contact support' text a real destination", () => {
+    // It used to just be the words "contact support" with nothing behind
+    // them. Retired by linking it rather than deleting it: a subscriber
+    // whose access looks wrong still needs somewhere to go.
+    const noticeAt = panel.indexOf('v-if="subscriptionNeedsAttention"');
+    expect(noticeAt, "no subscription-attention notice").toBeGreaterThan(-1);
+    const notice = panel.slice(noticeAt, panel.indexOf("</p>", noticeAt));
+    expect(notice).toContain("contact support");
+    expect(notice).toContain(':href="clerkBrand.supportUrl"');
+  });
+});
+
+describe("the Catalog panel", () => {
+  const at = cloudPage.indexOf(`v-else-if="activeSection === 'catalog'"`);
+  const panel = cloudPage.slice(at, cloudPage.indexOf("SECTION: MACHINES", at));
+
+  it("exists as a panel, not a card to scroll to", () => {
+    expect(at, "no catalog panel").toBeGreaterThan(-1);
+    expect(sectionOf("catalog")).toBe("catalog");
+  });
+
+  it("reveals at explore, not connect, even though the copy is about linked machines", () => {
+    // The naive read of "this needs a linked machine to be meaningful" points
+    // at "connect", but the panel lives inside the explore/ready template
+    // (the same v-else-if chain skills and billing use), which does not
+    // render at all at "connect". Locking this to "connect" would unlock the
+    // nav item two stages before there is anything to show, and describe
+    // "your linked machines" before cliLinked is even true. "explore" is the
+    // only value that keeps the nav item's lock in sync with the template
+    // that actually renders behind it.
+    const table = revealTable();
+    expect(table.catalog).toBe("explore");
+    // And the panel really is inside that chain, not pulled out the way
+    // machines is -- proven by position: it has to fall between the outer
+    // template's opening and the machines comment that marks where that
+    // template closes.
+    const exploreReadyAt = cloudPage.indexOf(`v-if="stage === 'explore' || stage === 'ready'"`);
+    const machinesCommentAt = cloudPage.indexOf("SECTION: MACHINES");
+    expect(exploreReadyAt).toBeGreaterThan(-1);
+    expect(at).toBeGreaterThan(exploreReadyAt);
+    expect(at).toBeLessThan(machinesCommentAt);
+  });
+
+  it("answers what a vault catalog is", () => {
+    expect(flatten(panel)).toContain("signed manifest");
+    expect(flatten(panel)).toContain("your linked machines pull skills from");
+  });
+
+  it("answers how it relates to linked machines", () => {
+    expect(flatten(panel)).toContain("Every machine you admit reads from that same vault catalog");
+  });
+
+  it("answers what publishing will look like, and agrees there is nothing to do today", () => {
+    expect(flatten(panel)).toContain("Publishing ships with hosted sync");
+    expect(flatten(panel)).toContain("nothing to publish or configure here today");
+    // Matches the Sync engine card's own framing (signing/serving stay local)
+    // rather than inventing a publish flow or an owner console that do not
+    // exist yet.
+    expect(flatten(panel)).toContain("signing and serving already work today");
+  });
+
+  it("gives an honest empty state instead of a fake control", () => {
+    expect(panel).toContain("Nothing published yet");
+    // Nothing on this panel is clickable -- there is genuinely nothing to do.
+    expect(panel).not.toContain("<button");
+  });
+
+  it("disambiguates from the public skills directory, and links it", () => {
+    // The site already uses "catalog" for the public examples page in
+    // ComparePage.vue, AuthorProfilePage.vue and data/skills.ts. Confusing
+    // the two is most of the actual complaint this task exists to fix.
+    expect(flatten(panel)).toContain("your vault catalog");
+    expect(flatten(panel)).toContain("the public skills directory");
+    expect(panel).toContain('<a href="/skills-directory">');
+  });
+
+  it("never matches the three regexes v1Content.test.ts bans from hosted copy", () => {
+    // Mirrors the "keeps hidden hosted copy reservation-only" guard in
+    // v1Content.test.ts, scoped to just the new copy so a failure here
+    // points straight at this panel instead of the whole file. Flattened,
+    // not raw: a negative match against hand-wrapped source is the wrong
+    // direction for a banned-phrase guard -- wrapping the words differently
+    // would silently defeat the raw-source version while the rendered text
+    // still said the banned thing.
+    const copy = flatten(panel);
+    expect(copy).not.toMatch(/live vault|provisioned runtime/i);
+    expect(copy).not.toMatch(/cloud sync is enabled|enabled cloud sync|sync now/i);
+    expect(copy).not.toMatch(/prototype mode/i);
+  });
+});
+
+describe("Docs and Support are always-visible links, not sections", () => {
+  it("are wired to an href, not a section", () => {
+    for (const key of ["docs", "support"]) {
+      const at = cloudPage.indexOf(`item("${key}"`);
+      expect(at, `no nav item named ${key}`).toBeGreaterThan(-1);
+      const call = cloudPage.slice(at, cloudPage.indexOf("\n", at));
+      expect(call).toContain("href:");
+      expect(call).not.toContain("section:");
+    }
+  });
+
+  it("point at the same destinations as the account dropdown", () => {
+    // ClerkAuthControls.vue's UserButton menu is "the account dropdown" --
+    // both read the same clerkBrand fields so there is exactly one place
+    // either URL is written down.
+    expect(cloudPage).toContain('import { clerkBrand } from "../clerk";');
+    const docsAt = cloudPage.indexOf('item("docs"');
+    const docsCall = cloudPage.slice(docsAt, cloudPage.indexOf("\n", docsAt));
+    expect(docsCall).toContain("clerkBrand.docsPath");
+    const supportAt = cloudPage.indexOf('item("support"');
+    const supportCall = cloudPage.slice(supportAt, cloudPage.indexOf("\n", supportAt));
+    expect(supportCall).toContain("clerkBrand.supportUrl");
+  });
+
+  it("carry no reveal stage or soon flag, so nothing can lock them", () => {
+    for (const key of ["docs", "support"]) {
+      const at = cloudPage.indexOf(`item("${key}"`);
+      const call = cloudPage.slice(at, cloudPage.indexOf("\n", at));
+      expect(call).not.toContain("revealAt:");
+      expect(call).not.toContain("soon:");
+    }
+    // And neither is a row SECTION_REVEAL could gate even if one were added
+    // by mistake -- they are not part of the Section union at all.
+    const table = revealTable();
+    expect(table).not.toHaveProperty("docs");
+    expect(table).not.toHaveProperty("support");
+  });
+
+  it("render as real anchors so open-in-new-tab and copy-link work", () => {
+    expect(cloudPage).toContain(`:is="item.href ? 'a' : 'button'"`);
+    expect(cloudPage).toContain(':href="item.href ?? undefined"');
+    expect(cloudPage).toContain(":target=\"item.external ? '_blank' : undefined\"");
+    // The two literals the sidebar's lock/highlight tests already pin, kept
+    // byte-identical through the tag switch rather than only true for
+    // <button> once <a> items exist alongside it.
+    expect(cloudPage).toContain(':disabled="item.disabled"');
+    expect(cloudPage).toContain(`:aria-current="item.active ? 'true' : undefined"`);
+  });
+
+  it("mark the GitHub support link external, and the docs link internal", () => {
+    const at = cloudPage.indexOf("const external = href !== null");
+    expect(at, "no external-link derivation").toBeGreaterThan(-1);
+    expect(cloudPage.slice(at, at + 120)).toContain("/^https?:\\/\\//");
+    // clerkBrand is the one place either URL is written down -- proving the
+    // derivation's http(s):// test actually discriminates the two values it
+    // will be run against.
+    expect(clerkConfig).toMatch(/supportUrl: "https:\/\/github\.com/);
+    expect(clerkConfig).toMatch(/docsPath: "\//);
+    expect(clerkConfig).not.toMatch(/docsPath: "https?:\/\//);
   });
 });
 

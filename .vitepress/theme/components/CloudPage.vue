@@ -45,12 +45,21 @@
         </div>
 
         <nav class="cv-nav">
-          <button
+          <!-- Docs and Support are plain destinations, not panels: item.href
+               is set only for those two, and that is what decides the tag.
+               An <a> gives them real navigation semantics -- open-in-new-tab,
+               copy link, no JS required -- that a button standing in for a
+               link would not. -->
+          <component
+            :is="item.href ? 'a' : 'button'"
             v-for="item in navItems"
             :key="item.key"
-            type="button"
+            :type="item.href ? undefined : 'button'"
             class="cv-nav-item"
             :class="item.cls"
+            :href="item.href ?? undefined"
+            :target="item.external ? '_blank' : undefined"
+            :rel="item.external ? 'noopener' : undefined"
             :disabled="item.disabled"
             :aria-current="item.active ? 'true' : undefined"
             @click="onNavClick(item)"
@@ -62,7 +71,7 @@
             <span v-else-if="item.locked" class="cv-nav-lock" aria-hidden="true"
               >🔒</span
             >
-          </button>
+          </component>
         </nav>
 
         <CloudAccountMenu
@@ -347,7 +356,10 @@
                 </ul>
                 <p v-if="subscriptionNeedsAttention" class="cv-muted cv-sub-warn">
                   Hosted access follows this status. If that looks wrong, reload
-                  after Stripe finishes processing, or contact support.
+                  after Stripe finishes processing, or
+                  <a :href="clerkBrand.supportUrl" target="_blank" rel="noopener"
+                    >contact support</a
+                  >.
                 </p>
                 <ul class="cv-reserved">
                   <li>
@@ -452,6 +464,50 @@
                     </p>
                   </template>
                 </div>
+              </article>
+            </div>
+          </template>
+
+          <!-- ---------- SECTION: CATALOG ----------
+               Answers the confusion this task exists to fix -- "even I don't
+               understand what a catalog is or how I'm supposed to use it or
+               publish it" -- with what the file actually is, why a second
+               linked machine does not get a copy of its own, and that there
+               is no publish path yet. Agrees with the Sync engine card on
+               the Overview panel rather than repeating or contradicting it:
+               nothing here is gated behind the cloud today, and there is
+               nothing to click on this panel either. -->
+          <template v-else-if="activeSection === 'catalog'">
+            <div class="cv-reveal" :style="revealDelay(0)">
+              <article class="cv-card soft">
+                <div class="cv-card-label">Vault catalog</div>
+                <span class="cv-pill warn"
+                  ><span class="cv-dot" /> Nothing published yet</span
+                >
+                <p class="cv-muted">
+                  Your vault catalog is the signed manifest your linked
+                  machines pull skills from — a file, not a screen you
+                  browse.
+                </p>
+                <p class="cv-muted">
+                  Every machine you admit reads from that same vault catalog
+                  once one exists. Link a second machine and it stays in
+                  sync through that one file, not a copy of its own.
+                </p>
+                <p class="cv-muted">
+                  Publishing ships with hosted sync, and that hasn't shipped
+                  yet — there's nothing to publish or configure here today.
+                  When it does, the signing key that makes a release
+                  trustworthy still stays on your machine, the same way
+                  signing and serving already work today: Cloud reads and
+                  serves, it never holds that key.
+                </p>
+                <p class="cv-muted sm">
+                  Not to be confused with
+                  <a href="/skills-directory">the public skills directory</a>,
+                  which lists public examples anyone can browse — your vault
+                  catalog stays private to this namespace.
+                </p>
               </article>
             </div>
           </template>
@@ -572,6 +628,7 @@ import {
   findAdmitTarget,
   readAdmitFingerprint,
 } from "../utils/admit";
+import { clerkBrand } from "../clerk";
 import { clerkAuthRecoveryMessage, isClerkApiAuthError, useClerkApiAuth } from "../utils/clerkApi";
 import {
   useTerminalReplay,
@@ -696,7 +753,7 @@ type Stage = "error" | "account" | "subscription" | "setup" | "connect" | "explo
 // The main area renders exactly one of these at a time, chosen from the
 // sidebar. Adding one means four edits and nothing else: a member here, a row
 // in SECTION_REVEAL, an item() line in navItems, and a block in the template.
-type Section = "overview" | "billing" | "machines" | "skills";
+type Section = "overview" | "billing" | "machines" | "skills" | "catalog";
 type NavItem = {
   key: string;
   label: string;
@@ -710,6 +767,13 @@ type NavItem = {
   // is permanently locked, and Settings has no panel built yet. A null section
   // is what makes onNavClick a no-op even if the disabled attribute were lost.
   section: Section | null;
+  // Set only for a plain link item (Docs, Support): a destination outside the
+  // switcher entirely, so it renders as a real <a> rather than a <button> that
+  // pretends to select a panel. null for every section-switching item.
+  href: string | null;
+  // Whether href leaves the site, so the template can add target="_blank"
+  // without a per-item flag the caller has to remember to set.
+  external: boolean;
 };
 
 const cloudState = ref<CloudState>({
@@ -1159,6 +1223,17 @@ const SECTION_REVEAL: Record<Section, Stage | null> = {
   machines: "connect",
   skills: "explore",
   billing: "explore",
+  // Not "connect", even though the copy is about linked machines and machines
+  // itself reveals there: machines only gets away with "connect" because its
+  // panel is the one rendered OUTSIDE the explore/ready template (see
+  // showsMachines, below). The catalog panel lives inside that template, in
+  // the same v-else-if chain as skills and billing -- so "connect" here would
+  // unlock the nav item two stages before the template that renders its
+  // panel ever mounts, leaving a highlighted item with nothing to show. It
+  // also would have described machines nobody has admitted yet: at "connect"
+  // cliLinked is false by definition, before "how it relates to your linked
+  // machines" is even true.
+  catalog: "explore",
 };
 
 // -1 for "error", which is deliberate: at that stage nothing but overview is
@@ -1196,6 +1271,11 @@ const navItems = computed<NavItem[]>(() => {
       soon?: boolean;
       revealAt?: Stage;
       section?: Section;
+      // A plain destination (Docs, Support) rather than a panel to switch to.
+      // Leaving section/revealAt/soon unset for these falls straight through
+      // to revealAt = null below, i.e. always unlocked -- there is no gate to
+      // add, only one to not add.
+      href?: string;
     } = {},
   ): NavItem => {
     // Resolved once and read by all three of revealed/justRevealed/locked. An
@@ -1207,6 +1287,8 @@ const navItems = computed<NavItem[]>(() => {
     const locked = Boolean(opts.soon) || !revealed;
     const section = opts.section ?? null;
     const active = !locked && section !== null && section === current;
+    const href = opts.href ?? null;
+    const external = href !== null && /^https?:\/\//.test(href);
     return {
       key,
       label,
@@ -1222,6 +1304,8 @@ const navItems = computed<NavItem[]>(() => {
       disabled: locked,
       active,
       section,
+      href,
+      external,
       cls: {
         active,
         soon: Boolean(opts.soon),
@@ -1241,12 +1325,24 @@ const navItems = computed<NavItem[]>(() => {
     // are enrolled, which are admitted, and when each was last seen. Fuller
     // per-release history arrives with catalog publishing.
     item("sync", "Sync log", ICON.sync, { section: "machines" }),
+    // Explains what a vault catalog actually is, once there is a linked
+    // machine to explain it in the context of. The catalog item below reveals
+    // at explore rather than connect -- see the comment on SECTION_REVEAL
+    // above for why the two cannot match here the way they do for machines.
+    item("catalog", "Catalog", ICON.layers, { section: "catalog" }),
     item("members", "Members", ICON.users, { soon: true }),
     item("billing", "Billing", ICON.card, { section: "billing" }),
     // No panel of its own yet, so this stays what it has always been: an item
     // that reveals at ready and does nothing when clicked. Giving it a section
     // would mean inventing settings there are none of.
     item("settings", "Settings", ICON.gear, { revealAt: "ready" }),
+    // Plain links, not panels: useful at every stage, including before a
+    // vault exists, so neither carries a section or a reveal stage. Same
+    // destinations as the account dropdown (ClerkAuthControls.vue's
+    // UserButton menu), reached through the one shared brand config instead
+    // of a second copy of these two URLs.
+    item("docs", "Docs", ICON.fileText, { href: clerkBrand.docsPath }),
+    item("support", "Support", ICON.helpCircle, { href: clerkBrand.supportUrl }),
   ];
 });
 
@@ -1775,6 +1871,9 @@ const ICON = {
   users: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/></svg>`,
   card: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>`,
   gear: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z"/></svg>`,
+  layers: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>`,
+  fileText: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>`,
+  helpCircle: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>`,
 } as const;
 </script>
 
@@ -1887,6 +1986,7 @@ const ICON = {
   font: inherit;
   font-size: 13px;
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
   transition:
     background var(--dur-fast) var(--ease),
@@ -2689,6 +2789,14 @@ const ICON = {
 .cv-muted.sm {
   font-size: 12px;
   margin-top: 10px;
+}
+.cv-muted a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: var(--line-2);
+}
+.cv-muted a:hover {
+  text-decoration-color: var(--accent);
 }
 
 /* app preview */
