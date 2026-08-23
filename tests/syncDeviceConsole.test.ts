@@ -701,8 +701,30 @@ describe("selecting a machine is not admitting it", () => {
     // credential that grants a machine access to the vault on page load.
     const at = cloudPage.indexOf("const admitFingerprint");
     expect(at).toBeGreaterThan(-1);
-    const handshake = cloudPage.slice(at, cloudPage.indexOf("const devicePollUrgent"));
+    // Bounded by the handshake's own focus watcher rather than whatever
+    // happens to be declared next: this slice used to run to
+    // `const devicePollUrgent`, so unrelated code inserted between the two
+    // was pulled in and judged. The end marker is the last statement the
+    // handshake owns.
+    // Bounded by the focus watcher's own last statement. An earlier attempt
+    // ended at the first `{ immediate: true }` after the anchor — which turned
+    // out to belong to the wait-budget watcher declared in between, so the
+    // slice stopped short of the focus watcher and the guard silently stopped
+    // covering the one place that could actually admit.
+    const focusAt = cloudPage.indexOf("button?.focus();", at);
+    expect(focusAt, "focus watcher not found inside the handshake").toBeGreaterThan(at);
+    const end = cloudPage.indexOf(");", focusAt);
+    expect(end).toBeGreaterThan(focusAt);
 
+    // Comments stripped before judging. A guard that a comment can break — or
+    // satisfy — is not guarding the code, and this one broke on a comment that
+    // merely named the function it forbids calling.
+    const handshake = cloudPage
+      .slice(at, end)
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+
+    expect(handshake).toContain("findAdmitTarget");
     expect(handshake).not.toContain("decideDevice");
     expect(handshake).not.toContain("'admit'");
   });

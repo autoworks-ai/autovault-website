@@ -111,9 +111,35 @@
           </div>
         </header>
 
-        <!-- The single progress model. Present at every stage, so nothing
-             resets or re-numbers as the user advances. -->
+        <!-- Focal while the vault is shut. This is the element that changes
+             as you advance, which is why it earns the slot: it replaces a
+             finished rail that kept a row to say nothing, plus the status
+             pills that repeated it. Once the vault is open it shrinks into
+             the strip below and the dashboard becomes the content. -->
+        <!-- Held through the unlock. Admitting a machine flips the stage in
+             the same tick, so gating purely on `!vaultOpen` unmounted this and
+             played the celebration on the 34px strip mark instead — a gesture
+             performed by an icon that had just teleported. The mark stays big
+             for the ~700ms, then collapses. -->
+        <div
+          v-if="!vaultOpen || vaultUnlocking"
+          class="cv-vaultfocal"
+          aria-hidden="true"
+        >
+          <BrandMark
+            :size="72"
+            :state="vaultOpen ? 'unlocked' : 'locked'"
+            :working="vaultWorking"
+            :unlocking="vaultUnlocking"
+            show-depth
+          />
+        </div>
+
+        <!-- The single progress model. One derivation, rendered two ways:
+             labelled while there is still something to do, and collapsed into
+             the vault strip once there is not. -->
         <ol
+          v-if="!vaultOpen"
           class="cv-rail"
           :class="{ complete: onboardingComplete }"
           aria-label="Hosted vault setup progress"
@@ -231,6 +257,19 @@
         <template v-if="stage === 'explore' || stage === 'ready'">
           <!-- progress summary card (collapses stage A) -->
           <div class="cv-status-card" :class="{ allset: stage === 'ready' }">
+            <!-- The same mark, compact. It carries the one fact this strip
+                 exists to state — the vault is open — so the pill beside it
+                 does not have to shout it. -->
+            <!-- Hidden while the focal mark above is mid-celebration, so
+                 there is never a moment with two vaults on screen. -->
+            <span v-show="!vaultUnlocking" class="cv-status-mark" aria-hidden="true">
+              <BrandMark
+                :size="34"
+                state="unlocked"
+                :working="vaultWorking"
+                show-depth
+              />
+            </span>
             <span class="cv-pill ok"
               ><span class="cv-dot" />
               {{ stage === "ready" ? "All set" : "CLI linked" }}</span
@@ -477,6 +516,7 @@ import HostedVaultFunnel from "./HostedVaultFunnel.vue";
 import BrandMark from "./BrandMark.vue";
 import CloudAccountMenu from "./CloudAccountMenu.vue";
 import { copyText as copyToClipboard } from "../utils/clipboard";
+import { prefersReducedMotion } from "../utils/motion";
 import { formatPriceLabel } from "../utils/money";
 import {
   admitHandshakeState,
@@ -1308,6 +1348,51 @@ const DEVICE_POLL_IDLE_MS = 30_000;
 let devicePollTimer: ReturnType<typeof setInterval> | undefined;
 let devicePollInterval = 0;
 
+// ---- vault motion --------------------------------------------------------
+//
+// The mark IS the progress indicator: shut while setup is unfinished, open
+// once a machine is linked. That is the whole reason it earns a focal slot —
+// it is the one element that changes as you advance, so it replaces a rail
+// that duplicated the status pills that duplicated the card contents.
+
+const VAULT_UNLOCK_MS = 700;
+
+const vaultOpen = computed(() => stage.value === "explore" || stage.value === "ready");
+
+// The dial sweeps only while something is genuinely in flight. Not a spinner:
+// a dial that turns forever reads as a component somebody forgot to stop.
+const vaultWorking = computed(
+  () => !hydrated.value || admitState.value === "waiting" || deviceBusy.value !== null
+);
+
+const vaultUnlocking = ref(false);
+let vaultUnlockTimer: ReturnType<typeof setTimeout> | undefined;
+
+// Fired from exactly one place — see decideDevice.
+//
+// NOT from watch(stage), which is the obvious implementation and is wrong.
+// This page loads /api/me twice: once on mount, then again when Clerk
+// resolves. The first comes back anonymous and computes stage "setup"; the
+// second returns the real vault and jumps to "ready". So any guard of the
+// form "previous was non-null" celebrates on EVERY reload for EVERY returning
+// customer, which is exactly how an animation stops meaning anything.
+function celebrateUnlock() {
+  // Inside the handler, never at setup scope: this only ever runs from a user
+  // action, so it cannot contribute to a hydration mismatch the way a
+  // setup-time media query read would.
+  if (prefersReducedMotion()) return;
+  if (vaultUnlockTimer) clearTimeout(vaultUnlockTimer);
+  vaultUnlocking.value = true;
+  vaultUnlockTimer = setTimeout(() => {
+    vaultUnlocking.value = false;
+    vaultUnlockTimer = undefined;
+  }, VAULT_UNLOCK_MS);
+}
+
+onBeforeUnmount(() => {
+  if (vaultUnlockTimer) clearTimeout(vaultUnlockTimer);
+});
+
 const devicePollUrgent = computed(
   () =>
     stage.value === "connect" ||
@@ -1370,7 +1455,12 @@ async function decideDevice(deviceId: string, action: "admit" | "revoke") {
       notice.value = { kind: "warn", text: payload.error || "Couldn't update that device just now." };
       return;
     }
+    // Captured before the refresh so the comparison is against the state the
+    // owner actually saw. Only a closed vault becoming open celebrates —
+    // admitting a second machine to an already-open vault is routine.
+    const wasOpen = vaultOpen.value;
     await loadDevices();
+    if (action === "admit" && !wasOpen && vaultOpen.value) celebrateUnlock();
     notice.value = {
       kind: "ok",
       text: action === "admit"
@@ -2067,6 +2157,28 @@ const ICON = {
 .cv-cmd-copy:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* The vault, focal. Sized so it reads as the subject of the page rather than
+   an icon, and centered because at these stages there is exactly one thing to
+   do and nothing should compete with it. */
+.cv-vaultfocal {
+  display: grid;
+  place-items: center;
+  padding: 6px 0 18px;
+  color: var(--accent);
+}
+.cv-vaultfocal :deep(.brand-mark-svg),
+.cv-status-mark :deep(.brand-mark-svg) {
+  color: inherit;
+}
+/* Compact once the vault is open: it states the one fact this strip exists
+   for, so the pill beside it does not have to. */
+.cv-status-mark {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--accent);
 }
 
 .cv-rail {
