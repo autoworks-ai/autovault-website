@@ -175,7 +175,14 @@ const commandBlock = computed(() => [
   "",
   `# ${namespaceStatusLabel.value}`,
   `# ${hostedEndpoint.value}`,
-  vault.value ? "# Cloud sync is not enabled yet." : "# Checkout must complete before this namespace is reserved."
+  // The false branch is only ever read by somebody who has already paid:
+  // this block renders (and its copy buttons exist) only under
+  // showLocalHandoff, which is the reserve step, which requires paid && !vault.
+  // It used to say "Checkout must complete before this namespace is reserved",
+  // which was survivable while the auto-provision made that state last one
+  // frame; now that reserving waits for a click, it is the durable
+  // post-checkout screen -- and the screen-reader transcript.
+  vault.value ? "# Cloud sync is not enabled yet." : "# Checkout is complete. Reserve the namespace above to claim it."
 ].join("\n"));
 
 // Which single action this step needs. CloudPage owns the kicker, heading
@@ -514,16 +521,33 @@ async function resumeCheckoutReturn() {
     await reconcileCheckout(sessionId);
   }
 
-  if (paid.value && !vault.value) {
-    await provisionVault();
-  } else if (!paid.value) {
+  // Reserving the namespace is a step the user takes, not something that
+  // happens to them. This used to call provisionVault right here, which made
+  // `vault` truthy before the reserve step had rendered a single interactive
+  // frame -- the shell derives its stage from vault truthiness, so it flipped
+  // straight to "connect" and the "Reserve namespace" button existed for about
+  // one frame. Confirm the payment landed, say so, and stop.
+  if (paid.value) {
     notice.value = {
-      kind: "warn",
-      text: "Checkout returned. Waiting for Stripe to confirm your subscription before reserving the namespace."
+      kind: "ok",
+      text: "Payment confirmed. Reserve your hosted namespace to finish setting up."
     };
+    // Clear on "the return has been handled", which here means the payment is
+    // confirmed -- NOT on `vault`, which no longer becomes truthy on this path
+    // and would leave ?hosted=success&session_id=... in the address bar forever.
+    //
+    // The unpaid branch deliberately keeps them: session_id is the only thing a
+    // later load can hand to /api/billing/reconcile, and reconcileAttempted is
+    // never reset within a page life, so reloading is the recovery path for a
+    // webhook that has not landed yet. Dropping the params would remove it.
+    clearCheckoutReturnParams();
+    return;
   }
 
-  if (vault.value) clearCheckoutReturnParams();
+  notice.value = {
+    kind: "warn",
+    text: "Checkout returned. Waiting for Stripe to confirm your subscription before reserving the namespace."
+  };
 }
 
 async function reconcileCheckout(sessionId: string) {
