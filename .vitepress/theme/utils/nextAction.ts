@@ -24,8 +24,8 @@
 /**
  * `funnel`        — the pre-vault primary: Create your account / Open checkout
  *                   / Reserve namespace, in HostedVaultFunnel.
- * `admit`         — the Admit button on the one pending machine this page can
- *                   name, in CloudPage's Machines card.
+ * `admit`         — the Admit button on the `?admit=` target row, in
+ *                   CloudPage's Machines card.
  * `early-access`  — the status strip's "Get early access", in CloudPage.
  * `null`          — nothing to mark: the page does not know its state yet, the
  *                   load failed, everything is done, or the only remaining
@@ -37,9 +37,11 @@ export interface CloudNextActionInput {
   /** CloudPage's `stage`. */
   stage: string;
   /**
-   * There is exactly one pending machine this page is entitled to point at —
-   * either the `?admit=` target (the CLI put its fingerprint in the URL, so the
-   * page did not choose it) or the only pending row there is.
+   * A pending machine this page did not choose: the `?admit=` target, whose
+   * fingerprint the CLI put in the URL.
+   *
+   * Named rather than merely present. "The only pending row there is" looks
+   * equally unambiguous and is not — see the trace in CloudPage's call site.
    */
   namedPendingMachine: boolean;
   /** The Machines card is one of the panels currently rendered. */
@@ -84,12 +86,17 @@ export function cloudNextAction({
     return "funnel";
   }
 
-  // `connect`, with no machine this page can name. Deliberately unmarked.
+  // `connect`, with no machine this page can name. Deliberately unmarked, and
+  // this is the branch that carries the whole restraint.
   //
-  // Two machines pending and nothing in the URL naming one is the exact
-  // ambiguity the marker must not manufacture: whichever Admit it pointed at
-  // would be a guess presented as an instruction. And with none pending there
-  // is no button here at all — the action is running a command in a terminal
-  // this page cannot reach, which the transcript above already spells out.
+  // Machines pending and nothing in the URL naming one is the exact ambiguity
+  // the marker must not manufacture: whichever Admit it pointed at would be a
+  // guess presented as an instruction, and the thing being granted is vault
+  // access. That holds at one pending row as firmly as at two — see the call
+  // site — because the count changes under the owner's hand.
+  //
+  // With none pending there is no button here at all: the action is running a
+  // command in a terminal this page cannot reach, which the transcript above
+  // already spells out.
   return null;
 }

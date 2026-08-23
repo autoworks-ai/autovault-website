@@ -102,11 +102,12 @@ describe("which control is the one thing to do next", () => {
     expect(site("connect", true, true)).toBe("admit");
   });
 
-  it("marks nothing at connect when no single machine can be named", () => {
-    // Two pending and nothing in the URL naming one: pointing at either would
-    // be a guess delivered as an instruction, and admitting the wrong box is
-    // the hazard the previous task removed. With none pending there is no
-    // button here at all.
+  it("marks nothing at connect when no machine is named", () => {
+    // Pending machines with nothing in the URL naming one: pointing at any of
+    // them would be a guess delivered as an instruction, and the thing being
+    // granted is vault access. With none pending there is no button here at
+    // all. Both cases are `namedPendingMachine: false` -- see the wiring block
+    // below for why "the only pending row there is" does not count as named.
     expect(site("connect", false, true)).toBeNull();
     expect(site("connect")).toBeNull();
   });
@@ -168,9 +169,42 @@ describe("the marker is wired to that decision and to nothing else", () => {
     expect(cloudPage).toContain(`:marked-action="nextAction === 'funnel'"`);
     expect(cloudPage).toContain(`:class="{ 'av-nextaction': nextAction === 'early-access' }"`);
     expect(cloudPage).toContain(`:class="{ 'av-nextaction': isNextAction(device) }"`);
-    // isNextAction is the admit branch, and it reads the same computed rather
-    // than re-deriving "is this the target row" from the URL.
-    expect(cloudPage).toContain(`return nextAction.value === "admit" && markedDevice.value?.id === device.id;`);
+    // isNextAction is the admit branch. It reads the shared decision AND the
+    // existing isAdmitTarget helper, rather than re-deriving either.
+    expect(cloudPage).toContain(`return nextAction.value === "admit" && isAdmitTarget(device);`);
+  });
+
+  it("treats only the ?admit= target as a named machine, never 'the only one'", () => {
+    /**
+     * The regression this pins, measured in the browser at connect with two
+     * pending machines and ?admit=PEND…XYZW:
+     *
+     *   before   laptop-2 pending admit-target   marked Admit@laptop-2
+     *   +60ms    laptop-2 pending admit-target   marked Working…@laptop-2
+     *   +3s      laptop-2 ACTIVE                 marked Admit@jacks-mbp
+     *
+     * `decideDevice` writes `status: "active"` optimistically in the same tick
+     * as the click, so admitting the machine the CLI named empties
+     * `admitTarget` -- and a "the only pending row there is" fallback would
+     * then mark the OTHER machine, right where the pointer already was, while
+     * the list reorders underneath it. The page would be advertising a grant of
+     * vault access to a machine nothing named, at the moment of the click.
+     *
+     * Task F drew the same line one notch weaker for the topbar badge: it
+     * scrolls to the card but deliberately does not focus Admit, "because
+     * nothing here named a machine."
+     */
+    expect(cloudPage).toContain("namedPendingMachine: Boolean(admitTarget.value)");
+    // The two shapes a fallback would have to take, neither of which may appear
+    // in the decision's input. `pendingDevices` is still read elsewhere on this
+    // page (the topbar badge, the card heading), so this is scoped to the call.
+    const at = cloudPage.indexOf("cloudNextAction({");
+    expect(at).toBeGreaterThan(-1);
+    const call = cloudPage
+      .slice(at, cloudPage.indexOf("});", at))
+      .replace(/\/\/.*$/gm, " ");
+    expect(call).not.toContain("pendingDevices");
+    expect(call).not.toContain("length === 1");
   });
 
   it("has exactly one place that decides, and it is not a template", () => {
@@ -263,6 +297,21 @@ describe("the marker rule is live, steady, and reduced-motion safe", () => {
     expect(rule).not.toContain("alternate");
     expect(rule).toContain("av-nextaction-in 320ms");
     expect(globalStyles).toContain("@keyframes av-nextaction-in");
+  });
+
+  it("keeps room around the funnel's primary for the marker to sit in", () => {
+    // Measured at the reserve step before this was added: the namespace note's
+    // box ended at y=690 and .hosted-stage-action started at y=690, with the
+    // starter-skills panel flush against its bottom edge -- zero either side.
+    // The halo drew straight through the note above the button.
+    //
+    // Unconditional, not "when marked": reserving the space only while marked
+    // would move the button at the moment it gets marked, which is the layout
+    // shift the connect terminal's reserved height exists to remove.
+    const rule = markerRule(".hosted-stage-action");
+    const margin = /margin:\s*([^;]+);/.exec(rule)?.[1] ?? "";
+    expect(margin, ".hosted-stage-action has no margin").toBeTruthy();
+    expect(margin).not.toMatch(/^0(px)?$/);
   });
 
   it("lands on the drawn state when motion is turned down", () => {

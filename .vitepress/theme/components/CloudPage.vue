@@ -1985,31 +1985,31 @@ const showsMachines = computed(
  * truth table and not a coincidence between three `v-if`s in two components.
  * ------------------------------------------------------------------------ */
 
-/**
- * The single pending machine this page is entitled to point at.
- *
- * The `?admit=` target qualifies by construction — the CLI put that
- * fingerprint in the URL, so the page is repeating a name rather than choosing
- * one. Failing that, one pending row is equally unambiguous: there is only one
- * Admit button on screen and no other machine it could mean.
- *
- * Two or more pending with nothing naming one returns null on purpose. A
- * marker there would be the page guessing, in the voice it uses for
- * instructions, about which box gets vault access.
- */
-const markedDevice = computed(() => {
-  const target = admitTarget.value;
-  // findAdmitTarget already returns pending-only, so this is the same row the
-  // ?admit= handshake focuses — never a machine that has since been admitted.
-  if (target) return target;
-  const pending = pendingDevices.value;
-  return pending.length === 1 ? pending[0] : null;
-});
-
 const nextAction = computed<CloudNextAction>(() =>
   cloudNextAction({
     stage: stage.value,
-    namedPendingMachine: Boolean(markedDevice.value),
+    // The ?admit= target and nothing else. The CLI put that fingerprint in the
+    // URL, so pointing at that row is the page repeating a name rather than
+    // choosing one, and findAdmitTarget is pending-only and exact-match-only.
+    //
+    // "The only pending row there is" was also tried, on the reasoning that one
+    // Admit button cannot be ambiguous. Measured, it is worse than no marker.
+    // decideDevice writes `status: "active"` optimistically in the same tick as
+    // the click, so admitting the machine the CLI named empties admitTarget and
+    // leaves exactly one pending row -- and the marker moved to the OTHER
+    // machine, ~61px from where the pointer already was, while the list
+    // reordered underneath it. Traced at connect with two pending:
+    //
+    //   before   laptop-2 pending admit-target   marked Admit@laptop-2
+    //   +3s      laptop-2 active                 marked Admit@jacks-mbp
+    //
+    // The page would be advertising a grant of vault access to a machine
+    // nothing named, at the moment the owner's hand is on the button. That is
+    // the wrong-machine hazard, arrived at from a new direction. Task F drew
+    // this same line one notch weaker for the topbar badge: it scrolls to the
+    // card but deliberately does not focus Admit, "because nothing here named a
+    // machine". A marker is a weaker claim than focus, but it is the same claim.
+    namedPendingMachine: Boolean(admitTarget.value),
     // Both halves of "the Admit button is actually rendered": the card is
     // gated on `vault` existing, and on being one of the two panels that show
     // it. Reading the panel alone would mark a button in a template Vue is not
@@ -2019,7 +2019,7 @@ const nextAction = computed<CloudNextAction>(() =>
 );
 
 function isNextAction(device: SyncDevice) {
-  return nextAction.value === "admit" && markedDevice.value?.id === device.id;
+  return nextAction.value === "admit" && isAdmitTarget(device);
 }
 
 const navItems = computed<NavItem[]>(() => {
