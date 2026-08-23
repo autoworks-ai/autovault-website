@@ -457,7 +457,14 @@ describe("the namespace field in the funnel", () => {
     expect(funnel).toContain("if (seq !== namespaceCheckSeq) return;");
     // And an invalid shape never reaches the network -- it cannot become
     // available, so the round trip buys nothing.
-    expect(funnel).toContain("if (!namespaceSlug.value || localSlugProblem(namespaceSlug.value) || !signedIn.value) return;");
+    expect(funnel).toContain("if (!namespaceSlug.value || localSlugProblem(namespaceSlug.value) || !namespaceCheckReady.value) return;");
+  });
+
+  it("waits for the credential rather than firing a guaranteed 401", () => {
+    // Observed in a browser against wrangler pages dev: gating on `signedIn`
+    // fired the first check before Clerk had a token, because that computed
+    // also trusts an /api/me that resolved first. One 401 per page load.
+    expect(funnel).toContain("const namespaceCheckReady = computed(() => clerkAuthEnabled ? isClerkSignedIn.value : signedIn.value);");
   });
 
   it("does not mint a fresh Clerk token per keystroke", () => {

@@ -261,6 +261,11 @@ const namespaceSuggestion = computed(() => clampSlug(
   slugify(current.value?.user?.email || current.value?.user?.name || clerkUserSlugSeed.value || "your-team")
 ));
 const namespaceSlug = computed(() => namespaceInput.value.trim().toLowerCase());
+// Not `signedIn`, which also trusts an /api/me that resolved first. The
+// availability endpoint needs a credential, and authHeaders only attaches a
+// Clerk token once Clerk itself reports a session -- asking before that sends a
+// guaranteed 401 on every page load. Observed, not theorised.
+const namespaceCheckReady = computed(() => clerkAuthEnabled ? isClerkSignedIn.value : signedIn.value);
 // Follows the field before a vault exists, so the endpoint quoted in the local
 // handoff card is the one they are about to reserve.
 const teamSlug = computed(() => vault.value?.slug || namespaceSlug.value || namespaceSuggestion.value);
@@ -394,7 +399,7 @@ const namespaceState = computed<{ tone: "ok" | "warn" | "fail" | "muted"; text: 
   // /api/vaults/availability requires a session, so before sign-in there is
   // genuinely nothing to report. Saying "available" here would be a guess, and
   // the guess a user acts on is the one that hurts.
-  if (!signedIn.value) return { tone: "muted", text: "Availability is confirmed once your account exists." };
+  if (!namespaceCheckReady.value) return { tone: "muted", text: "Availability is confirmed once your account exists." };
 
   const verdict = namespaceVerdict.value;
   if (namespaceChecking.value || verdict?.slug !== slug) return { tone: "muted", text: "Checking availability…" };
@@ -445,7 +450,7 @@ function scheduleNamespaceCheck() {
   namespaceCheckSeq += 1;
   namespaceChecking.value = false;
   if (!canUseBrowser()) return;
-  if (!namespaceSlug.value || localSlugProblem(namespaceSlug.value) || !signedIn.value) return;
+  if (!namespaceSlug.value || localSlugProblem(namespaceSlug.value) || !namespaceCheckReady.value) return;
   namespaceChecking.value = true;
   namespaceCheckTimer = setTimeout(() => void runNamespaceCheck(), NAMESPACE_CHECK_DELAY_MS);
 }
@@ -498,9 +503,9 @@ onMounted(async () => {
 
 // The suggestion only resolves once the user is known, and signing in is what
 // makes the availability endpoint answerable at all.
-watch([namespaceSuggestion, signedIn], () => {
+watch([namespaceSuggestion, namespaceCheckReady], () => {
   syncNamespaceFromDraft();
-  if (signedIn.value && namespaceSlug.value && !namespaceVerdict.value) scheduleNamespaceCheck();
+  if (namespaceCheckReady.value && namespaceSlug.value && !namespaceVerdict.value) scheduleNamespaceCheck();
 });
 
 watch([isClerkLoaded, isClerkSignedIn], ([loaded]) => {
