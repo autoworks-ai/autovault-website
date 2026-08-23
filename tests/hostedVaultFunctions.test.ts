@@ -10,6 +10,53 @@ describe("hosted vault Pages Function smoke tests", () => {
     vi.unstubAllGlobals();
   });
 
+  it("refuses a second subscription for an already-active subscriber", async () => {
+    // The client used to be the only thing standing between a paying user and
+    // a second subscription: the funnel and the shell each owned an /api/me,
+    // so one failed request was enough to render "Open checkout" to somebody
+    // already paying. Stripe takes a second subscription-mode session without
+    // complaint, so the refusal has to live here as well as in the UI.
+    const stripe = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", stripe);
+
+    const env = createPagesEnv({ subscriptionStatus: "active" });
+    const cookie = await createSession(new Request("https://autovault.dev"), env, "github_1");
+    const response = await checkoutHostedVault({
+      request: new Request("https://autovault.dev/api/checkout/hosted-vault", {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({ source: "deploy" })
+      }),
+      env
+    });
+
+    expect(response.status).toBe(409);
+    // And it must refuse BEFORE reaching Stripe, or the session exists anyway.
+    expect(stripe).not.toHaveBeenCalled();
+  });
+
+  it("still lets a lapsed subscriber check out again", async () => {
+    // Only ACTIVE is refused. Someone whose subscription was canceled is
+    // exactly who should be able to start a new one.
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      id: "cs_test_456",
+      url: "https://checkout.stripe.com/c/test_456"
+    }), { status: 200, headers: { "content-type": "application/json" } })));
+
+    const env = createPagesEnv({ subscriptionStatus: "canceled" });
+    const cookie = await createSession(new Request("https://autovault.dev"), env, "github_1");
+    const response = await checkoutHostedVault({
+      request: new Request("https://autovault.dev/api/checkout/hosted-vault", {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({ source: "deploy" })
+      }),
+      env
+    });
+
+    expect(response.status).toBe(200);
+  });
+
   it("sends an authenticated unpaid user to Stripe Checkout", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
       id: "cs_test_123",

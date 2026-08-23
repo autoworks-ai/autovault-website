@@ -8,6 +8,7 @@ const props = defineProps<{
   email: string;
   statusText: string;
   avatarStyle: Record<string, string>;
+  signedIn: boolean;
   busy: boolean;
 }>();
 
@@ -26,7 +27,12 @@ type MenuItem = {
   run: () => void;
 };
 
+// canManageAccount only reports whether the Clerk SDK loaded, which is true
+// for a signed-out visitor too -- so it cannot gate these on its own.
+// Offering Profile and Sign out to someone who has not signed in produces two
+// menu items that silently do nothing.
 const items = computed<MenuItem[]>(() => {
+  if (!props.signedIn) return [];
   const entries: MenuItem[] = [];
   if (canManageAccount.value) {
     entries.push({ key: "profile", label: "Profile", run: onProfile });
@@ -42,6 +48,24 @@ const items = computed<MenuItem[]>(() => {
 
 const menu = useDisclosureMenu(() => items.value.length);
 const { open, activeIndex, triggerRef, menuRef, placement, toggle, closeMenu, reposition, onTriggerKeydown, onMenuKeydown, setItemRef } = menu;
+
+// A session can end while this menu is open -- an expiry, or a sign-out in
+// another tab that Clerk propagates here. `items` empties and the trigger is
+// replaced by the static signed-out footer, and nothing was closing the
+// disclosure: an empty teleported role="menu" stayed on screen, labelled by an
+// id that no longer existed, with focus stranded on a button Vue had just
+// removed.
+//
+// Closed without restoring focus, deliberately. The trigger is gone, so there
+// is nothing to restore to; focus falling to the document is the honest
+// outcome when the page has changed underneath the user rather than because
+// of something they did.
+watch(
+  () => props.signedIn && items.value.length > 0,
+  (usable) => {
+    if (!usable) closeMenu();
+  }
+);
 
 // Clerk finishes loading after first paint, so this list can GROW while the
 // menu is open: Billing on its own becomes Profile / Billing / Sign out. Vue
@@ -139,7 +163,18 @@ async function onSignOut() {
 
 <template>
   <div class="cv-acct">
+    <!-- Signed out there is no account to manage, so this is plain status
+         text rather than a button that opens an empty menu. -->
+    <div v-if="!props.signedIn" class="cv-side-foot static">
+      <span class="cv-avatar" aria-hidden="true" />
+      <span class="cv-who">
+        <strong>Not signed in</strong>
+        <small>Step 1 unlocks this panel</small>
+      </span>
+    </div>
+
     <button
+      v-else
       ref="triggerRef"
       id="cv-account-trigger"
       type="button"
@@ -219,6 +254,12 @@ async function onSignOut() {
 }
 .cv-side-foot:hover {
   background: rgba(90, 214, 192, 0.06);
+}
+.cv-side-foot.static {
+  cursor: default;
+}
+.cv-side-foot.static:hover {
+  background: none;
 }
 .cv-side-foot:focus-visible {
   outline: 2px solid var(--accent);
