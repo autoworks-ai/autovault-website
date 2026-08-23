@@ -1471,6 +1471,26 @@ async function decideDevice(deviceId: string, action: "admit" | "revoke") {
     // transient network blip swallow the one celebration that matters, with
     // no stage watcher to catch it later.
     const opened = action === "admit" && !wasOpen;
+
+    // Apply what the server just confirmed, before the refresh and without
+    // depending on it. A 2xx means this device's status changed; holding that
+    // only in the response and re-deriving it from a separate request made the
+    // open state hostage to that request succeeding.
+    //
+    // Without this the previous fix traded one bug for a worse one: the
+    // celebration fired unconditionally, but `devices` still held the pending
+    // row, so the mark played the unlock and then dropped back to locked when
+    // the 700ms timer cleared. A vault that visibly opens and shuts again is
+    // worse than one that never animated.
+    //
+    // Safe in both directions because both reflect a confirmed write, and the
+    // poll reconciles either way a few seconds later.
+    devices.value = devices.value.map((device) =>
+      device.id === deviceId
+        ? { ...device, status: action === "admit" ? "active" : "revoked" }
+        : device
+    );
+
     await loadDevices();
     if (opened) celebrateUnlock();
     notice.value = {

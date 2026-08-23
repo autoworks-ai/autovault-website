@@ -62,6 +62,21 @@ describe("the unlock fires on the event, not on the render", () => {
     expect(body).not.toContain("!wasOpen && vaultOpen.value");
   });
 
+  it("holds the vault open without waiting for the refresh", () => {
+    // Decoupling the celebration from vaultOpen fixed a lost animation and
+    // introduced a worse one: with the refresh failed, `devices` still held
+    // the pending row, so the mark played the unlock and dropped back to
+    // locked when the timer cleared. A vault that visibly opens and shuts is
+    // worse than one that never animated.
+    const body = cloudPage.slice(cloudPage.indexOf("async function decideDevice"));
+    const optimistic = body.indexOf("devices.value = devices.value.map(");
+    const refreshed = body.indexOf("await loadDevices();");
+    expect(optimistic).toBeGreaterThan(-1);
+    // Applied BEFORE the refresh, so a failed refresh cannot undo it.
+    expect(optimistic).toBeLessThan(refreshed);
+    expect(body).toContain('status: action === "admit" ? "active" : "revoked"');
+  });
+
   it("compares against the state the owner saw, not the refreshed one", () => {
     // `wasOpen` has to be read before loadDevices(), or it already reflects the
     // admit and the vault never appears to have changed.
