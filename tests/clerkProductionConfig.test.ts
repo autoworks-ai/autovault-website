@@ -397,6 +397,34 @@ describe("Clerk production deployment configuration", () => {
     expect(tab).toContain("loadState === 'error'");
   });
 
+  it("does not let a slow device count hold the tab on 'Loading your cloud status…' behind data /api/me already returned", () => {
+    const tab = read(".vitepress/theme/components/ClerkCloudTab.vue");
+
+    // Pin the fix, not the prose: within load(), the ready transition must
+    // come from /api/me's payload alone, strictly before the device-count
+    // fetch is even started -- so a stalled /api/vaults/current/devices
+    // cannot delay it.
+    const loadAt = tab.indexOf("async function load()");
+    const loadBody = tab.slice(loadAt, tab.indexOf("async function loadActiveDeviceCount", loadAt));
+    const readyAt = loadBody.indexOf('loadState.value = "ready"');
+    const deviceCallAt = loadBody.indexOf("loadActiveDeviceCount()");
+    expect(readyAt).toBeGreaterThan(-1);
+    expect(deviceCallAt).toBeGreaterThan(-1);
+    expect(readyAt).toBeLessThan(deviceCallAt);
+
+    // And it must not be awaited inline -- that would re-block ready on it
+    // despite running after. Only the non-blocking form is acceptable here.
+    expect(loadBody).not.toContain("await loadActiveDeviceCount()");
+    expect(loadBody).toContain("void loadActiveDeviceCount().then((count) => {");
+
+    // The count still arrives once resolved, and still respects the
+    // unmount guard the rest of this file applies everywhere else.
+    const thenAt = loadBody.indexOf("loadActiveDeviceCount().then((count) => {");
+    const thenBody = loadBody.slice(thenAt, loadBody.indexOf("});", thenAt));
+    expect(thenBody).toContain("if (!componentActive) return;");
+    expect(thenBody).toContain("activeDeviceCount.value = count;");
+  });
+
   it("reuses CloudPage.vue's subscription vocabulary and billing-portal request shape in ClerkCloudTab instead of inventing new ones", () => {
     const tab = read(".vitepress/theme/components/ClerkCloudTab.vue");
     const cloudPage = read(".vitepress/theme/components/CloudPage.vue");

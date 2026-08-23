@@ -101,9 +101,18 @@ async function load() {
     if (!componentActive) return;
     subscription.value = payload.subscription ?? null;
     vault.value = payload.vault ?? null;
-    activeDeviceCount.value = payload.vault ? await loadActiveDeviceCount() : null;
-    if (!componentActive) return;
+    // Device count is explicitly optional (see loadActiveDeviceCount's own
+    // comment) -- flip to ready off /api/me alone and let the count arrive
+    // independently, so a slow or stalled /api/vaults/current/devices cannot
+    // hold the whole tab on "Loading your cloud status…" behind data it
+    // already has.
     loadState.value = "ready";
+    if (payload.vault) {
+      void loadActiveDeviceCount().then((count) => {
+        if (!componentActive) return;
+        activeDeviceCount.value = count;
+      });
+    }
   } catch (error) {
     if (!componentActive) return;
     loadState.value = "error";
