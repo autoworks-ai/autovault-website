@@ -87,3 +87,41 @@ describe("the page reads the platform without breaking prerender", () => {
     expect(quickStart).toContain('const selectedMethod = ref<Method>("npm")');
   });
 });
+
+// The quick start page sets `layout: false` and renders its own chrome through
+// DocsShell, so VitePress's themeConfig.sidebar is never displayed on it — the
+// right-hand TOC in DocsShell is. Renaming a heading therefore has to be
+// followed there, and nothing checked that until this test: the first pass of
+// this PR renamed six headings and left the rendered TOC reading "Run the setup
+// wizard" and "Verify the install".
+describe("the rendered TOC keeps up with the page", () => {
+  const docsShell = readFileSync(
+    new URL("../.vitepress/theme/components/DocsShell.vue", import.meta.url),
+    "utf-8"
+  );
+
+  // The `toc:` array inside the "quick-start" entry of DocsShell's configs map.
+  const quickStartToc = docsShell.slice(
+    docsShell.indexOf('"quick-start": {'),
+    docsShell.indexOf("authoring: {")
+  );
+  const tocIds = [...quickStartToc.matchAll(/id: "([a-z-]+)"/g)].map((m) => m[1]);
+  const pageIds = new Set([...quickStart.matchAll(/id="([a-z-]+)"/g)].map((m) => m[1]));
+
+  it("finds every TOC entry on the page", () => {
+    expect(tocIds.length).toBeGreaterThan(4);
+    // A TOC row whose anchor no longer exists scrolls nowhere and says nothing
+    // about it, which is the failure mode worth catching automatically.
+    for (const id of tocIds) {
+      expect(pageIds.has(id), `TOC links #${id}, which the page does not define`).toBe(true);
+    }
+  });
+
+  it("does not still describe the old step wording", () => {
+    // Labels are prose and will drift again; these are the exact strings this
+    // PR renamed, so they must not survive in the TOC that renders.
+    for (const stale of ["Run the setup wizard", "Verify the install", "Install the local vault"]) {
+      expect(quickStartToc).not.toContain(stale);
+    }
+  });
+});
