@@ -474,7 +474,11 @@ describe("the Catalog panel", () => {
   });
 
   it("gives an honest empty state instead of a fake control", () => {
-    expect(panel).toContain("Nothing published yet");
+    // Capability wording, not a per-vault fact: the panel never queries KV,
+    // so it must not claim to know this vault specifically has nothing
+    // published -- only that self-serve publishing does not exist yet.
+    expect(panel).toContain("No publish path yet");
+    expect(panel).not.toContain("Nothing published yet");
     // Nothing on this panel is clickable -- there is genuinely nothing to do.
     expect(panel).not.toContain("<button");
   });
@@ -607,5 +611,19 @@ describe("the machines list stays where it is needed", () => {
     expect(body.indexOf("await nextTick();")).toBeLessThan(
       body.indexOf("devicesCard.value?.scrollIntoView")
     );
+  });
+
+  it("scrolls to itself when Sync log is selected from the nav, not just via the admit handshake", () => {
+    // Machines has no template block of its own -- selecting it can leave
+    // the page pixel-identical to Overview, with only aria-current moving.
+    // onNavClick is the second (and only other) caller of focusDevicesCard.
+    const at = cloudPage.indexOf("function onNavClick(item: NavItem)");
+    expect(at).toBeGreaterThan(-1);
+    const body = cloudPage.slice(at, cloudPage.indexOf("\n}", at));
+    expect(body).toContain('item.section === "machines"');
+    expect(body).toContain("focusDevicesCard()");
+    // Still sets the section too -- this is additive feedback, not a
+    // reversion to the old scroll-only dispatch.
+    expect(body).toContain("selectedSection.value = item.section;");
   });
 });

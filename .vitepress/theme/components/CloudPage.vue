@@ -533,8 +533,15 @@
             >
               <article class="cv-card soft">
                 <div class="cv-card-label">Vault catalog</div>
+                <!-- Capability, not a per-vault fact: this panel does not
+                     query AUTOVAULT_VAULT_OBJECTS, so it cannot know whether
+                     a catalog happens to already sit in KV for this vault
+                     (the documented manual `wrangler kv key put` path makes
+                     that possible today). What is true regardless of that is
+                     that self-serve publishing does not exist yet — say
+                     that, not an unqueried "nothing published." -->
                 <span class="cv-pill warn"
-                  ><span class="cv-dot" /> Nothing published yet</span
+                  ><span class="cv-dot" /> No publish path yet</span
                 >
                 <p class="cv-muted">
                   Your vault catalog is the signed manifest your linked
@@ -1897,6 +1904,13 @@ function onNavClick(item: NavItem) {
   // area cannot render.
   if (item.locked || !item.section) return;
   selectedSection.value = item.section;
+  // Machines has no template block of its own — see showsMachines above the
+  // devices list — so selecting it can leave the page looking identical to
+  // Overview, with only aria-current moving. That reads as a broken click
+  // right when someone is watching for their first device to show up.
+  // Scroll to the list so it visibly does something; every other item's own
+  // panel is feedback enough on its own.
+  if (item.section === "machines") void focusDevicesCard();
 }
 
 let devicesFlashTimer: ReturnType<typeof setTimeout> | undefined;
