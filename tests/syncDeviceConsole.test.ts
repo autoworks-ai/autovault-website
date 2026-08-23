@@ -632,6 +632,35 @@ describe("the admit link selects a machine", () => {
     }
   });
 
+  it("stops polling fast for an admit link that matches nothing", () => {
+    // A stale, malformed, or wrong-account ?admit= never matches a row, so
+    // `waiting` would be permanent and the four-second poll would run for the
+    // life of the tab. /api/vaults/current/devices does a Clerk profile lookup
+    // per call, so that is ~900 requests an hour that cannot ever succeed.
+    expect(cloudPage).toContain("ADMIT_WAIT_BUDGET_MS = 120_000");
+
+    const urgentAt = cloudPage.indexOf("const devicePollUrgent");
+    const urgent = cloudPage.slice(urgentAt, cloudPage.indexOf(");", urgentAt));
+    expect(urgent).toContain('admitState.value === "waiting" && !admitWaitExpired.value');
+
+    // Reset, not latched: a row arriving after the budget still gets the full
+    // scroll-highlight-focus treatment.
+    expect(cloudPage).toContain("admitWaitExpired.value = false;");
+    // And the timer is cleaned up rather than left to fire into a dead page.
+    expect(cloudPage).toContain("onBeforeUnmount(clearAdmitWaitTimer)");
+  });
+
+  it("says so instead of spinning forever", () => {
+    // A spinner that never resolves is worse than an answer. Asserted on the
+    // branch and its stable phrases rather than the rendered sentence, whose
+    // line breaks are template indentation and would fail on a reflow.
+    expect(cloudPage).toContain('v-if="admitWaitExpired"');
+    expect(cloudPage).toContain("No machine matching");
+    expect(cloudPage).toContain("run");
+    expect(cloudPage).toContain("there again.");
+    expect(cloudPage).toContain(".cv-devices-waiting.stalled .cv-dot");
+  });
+
   it("waits quietly for a row that has not arrived yet", () => {
     // The CLI enrols and *then* opens the browser, so an empty list on the
     // first fetch is the normal path through this code.

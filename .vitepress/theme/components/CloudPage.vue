@@ -391,9 +391,22 @@
           <!-- The CLI enrols and only then opens this page, so arriving before
                the row exists is the normal case, not an error. Say what is
                happening and let the poll catch up -- never a warning notice. -->
-          <p v-if="admitState === 'waiting'" class="cv-devices-waiting">
+          <p
+            v-if="admitState === 'waiting'"
+            class="cv-devices-waiting"
+            :class="{ stalled: admitWaitExpired }"
+          >
             <span class="cv-dot" />
-            Waiting for <code>{{ admitFingerprint }}</code> to check in…
+            <!-- Once the budget is spent nothing is arriving, and a spinner
+                 that never resolves is worse than saying so. -->
+            <template v-if="admitWaitExpired">
+              No machine matching <code>{{ admitFingerprint }}</code> has checked
+              in. If you closed that terminal, run
+              <code>autovault link</code> there again.
+            </template>
+            <template v-else>
+              Waiting for <code>{{ admitFingerprint }}</code> to check in…
+            </template>
           </p>
 
           <p v-else-if="!devices.length" class="cv-devices-empty">
@@ -674,6 +687,47 @@ const admitFingerprint = ref<string | null>(null);
 const admitTarget = computed(() => findAdmitTarget(devices.value, admitFingerprint.value));
 
 const admitState = computed(() => admitHandshakeState(devices.value, admitFingerprint.value));
+
+// A `waiting` handshake is normally seconds long: the CLI enrols, then opens
+// this page, so the row is usually one poll behind. But a stale, malformed, or
+// wrong-account `?admit=` link never matches anything, and `waiting` would then
+// be permanent -- pinning the poll at four seconds for the life of the tab.
+// /api/vaults/current/devices goes through requireUser, which in Clerk mode
+// does a profile lookup per call, so that is ~900 requests an hour in the one
+// case where not one of them can succeed.
+//
+// Two minutes is far longer than the real path needs (a sign-in round trip
+// reloads the page, restarting this) and short enough that a dead link stops
+// costing anything.
+const ADMIT_WAIT_BUDGET_MS = 120_000;
+const admitWaitExpired = ref(false);
+let admitWaitTimer: ReturnType<typeof setTimeout> | undefined;
+
+function clearAdmitWaitTimer() {
+  if (admitWaitTimer) clearTimeout(admitWaitTimer);
+  admitWaitTimer = undefined;
+}
+
+watch(
+  admitState,
+  (state) => {
+    if (state !== "waiting") {
+      // Covers the row arriving late: expiry is reset, not latched, so a
+      // machine that shows up after the budget still gets the full treatment.
+      clearAdmitWaitTimer();
+      admitWaitExpired.value = false;
+      return;
+    }
+    if (admitWaitTimer) return;
+    admitWaitTimer = setTimeout(() => {
+      admitWaitExpired.value = true;
+      admitWaitTimer = undefined;
+    }, ADMIT_WAIT_BUDGET_MS);
+  },
+  { immediate: true }
+);
+
+onBeforeUnmount(clearAdmitWaitTimer);
 
 function isAdmitTarget(device: SyncDevice) {
   return admitTarget.value?.id === device.id;
@@ -1261,8 +1315,10 @@ const devicePollUrgent = computed(
     // A machine linking against an already-set-up vault reaches neither of the
     // conditions above until its row lands, so on the idle 30s cadence the
     // owner could sit for half a minute on a page that came from the CLI and
-    // shows nothing. `?admit=` is positive evidence that a row is inbound.
-    admitState.value === "waiting"
+    // shows nothing. `?admit=` is positive evidence that a row is inbound --
+    // but only until the budget above runs out, because a link that matches
+    // nothing is evidence of nothing.
+    (admitState.value === "waiting" && !admitWaitExpired.value)
 );
 
 function stopDevicePolling() {
@@ -1881,6 +1937,11 @@ const ICON = {
 }
 .cv-devices-waiting .cv-dot {
   animation: cv-admit-pulse 1.6s ease-in-out infinite;
+}
+/* Stop pulsing once nothing is coming — the animation reads as progress. */
+.cv-devices-waiting.stalled .cv-dot {
+  animation: none;
+  opacity: 0.35;
 }
 @keyframes cv-admit-pulse {
   0%,
