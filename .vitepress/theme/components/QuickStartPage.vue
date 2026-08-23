@@ -191,6 +191,7 @@ import { useTerminalReplay, type TerminalReplayLine } from "../composables/useTe
 import { PRODUCT_VERSION, PRODUCT_VERSION_BADGE } from "../data/product";
 import { AUTOVAULT_AGENT_SETUP_PROMPT, AUTOVAULT_INSTALL_COMMAND, AUTOVAULT_NPM_INSTALL_COMMAND } from "../../shared/bootstrap";
 import { copyText } from "../utils/clipboard";
+import { installMethodFor } from "../utils/platform";
 
 type Method = "npm" | "curl" | "brew";
 type VaultRow = { depth: number; label: string; kind: "dir" | "file" | "sig"; id?: string };
@@ -215,22 +216,8 @@ const AGENT_SETUP_PROMPT = AUTOVAULT_AGENT_SETUP_PROMPT;
 // page exists for.
 const detectedPlatform = ref<string | null>(null);
 
-function detectInstallMethod(): { method: Method; label: string } | null {
-  const ua = navigator.userAgent;
-  // Windows first: `curl … | sh` has no shell to run in on PowerShell or cmd,
-  // and brew does not exist there, so npm is the only line that works. A WSL2
-  // user still reports a Windows UA, and npm works there too.
-  if (/Windows|Win64|Win32/i.test(ua)) return { method: "npm", label: "Windows" };
-  // curl elsewhere, because it is the only channel with no prerequisite of its
-  // own -- brew needs Homebrew, npm needs Node 24+ -- and it is the one that
-  // provisions ~/.autovault and bootstraps the bundled skills for you.
-  if (/Mac OS X|Macintosh/i.test(ua)) return { method: "curl", label: "macOS" };
-  if (/Linux|X11/i.test(ua)) return { method: "curl", label: "Linux" };
-  return null;
-}
-
 onMounted(() => {
-  const detected = detectInstallMethod();
+  const detected = installMethodFor(navigator.userAgent, navigator.maxTouchPoints);
   if (!detected) return;
   selectedMethod.value = detected.method;
   detectedPlatform.value = detected.label;
