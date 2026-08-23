@@ -298,6 +298,64 @@ describe("the arrival cannot disturb the first-machine celebration", () => {
   });
 });
 
+describe("what makes the load-triggered arrival safe: opening needs an admitted machine", () => {
+  // Codex raised, twice and correctly on mechanism, that the one-shot arrival
+  // can be consumed on a `?hosted=success` return before the vault row exists.
+  // The reason that is not a defect is the coupling pinned here: `vaultOpen`
+  // needs an ADMITTED MACHINE, not merely a vault.
+  //
+  // Scope that precisely, because "every checkout return is locked" would be
+  // false. The finding is about the `{ user, vault: null }` window, and only a
+  // FIRST vault is ever in it -- an owner provisioning their first vault has
+  // no admitted device, so the mark renders `locked` with no dial both before
+  // provisioning (stage `setup`) and after it (stage `connect`). Waiting for
+  // the vault would relocate that same locked swell without changing a pixel.
+  //
+  // A RESUBSCRIBING owner is the case that is not locked: `getCurrentVault`
+  // still returns the vault they already had, so with an admitted device they
+  // land on `explore`/`ready` and the dial does fire. The finding does not
+  // reach them either, for a different reason -- /api/me answers with `user`
+  // and `vault` in one payload (functions/api/me.js), so `{ user, vault: null }`
+  // never arises for someone who already has a vault.
+  //
+  // Declining the vault-triggered change is what keeps the trigger
+  // load-driven -- and the load-driven trigger is what stops this page's TWO
+  // /api/me loads from celebrating on every reload for every returning
+  // customer, which is the hazard "fires from the load, not from a state
+  // transition" exists to guard.
+  //
+  // So these pin the COUPLING, not the conclusion. If the locked-swell
+  // decision is ever revisited, the moot-ness stops holding and this is what
+  // notices first.
+
+  /** The body of the `stage` computed. */
+  const stageBody = (() => {
+    const at = cloudPage.indexOf("const stage = computed<Stage>(() => {");
+    expect(at, "no stage computed").toBeGreaterThan(-1);
+    return cloudPage.slice(at, cloudPage.indexOf("\n});", at));
+  })();
+
+  it("cannot open the vault without an admitted machine", () => {
+    expect(cloudPage).toContain(
+      'const vaultOpen = computed(() => stage.value === "explore" || stage.value === "ready");'
+    );
+    // A vault on its own is `connect`. `explore` is on the far side of an
+    // admit, so a fresh checkout return cannot reach it.
+    expect(stageBody).toContain('if (!cliLinked.value) return "connect";');
+    expect(cloudPage).toContain(
+      "const cliLinked = computed(() => activeDevices.value.length > 0);"
+    );
+  });
+
+  it("has no vault to open before a first provisioning either", () => {
+    // The other half of the first-vault window: with no vault row the stage
+    // machine falls through to these three, none of which is explore or ready.
+    expect(stageBody).toContain('if (!signedIn.value) return "account";');
+    expect(stageBody).toContain('if (!paid.value) return "subscription";');
+    expect(stageBody).toContain('return "setup";');
+  });
+});
+
 describe("reduced motion gets a vault, just not a moving one", () => {
   it("never sets the transient class", () => {
     const start = fnBody("startVaultArrival");
