@@ -262,7 +262,10 @@ describe("the auth context is recorded honestly", () => {
     const body = fnBody("loadCloudState");
     const capture = body.indexOf("const requestSignedIn = isClerkSignedIn.value;");
     expect(capture).toBeGreaterThan(-1);
-    expect(body.indexOf("await authHeaders(")).toBeGreaterThan(capture);
+    // Still the first await in the sequence -- it just goes through the race
+    // that bounds the token step as well as the fetch.
+    expect(body.indexOf("await Promise.race([")).toBeGreaterThan(capture);
+    expect(body.indexOf("authHeaders(")).toBeGreaterThan(capture);
   });
 
   it("does not let the superseded mount request pull the veil back down", () => {
@@ -362,12 +365,76 @@ describe("the wait is bounded", () => {
     expect(body).toContain("loadPatienceExpired.value = true;");
   });
 
-  it("feeds both gates, so neither can hang the page alone", () => {
+  it("bounds both gates, each from the moment its own wait starts", () => {
+    // Sharing the mount deadline with the device gate made that gate a no-op
+    // for precisely the owner it protects. The mount deadline bounds the wait
+    // for /api/me; a returning owner whose /api/me lands after it has already
+    // passed reads "expired" in the same tick the vault appears, with
+    // `devices` still empty -- so cliLinked is false, stage resolves to
+    // "connect", and the typed terminal replays at somebody who linked months
+    // ago. The list waits on its own clock.
     const body = stageBody();
-    expect(body).toContain("patienceExpired: loadPatienceExpired.value,");
+    expect(body).toContain("patienceExpired: devicePatienceExpired.value,");
+    expect(body).not.toContain("patienceExpired: loadPatienceExpired.value,");
     const known = cloudPage.indexOf("const cloudStateKnown = computed(");
     const block = cloudPage.slice(known, cloudPage.indexOf("\n);", known));
     expect(block).toContain("patienceExpired: loadPatienceExpired.value");
+  });
+
+  it("does not start the device window before there is a list to wait for", () => {
+    const arm = fnBody("armDevicePatience");
+    expect(arm).toContain("devicePatienceExpired.value = true;");
+    // Armed from the gate-arming watcher, and only when the gate actually
+    // armed: a vault provisioned during this session is not waiting for a
+    // list whose answer is already known to be empty.
+    const gate = cloudPage.slice(
+      cloudPage.indexOf("watch(cloudStateKnown, (known) => {"),
+      cloudPage.indexOf("const stage = computed<Stage>")
+    );
+    expect(gate).toContain("if (devicesGateArmed.value) armDevicePatience();");
+    // Cleared on unmount, like its counterpart, so it cannot outlive the page.
+    expect(cloudPage).toContain(
+      "if (devicePatienceTimer) clearTimeout(devicePatienceTimer);"
+    );
+  });
+
+  it("bounds the request that the in-flight guard trusts", () => {
+    // cloudLoadsInFlight suspends the deadline while a request is
+    // outstanding, on the reasoning that a request in flight is a wait WITH
+    // an end. `fetch` has no default timeout, so that was an assumption: a
+    // stalled connection never settles, the counter never returns to zero,
+    // the deadline it masks can never fire, and the opaque inert veil stays
+    // up for the life of the tab.
+    const body = fnBody("loadCloudState");
+    expect(body).toContain("const abort = new AbortController();");
+    expect(body).toContain("setTimeout(() => abort.abort(), LOAD_PATIENCE_MS)");
+    expect(body).toContain("signal: abort.signal,");
+    // Cleared in the finally, so a prompt response leaves no timer behind.
+    expect(body.indexOf("clearTimeout(abortTimer);")).toBeGreaterThan(
+      body.indexOf("} finally {")
+    );
+    // And it covers the token step, not only the fetch. Clerk's getToken is
+    // its own network call; a stall there never reaches the finally where the
+    // in-flight counter is decremented, so a fetch-only signal would leave
+    // exactly the permanent veil this bound exists to remove.
+    expect(body).toContain("abortRejection(abort.signal),");
+    const rejection = fnBody("abortRejection");
+    expect(rejection).toContain('error.name = "AbortError";');
+    // Rejects and never resolves: it can only lose the race or end it.
+    expect(rejection).not.toContain("resolve(");
+  });
+
+  it("says it could not reach the vault rather than inventing an empty one", () => {
+    // The abort has to land somewhere honest. On the silent network branch it
+    // would be worse than the veil it replaces: the finally records this
+    // request's auth context, that matches Clerk, cloudStateKnown goes true,
+    // and the empty placeholder renders as "Finish checkout" to a paying
+    // owner -- the original complaint, twenty seconds late.
+    const body = fnBody("loadCloudState");
+    const at = body.indexOf("isAbortError(error)");
+    expect(at, "the catch does not tell an abort from a network failure").toBeGreaterThan(-1);
+    expect(body.slice(at, at + 200)).toContain("We couldn't reach your vault");
+    expect(fnBody("isAbortError")).toContain('"AbortError"');
   });
 
   it("never gives up on a request that is still coming", () => {
@@ -508,6 +575,21 @@ describe("the load screen is the vault, not a new graphic", () => {
     expect(list).toContain(".cv-boot-ring.mid,");
     expect(list).toContain(".cv-boot-ring.outer,");
     expect(style).toContain(".cv-boot.opening {\n    animation: none;\n    opacity: 0;\n  }");
+  });
+
+  it("does not open a vault the visitor has not got yet", () => {
+    // `signedIn` alone was the wrong question. A brand-new account whose load
+    // crosses the 350ms threshold played the whole 700ms unlock and then
+    // revealed the checkout step -- the mark claiming something of theirs had
+    // opened while `vault` was still null. Both conditions stay: the
+    // signed-out case is separately measured, so this narrows the gate rather
+    // than swapping it.
+    const body = cloudPage.slice(
+      cloudPage.indexOf("async function openBoot()"),
+      cloudPage.indexOf("watch(settled, (isSettled)")
+    );
+    expect(body).toContain("!signedIn.value");
+    expect(body).toContain("!vault.value");
   });
 
   it("leaves the phase alone if the answer is lost again mid-decision", () => {

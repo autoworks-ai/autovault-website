@@ -1045,6 +1045,35 @@ function armLoadPatience() {
     loadPatienceTimer = undefined;
   }, LOAD_PATIENCE_MS);
 }
+
+// The device list's own copy of that bound -- a copy rather than a share,
+// because the two waits do not start at the same moment. The deadline above
+// is armed on mount and bounds the wait for /api/me. The wait for the device
+// list cannot begin until an /api/me has come back carrying a vault, which is
+// the moment the gate below arms.
+//
+// Feeding the mount deadline to the device gate made that gate a no-op for
+// precisely the owner it exists to protect. A returning owner whose /api/me
+// lands after the mount deadline has already passed reads "expired" in the
+// same tick the vault appears, with `devices` still empty, so `cliLinked` is
+// false and the typed connect terminal replays at somebody who linked months
+// ago -- the exact replay this gate was added to stop. The deadline could
+// also fire mid-way through the first device request, which is the same
+// defect a few hundred milliseconds later.
+//
+// Same duration, and for the same reason: the list polls every four seconds,
+// so twenty seconds is five failed attempts. A failure signal, not a
+// slowness budget.
+const devicePatienceExpired = ref(false);
+let devicePatienceTimer: ReturnType<typeof setTimeout> | undefined;
+
+function armDevicePatience() {
+  if (devicePatienceTimer) clearTimeout(devicePatienceTimer);
+  devicePatienceTimer = setTimeout(() => {
+    devicePatienceExpired.value = true;
+    devicePatienceTimer = undefined;
+  }, LOAD_PATIENCE_MS);
+}
 // Set when /api/me could not be resolved because auth failed — as opposed to
 // resolving successfully and reporting no vault. Without this the two cases
 // are indistinguishable downstream, and a signed-in, paying, provisioned user
@@ -1161,6 +1190,8 @@ onBeforeUnmount(clearAdmitWaitTimer);
 onBeforeUnmount(() => {
   if (loadPatienceTimer) clearTimeout(loadPatienceTimer);
   loadPatienceTimer = undefined;
+  if (devicePatienceTimer) clearTimeout(devicePatienceTimer);
+  devicePatienceTimer = undefined;
 });
 
 function isAdmitTarget(device: SyncDevice) {
@@ -1244,6 +1275,10 @@ watch(cloudStateKnown, (known) => {
   if (!known || devicesGateDecided) return;
   devicesGateDecided = true;
   devicesGateArmed.value = Boolean(vault.value);
+  // Only an armed gate is waiting for anything, and this is the first moment
+  // the page knows it is one. A vault provisioned during this session never
+  // arms, so it never starts a window it would not use.
+  if (devicesGateArmed.value) armDevicePatience();
 });
 
 const stage = computed<Stage>(() => {
@@ -1267,7 +1302,7 @@ const stage = computed<Stage>(() => {
       !deviceListIsKnown({
         gateArmed: devicesGateArmed.value,
         listAnswered: devicesKnown.value,
-        patienceExpired: loadPatienceExpired.value,
+        patienceExpired: devicePatienceExpired.value,
       })
     ) {
       return "loading";
@@ -1397,6 +1432,14 @@ async function openBoot() {
     // The dial still sweeps behind the veil while the page loads; there is
     // simply nothing to unlock at the end of it.
     !signedIn.value ||
+    // Nor a signed-in visitor who has not reserved one yet. `signedIn` was
+    // the wrong question on its own: a brand-new account whose load crosses
+    // the 350ms threshold played the whole 700ms unlock and then revealed the
+    // checkout step, so the mark spent that beat claiming something of theirs
+    // had opened while `vault` was still null. Both conditions stay -- the
+    // signed-out case above is separately measured -- because this narrows
+    // the gate rather than swapping it.
+    !vault.value ||
     // Read inside the callback, never at setup scope: the PR #88 hydration
     // class, and the same placement the two existing gestures use.
     prefersReducedMotion() ||
@@ -2014,6 +2057,43 @@ watch(
   { immediate: true }
 );
 
+// A deadline that only reaches `fetch` bounds only the last step of the
+// request. `authHeaders` goes through Clerk's getToken, which is its own
+// network call with its own way to stall, and an await that never settles
+// never reaches the finally below -- which is where cloudLoadsInFlight is
+// decremented, so the deadline it masks would still never fire and the veil
+// would still be permanent. Racing the signal against the token step is what
+// makes the bound cover the sequence rather than its tail.
+//
+// Rejects and never resolves, so it can only ever lose the race or end it.
+function abortRejection(signal: AbortSignal): Promise<never> {
+  return new Promise((_resolve, reject) => {
+    const fail = () => {
+      // Named rather than typed: DOMException is not constructible everywhere
+      // this file is parsed, and the name is what isAbortError reads.
+      const error = new Error("The request was aborted.");
+      error.name = "AbortError";
+      reject(error);
+    };
+    if (signal.aborted) {
+      fail();
+      return;
+    }
+    signal.addEventListener("abort", fail, { once: true });
+  });
+}
+
+// The one error shape that has to be told apart from a network failure, and
+// `instanceof DOMException` is not it: an abort surfaces as a plain object in
+// some runtimes and the test environment has no DOMException at all.
+function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { name?: unknown }).name === "AbortError"
+  );
+}
+
 async function loadCloudState(initial = false) {
   const requestSeq = ++cloudStateRequestSeq;
   // Captured here, not in the finally. This is the context the request is
@@ -2023,14 +2103,29 @@ async function loadCloudState(initial = false) {
   // an authenticated one, which is the flash wearing a different hat.
   const requestSignedIn = isClerkSignedIn.value;
   cloudLoadsInFlight.value += 1;
+  // What makes cloudLoadsInFlight's own claim true. That counter suspends the
+  // patience deadline for as long as a request is outstanding, on the
+  // reasoning that a request in flight is a wait WITH an end -- and `fetch`
+  // has no default timeout, so that was an assumption rather than a fact. A
+  // stalled connection (a captive portal, a dead proxy, a socket the network
+  // dropped without an RST) never settles: the counter never returns to zero,
+  // the deadline it masks can never fire, and the opaque, inert boot veil
+  // stays up for the life of the tab. Bounded by the same number, because it
+  // is the same bound.
+  const abort = new AbortController();
+  const abortTimer = setTimeout(() => abort.abort(), LOAD_PATIENCE_MS);
   try {
-    const headers = await authHeaders({ accept: "application/json" }, {
-      required: clerkAuthEnabled && isClerkSignedIn.value,
-      fresh: isClerkSignedIn.value,
-    });
+    const headers = await Promise.race([
+      authHeaders({ accept: "application/json" }, {
+        required: clerkAuthEnabled && isClerkSignedIn.value,
+        fresh: isClerkSignedIn.value,
+      }),
+      abortRejection(abort.signal),
+    ]);
     const response = await fetch("/api/me", {
       credentials: "include",
       headers,
+      signal: abort.signal,
     });
     if (requestSeq !== cloudStateRequestSeq) return;
     cloudState.value = response.ok
@@ -2062,8 +2157,18 @@ async function loadCloudState(initial = false) {
       return;
     }
     cloudState.value = { user: null, subscription: null, vault: null };
-    loadError.value = null;
+    // An aborted request answered nothing, which is the 5xx case wearing a
+    // different hat, and it has to say so. Left on the silent branch below it
+    // would be worse than the veil it replaces: the finally records this
+    // request's auth context, that context matches Clerk, cloudStateKnown
+    // goes true, and the empty placeholder renders as "Finish checkout" to a
+    // paying owner -- the original complaint, twenty seconds late. The error
+    // card and its Try again button are the honest answer.
+    loadError.value = isAbortError(error)
+      ? "We couldn't reach your vault just now. Nothing has changed on your account."
+      : null;
   } finally {
+    clearTimeout(abortTimer);
     cloudLoadsInFlight.value -= 1;
     // `initial` used to set hydrated outside the staleness guard, so a slow
     // first request could un-veil the page using a superseded response.
