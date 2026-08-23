@@ -333,6 +333,21 @@ describe("POST /api/vaults/provision", () => {
     expect(db.prepare("select count(*) as n from vaults").get()).toEqual({ n: 0 });
   });
 
+  it("refuses an explicitly empty slug rather than deriving a permanent one", async () => {
+    // Omitting `slug` means "no opinion" and legitimately derives. Sending one
+    // that is present but unusable is an opinion the validator refuses, and
+    // answering it with a silent permanent rename is the very outcome this
+    // handler documents itself as preventing. The UI can no longer produce it,
+    // but a crafted or stale client still can.
+    const { db, env, cookie } = await paidEnv();
+    for (const slug of ["", "   ", null, 42] as const) {
+      const response = await provisionHostedVault({ request: provisionRequest(cookie, { slug }), env });
+      expect(response.status, JSON.stringify(slug)).toBe(400);
+      expect((await response.json() as { code: string }).code, JSON.stringify(slug)).toBe("empty");
+    }
+    expect(db.prepare("select count(*) as n from vaults").get()).toEqual({ n: 0 });
+  });
+
   it("still derives a slug when the body omits one, so existing callers keep working", async () => {
     const { env, cookie } = await paidEnv();
     const response = await provisionHostedVault({

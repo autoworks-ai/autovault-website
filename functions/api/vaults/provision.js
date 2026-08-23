@@ -24,7 +24,17 @@ export async function onRequestPost({ request, env }) {
 // and their CLI pinned to it, is a worse outcome than a 400 that says why.
 function requestedSlug(body) {
   const raw = body?.slug;
-  if (typeof raw !== "string" || !raw.trim()) return undefined;
+  // ABSENT is the only case the derived fallback is for: callers that predate
+  // this field, and the funnel when nobody typed a name (it sends `undefined`,
+  // which JSON drops). Anything PRESENT is an opinion -- including "" and a
+  // non-string -- and an opinion the validator refuses has to come back as the
+  // 400 that says why.
+  //
+  // Treating a present-but-empty slug as absent reopened the exact hole this
+  // function exists to close, one layer down: a crafted or stale client posting
+  // { "slug": "" } was handed a permanent, unrenameable namespace it never
+  // asked for, silently. validateVaultSlug already has an `empty` code for it.
+  if (raw === undefined) return undefined;
   const verdict = validateVaultSlug(raw);
   if (!verdict.ok) throw new ApiError(400, verdict.message, verdict.code);
   return verdict.slug;
