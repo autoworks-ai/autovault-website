@@ -54,3 +54,47 @@ describe("pull_request triggers cover stacked PRs", () => {
     expect(condition).toContain("refs/heads/main");
   });
 });
+
+// Branch protection on `main` requires these checks by name. GitHub matches
+// them as opaque strings: a required context that never reports does not fail,
+// it simply never arrives, and the pull request waits.
+//
+// The list is duplicated from a GitHub setting, which is the weak part of this
+// — there is no API the test suite can read at build time. It is still worth
+// pinning, because both ways it drifts are silent, and both were hit in one
+// night: renaming a job orphans the requirement, and enabling a merge queue (a
+// settings toggle, no code change) makes every workflow without a `merge_group`
+// trigger unable to report at all.
+const REQUIRED_CHECKS = [
+  { context: "build-test", workflow: ".github/workflows/ci.yml", job: "build-test" },
+  {
+    context: "Dependency Audit (production)",
+    workflow: ".github/workflows/security.yml",
+    job: "audit-prod"
+  }
+] as const;
+
+describe("workflows can satisfy the checks main requires of them", () => {
+  for (const { context, workflow, job } of REQUIRED_CHECKS) {
+    it(`${workflow} still reports "${context}"`, () => {
+      // The reported context is the job's `name` when it has one and the job
+      // key otherwise. Renaming either detaches the job from the requirement,
+      // and the PR then waits on a check nothing produces.
+      const definition = readWorkflow(workflow).jobs?.[job];
+      expect(definition, `${workflow} has no job "${job}"`).toBeTruthy();
+      expect(definition.name ?? job).toBe(context);
+    });
+
+    it(`${workflow} runs on merge_group, so a queue cannot wedge on it`, () => {
+      // Observed 2026-08-23: security.yml had no merge_group trigger while
+      // "Dependency Audit (production)" was required, so a queue branch only
+      // ever carried ci.yml's checks. The queue sat in AWAITING_CHECKS waiting
+      // for a check that could not run, and would have done so for the whole
+      // 3600-minute checkResponseTimeout.
+      //
+      // Asserted even though the queue is disabled again: re-enabling it is a
+      // settings toggle, and this is what makes that toggle safe.
+      expect(Object.keys(readTriggers(workflow))).toContain("merge_group");
+    });
+  }
+});
