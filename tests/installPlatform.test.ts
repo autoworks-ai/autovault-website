@@ -17,7 +17,9 @@ const UA = {
   // Android reports "Linux".
   android: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
   linux: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-  windows: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+  windows: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  // ChromeOS carries X11, same as a Linux desktop.
+  chromeos: "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 } as const;
 
 describe("preselecting an install command", () => {
@@ -46,6 +48,18 @@ describe("preselecting an install command", () => {
     expect(installMethodFor(UA.mac, 0)).toEqual({ method: "curl", label: "macOS" });
     // A Mac with a touchpad still reports at most 1.
     expect(installMethodFor(UA.mac, 1)).toEqual({ method: "curl", label: "macOS" });
+  });
+
+  it("does not read a Chromebook as a Linux desktop", () => {
+    // ChromeOS reports "X11; CrOS x86_64" and would otherwise take the X11
+    // fallback. A Chromebook has no shell for `curl … | sh` unless the
+    // optional Linux environment is on, which the UA cannot tell us.
+    expect(UA.chromeos).toContain("X11");
+    expect(installMethodFor(UA.chromeos, 0)).toBeNull();
+    // Touch does not save us here: many Chromebooks report 0.
+    expect(installMethodFor(UA.chromeos, 5)).toBeNull();
+    // A real Linux desktop still resolves.
+    expect(installMethodFor(UA.linux, 0)).toEqual({ method: "curl", label: "Linux" });
   });
 
   it("leaves the default alone when it cannot tell", () => {

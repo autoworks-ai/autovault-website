@@ -36,6 +36,13 @@ export function installMethodFor(
   if (/iPhone|iPod|iPad|Android/i.test(userAgent)) return null;
   if (/Macintosh/.test(userAgent) && maxTouchPoints > 1) return null;
 
+  // ChromeOS reports "X11; CrOS x86_64", which the X11 fallback below would
+  // read as Linux. A Chromebook has no shell for `curl … | sh` unless the
+  // optional Linux development environment has been turned on, and nothing in
+  // the user agent says whether it has -- so decline rather than present an
+  // installer as detected-compatible.
+  if (/CrOS/.test(userAgent)) return null;
+
   // Windows before the rest: `curl … | sh` has no shell to run in on
   // PowerShell or cmd, and brew does not exist there, so npm is the only line
   // that works. A WSL2 user still reports a Windows UA, and npm works there.
