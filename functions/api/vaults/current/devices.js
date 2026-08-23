@@ -2,6 +2,12 @@ import { requireUser } from "../../_lib/auth.js";
 import { all } from "../../_lib/db.js";
 import { ApiError, handleApi, json } from "../../_lib/http.js";
 import { deviceFingerprint } from "../../_lib/sync.js";
+
+// Belt and braces alongside deny-removes-the-row: this response is polled, and
+// an unbounded list would grow both the payload and the rendered DOM. Ordered
+// pending-first, so a cap can only ever hide the oldest settled history --
+// never a device waiting on a decision.
+const MAX_LISTED_DEVICES = 100;
 import { getCurrentVault } from "../../_lib/vault.js";
 
 // GET /api/vaults/current/devices
@@ -23,7 +29,8 @@ export async function onRequestGet({ request, env }) {
       order by
         case status when 'pending' then 0 when 'active' then 1 else 2 end,
         first_seen_at desc
-    `, vault.id);
+      limit ?
+    `, vault.id, MAX_LISTED_DEVICES);
 
     return json({
       slug: vault.slug,

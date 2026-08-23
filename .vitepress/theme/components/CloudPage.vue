@@ -985,8 +985,9 @@ watch(
       devices.value = [];
       return;
     }
+    // Always load once; the watcher above decides whether to keep polling.
     void loadDevices();
-    startDevicePolling();
+    if (devicePollWanted.value) startDevicePolling();
   },
   { immediate: true }
 );
@@ -1155,6 +1156,26 @@ async function loadDevices() {
 
 let devicePollTimer: ReturnType<typeof setInterval> | undefined;
 
+// Poll only while something is actually expected to change.
+//
+// /api/vaults/current/devices goes through requireUser, which in Clerk mode
+// hits client.users.getUser AND upserts the user on every call. A flat
+// four-second timer therefore costs roughly 900 Clerk profile fetches and 900
+// D1 writes per hour, per open tab, on a dashboard where nothing is happening.
+//
+// The only moments that need live updates are the ones where a machine is
+// waiting on the owner: the connect step, and any time a pending device
+// exists. Otherwise the list is refreshed on load and after an action, which
+// is the same thing a person would get from a reload.
+const devicePollWanted = computed(
+  () => Boolean(vault.value) && (stage.value === "connect" || pendingDevices.value.length > 0)
+);
+
+function stopDevicePolling() {
+  if (devicePollTimer) clearInterval(devicePollTimer);
+  devicePollTimer = undefined;
+}
+
 function startDevicePolling() {
   if (devicePollTimer || typeof window === "undefined") return;
   devicePollTimer = setInterval(() => {
@@ -1163,9 +1184,12 @@ function startDevicePolling() {
   }, 4000);
 }
 
-onBeforeUnmount(() => {
-  if (devicePollTimer) clearInterval(devicePollTimer);
+watch(devicePollWanted, (wanted) => {
+  if (wanted) startDevicePolling();
+  else stopDevicePolling();
 });
+
+onBeforeUnmount(stopDevicePolling);
 
 async function decideDevice(deviceId: string, action: "admit" | "revoke") {
   if (deviceBusy.value) return;

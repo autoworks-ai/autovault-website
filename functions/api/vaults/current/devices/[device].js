@@ -37,7 +37,7 @@ export async function onRequestPost({ request, env, params }) {
     }
 
     const device = await first(env, `
-      select id, status from sync_devices where id = ? and vault_id = ?
+      select id, status, admitted_at from sync_devices where id = ? and vault_id = ?
     `, params.device, vault.id);
     if (!device) throw new ApiError(404, "No such device on this vault.");
 
@@ -47,6 +47,26 @@ export async function onRequestPost({ request, env, params }) {
     // pending row the owner can see.
     if (body.action === "admit" && device.status === "revoked") {
       throw new ApiError(409, "This device was revoked. Re-link it from that machine to enrol a new key.");
+    }
+
+    // Denying a device that was never admitted DELETES it rather than leaving a
+    // revoked tombstone.
+    //
+    // A pending row is a queue entry, not an access grant -- there is nothing
+    // to revoke, because it never had any. Keeping it would also be an
+    // unbounded leak: denying frees a pending slot while the row stays for
+    // ever, so a spam-and-clear loop grows the console's list without limit.
+    //
+    // A device that WAS admitted keeps its row. There the tombstone is the
+    // point: it blocks the key and it is how the CLI hears "revoked" and exits.
+    if (body.action === "revoke" && device.status === "pending" && !device.admitted_at) {
+      const removed = await run(env, `
+        delete from sync_devices where id = ? and vault_id = ? and status = 'pending'
+      `, device.id, vault.id);
+      if (!removed?.meta?.changes) {
+        throw new ApiError(409, "That device changed while you were deciding. Reload and try again.");
+      }
+      return json({ device: { id: device.id, status: "denied" } });
     }
 
     // Conditional on the state we read, not just on the id.

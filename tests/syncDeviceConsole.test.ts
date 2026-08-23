@@ -316,3 +316,64 @@ describe("nav items only enable once their destination exists", () => {
     expect(cloudPage.slice(at, at + 420)).toContain("devicesRequestSeq += 1;");
   });
 });
+
+describe("the console does not cost more than it is worth", () => {
+  it("denies a never-admitted device by removing it, not by leaving a tombstone", async () => {
+    // A pending row is a queue entry, not an access grant -- there is nothing
+    // to revoke. Keeping it would also leak: denying frees a pending slot
+    // while the row stays for ever, so spam-and-clear grows the list without
+    // bound and the four-second poll carries all of it.
+    const { db, env, cookie, vaultId } = await seedOwner();
+    addDevice(db, vaultId, "device-1", KEY_A, "pending", "2026-08-23T01:00:00.000Z");
+
+    const response = await decideDevice({
+      request: req(cookie, "/api/vaults/current/devices/device-1", { action: "revoke" }),
+      env,
+      params: { device: "device-1" }
+    });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).device.status).toBe("denied");
+    expect(Number((db.prepare("select count(*) as n from sync_devices").get() as { n: number }).n)).toBe(0);
+  });
+
+  it("keeps the row when revoking a device that WAS admitted", async () => {
+    // Here the tombstone is the point: it blocks the key, and it is how the
+    // CLI hears "revoked" and exits rather than sitting in its spinner.
+    const { db, env, cookie, vaultId } = await seedOwner();
+    db.prepare(
+      `insert into sync_devices (id, vault_id, public_key, status, first_seen_at, admitted_at)
+       values ('device-1', ?, ?, 'active', ?, ?)`
+    ).run(vaultId, KEY_A, "2026-08-23T01:00:00.000Z", "2026-08-23T01:05:00.000Z");
+
+    const response = await decideDevice({
+      request: req(cookie, "/api/vaults/current/devices/device-1", { action: "revoke" }),
+      env,
+      params: { device: "device-1" }
+    });
+
+    expect(response.status).toBe(200);
+    expect(deviceRow(db, "device-1").status).toBe("revoked");
+  });
+
+  it("bounds the list it returns on every poll", () => {
+    const source = readFileSync(
+      new URL("../functions/api/vaults/current/devices.js", import.meta.url),
+      "utf-8"
+    );
+    expect(source).toContain("MAX_LISTED_DEVICES");
+    expect(source).toContain("limit ?");
+    // Ordered pending-first, so the cap can only hide settled history and
+    // never a device waiting on a decision.
+    expect(source.indexOf("order by")).toBeLessThan(source.indexOf("limit ?"));
+  });
+
+  it("only polls while something is waiting on the owner", () => {
+    // requireUser hits Clerk's getUser and upserts on every call, so a flat
+    // four-second timer is ~900 profile fetches and 900 D1 writes per hour per
+    // open tab on a dashboard where nothing is happening.
+    expect(cloudPage).toContain('stage.value === "connect" || pendingDevices.value.length > 0');
+    expect(cloudPage).toContain("watch(devicePollWanted");
+    expect(cloudPage).toContain("else stopDevicePolling();");
+  });
+});
