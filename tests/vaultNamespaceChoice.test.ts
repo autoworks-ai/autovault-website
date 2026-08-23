@@ -562,22 +562,37 @@ describe("the namespace field in the funnel", () => {
     // sessionStorage. After the Stripe redirect remounted the component,
     // syncNamespaceFromDraft put that deleted name back and offered it for
     // permanent reservation.
-    const fn = funnel.slice(funnel.indexOf("function persistDraft"), funnel.indexOf("function buildDraft"));
-    expect(fn).toContain("const stored = readDraft();");
-    expect(fn).toContain("delete cleared.desiredSlug;");
-    // The whole draft is NOT dropped: a skill pasted in the playground lives
-    // under the same key and is not this component's to delete.
-    expect(fn).not.toContain("removeItem");
+    // One helper owns the stored namespace, and it touches only that field --
+    // a skill pasted in the playground shares PENDING_DRAFT_KEY and is not this
+    // component's to delete, so nothing here may drop the whole draft.
+    const helper = funnel.slice(funnel.indexOf("function writeStoredSlug"), funnel.indexOf("function syncNamespaceFromDraft"));
+    expect(helper).toContain("const stored = readDraft();");
+    expect(helper).toContain("if (!stored) return;");
+    expect(helper).toContain("delete next.desiredSlug;");
+    expect(funnel).not.toContain("removeItem");
 
-    // And persistDraft alone is not enough: it only runs from startFlow, and
-    // the reserve button is disabled while the field is empty -- so deleting a
-    // namespace at the reserve step would never reach that branch at all. The
-    // edit handler keeps storage in step directly.
-    const input = funnel.slice(funnel.indexOf("function onNamespaceInput"), funnel.indexOf("function scheduleNamespaceCheck"));
-    expect(input).toContain("syncStoredSlug();");
-    expect(input).toContain("function syncStoredSlug()");
-    expect(input).toContain("if (!stored) return;");
-    expect(input).toContain("delete next.desiredSlug;");
+    // persistDraft alone is not enough: it only runs from startFlow, and the
+    // reserve button is disabled while the field is empty -- so deleting a
+    // namespace at the reserve step would never reach it at all. The edit
+    // handler keeps storage in step directly.
+    const input = funnel.slice(funnel.indexOf("function onNamespaceInput"), funnel.indexOf("function writeStoredSlug"));
+    expect(input).toContain("writeStoredSlug(namespaceSlug.value);");
+    const persist = funnel.slice(funnel.indexOf("function persistDraft"), funnel.indexOf("function buildDraft"));
+    expect(persist).toContain('writeStoredSlug("")');
+  });
+
+  it("does not hand the next account the namespace this one just claimed", () => {
+    // sessionStorage outlives a sign-out in the same tab, and nothing consumed
+    // the stored slug once the vault existed. A second account signing in to
+    // that tab was prefilled with the first one's claimed namespace, had it
+    // marked as its own choice by syncNamespaceFromDraft, got it refused by the
+    // availability check, and was then held out of checkout by the gate that
+    // refuses an already-refused name.
+    const fn = funnel.slice(funnel.indexOf("async function provisionVault"));
+    const body = fn.slice(0, fn.indexOf("async function savePendingImport"));
+    expect(body).toContain('writeStoredSlug("")');
+    // After the vault is confirmed, not before -- the claim is what spends it.
+    expect(body.indexOf('writeStoredSlug("")')).toBeGreaterThan(body.indexOf('emit("stateChange"'));
   });
 
   it("puts a refused name back on the field instead of reading as a crash", () => {

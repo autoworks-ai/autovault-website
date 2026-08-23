@@ -489,21 +489,27 @@ function onNamespaceInput(event: Event) {
   // produced the same string as last render (typing a second "!" for instance)
   // it did not, so the rejected character would sit in the field. Write it back.
   if (input.value !== cleaned) input.value = cleaned;
-  syncStoredSlug();
+  writeStoredSlug(namespaceSlug.value);
   scheduleNamespaceCheck();
 }
 
-// Keep storage in step with the field. Without this the stored slug outlives the
-// value it came from: persistDraft() only runs from startFlow, and the reserve
-// button is disabled while the field is empty, so a paid user who deletes their
-// namespace and reloads gets it restored and can reserve the name they removed.
-// Only this one field is touched, and only on a draft that already exists --
-// creating one is startFlow's job, and `sourceText` belongs to the playground.
-function syncStoredSlug() {
+// The single owner of the stored namespace: writes `slug`, or drops the field
+// when it is empty. Three things can invalidate it and all three come here.
+//
+// Editing the field, because persistDraft() only runs from startFlow and the
+// reserve button is disabled while the field is empty -- so a paid user who
+// deleted their namespace and reloaded would get it restored and could reserve
+// the name they removed. Reserving, because the stored slug has done its whole
+// job the moment the vault exists and sessionStorage outlives a sign-out in the
+// same tab. And startFlow, when nothing is left worth storing.
+//
+// It touches only this one field, and only on a draft that already exists:
+// creating one is startFlow's job, and `sourceText` belongs to the playground,
+// which shares this key.
+function writeStoredSlug(slug: string) {
   if (!canUseBrowser()) return;
   const stored = readDraft();
   if (!stored) return;
-  const slug = namespaceSlug.value;
   if ((stored.desiredSlug || "") === slug) return;
   const next: PendingDraft = { ...stored };
   if (slug) next.desiredSlug = slug;
@@ -638,14 +644,8 @@ function persistDraft() {
   // Nothing here is worth storing -- but a draft already in storage can still
   // carry a namespace this page has since cleared, and syncNamespaceFromDraft
   // would restore it after the Stripe redirect and offer it for permanent
-  // reservation, silently undoing the deletion. Drop that one field rather than
-  // the whole draft: a skill pasted in the playground shares this key and is not
-  // this component's to delete.
-  const stored = readDraft();
-  if (!stored?.desiredSlug) return;
-  const cleared: PendingDraft = { ...stored };
-  delete cleared.desiredSlug;
-  window.sessionStorage.setItem(PENDING_DRAFT_KEY, JSON.stringify(cleared));
+  // reservation, silently undoing the deletion.
+  writeStoredSlug("");
 }
 
 function buildDraft(): PendingDraft | null {
@@ -845,6 +845,14 @@ async function provisionVault() {
     // button: otherwise it renders clickable for one frame at a step the shell
     // has already left, and a fast second click double-provisions.
     await nextTick();
+    // The stored slug is spent: it existed only to survive the trip to Stripe,
+    // and the vault now exists. sessionStorage outlives a sign-out in the same
+    // tab, so leaving it means the NEXT account to sign in here is prefilled
+    // with this one's claimed namespace, has it marked as its own choice by
+    // syncNamespaceFromDraft, gets it refused by the availability check, and is
+    // then held out of checkout by the gate that refuses an already-refused
+    // name. The skill draft, if there is one, is left alone.
+    writeStoredSlug("");
     // Runs after the shell has already advanced. It only persists queued
     // skills; nothing user-visible depends on its result.
     await savePendingImport();
