@@ -757,7 +757,7 @@ import CloudAccountMenu from "./CloudAccountMenu.vue";
 import { copyText as copyToClipboard } from "../utils/clipboard";
 import { prefersReducedMotion } from "../utils/motion";
 import { formatPriceLabel } from "../utils/money";
-import { consumeVaultArrival } from "../utils/vaultArrival";
+import { consumeVaultArrival, isAuthenticatedCloudState } from "../utils/vaultArrival";
 import {
   admitHandshakeState,
   findAdmitTarget,
@@ -1866,6 +1866,28 @@ const arrivalSearch = ref("");
 // and cannot contribute a hydration mismatch.
 const ambientVault = computed(() => hydrated.value && signedIn.value);
 
+// Presence is ambient-always; the arrival is not, and the difference is the
+// whole of this gate.
+//
+// `signedIn` ORs in the live Clerk flag on purpose (see its own comment), so
+// it turns true the moment Clerk resolves -- which is one whole /api/me before
+// the authenticated payload lands. `hydrated` is already true by then, because
+// the anonymous load on mount passes `initial` and sets it even when its
+// response is discarded as stale. So `ambientVault` alone flips true while
+// `vault` is still null, and the one-shot arrival gets spent on the empty
+// state: the returning owner watches a LOCKED mark swell, and the real unlock
+// arrival they were owed is gone.
+//
+// `cloudState` is only ever written from an applied /api/me or from the
+// funnel's own syncCloudState, so asking it -- rather than the Clerk flag --
+// is asking the state itself instead of a promise of one.
+const cloudStateAuthenticated = computed(() =>
+  isAuthenticatedCloudState(cloudState.value)
+);
+const vaultArrivalReady = computed(
+  () => ambientVault.value && cloudStateAuthenticated.value
+);
+
 const vaultArriving = ref(false);
 let vaultArrivalTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -1897,10 +1919,10 @@ function startVaultArrival() {
 
 // Not `{ immediate: true }`: immediate runs at setup scope, where reading the
 // motion preference is the hydration-mismatch class fixed in PR #88.
-// `ambientVault` is false at setup on both server and client anyway -- it
+// `vaultArrivalReady` is false at setup on both server and client anyway -- it
 // cannot flip before /api/me lands, which is post-mount by construction.
-watch(ambientVault, (visible) => {
-  if (visible) startVaultArrival();
+watch(vaultArrivalReady, (ready) => {
+  if (ready) startVaultArrival();
 });
 
 onBeforeUnmount(cancelVaultArrival);

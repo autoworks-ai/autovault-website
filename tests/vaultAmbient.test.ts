@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
   consumeVaultArrival,
+  isAuthenticatedCloudState,
   resetVaultArrivalLedger,
   vaultArrivalOccasion,
 } from "../.vitepress/theme/utils/vaultArrival";
@@ -175,6 +176,47 @@ describe("the arrival fires once per occasion", () => {
   });
 });
 
+describe("the arrival waits for the authenticated answer, not the Clerk flag", () => {
+  // The race this closes: /cloud loads /api/me twice. The first goes out
+  // anonymous and its `finally` sets `hydrated` even when the response is
+  // discarded as stale, because it passes `initial`. Clerk resolves in
+  // between, which flips `signedIn` through its live-flag OR. So `hydrated &&
+  // signedIn` is true a whole request before the authenticated payload lands,
+  // and gating the one-shot arrival on it spends the occasion on the empty
+  // state -- a returning owner watches a LOCKED mark swell and never gets the
+  // real one, because there is only ever one.
+  //
+  // These run the predicate rather than grepping for it, which is the reason
+  // it lives in the util module at all.
+
+  it("does not treat the anonymous answer as authenticated", () => {
+    // /api/me answers a request it could not authenticate with 200 and nulls,
+    // so "the response came back" is not the same question as "we know who
+    // this is".
+    expect(isAuthenticatedCloudState({ user: null, subscription: null, vault: null }))
+      .toBe(false);
+  });
+
+  it("treats a user as proof", () => {
+    expect(isAuthenticatedCloudState({ user: { id: "clerk_1" }, vault: null }))
+      .toBe(true);
+  });
+
+  it("treats a vault as proof too, which is what saves the checkout return", () => {
+    // HostedVaultFunnel emits `{ ...(current ?? { user: null }), vault }` after
+    // it provisions, so the occasion the ask named FIRST can arrive carrying a
+    // real vault and a null user. A `user`-only gate would silently drop the
+    // post-checkout celebration -- trading this bug for a worse one.
+    expect(isAuthenticatedCloudState({ user: null, vault: { id: "v_1" } })).toBe(true);
+  });
+
+  it("answers nothing with false rather than throwing", () => {
+    expect(isAuthenticatedCloudState(null)).toBe(false);
+    expect(isAuthenticatedCloudState(undefined)).toBe(false);
+    expect(isAuthenticatedCloudState({})).toBe(false);
+  });
+});
+
 describe("the arrival cannot disturb the first-machine celebration", () => {
   // The load trigger and the admit trigger are separate refs on separate
   // timers on purpose. These are structural assertions — they pin the shape
@@ -214,13 +256,25 @@ describe("the arrival cannot disturb the first-machine celebration", () => {
     // Same hazard vaultMotion.test.ts guards for the admit celebration: this
     // page loads /api/me twice, and any "previous was non-null" watcher on the
     // stage celebrates on every reload for every returning customer.
-    // `ambientVault` is monotonic per mount — it goes false -> true once when
-    // the boot veil lifts — and the one-shot ledger covers the remount case.
-    expect(cloudPage).toContain("watch(ambientVault, (visible) => {");
+    // `vaultArrivalReady` is monotonic per mount — it goes false -> true once,
+    // when the authenticated payload lands behind the boot veil — and the
+    // one-shot ledger covers the remount case.
+    expect(cloudPage).toContain("watch(vaultArrivalReady, (ready) => {");
     expect(cloudPage).not.toContain("watch(vaultOpen");
     expect(cloudPage).not.toContain("watch(() => vaultOpen");
+    // Presence is still the plain gate; only the trigger waits for more.
     expect(cloudPage).toContain(
       "const ambientVault = computed(() => hydrated.value && signedIn.value);"
+    );
+    // And the trigger is NOT that gate on its own. This is the assertion that
+    // fails if someone reverts the arrival to the Clerk flag plus `hydrated`:
+    // the predicate above proves the rule, this proves the page still asks it.
+    expect(cloudPage).not.toContain("watch(ambientVault");
+    expect(cloudPage).toContain(
+      "const cloudStateAuthenticated = computed(() =>\n  isAuthenticatedCloudState(cloudState.value)\n);"
+    );
+    expect(cloudPage).toContain(
+      "const vaultArrivalReady = computed(\n  () => ambientVault.value && cloudStateAuthenticated.value\n);"
     );
   });
 
