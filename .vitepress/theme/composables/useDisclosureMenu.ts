@@ -106,6 +106,7 @@ export type DisclosureMenu = {
   menuRef: Ref<HTMLElement | null>;
   placement: Ref<MenuPlacement | null>;
   openMenu: (focus?: "first" | "last") => void;
+  reposition: () => void;
   closeMenu: (options?: { restoreFocus?: boolean }) => void;
   toggle: () => void;
   onTriggerKeydown: (event: KeyboardEvent) => void;
@@ -145,6 +146,32 @@ export function useDisclosureMenu(itemCount: () => number): DisclosureMenu {
     void nextTick(() => itemRefs.value[index]?.focus());
   }
 
+  /**
+   * Measure the menu as it would be if nothing constrained it.
+   *
+   * This function's output becomes the menu's min/max width, so measuring
+   * while a previous result is still applied feeds the calculation its own
+   * stale output. Every path that re-measures hit that in a different
+   * costume -- the first open measured a box pinned to zero, a resize from a
+   * narrow viewport measured against the narrow cap, and a menu whose item
+   * list grew measured the old height -- each time placing the menu for one
+   * size and then rendering it at another.
+   *
+   * Clearing the two inline constraints for the duration of the read is what
+   * makes all of those correct at once, including paths added later. The
+   * write/read/restore is synchronous, so no paint happens in between.
+   */
+  function measureUnconstrained(menu: HTMLElement) {
+    const previousMaxWidth = menu.style.maxWidth;
+    const previousMinWidth = menu.style.minWidth;
+    menu.style.maxWidth = "";
+    menu.style.minWidth = "";
+    const measured = { width: menu.offsetWidth, height: menu.offsetHeight };
+    menu.style.maxWidth = previousMaxWidth;
+    menu.style.minWidth = previousMinWidth;
+    return measured;
+  }
+
   function reposition() {
     const trigger = triggerRef.value;
     const menu = menuRef.value;
@@ -158,7 +185,7 @@ export function useDisclosureMenu(itemCount: () => number): DisclosureMenu {
         right: rect.right,
         width: rect.width
       },
-      menu: { width: menu.offsetWidth, height: menu.offsetHeight },
+      menu: measureUnconstrained(menu),
       viewport: { width: window.innerWidth, height: window.innerHeight }
     });
   }
@@ -290,6 +317,7 @@ export function useDisclosureMenu(itemCount: () => number): DisclosureMenu {
     placement,
     openMenu,
     closeMenu,
+    reposition,
     toggle,
     onTriggerKeydown,
     onMenuKeydown,

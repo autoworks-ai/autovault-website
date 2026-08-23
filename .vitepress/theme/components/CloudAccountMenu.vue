@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from "vue";
+import { computed, nextTick, watch } from "vue";
 import { useDisclosureMenu } from "../composables/useDisclosureMenu";
 import { useClerkAccount } from "../utils/clerkAccount";
 
@@ -41,7 +41,7 @@ const items = computed<MenuItem[]>(() => {
 });
 
 const menu = useDisclosureMenu(() => items.value.length);
-const { open, activeIndex, triggerRef, menuRef, placement, toggle, closeMenu, onTriggerKeydown, onMenuKeydown, setItemRef } = menu;
+const { open, activeIndex, triggerRef, menuRef, placement, toggle, closeMenu, reposition, onTriggerKeydown, onMenuKeydown, setItemRef } = menu;
 
 // Clerk finishes loading after first paint, so this list can GROW while the
 // menu is open: Billing on its own becomes Profile / Billing / Sign out. Vue
@@ -58,6 +58,12 @@ watch(
     if (!focusedKey) return;
     const moved = next.split("|").indexOf(focusedKey);
     if (moved !== -1) activeIndex.value = moved;
+
+    // The list changing also changes the menu's height, and the placement was
+    // computed for the old one. An above-placed menu grows downward over its
+    // own trigger; a below-placed one near the bottom of the viewport gets
+    // clipped. Re-measure once the new items are in the DOM.
+    void nextTick(reposition);
   }
 );
 

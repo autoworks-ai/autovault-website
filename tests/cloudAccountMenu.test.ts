@@ -132,6 +132,35 @@ describe("cloud account menu", () => {
     expect(body).toContain("activeIndex.value = moved");
   });
 
+  it("clears its own previous constraints before every measurement", () => {
+    // reposition()'s output BECOMES the menu's min/max width, so measuring
+    // while a previous result is still applied feeds the calculation its own
+    // stale output. That one flaw wore three costumes: the first open measured
+    // a box pinned to zero, a resize from a narrow viewport measured against
+    // the narrow cap, and a grown item list measured the old height. Fixing it
+    // where the measurement happens covers paths added later too.
+    const at = composable.indexOf("function measureUnconstrained");
+    expect(at).toBeGreaterThan(-1);
+    const body = composable.slice(at, composable.indexOf("function reposition", at));
+    expect(body).toContain('menu.style.maxWidth = "";');
+    expect(body).toContain('menu.style.minWidth = "";');
+    // Restored in the same synchronous pass, so nothing paints in between.
+    expect(body).toContain("menu.style.maxWidth = previousMaxWidth;");
+    expect(body).toContain("menu.style.minWidth = previousMinWidth;");
+    // And reposition has to actually use it rather than read offsetWidth raw.
+    const repos = composable.slice(composable.indexOf("function reposition"));
+    expect(repos.slice(0, 700)).toContain("menu: measureUnconstrained(menu)");
+  });
+
+  it("re-measures when Clerk changes the item list, not just the index", () => {
+    // A changed list changes the menu's height, and the placement was computed
+    // for the old one: an above-placed menu grows down over its own trigger,
+    // a below-placed one near the viewport bottom gets clipped.
+    const at = menu.indexOf("watch(\n  () => items.value.map");
+    const body = menu.slice(at, at + 900);
+    expect(body).toContain("void nextTick(reposition)");
+  });
+
   it("measures the popover unconstrained before it places it", () => {
     // openMenu() renders first and measures on the next tick, and closeMenu()
     // clears placement -- so the unplaced branch runs on every open. Falling
