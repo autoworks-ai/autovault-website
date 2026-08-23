@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { createTestEnv, seedUser } from "./support/d1.js";
 import {
   DEVICE_TIMESTAMP_SKEW_SECONDS,
@@ -451,6 +452,16 @@ describe("entitlement and abuse limits", () => {
       params: { slug: SLUG }
     });
     expect(refused.status).toBe(429);
+    // The cap has to hold as ONE statement. Counting first and inserting after
+    // is a check-then-act, and first contact is unauthenticated: a parallel
+    // burst can have every request see room and then every insert land.
+    const source = readFileSync(
+      new URL("../functions/v/[slug]/devices.js", import.meta.url),
+      "utf-8"
+    );
+    const insert = source.slice(source.indexOf("insert into sync_devices"));
+    expect(insert.slice(0, 400)).toContain("select count(*) from sync_devices");
+    expect(source).not.toContain("countPendingDevices(env");
 
     // A full queue must never lock out a machine that is already enrolled --
     // that would turn an abuse limit into a denial of service on real users.
