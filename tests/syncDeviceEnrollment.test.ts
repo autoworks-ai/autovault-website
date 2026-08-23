@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createTestEnv, seedUser } from "./support/d1.js";
 import {
   DEVICE_TIMESTAMP_SKEW_SECONDS,
+  MAX_PENDING_DEVICES_PER_VAULT,
   deviceFingerprint,
   verifyDeviceSignature
 } from "../functions/api/_lib/sync.js";
@@ -14,17 +15,32 @@ import { onRequest as siteMiddleware } from "../functions/_middleware.js";
 const ORIGIN = "https://autovault.dev";
 const SLUG = "demo-vault";
 
-function kv(entries: Record<string, string> = {}) {
-  const store = new Map(Object.entries(entries));
+// Models the real binding on the axis that matters: KV stores BYTES. The
+// default get() UTF-8-DECODES them, which is lossy for anything that is not
+// valid UTF-8, while "arrayBuffer" hands the bytes back untouched.
+//
+// A stub that stored JS strings would round-trip perfectly through both modes
+// and could never fail on the difference -- which is exactly what happened to
+// the first version of this file.
+function kv(entries: Record<string, string | Uint8Array> = {}) {
+  const store = new Map<string, Uint8Array>(
+    Object.entries(entries).map(([key, value]) => [
+      key,
+      typeof value === "string" ? new TextEncoder().encode(value) : value
+    ])
+  );
   const reads: string[] = [];
   return {
     reads,
-    async get(key: string) {
+    async get(key: string, type?: string) {
       reads.push(key);
-      return store.get(key) ?? null;
+      const value = store.get(key);
+      if (value === undefined) return null;
+      if (type === "arrayBuffer") return value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
+      return new TextDecoder().decode(value);
     },
     async put(key: string, value: string) {
-      store.set(key, value);
+      store.set(key, new TextEncoder().encode(value));
     },
     _store: store
   };
@@ -34,12 +50,24 @@ function deviceRowCount(db: any): number {
   return Number((db.prepare("select count(*) as n from sync_devices").get() as { n: number }).n);
 }
 
-function seedVault(db: any, { vaultId = "vault_1", userId = "clerk_1", slug = SLUG } = {}) {
+function seedVault(
+  db: any,
+  { vaultId = "vault_1", userId = "clerk_1", slug = SLUG, subscription = "active" } = {}
+) {
   seedUser(db, { id: userId });
   db.prepare(
     `insert into vaults (id, user_id, slug, status, public_url, created_at)
      values (?, ?, ?, 'reserved', ?, ?)`
   ).run(vaultId, userId, slug, `${ORIGIN}/v/${slug}`, new Date().toISOString());
+  if (subscription) {
+    db.prepare(
+      `insert into subscriptions (user_id, stripe_subscription_id, stripe_customer_id, status, price_id, current_period_end, created_at, updated_at)
+       values (?, ?, ?, ?, 'price_hosted_vault', ?, ?, ?)`
+    ).run(
+      userId, `sub_${vaultId}`, `cus_${vaultId}`, subscription,
+      4102444800, new Date().toISOString(), new Date().toISOString()
+    );
+  }
   return vaultId;
 }
 
@@ -220,13 +248,13 @@ describe("catalog and bundle access", () => {
   const BUNDLE_HASH = "a".repeat(64);
   const BUNDLE = JSON.stringify({ skill_md: "# Demo", resources: [] });
 
-  async function withDevice(status: string) {
+  async function withDevice(status: string, subscription: string | false = "active") {
     const objects = kv({
       "sync:vault_1:catalog": CATALOG,
       [`sync:vault_1:bundle:${BUNDLE_HASH}`]: BUNDLE
     });
     const { db, env } = createTestEnv({ AUTOVAULT_VAULT_OBJECTS: objects });
-    const vaultId = seedVault(db);
+    const vaultId = seedVault(db, { subscription: subscription as string });
     const device = await newDeviceKey();
     db.prepare(
       `insert into sync_devices (id, vault_id, public_key, status, first_seen_at)
@@ -369,5 +397,126 @@ describe("sync routes are never redirected", () => {
     });
     expect(response.status).toBe(302);
     expect(response.headers.get("location")).toBe(`https://autovault.dev/v/${SLUG}/catalog.json`);
+  });
+});
+
+describe("entitlement and abuse limits", () => {
+  const BUNDLE_HASH = "b".repeat(64);
+
+  async function vaultWithDevice(subscription: string, status = "active") {
+    const objects = kv({ [`sync:vault_1:bundle:${BUNDLE_HASH}`]: JSON.stringify({ skill_md: "# x", resources: [] }) });
+    const { db, env } = createTestEnv({ AUTOVAULT_VAULT_OBJECTS: objects });
+    const vaultId = seedVault(db, { subscription });
+    const device = await newDeviceKey();
+    db.prepare(
+      `insert into sync_devices (id, vault_id, public_key, status, first_seen_at)
+       values ('device-1', ?, ?, ?, ?)`
+    ).run(vaultId, device.publicKey, status, new Date().toISOString());
+    return { db, env, device };
+  }
+
+  function bundleCall(ctx: { env: any; device: any }) {
+    return signedRequest(ctx.device, "GET", `/v/${SLUG}/bundles/${BUNDLE_HASH}.json`)
+      .then((request) => readBundle({ request, env: ctx.env, params: { slug: SLUG, bundle: `${BUNDLE_HASH}.json` } }));
+  }
+
+  it("stops serving content when the subscription lapses", async () => {
+    // Device status does not carry entitlement. Stripe marking a subscription
+    // canceled updates `subscriptions` and touches no device, so without this
+    // an admitted device downloads for ever after the customer stops paying.
+    expect((await bundleCall(await vaultWithDevice("active"))).status).toBe(200);
+    for (const lapsed of ["canceled", "unpaid", "incomplete_expired"]) {
+      const response = await bundleCall(await vaultWithDevice(lapsed));
+      expect(response.status, lapsed).toBe(402);
+    }
+  });
+
+  it("caps how many devices can queue for admission", async () => {
+    // First contact is unauthenticated by design, so anyone who knows the
+    // public slug could otherwise mint keypairs in a loop and grow D1 without
+    // bound while burying the owner's real device in the queue.
+    const { db, env } = createTestEnv({ AUTOVAULT_VAULT_OBJECTS: kv() });
+    const vaultId = seedVault(db);
+    for (let index = 0; index < MAX_PENDING_DEVICES_PER_VAULT; index += 1) {
+      db.prepare(
+        `insert into sync_devices (id, vault_id, public_key, status, first_seen_at)
+         values (?, ?, ?, 'pending', ?)`
+      ).run(`device-${index}`, vaultId, `filler-key-${index}`, new Date().toISOString());
+    }
+
+    const fresh = await newDeviceKey();
+    const refused = await enrollDevice({
+      request: await signedRequest(fresh, "POST", `/v/${SLUG}/devices`, { body: { public_key: fresh.publicKey } }),
+      env,
+      params: { slug: SLUG }
+    });
+    expect(refused.status).toBe(429);
+
+    // A full queue must never lock out a machine that is already enrolled --
+    // that would turn an abuse limit into a denial of service on real users.
+    const known = await newDeviceKey();
+    db.prepare(
+      `insert into sync_devices (id, vault_id, public_key, status, first_seen_at)
+       values ('device-known', ?, ?, 'active', ?)`
+    ).run(vaultId, known.publicKey, new Date().toISOString());
+    const allowed = await enrollDevice({
+      request: await signedRequest(known, "POST", `/v/${SLUG}/devices`, { body: { public_key: known.publicKey } }),
+      env,
+      params: { slug: SLUG }
+    });
+    expect(allowed.status).toBe(200);
+    expect(await allowed.json()).toEqual({ device_id: "device-known", status: "active" });
+  });
+
+  it("resolves slugs longer than the CLI's own 63-character pattern", async () => {
+    // vaultSlugForUser appends "-" plus six characters without truncating the
+    // base, so provisioning can mint a slug past 63. Validating against the
+    // CLI's pattern here 404'd every sync route for those vaults.
+    const longSlug = `${"a".repeat(70)}-abcdef`;
+    const { db, env } = createTestEnv({ AUTOVAULT_VAULT_OBJECTS: kv({ "sync:vault_long:catalog": "{}" }) });
+    seedVault(db, { vaultId: "vault_long", slug: longSlug });
+    const device = await newDeviceKey();
+    db.prepare(
+      `insert into sync_devices (id, vault_id, public_key, status, first_seen_at)
+       values ('device-1', 'vault_long', ?, 'active', ?)`
+    ).run(device.publicKey, new Date().toISOString());
+
+    const response = await readCatalog({
+      request: await signedRequest(device, "GET", `/v/${longSlug}/catalog.json`),
+      env,
+      params: { slug: longSlug }
+    });
+    expect(response.status).toBe(200);
+  });
+
+  it("serves stored bytes rather than a re-encoded string", async () => {
+    // KV's default text mode UTF-8-decodes, and decoding is LOSSY for bytes
+    // that are not valid UTF-8 -- they come back as U+FFFD and re-encode to
+    // something else entirely. The hash and the signature are over the bytes,
+    // so anything lossy here makes a valid bundle fail verification on the
+    // client, with an error that blames the signature rather than the server.
+    //
+    // 0xFF is never valid UTF-8, so it survives arrayBuffer and cannot
+    // survive a decode/re-encode round trip.
+    const stored = new Uint8Array([...new TextEncoder().encode('{"schema_version":1,"x":"'), 0xff, ...new TextEncoder().encode('"}')]);
+    const { db, env } = createTestEnv({
+      AUTOVAULT_VAULT_OBJECTS: kv({ "sync:vault_1:catalog": stored })
+    });
+    const vaultId = seedVault(db);
+    const device = await newDeviceKey();
+    db.prepare(
+      `insert into sync_devices (id, vault_id, public_key, status, first_seen_at)
+       values ('device-1', ?, ?, 'active', ?)`
+    ).run(vaultId, device.publicKey, new Date().toISOString());
+
+    const response = await readCatalog({
+      request: await signedRequest(device, "GET", `/v/${SLUG}/catalog.json`),
+      env,
+      params: { slug: SLUG }
+    });
+    const served = new Uint8Array(await response.arrayBuffer());
+    expect(served).toEqual(stored);
+    // And specifically: the byte was not replaced.
+    expect(served).not.toContain(0xfd);
   });
 });
