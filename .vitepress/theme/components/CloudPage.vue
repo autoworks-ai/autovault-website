@@ -806,7 +806,7 @@ import CloudAccountMenu from "./CloudAccountMenu.vue";
 import { copyText as copyToClipboard } from "../utils/clipboard";
 import { prefersReducedMotion } from "../utils/motion";
 import { formatPriceLabel } from "../utils/money";
-import { consumeVaultArrival } from "../utils/vaultArrival";
+import { consumeVaultArrival, isAuthenticatedCloudState } from "../utils/vaultArrival";
 import { cloudStateIsKnown, deviceListIsKnown } from "../utils/cloudLoadState";
 import {
   admitHandshakeState,
@@ -2389,6 +2389,36 @@ const arrivalSearch = ref("");
 //               frame of the real page and the only honest place for it.
 const ambientVault = computed(() => revealed.value && signedIn.value);
 
+// Presence is ambient-always; the arrival is not, and the difference is the
+// whole of this gate.
+//
+// This gate was written (PR #113) against an `ambientVault` that was still
+// `hydrated && signedIn`, and the `revealed` it now reads is a strictly
+// stronger claim -- which makes it tempting to conclude this gate has been
+// absorbed and can go. It has not been. The gap is exactly one short-circuit
+// wide, and it is in utils/cloudLoadState.ts: `cloudStateIsKnown` returns
+// true on `hydrated && patienceExpired` WITHOUT auth ever settling. On that
+// path stage leaves "loading", `settled` and then `revealed` follow, and
+// `signedIn` ORs in the live Clerk flag (see its own comment) -- so the whole
+// chain above can be true while the only /api/me in hand is the anonymous
+// mount response, with `user` and `vault` still null.
+//
+// What that costs is not a frame. The occasion is spent once
+// (consumeVaultArrival), so the returning owner watches a LOCKED mark swell
+// and the real unlock arrival they were owed never plays. And the bounded
+// wait is not an exotic path: it exists precisely for a slow Clerk, which is
+// the same slowness that leaves the authenticated payload in flight.
+//
+// `cloudState` is only ever written from an applied /api/me or from the
+// funnel's own syncCloudState, so asking it -- rather than the Clerk flag --
+// is asking the state itself instead of a promise of one.
+const cloudStateAuthenticated = computed(() =>
+  isAuthenticatedCloudState(cloudState.value)
+);
+const vaultArrivalReady = computed(
+  () => ambientVault.value && cloudStateAuthenticated.value
+);
+
 const vaultArriving = ref(false);
 let vaultArrivalTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -2420,10 +2450,10 @@ function startVaultArrival() {
 
 // Not `{ immediate: true }`: immediate runs at setup scope, where reading the
 // motion preference is the hydration-mismatch class fixed in PR #88.
-// `ambientVault` is false at setup on both server and client anyway -- it
+// `vaultArrivalReady` is false at setup on both server and client anyway -- it
 // cannot flip before /api/me lands, which is post-mount by construction.
-watch(ambientVault, (visible) => {
-  if (visible) startVaultArrival();
+watch(vaultArrivalReady, (ready) => {
+  if (ready) startVaultArrival();
 });
 
 onBeforeUnmount(cancelVaultArrival);

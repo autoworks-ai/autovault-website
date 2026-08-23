@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
   consumeVaultArrival,
+  isAuthenticatedCloudState,
   resetVaultArrivalLedger,
   vaultArrivalOccasion,
 } from "../.vitepress/theme/utils/vaultArrival";
@@ -175,6 +176,47 @@ describe("the arrival fires once per occasion", () => {
   });
 });
 
+describe("the arrival waits for the authenticated answer, not the Clerk flag", () => {
+  // The race this closes: /cloud loads /api/me twice. The first goes out
+  // anonymous and its `finally` sets `hydrated` even when the response is
+  // discarded as stale, because it passes `initial`. Clerk resolves in
+  // between, which flips `signedIn` through its live-flag OR. So `hydrated &&
+  // signedIn` is true a whole request before the authenticated payload lands,
+  // and gating the one-shot arrival on it spends the occasion on the empty
+  // state -- a returning owner watches a LOCKED mark swell and never gets the
+  // real one, because there is only ever one.
+  //
+  // These run the predicate rather than grepping for it, which is the reason
+  // it lives in the util module at all.
+
+  it("does not treat the anonymous answer as authenticated", () => {
+    // /api/me answers a request it could not authenticate with 200 and nulls,
+    // so "the response came back" is not the same question as "we know who
+    // this is".
+    expect(isAuthenticatedCloudState({ user: null, subscription: null, vault: null }))
+      .toBe(false);
+  });
+
+  it("treats a user as proof", () => {
+    expect(isAuthenticatedCloudState({ user: { id: "clerk_1" }, vault: null }))
+      .toBe(true);
+  });
+
+  it("treats a vault as proof too, which is what saves the checkout return", () => {
+    // HostedVaultFunnel emits `{ ...(current ?? { user: null }), vault }` after
+    // it provisions, so the occasion the ask named FIRST can arrive carrying a
+    // real vault and a null user. A `user`-only gate would silently drop the
+    // post-checkout celebration -- trading this bug for a worse one.
+    expect(isAuthenticatedCloudState({ user: null, vault: { id: "v_1" } })).toBe(true);
+  });
+
+  it("answers nothing with false rather than throwing", () => {
+    expect(isAuthenticatedCloudState(null)).toBe(false);
+    expect(isAuthenticatedCloudState(undefined)).toBe(false);
+    expect(isAuthenticatedCloudState({})).toBe(false);
+  });
+});
+
 describe("the arrival cannot disturb the first-machine celebration", () => {
   // The load trigger and the admit trigger are separate refs on separate
   // timers on purpose. These are structural assertions — they pin the shape
@@ -214,11 +256,17 @@ describe("the arrival cannot disturb the first-machine celebration", () => {
     // Same hazard vaultMotion.test.ts guards for the admit celebration: this
     // page loads /api/me twice, and any "previous was non-null" watcher on the
     // stage celebrates on every reload for every returning customer.
-    // `ambientVault` is monotonic per mount — it goes false -> true once when
-    // the boot veil lifts — and the one-shot ledger covers the remount case.
-    expect(cloudPage).toContain("watch(ambientVault, (visible) => {");
+    // `vaultArrivalReady` is monotonic per mount — it goes false -> true once,
+    // in the tick whichever of its two conditions lands last: the boot veil
+    // lifting, or the authenticated payload arriving. Usually that is the
+    // veil, because the payload is what settles the stage; on the bounded-wait
+    // path it is the payload, which is the case the auth gate is there for.
+    // The one-shot ledger covers the remount case.
+    expect(cloudPage).toContain("watch(vaultArrivalReady, (ready) => {");
     expect(cloudPage).not.toContain("watch(vaultOpen");
     expect(cloudPage).not.toContain("watch(() => vaultOpen");
+    // Presence is still the plain gate; only the trigger waits for more.
+    //
     // The gate is the moment the veil ACTUALLY lifts, and that moved twice.
     // `hydrated` now means only that some /api/me response arrived, and the
     // first one is anonymous and lands while the veil is still up. `settled`
@@ -233,6 +281,24 @@ describe("the arrival cannot disturb the first-machine celebration", () => {
       'const revealed = computed(() => settled.value && bootPhase.value === "open");'
     );
     expect(cloudPage).toContain('<div v-if="!revealed" class="cv-boot"');
+    // And the trigger is NOT that gate on its own. This is the assertion that
+    // fails if someone reverts the arrival to the Clerk flag plus `hydrated`:
+    // the predicate above proves the rule, this proves the page still asks it.
+    //
+    // Both gates survive the merge of #113 and #114 on purpose, and this pair
+    // is what stops the plausible-sounding collapse. `revealed` is a stronger
+    // claim than the `hydrated` #113 was written against, but not a strictly
+    // sufficient one: cloudStateIsKnown short-circuits true on `hydrated &&
+    // patienceExpired` without auth settling (cloudLoadState.test.ts runs that
+    // rule), so `revealed` can be reached against an anonymous payload and
+    // only cloudStateAuthenticated still says no.
+    expect(cloudPage).not.toContain("watch(ambientVault");
+    expect(cloudPage).toContain(
+      "const cloudStateAuthenticated = computed(() =>\n  isAuthenticatedCloudState(cloudState.value)\n);"
+    );
+    expect(cloudPage).toContain(
+      "const vaultArrivalReady = computed(\n  () => ambientVault.value && cloudStateAuthenticated.value\n);"
+    );
   });
 
   it("consumes the occasion rather than peeking at it", () => {
@@ -252,6 +318,64 @@ describe("the arrival cannot disturb the first-machine celebration", () => {
     const mount = cloudPage.slice(at, cloudPage.indexOf("\n});", at));
     expect(mount).toContain("arrivalSearch.value = window.location.search;");
     expect(fnBody("startVaultArrival")).not.toContain("window.location");
+  });
+});
+
+describe("what makes the load-triggered arrival safe: opening needs an admitted machine", () => {
+  // Codex raised, twice and correctly on mechanism, that the one-shot arrival
+  // can be consumed on a `?hosted=success` return before the vault row exists.
+  // The reason that is not a defect is the coupling pinned here: `vaultOpen`
+  // needs an ADMITTED MACHINE, not merely a vault.
+  //
+  // Scope that precisely, because "every checkout return is locked" would be
+  // false. The finding is about the `{ user, vault: null }` window, and only a
+  // FIRST vault is ever in it -- an owner provisioning their first vault has
+  // no admitted device, so the mark renders `locked` with no dial both before
+  // provisioning (stage `setup`) and after it (stage `connect`). Waiting for
+  // the vault would relocate that same locked swell without changing a pixel.
+  //
+  // A RESUBSCRIBING owner is the case that is not locked: `getCurrentVault`
+  // still returns the vault they already had, so with an admitted device they
+  // land on `explore`/`ready` and the dial does fire. The finding does not
+  // reach them either, for a different reason -- /api/me answers with `user`
+  // and `vault` in one payload (functions/api/me.js), so `{ user, vault: null }`
+  // never arises for someone who already has a vault.
+  //
+  // Declining the vault-triggered change is what keeps the trigger
+  // load-driven -- and the load-driven trigger is what stops this page's TWO
+  // /api/me loads from celebrating on every reload for every returning
+  // customer, which is the hazard "fires from the load, not from a state
+  // transition" exists to guard.
+  //
+  // So these pin the COUPLING, not the conclusion. If the locked-swell
+  // decision is ever revisited, the moot-ness stops holding and this is what
+  // notices first.
+
+  /** The body of the `stage` computed. */
+  const stageBody = (() => {
+    const at = cloudPage.indexOf("const stage = computed<Stage>(() => {");
+    expect(at, "no stage computed").toBeGreaterThan(-1);
+    return cloudPage.slice(at, cloudPage.indexOf("\n});", at));
+  })();
+
+  it("cannot open the vault without an admitted machine", () => {
+    expect(cloudPage).toContain(
+      'const vaultOpen = computed(() => stage.value === "explore" || stage.value === "ready");'
+    );
+    // A vault on its own is `connect`. `explore` is on the far side of an
+    // admit, so a fresh checkout return cannot reach it.
+    expect(stageBody).toContain('if (!cliLinked.value) return "connect";');
+    expect(cloudPage).toContain(
+      "const cliLinked = computed(() => activeDevices.value.length > 0);"
+    );
+  });
+
+  it("has no vault to open before a first provisioning either", () => {
+    // The other half of the first-vault window: with no vault row the stage
+    // machine falls through to these three, none of which is explore or ready.
+    expect(stageBody).toContain('if (!signedIn.value) return "account";');
+    expect(stageBody).toContain('if (!paid.value) return "subscription";');
+    expect(stageBody).toContain('return "setup";');
   });
 });
 
