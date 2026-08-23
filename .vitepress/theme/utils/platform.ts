@@ -43,10 +43,15 @@ export function installMethodFor(
   // installer as detected-compatible.
   if (/CrOS/.test(userAgent)) return null;
 
-  // Windows before the rest: `curl … | sh` has no shell to run in on
-  // PowerShell or cmd, and brew does not exist there, so npm is the only line
-  // that works. A WSL2 user still reports a Windows UA, and npm works there.
-  if (/Windows|Win64|Win32/i.test(userAgent)) return { method: "npm", label: "Windows" };
+  // Windows declines too, for the same reason as everything above it: the
+  // user agent cannot answer the question that matters. This page states
+  // Windows support as WSL2, and nothing in a browser UA reveals whether WSL2
+  // is installed or which shell the visitor will paste into — so labelling the
+  // tab "Windows" would claim a compatibility we cannot see.
+  //
+  // Declining costs nothing here: npm is already the default, so a Windows
+  // visitor sees exactly what they saw before, minus a claim we cannot back.
+  if (/Windows|Win64|Win32/i.test(userAgent)) return null;
 
   // curl elsewhere: it is the only channel with no prerequisite of its own
   // (brew needs Homebrew, npm needs Node 24+) and the one that provisions

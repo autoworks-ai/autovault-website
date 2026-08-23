@@ -29,7 +29,14 @@ describe("preselecting an install command", () => {
     // brew, so npm is the only line that runs.
     expect(installMethodFor(UA.mac, 0)).toEqual({ method: "curl", label: "macOS" });
     expect(installMethodFor(UA.linux, 0)).toEqual({ method: "curl", label: "Linux" });
-    expect(installMethodFor(UA.windows, 0)).toEqual({ method: "npm", label: "Windows" });
+    // Windows is deliberately absent — see the test below.
+  });
+
+  it("does not claim Windows, which the UA cannot settle either", () => {
+    // The page states Windows support as WSL2, and no browser UA reveals
+    // whether WSL2 is present or which shell the visitor will paste into.
+    // npm stays selected because it is the default, not because we detected it.
+    expect(installMethodFor(UA.windows, 0)).toBeNull();
   });
 
   it("refuses to guess on a phone or tablet", () => {
