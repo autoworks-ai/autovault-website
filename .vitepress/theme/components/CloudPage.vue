@@ -3271,12 +3271,35 @@ const ICON = {
     opacity: 1;
   }
 }
+/* The measure, and the whole horizontal half of "the actual permission grant
+   button is off to the right".
+
+   This was `flex: 1 1 auto`, so the identity column absorbed every pixel of
+   slack in the row. .cv-shell has no max-width -- /cloud is deliberately
+   full-bleed (.cd-full-content) -- so on a 2560px monitor the row is 2236px
+   wide and the machine's name sat 2260px from the Admit button that acts on
+   it. Reading a fingerprint and then travelling that far to click is a
+   cross-reference, not a glance, and with two machines pending it is a
+   cross-reference you can lose your place in -- which is how the wrong box
+   gets admitted.
+   A fixed basis instead of a growing one keeps every row's controls on the
+   same x, so the buttons stack in a column rather than landing wherever each
+   hostname happens to end. It still shrinks (0 1, not 0 0) for the narrow
+   viewports above the wrap breakpoint. */
 .cv-device-id {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-  flex: 1 1 auto;
+  flex: 0 1 300px;
+}
+/* Two pending machines differ by exactly this string -- it is what the CLI
+   printed on each box, and the only thing that tells them apart. At --ink-3 it
+   was the dimmest thing in the row it most needed to be read from. Lifted a
+   step on the rows that are actually asking to be told apart; the settled ones
+   keep the quiet treatment. */
+.cv-device.pending .cv-device-id code {
+  color: var(--ink-2);
 }
 .cv-device-id strong {
   font-size: 12.5px;
@@ -3291,12 +3314,22 @@ const ICON = {
   font-size: 11px;
   color: var(--ink-3);
 }
+/* Travels with the identity now rather than being flung to the far end of the
+   row. Left-aligned at every width -- the @media block below used to switch
+   this to flex-start under 640px and that rule is gone, because there is no
+   longer a width at which this column is right-aligned.
+
+   `min-width` rather than a fixed basis: the width is the content's
+   ("first seen just now", "first seen Aug 23"), floored so that the Admit
+   buttons still line up across rows instead of stepping in and out by however
+   many characters the last timestamp happened to need. */
 .cv-device-seen {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  align-items: flex-end;
-  flex: 0 0 auto;
+  align-items: flex-start;
+  flex: 0 1 auto;
+  min-width: 132px;
 }
 .cv-device-seen small {
   font-size: 11px;
@@ -3318,8 +3351,11 @@ const ICON = {
   .cv-device {
     flex-wrap: wrap;
   }
+  /* Nothing to re-align here any more: .cv-device-seen is left-aligned at
+     every width now, and its floor has to go so the identity is not squeezed
+     out by a timestamp on a phone. */
   .cv-device-seen {
-    align-items: flex-start;
+    min-width: 0;
   }
   .cv-device-actions {
     width: 100%;
