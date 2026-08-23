@@ -193,3 +193,26 @@ describe("the honour-system checkbox is gone", () => {
     expect(cloudPage).toContain("waiting for you to admit it below");
   });
 });
+
+describe("Skills and Sync log are real destinations now", () => {
+  it("stops badging them as soon", () => {
+    expect(cloudPage).toContain('item("skills", "Skills", ICON.book, { revealAt: "connect", action: "preview" })');
+    expect(cloudPage).toContain('action: "scroll-devices"');
+    // Members stays soon: beta is pending/active/revoked devices, not roles.
+    expect(cloudPage).toContain('item("members", "Members", ICON.users, { soon: true');
+  });
+
+  it("keeps the machines list reachable after the connect step", () => {
+    // It started life inside the connect stage, so admitting the first device
+    // advanced the stage and the list vanished -- leaving no way back to
+    // revoke a machine. Sync log lands here, so it has to exist there too.
+    const at = cloudPage.indexOf('ref="devicesCard"');
+    expect(at).toBeGreaterThan(-1);
+    expect(cloudPage.slice(at - 120, at + 60)).toContain('v-if="vault"');
+    // And it must sit outside the stage-specific templates.
+    const connectStage = cloudPage.indexOf("STAGE A: CONNECT");
+    const exploreStage = cloudPage.indexOf("STAGE B: EXPLORE");
+    expect(at).toBeGreaterThan(exploreStage);
+    expect(connectStage).toBeGreaterThan(-1);
+  });
+});

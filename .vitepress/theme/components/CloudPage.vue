@@ -215,61 +215,6 @@
               <ConnectTerminal :slug="vaultSlug" />
             </div>
 
-            <!-- Enrolled machines. This list IS the link step: there is no
-                 button to say a CLI is connected, because saying so was never
-                 evidence of anything. A row appears here when a real machine
-                 signs a real enrollment request. -->
-            <div class="cv-devices" role="region" aria-labelledby="cv-devices-title">
-              <h3 id="cv-devices-title" class="cv-devices-title">
-                Machines
-                <span v-if="pendingDevices.length" class="cv-devices-count">
-                  {{ pendingDevices.length }} waiting
-                </span>
-              </h3>
-
-              <p v-if="!devices.length" class="cv-devices-empty">
-                Nothing enrolled yet. Run the command above and this machine
-                will appear here within a few seconds.
-              </p>
-
-              <ul v-else class="cv-device-list">
-                <li v-for="device in devices" :key="device.id" class="cv-device" :class="device.status">
-                  <span class="cv-device-id">
-                    <strong>{{ device.hostname || "Unnamed machine" }}</strong>
-                    <!-- Matches what the CLI printed on that machine, so the
-                         owner can tell two pending devices apart. -->
-                    <code>ed25519 {{ device.fingerprint }}</code>
-                  </span>
-                  <span class="cv-device-seen">
-                    <span class="cv-pill" :class="device.status === 'active' ? 'ok' : ''">
-                      <span class="cv-dot" />{{ device.status }}
-                    </span>
-                    <small>first seen {{ formatWhen(device.first_seen_at) }}</small>
-                  </span>
-                  <span class="cv-device-actions">
-                    <button
-                      v-if="device.status === 'pending'"
-                      type="button"
-                      class="cv-btn small"
-                      :disabled="deviceBusy === device.id"
-                      @click="decideDevice(device.id, 'admit')"
-                    >
-                      {{ deviceBusy === device.id ? "Working…" : "Admit" }}
-                    </button>
-                    <button
-                      v-if="device.status !== 'revoked'"
-                      type="button"
-                      class="cv-btn ghost small"
-                      :disabled="deviceBusy === device.id"
-                      @click="decideDevice(device.id, 'revoke')"
-                    >
-                      {{ device.status === "pending" ? "Deny" : "Revoke" }}
-                    </button>
-                  </span>
-                </li>
-              </ul>
-            </div>
-
             <div class="cv-focal-actions">
               <a class="cv-btn ghost" :href="installDocsHref"
                 >Installation guide</a
@@ -427,6 +372,60 @@
             </article>
           </div>
         </template>
+        <!-- Enrolled machines. This list IS the link step: there is no
+             button to say a CLI is connected, because saying so was never
+             evidence of anything. A row appears here when a real machine
+             signs a real enrollment request. -->
+        <div v-if="vault" ref="devicesCard" class="cv-devices standalone" :class="{ focusflash: focusedCard === 'devices' }" role="region" aria-labelledby="cv-devices-title">
+          <h3 id="cv-devices-title" class="cv-devices-title">
+            Machines
+            <span v-if="pendingDevices.length" class="cv-devices-count">
+              {{ pendingDevices.length }} waiting
+            </span>
+          </h3>
+
+          <p v-if="!devices.length" class="cv-devices-empty">
+            Nothing enrolled yet. Run the command above and this machine
+            will appear here within a few seconds.
+          </p>
+
+          <ul v-else class="cv-device-list">
+            <li v-for="device in devices" :key="device.id" class="cv-device" :class="device.status">
+              <span class="cv-device-id">
+                <strong>{{ device.hostname || "Unnamed machine" }}</strong>
+                <!-- Matches what the CLI printed on that machine, so the
+                     owner can tell two pending devices apart. -->
+                <code>ed25519 {{ device.fingerprint }}</code>
+              </span>
+              <span class="cv-device-seen">
+                <span class="cv-pill" :class="device.status === 'active' ? 'ok' : ''">
+                  <span class="cv-dot" />{{ device.status }}
+                </span>
+                <small>first seen {{ formatWhen(device.first_seen_at) }}</small>
+              </span>
+              <span class="cv-device-actions">
+                <button
+                  v-if="device.status === 'pending'"
+                  type="button"
+                  class="cv-btn small"
+                  :disabled="deviceBusy === device.id"
+                  @click="decideDevice(device.id, 'admit')"
+                >
+                  {{ deviceBusy === device.id ? "Working…" : "Admit" }}
+                </button>
+                <button
+                  v-if="device.status !== 'revoked'"
+                  type="button"
+                  class="cv-btn ghost small"
+                  :disabled="deviceBusy === device.id"
+                  @click="decideDevice(device.id, 'revoke')"
+                >
+                  {{ device.status === "pending" ? "Deny" : "Revoke" }}
+                </button>
+              </span>
+            </li>
+          </ul>
+        </div>
       </main>
     </div>
   </section>
@@ -577,7 +576,7 @@ type NavItem = {
   locked: boolean;
   disabled: boolean;
   cls: Record<string, boolean>;
-  action: "none" | "preview" | "scroll-billing";
+  action: "none" | "preview" | "scroll-billing" | "scroll-devices";
 };
 
 const cloudState = ref<CloudState>({
@@ -602,9 +601,10 @@ const notice = ref<CloudNotice | null>(null);
 function setNotice(next: CloudNotice | null) {
   notice.value = next;
 }
-const focusedCard = ref<"preview" | "billing" | null>(null);
+const focusedCard = ref<"preview" | "billing" | "devices" | null>(null);
 const previewCard = ref<HTMLElement | null>(null);
 const billingCard = ref<HTMLElement | null>(null);
+const devicesCard = ref<HTMLElement | null>(null);
 const previewRows = [{ w: "55%" }, { w: "42%" }, { w: "60%" }];
 
 const { authHeaders, clerkAuthEnabled, isClerkLoaded, isClerkSignedIn, clerkUserLabel } =
@@ -944,8 +944,11 @@ const navItems = computed<NavItem[]>(() => {
 
   return [
     item("overview", "Overview", ICON.grid, { active: true }),
-    item("skills", "Skills", ICON.book, { soon: true, action: "preview" }),
-    item("sync", "Sync log", ICON.sync, { soon: true, action: "preview" }),
+    item("skills", "Skills", ICON.book, { revealAt: "connect", action: "preview" }),
+    // Lands on the machines list. That IS the sync state today: which devices
+    // are enrolled, which are admitted, and when each was last seen. Fuller
+    // per-release history arrives with catalog publishing.
+    item("sync", "Sync log", ICON.sync, { revealAt: "connect", action: "scroll-devices" }),
     item("members", "Members", ICON.users, { soon: true, action: "preview" }),
     item("billing", "Billing", ICON.card, {
       revealAt: "explore",
@@ -1243,9 +1246,11 @@ function onNavClick(item: NavItem) {
   if (item.action === "preview") void focusCard("preview", previewCard.value);
   else if (item.action === "scroll-billing")
     void focusCard("billing", billingCard.value);
+  else if (item.action === "scroll-devices")
+    void focusCard("devices", devicesCard.value);
 }
 
-async function focusCard(name: "preview" | "billing", el: HTMLElement | null) {
+async function focusCard(name: "preview" | "billing" | "devices", el: HTMLElement | null) {
   await nextTick();
   el?.scrollIntoView({ behavior: "smooth", block: "center" });
   focusedCard.value = name;
@@ -1663,6 +1668,19 @@ const ICON = {
   padding-top: 16px;
   border-top: 1px solid var(--line);
 }
+/* Inside the focal card it borrowed that card's frame. On its own it needs
+   one, and it is now the only route to revoking a machine. */
+.cv-devices.standalone {
+  margin-top: 20px;
+  padding: 16px 18px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--cv-radius);
+  background: var(--bg-1);
+}
+.cv-devices.standalone.focusflash {
+  border-color: var(--accent);
+}
+
 .cv-devices-title {
   display: flex;
   align-items: center;
