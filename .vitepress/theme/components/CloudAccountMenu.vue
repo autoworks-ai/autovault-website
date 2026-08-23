@@ -45,16 +45,23 @@ const menuStyle = computed(() => ({
   visibility: placement.value ? ("visible" as const) : ("hidden" as const)
 }));
 
-// Every handler closes with restoreFocus:false and only then runs its action.
-// Returning focus to the trigger first would fight whatever the action opens
-// — Clerk's profile modal in particular — for the focus it just took.
+// Profile and Sign out close with restoreFocus:false and only then run their
+// action. Returning focus to the trigger first would fight whatever the action
+// opens — Clerk's profile modal in particular — for the focus it just took.
 function onProfile() {
   closeMenu();
   openProfile();
 }
 
+// Billing is the exception, and restores focus. Its action is an async fetch
+// that only sometimes navigates away: a 409 (no billing account yet) or a
+// Stripe/auth/network failure ends with a notice rendered elsewhere on the
+// page and nothing claiming focus, so a bare close would drop the keyboard
+// user onto <body> and make them tab in from the top of the document again.
+// On the success path the browser navigates to Stripe, so restoring focus to
+// the trigger costs nothing.
 function onBilling() {
-  closeMenu();
+  closeMenu({ restoreFocus: true });
   emit("billing");
 }
 

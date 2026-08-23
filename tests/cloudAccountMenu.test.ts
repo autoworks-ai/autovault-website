@@ -57,11 +57,35 @@ describe("cloud account menu", () => {
   it("closes before running an action rather than restoring focus into it", () => {
     // Restoring focus to the trigger races Clerk's profile modal for focus
     // and can yank it straight back out of the dialog.
-    for (const handler of ["function onProfile", "function onBilling", "async function onSignOut"]) {
+    for (const handler of ["function onProfile", "async function onSignOut"]) {
       const body = menu.slice(menu.indexOf(handler), menu.indexOf(handler) + 220);
       expect(body).toContain("closeMenu()");
       expect(body).not.toContain("restoreFocus: true");
     }
+  });
+
+  it("restores focus for Billing, whose action often takes none", () => {
+    // Billing is the one item that can finish without anything claiming
+    // focus: a 409 (no billing account yet) or a Stripe/auth/network failure
+    // renders a notice elsewhere on the page and never navigates, so closing
+    // without restoring drops the keyboard user onto <body> and makes them
+    // tab in from the top of the document again.
+    const at = menu.indexOf("function onBilling");
+    expect(at).toBeGreaterThan(-1);
+    expect(menu.slice(at, at + 220)).toContain("closeMenu({ restoreFocus: true })");
+  });
+
+  it("hands focus back to the trigger when Tab closes the menu", () => {
+    // The menu is teleported to the end of <body> and its items are
+    // tabindex="-1", so closing without moving focus resumes sequential
+    // navigation from the teleported node -- or from <body> once Vue removes
+    // it -- and lands the user at the top or bottom of the page instead of
+    // beside the account button. Anchor on the branch, not the prose.
+    const tabAt = composable.indexOf('event.key === "Tab"');
+    const afterTab = composable.indexOf("nextMenuIndex(activeIndex.value", tabAt);
+    expect(tabAt).toBeGreaterThan(-1);
+    expect(afterTab).toBeGreaterThan(tabAt);
+    expect(composable.slice(tabAt, afterTab)).toContain("closeMenu({ restoreFocus: true })");
   });
 
   it("routes Clerk through composables, never window.Clerk", () => {
