@@ -146,18 +146,28 @@ describe("unified shell", () => {
     expect(pageTitle).toContain('if (!vault.value)');
     expect(pageTitle).toContain('"Reserve a hosted AutoVault namespace"');
 
-    // 3. connect stage (must be checked BEFORE the fallthrough to "Overview")
+    // 3. connect stage (must be checked BEFORE the fallthrough)
     expect(pageTitle).toContain('if (stage.value === "connect")');
     expect(pageTitle).toContain('"Connect your CLI"');
 
-    // 4. else → Overview
-    expect(pageTitle).toContain('return "Overview"');
+    // 4. else → the selected panel's own title. This used to be a literal
+    //    `return "Overview"`, which was correct only while "Overview" was the
+    //    whole page; once the sidebar started selecting one of five panels it
+    //    left the h1 saying "Overview" on Billing while aria-current had
+    //    already moved. The branch is now a lookup -- see the SECTION_TITLE
+    //    tests in cloudDashboardSections.test.ts for what it resolves to --
+    //    but the ordering this test exists to guard is unchanged.
+    expect(pageTitle).toContain("return SECTION_TITLE[activeSection.value];");
+    expect(pageTitle).not.toContain('return "Overview"');
 
-    // The key assertion: connect is checked BEFORE "Overview" fallthrough
+    // The key assertion: connect is checked BEFORE the fallthrough, so a
+    // vaulted user mid-link still gets "Connect your CLI" rather than the
+    // title of whichever panel happens to be selected behind the stage
+    // template that is not rendering yet.
     const connectCheck = pageTitle.indexOf('stage.value === "connect"');
-    const overviewFallthrough = pageTitle.indexOf('return "Overview"');
+    const fallthrough = pageTitle.indexOf("return SECTION_TITLE[activeSection.value];");
     expect(connectCheck).toBeGreaterThan(-1);
-    expect(overviewFallthrough).toBeGreaterThan(connectCheck);
+    expect(fallthrough).toBeGreaterThan(connectCheck);
   });
 
   it("stacks the rail on narrow viewports instead of wrapping it per character", () => {

@@ -260,7 +260,9 @@ describe("Skills and Sync log are real destinations now", () => {
 
     expect(cloudPage).toContain("selectedSection.value = item.section;");
 
-    // Skills -> the panel holding the app preview and the early-access ask.
+    // Skills -> the panel holding the app preview. The early-access ask used
+    // to live here too; it moved to the vault strip, which stays on screen
+    // whichever panel is selected -- see cloudDashboardSections.test.ts.
     expect(sectionOf("skills")).toBe("skills");
     const skillsPanel = cloudPage.indexOf(`v-else-if="activeSection === 'skills'"`);
     expect(skillsPanel, "no skills panel").toBeGreaterThan(-1);

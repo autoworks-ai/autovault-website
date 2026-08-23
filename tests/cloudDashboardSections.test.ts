@@ -51,6 +51,21 @@ function revealTable(): Record<string, string | null> {
   return rows;
 }
 
+/** What the <h1> says while each section is on screen, off SECTION_TITLE.
+ * `[^"]+` rather than revealTable's `\w+`: these are display strings, and
+ * "Vault catalog" has a space in it -- a \w+ match would drop that row
+ * silently and leave the key-parity assertion below passing on four rows. */
+function titleTable(): Record<string, string> {
+  const at = cloudPage.indexOf("const SECTION_TITLE");
+  expect(at, "no SECTION_TITLE table").toBeGreaterThan(-1);
+  const body = cloudPage.slice(at, cloudPage.indexOf("};", at));
+  const rows: Record<string, string> = {};
+  for (const [, name, value] of body.matchAll(/^\s{2}(\w+): "([^"]+)",/gm)) {
+    rows[name] = value;
+  }
+  return rows;
+}
+
 describe("the sidebar selects a panel", () => {
   it("keeps one ref and one computed instead of a router", () => {
     // /cloud is one page. A URL that named a panel would have to survive the
@@ -150,6 +165,136 @@ describe("the sidebar selects a panel", () => {
     expect(cloudPage).not.toContain("{ active: true }");
     expect(cloudPage).toContain("const active = !locked && section !== null && section === current;");
     expect(cloudPage).toContain(`:aria-current="item.active ? 'true' : undefined"`);
+  });
+});
+
+describe("the heading names the panel that is on screen", () => {
+  it("titles every section, keyed by the same union the panels are", () => {
+    // Not a subset and not a superset: a missing row is a heading that cannot
+    // be produced (Record<Section, string> would fail typecheck, but this
+    // catches a row added to one table and forgotten in the other, which
+    // typechecks fine and silently mislabels a panel).
+    expect(cloudPage).toContain("const SECTION_TITLE: Record<Section, string> = {");
+    expect(titleTable()).toEqual({
+      overview: "Overview",
+      billing: "Billing",
+      machines: "Machines",
+      skills: "Skills",
+      catalog: "Vault catalog"
+    });
+    expect(Object.keys(titleTable()).sort()).toEqual(Object.keys(revealTable()).sort());
+  });
+
+  it("follows the selection, not a literal, past the stage branches", () => {
+    // The defect: C1 made pageTitle stage-keyed with a literal "Overview"
+    // fallthrough, and C2 then turned Overview into one panel of five and
+    // moved aria-current onto whichever nav item is selected. Neither diff
+    // showed the combination -- on Billing the h1 said "Overview" while
+    // aria-current said Billing, so the DOM stated two different answers to
+    // "where am I".
+    const at = cloudPage.indexOf("const pageTitle = computed");
+    const body = cloudPage.slice(at, cloudPage.indexOf("});", at));
+    expect(body).toContain("return SECTION_TITLE[activeSection.value];");
+    expect(body).not.toContain('return "Overview"');
+
+    // Same computed the nav reads to decide which item is aria-current, so
+    // the two cannot disagree: navItems takes `current` from activeSection,
+    // and `active` -- which drives aria-current -- is `section === current`.
+    const navAt = cloudPage.indexOf("const navItems = computed<NavItem[]>(");
+    const nav = cloudPage.slice(navAt, cloudPage.indexOf("\n});", navAt));
+    expect(nav).toContain("const current = activeSection.value;");
+    expect(nav).toContain("const active = !locked && section !== null && section === current;");
+  });
+
+  it("keeps the three stage branches ahead of it", () => {
+    // Re-homed from cloudDashboardHonesty.test.ts's angle: error, pre-vault
+    // and connect are facts about the stage, and at those stages the panel
+    // chain is not what is rendering. v1Content.test.ts reads the pre-vault
+    // literal out of this exact branch.
+    const at = cloudPage.indexOf("const pageTitle = computed");
+    const body = cloudPage.slice(at, cloudPage.indexOf("});", at));
+    const fallthrough = body.indexOf("return SECTION_TITLE[activeSection.value];");
+    for (const branch of [
+      'if (stage.value === "error") return "We couldn\'t load your vault";',
+      'if (!vault.value) return "Reserve a hosted AutoVault namespace";',
+      'if (stage.value === "connect") return "Connect your CLI";'
+    ]) {
+      expect(body, branch).toContain(branch);
+      expect(body.indexOf(branch), `${branch} must precede the fallthrough`).toBeLessThan(
+        fallthrough
+      );
+    }
+  });
+
+  it("gives each panel an accessible name that tracks the heading", () => {
+    // Only .cv-devices carried a region role before this; the other panels
+    // swapped in with no role and no label, so nothing announced the change.
+    expect(cloudPage).toContain('<h1 id="cv-page-title">{{ pageTitle }}</h1>');
+    expect(cloudPage).toContain('aria-labelledby="cv-devices-title"');
+    // One per in-chain panel: overview, billing, skills, catalog. Machines
+    // keeps its own heading as its label, since it renders outside the chain.
+    expect((cloudPage.match(/aria-labelledby="cv-page-title"/g) ?? []).length).toBe(4);
+    for (const section of ["overview", "billing", "skills", "catalog"]) {
+      const at = cloudPage.indexOf(`activeSection === '${section}'`);
+      expect(at, `no ${section} panel`).toBeGreaterThan(-1);
+      const opening = cloudPage.slice(at, cloudPage.indexOf(">", cloudPage.indexOf("<div", at)));
+      expect(opening, `${section} panel is not a named region`).toContain('role="region"');
+      expect(opening, `${section} panel has no label`).toContain('aria-labelledby="cv-page-title"');
+    }
+  });
+});
+
+describe("the early-access ask belongs to the stage, not to a panel", () => {
+  /** The vault strip, from its own class attribute to where the panel chain
+   * starts. Everything in here renders whichever panel is selected. */
+  const stripAt = cloudPage.indexOf('class="cv-status-card"');
+  const strip = cloudPage.slice(stripAt, cloudPage.indexOf("SECTION: OVERVIEW", stripAt));
+
+  it("is reachable from the strip, whichever panel is on screen", () => {
+    // The defect this fixes: markProgress('early_access') is the only action
+    // that advances explore -> ready, and C2's section split left its single
+    // call site inside the Skills panel. `explore` lands on Overview, so a
+    // paying, vaulted, linked user's next page load had nothing on it to do
+    // -- and the one nav item hiding the CTA was badged "new" identically to
+    // the two beside it that did not.
+    expect(stripAt, "no status card").toBeGreaterThan(-1);
+    expect(strip).toContain("@click=\"markProgress('early_access')\"");
+    expect(strip).toContain("Get early access");
+    // Same behaviour it had in the panel: it takes the shell's request lock
+    // and says so rather than going quiet.
+    expect(strip).toContain(':disabled="busy"');
+    expect(strip).toContain('busy ? "Saving…"');
+    // And the strip really is stage chrome outside the chain -- the panel
+    // test above pins that, this pins that the button came with it.
+    const overviewAt = cloudPage.indexOf(`v-if="activeSection === 'overview'"`);
+    expect(strip.indexOf("markProgress")).toBeGreaterThan(-1);
+    expect(stripAt).toBeLessThan(overviewAt);
+  });
+
+  it("moved rather than being copied", () => {
+    // Two call sites would be two buttons on screen at once whenever Skills
+    // is the selected panel, both writing the same column.
+    expect((cloudPage.match(/markProgress\('early_access'\)/g) ?? []).length).toBe(1);
+    const skillsAt = cloudPage.indexOf(`v-else-if="activeSection === 'skills'"`);
+    const skills = cloudPage.slice(skillsAt, cloudPage.indexOf("SECTION: CATALOG", skillsAt));
+    expect(skillsAt, "no skills panel").toBeGreaterThan(-1);
+    expect(skills, "skills panel is still the only way to the CTA").not.toContain("markProgress");
+    // The panel still exists and is still worth visiting -- only the action
+    // left it. And it says where the action went.
+    expect(skills).toContain("Manage your vault from the web");
+    expect(flatten(skills)).toContain("Ask for early access from the vault strip above");
+  });
+
+  it("disappears once the ask has been made", () => {
+    // stage === "ready" IS early_access_at being set (see the stage computed),
+    // so the button has to go when the strip's own text starts saying "early
+    // access requested" and the Skills panel starts confirming it.
+    expect(strip).toContain(`v-if="stage !== 'ready'"`);
+    expect(strip).toContain("early access requested");
+    const at = cloudPage.indexOf("const stage = computed<Stage>");
+    const body = cloudPage.slice(at, cloudPage.indexOf("\n});", at));
+    expect(body).toContain('if (!earlyAccess.value) return "explore";');
+    expect(body).toContain('return "ready";');
   });
 });
 

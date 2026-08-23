@@ -93,7 +93,10 @@
               <span class="cv-crumb-host">vault.autovault.dev</span> /
               {{ vaultSlug }}
             </div>
-            <h1>{{ pageTitle }}</h1>
+            <!-- Named, because each panel below points its region label here:
+                 the heading is what tells assistive tech which panel the
+                 sidebar just swapped in. -->
+            <h1 id="cv-page-title">{{ pageTitle }}</h1>
           </div>
           <div class="cv-badges">
             <span v-if="vault" class="cv-pill ok"
@@ -302,11 +305,33 @@
                 >. Hosted sync turns on automatically when it ships.
               </template>
             </span>
+            <!-- The one thing a vaulted owner can still do, and it belongs to
+                 the stage rather than to a panel. It used to live inside the
+                 Skills panel, which meant the default landing panel had no
+                 action on it at all: at `explore` you arrived on Overview,
+                 and the only way to the sole remaining step was to guess
+                 which nav item hid it. Here it survives every panel switch.
+                 Gone at `ready` because the ask has been made -- the strip's
+                 own text says so, and the Skills panel confirms it. -->
+            <button
+              v-if="stage !== 'ready'"
+              type="button"
+              class="cv-btn cv-status-cta"
+              :disabled="busy"
+              @click="markProgress('early_access')"
+            >
+              {{ busy ? "Saving…" : "Get early access →" }}
+            </button>
           </div>
 
           <!-- ---------- SECTION: OVERVIEW ---------- -->
           <template v-if="activeSection === 'overview'">
-            <div class="cv-reveal" :style="revealDelay(0)">
+            <div
+              class="cv-reveal"
+              :style="revealDelay(0)"
+              role="region"
+              aria-labelledby="cv-page-title"
+            >
               <article class="cv-card soft">
                 <div class="cv-card-label">Sync engine</div>
                 <span class="cv-pill warn"
@@ -330,7 +355,12 @@
                subscription display — there is deliberately no second one on
                the overview. -->
           <template v-else-if="activeSection === 'billing'">
-            <div class="cv-reveal" :style="revealDelay(0)">
+            <div
+              class="cv-reveal"
+              :style="revealDelay(0)"
+              role="region"
+              aria-labelledby="cv-page-title"
+            >
               <article class="cv-card">
                 <div class="cv-card-label">Subscription</div>
                 <ul class="cv-kv">
@@ -392,7 +422,12 @@
                A preview, and labelled as one. The browser-side skill list does
                not exist yet; what is real here is the early-access request. -->
           <template v-else-if="activeSection === 'skills'">
-            <div class="cv-reveal" :style="revealDelay(0)">
+            <div
+              class="cv-reveal"
+              :style="revealDelay(0)"
+              role="region"
+              aria-labelledby="cv-page-title"
+            >
               <article class="cv-preview">
                 <div class="cv-appframe" aria-hidden="true">
                   <div class="cv-appbar">
@@ -449,20 +484,16 @@
                       ></span
                     >
                   </div>
-                  <template v-else>
-                    <button
-                      type="button"
-                      class="cv-btn"
-                      :disabled="busy"
-                      @click="markProgress('early_access')"
-                    >
-                      {{ busy ? "Saving…" : "Get early access →" }}
-                    </button>
-                    <p class="cv-muted sm">
-                      We'll email <strong>{{ accountEmailShort }}</strong> the
-                      moment it's live.
-                    </p>
-                  </template>
+                  <!-- The ask itself moved to the vault strip above, which is
+                       on screen whichever panel you are reading. What is left
+                       here is where it went: this panel is a preview, and a
+                       preview is a bad place to keep the stage's only
+                       action. -->
+                  <p v-else class="cv-muted sm">
+                    Ask for early access from the vault strip above, and we'll
+                    email <strong>{{ accountEmailShort }}</strong> the moment
+                    it's live.
+                  </p>
                 </div>
               </article>
             </div>
@@ -478,7 +509,12 @@
                nothing here is gated behind the cloud today, and there is
                nothing to click on this panel either. -->
           <template v-else-if="activeSection === 'catalog'">
-            <div class="cv-reveal" :style="revealDelay(0)">
+            <div
+              class="cv-reveal"
+              :style="revealDelay(0)"
+              role="region"
+              aria-labelledby="cv-page-title"
+            >
               <article class="cv-card soft">
                 <div class="cv-card-label">Vault catalog</div>
                 <span class="cv-pill warn"
@@ -1165,15 +1201,6 @@ const activeStepNumber = computed(() =>
     : ONBOARDING_STEP_KEYS.length,
 );
 
-// Header copy follows the stage rather than being hardcoded to "Overview",
-// which was only ever correct once a vault existed.
-const pageTitle = computed(() => {
-  if (stage.value === "error") return "We couldn't load your vault";
-  if (!vault.value) return "Reserve a hosted AutoVault namespace";
-  if (stage.value === "connect") return "Connect your CLI";
-  return "Overview";
-});
-
 // Headline and lede follow the active step, so the focal card always names
 // the one thing to do rather than describing the whole journey.
 const setupHeadline = computed(() => {
@@ -1236,6 +1263,18 @@ const SECTION_REVEAL: Record<Section, Stage | null> = {
   catalog: "explore",
 };
 
+// What the page's one <h1> says while each panel is on screen. Separate from
+// the nav label on purpose: the sidebar names a destination ("Sync log"), the
+// heading names the panel's own content, and "Vault catalog" has to stay
+// disambiguated from the public skills directory wherever it is written.
+const SECTION_TITLE: Record<Section, string> = {
+  overview: "Overview",
+  billing: "Billing",
+  machines: "Machines",
+  skills: "Skills",
+  catalog: "Vault catalog",
+};
+
 // -1 for "error", which is deliberate: at that stage nothing but overview is
 // reachable, and overview passes on the null branch.
 function stageReached(at: Stage | null, current: Stage) {
@@ -1251,6 +1290,23 @@ const activeSection = computed<Section>(() =>
     ? selectedSection.value
     : "overview",
 );
+
+// Header copy follows the stage rather than being hardcoded to "Overview",
+// which was only ever correct once a vault existed. The first three branches
+// are stage facts that outrank any selection: at error/pre-vault/connect the
+// switcher is not what is on screen, so the heading must not describe it.
+//
+// Past those, the panel IS the page, and the heading has to name the one that
+// is showing -- otherwise the sidebar moves aria-current onto Billing while
+// the only <h1> still says "Overview", and the DOM states two contradictory
+// things about where the reader is. Lives here, below activeSection, because
+// that is what the last branch reads.
+const pageTitle = computed(() => {
+  if (stage.value === "error") return "We couldn't load your vault";
+  if (!vault.value) return "Reserve a hosted AutoVault namespace";
+  if (stage.value === "connect") return "Connect your CLI";
+  return SECTION_TITLE[activeSection.value];
+});
 
 // Machines is the one panel that is also part of the overview. At connect it
 // is the only thing to look at — the CLI is sitting in a spinner waiting to be
@@ -2709,6 +2765,14 @@ const ICON = {
 .cv-status-text code {
   font-family: var(--mono);
   color: var(--ink);
+}
+/* Pushed to the trailing edge so the strip reads state-then-action, and
+   allowed to wrap onto its own line under the text on narrow viewports --
+   the parent is already flex-wrap: wrap, so this only has to stop claiming
+   the leftover space. */
+.cv-status-cta {
+  margin-left: auto;
+  flex: 0 0 auto;
 }
 
 /* cards & reveal */
