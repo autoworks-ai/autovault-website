@@ -379,6 +379,11 @@ async function provisionVault() {
     // their namespace was created.
     me.value = { ...(current.value ?? { user: null }), vault: payload.vault };
     emit("stateChange", me.value);
+    // Same reason loadMe settles one: the state this just handed up comes back
+    // as a prop, and resumeCheckoutReturn reads vault.value immediately after
+    // awaiting this call -- to decide whether to clear ?hosted=success from
+    // the URL. Without settling, that read races Vue's render flush.
+    await nextTick();
     // Runs after the shell has already advanced. It only persists queued
     // skills; nothing user-visible depends on its result.
     await savePendingImport();
