@@ -391,24 +391,52 @@ describe("the console does not cost more than it is worth", () => {
     expect(deviceRow(db, "device-1").status).toBe("revoked");
   });
 
-  it("bounds the list it returns on every poll", () => {
-    const source = readFileSync(
-      new URL("../functions/api/vaults/current/devices.js", import.meta.url),
-      "utf-8"
-    );
-    expect(source).toContain("MAX_LISTED_DEVICES");
-    expect(source).toContain("limit ?");
-    // Ordered pending-first, so the cap can only hide settled history and
-    // never a device waiting on a decision.
-    expect(source.indexOf("order by")).toBeLessThan(source.indexOf("limit ?"));
+  it("never caps live devices, only settled history", async () => {
+    // A single capped query starts omitting the oldest ACTIVE rows once live
+    // devices exceed the cap -- and this response is the console's only source
+    // of device ids and revoke controls, so those keys become unrevocable
+    // through the UI. Whatever a cap does, it must not make a key harder to
+    // take away.
+    const { db, env, cookie, vaultId } = await seedOwner();
+    for (let index = 0; index < 120; index += 1) {
+      db.prepare(
+        `insert into sync_devices (id, vault_id, public_key, status, first_seen_at, admitted_at)
+         values (?, ?, ?, 'active', ?, ?)`
+      ).run(`active-${index}`, vaultId, `active-key-${index}`,
+            `2026-08-01T00:00:00.000Z`, `2026-08-01T00:05:00.000Z`);
+    }
+
+    const payload = await (await listDevices({ request: req(cookie, "/api/vaults/current/devices"), env })).json();
+    const activeIds = payload.devices.filter((d: any) => d.status === "active").map((d: any) => d.id);
+    expect(activeIds).toHaveLength(120);
+    expect(activeIds).toContain("active-0");
   });
 
-  it("only polls while something is waiting on the owner", () => {
-    // requireUser hits Clerk's getUser and upserts on every call, so a flat
-    // four-second timer is ~900 profile fetches and 900 D1 writes per hour per
-    // open tab on a dashboard where nothing is happening.
+  it("still bounds settled history", async () => {
+    const { db, env, cookie, vaultId } = await seedOwner();
+    for (let index = 0; index < 150; index += 1) {
+      db.prepare(
+        `insert into sync_devices (id, vault_id, public_key, status, first_seen_at)
+         values (?, ?, ?, 'revoked', ?)`
+      ).run(`gone-${index}`, vaultId, `gone-key-${index}`, "2026-08-01T00:00:00.000Z");
+    }
+    const payload = await (await listDevices({ request: req(cookie, "/api/vaults/current/devices"), env })).json();
+    expect(payload.devices.filter((d: any) => d.status === "revoked").length).toBeLessThanOrEqual(100);
+  });
+
+  it("throttles polling but never stops it", () => {
+    // Stopping when nothing is pending is the obvious optimisation and it is
+    // wrong: a SECOND machine running `autovault link` creates a pending row
+    // that only polling can discover, so the condition would gate on the very
+    // thing it exists to find. The owner would sit looking at a dashboard that
+    // never mentions the machine waiting on them.
+    expect(cloudPage).toContain("DEVICE_POLL_ACTIVE_MS = 4000");
+    expect(cloudPage).toContain("DEVICE_POLL_IDLE_MS = 30_000");
     expect(cloudPage).toContain('stage.value === "connect" || pendingDevices.value.length > 0');
-    expect(cloudPage).toContain("watch(devicePollWanted");
-    expect(cloudPage).toContain("else stopDevicePolling();");
+    // The idle branch must still schedule a timer, not clear one.
+    const at = cloudPage.indexOf("function startDevicePolling");
+    const body = cloudPage.slice(at, at + 600);
+    expect(body).toContain("devicePollUrgent.value ? DEVICE_POLL_ACTIVE_MS : DEVICE_POLL_IDLE_MS");
+    expect(body).toContain("setInterval");
   });
 });

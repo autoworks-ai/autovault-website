@@ -987,7 +987,7 @@ watch(
     }
     // Always load once; the watcher above decides whether to keep polling.
     void loadDevices();
-    if (devicePollWanted.value) startDevicePolling();
+    startDevicePolling();
   },
   { immediate: true }
 );
@@ -1154,40 +1154,55 @@ async function loadDevices() {
   }
 }
 
-let devicePollTimer: ReturnType<typeof setInterval> | undefined;
 
-// Poll only while something is actually expected to change.
+// Two speeds, never off.
 //
-// /api/vaults/current/devices goes through requireUser, which in Clerk mode
-// hits client.users.getUser AND upserts the user on every call. A flat
-// four-second timer therefore costs roughly 900 Clerk profile fetches and 900
-// D1 writes per hour, per open tab, on a dashboard where nothing is happening.
+// Fast while something is waiting on the owner -- the connect step, or a
+// pending device -- because `autovault link` is sitting in a spinner and four
+// seconds is well inside its five-minute wait.
 //
-// The only moments that need live updates are the ones where a machine is
-// waiting on the owner: the connect step, and any time a pending device
-// exists. Otherwise the list is refreshed on load and after an action, which
-// is the same thing a person would get from a reload.
-const devicePollWanted = computed(
-  () => Boolean(vault.value) && (stage.value === "connect" || pendingDevices.value.length > 0)
+// Slow the rest of the time, but NOT stopped. Stopping was the obvious
+// optimisation and it was wrong: a second machine running `autovault link`
+// against an already-set-up vault creates a pending row that only polling can
+// discover, so the condition would gate on the very thing it is meant to find.
+// The owner would sit looking at a dashboard that never mentions the machine
+// waiting on them.
+//
+// The cost is why this is throttled at all: /api/vaults/current/devices goes
+// through requireUser, which in Clerk mode calls client.users.getUser and
+// upserts the user on every request. Thirty seconds idle is ~120 of those an
+// hour rather than ~900. The real fix is caching that profile sync in
+// getClerkSessionUser, where it would benefit every endpoint; this is the
+// version that does not add a second auth path.
+const DEVICE_POLL_ACTIVE_MS = 4000;
+const DEVICE_POLL_IDLE_MS = 30_000;
+
+let devicePollTimer: ReturnType<typeof setInterval> | undefined;
+let devicePollInterval = 0;
+
+const devicePollUrgent = computed(
+  () => stage.value === "connect" || pendingDevices.value.length > 0
 );
 
 function stopDevicePolling() {
   if (devicePollTimer) clearInterval(devicePollTimer);
   devicePollTimer = undefined;
+  devicePollInterval = 0;
 }
 
 function startDevicePolling() {
-  if (devicePollTimer || typeof window === "undefined") return;
+  if (typeof window === "undefined" || !vault.value) return;
+  const wanted = devicePollUrgent.value ? DEVICE_POLL_ACTIVE_MS : DEVICE_POLL_IDLE_MS;
+  if (devicePollTimer && devicePollInterval === wanted) return;
+  stopDevicePolling();
+  devicePollInterval = wanted;
   devicePollTimer = setInterval(() => {
     if (document.visibilityState === "hidden") return;
     void loadDevices();
-  }, 4000);
+  }, wanted);
 }
 
-watch(devicePollWanted, (wanted) => {
-  if (wanted) startDevicePolling();
-  else stopDevicePolling();
-});
+watch(devicePollUrgent, () => startDevicePolling());
 
 onBeforeUnmount(stopDevicePolling);
 
