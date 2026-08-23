@@ -409,13 +409,21 @@
                   </li>
                 </ul>
                 <div class="cv-card-actions">
+                  <!-- "Working…", not "Opening…" — same shared `busy` lock as
+                       the status strip's CTA above (see that button's
+                       comment), so clicking Get early access from here makes
+                       this button flip too. "Opening…" claimed a specific
+                       action that was not the one running; "Working…" does
+                       not, matching the mitigation already chosen for the
+                       mirror-image case rather than adding a second
+                       per-action lock next to the existing one. -->
                   <button
                     type="button"
                     class="cv-btn"
                     :disabled="busy"
                     @click="openBillingPortal"
                   >
-                    {{ busy ? "Opening…" : "Manage billing" }}
+                    {{ busy ? "Working…" : "Manage billing" }}
                   </button>
                 </div>
                 <p class="cv-muted sm">
