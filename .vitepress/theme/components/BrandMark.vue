@@ -4,7 +4,7 @@
     :height="size"
     viewBox="0 0 24 24"
     class="brand-mark-svg"
-    :class="[`is-${state}`, { 'has-depth': showDepth }]"
+    :class="[`is-${state}`, { 'has-depth': showDepth, 'is-working': working, 'is-unlocking': unlocking }]"
     fill="none"
     aria-hidden="true"
   >
@@ -24,9 +24,27 @@
 <script setup lang="ts">
 type BrandMarkState = "locked" | "unlocked";
 
-withDefaults(defineProps<{ size?: number; state?: BrandMarkState; showDepth?: boolean }>(), {
-  size: 22,
-  state: "locked",
-  showDepth: false
-});
+// `working` and `unlocking` are separate booleans rather than extra members of
+// BrandMarkState because they are *transient* and the resting state still has
+// to be readable underneath them: a mark can be unlocked and working (a second
+// machine checking in against an open vault), and `unlocking` has to sit on
+// top of `unlocked` so the keyframe can land exactly on that resting state.
+withDefaults(
+  defineProps<{
+    size?: number;
+    state?: BrandMarkState;
+    showDepth?: boolean;
+    /** Dial sweeps back and forth. The loading graphic. */
+    working?: boolean;
+    /** One ~700ms turn-and-retract. Apply in the same tick the state flips. */
+    unlocking?: boolean;
+  }>(),
+  {
+    size: 22,
+    state: "locked",
+    showDepth: false,
+    working: false,
+    unlocking: false
+  }
+);
 </script>

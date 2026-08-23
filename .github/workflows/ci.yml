@@ -3,8 +3,14 @@ name: CI
 on:
   push:
     branches: [main]
+  # Deliberately unfiltered. A `branches:` filter on `pull_request` matches the
+  # PR's BASE branch, so `branches: [main]` fired no event at all for a stacked
+  # PR -- one whose base is another feature branch. Those PRs showed an
+  # all-green checks list having never been built, tested or previewed, which
+  # makes the PR gate documented in AGENTS.md impossible to satisfy. The
+  # `deploy-production` job below is gated on `push` to `refs/heads/main`, so
+  # running on every PR base cannot ship anything.
   pull_request:
-    branches: [main]
   merge_group:
   workflow_dispatch:
 
@@ -17,7 +23,7 @@ permissions:
 env:
   NODE_VERSION: "24"
   PAGES_PROJECT_NAME: autovault-website
-  WRANGLER_VERSION: "4.93.1"
+  WRANGLER_VERSION: "4.95.0"
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
@@ -115,6 +121,18 @@ jobs:
           rm wrangler.toml
           npm run pages:preview-config
 
+      # Same rationale as deploy-production's migration step: without this,
+      # every PR preview runs Functions against whatever schema the preview D1
+      # database was last migrated to by hand, so a migration this PR adds
+      # (e.g. 0003's stripe_events table) 500s on the CI-generated preview
+      # instead of exercising the real path.
+      - name: Migrate preview D1 database
+        if: ${{ env.CLOUDFLARE_PREVIEW_D1_DATABASE_ID != '' && env.CLOUDFLARE_PREVIEW_KV_NAMESPACE_ID != '' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler d1 migrations apply "${CLOUDFLARE_PREVIEW_D1_DATABASE_NAME:-autovault-hosted-preview}" --remote
+
       - name: Deploy preview to Cloudflare Pages
         id: preview_deploy
         if: ${{ env.CLOUDFLARE_PREVIEW_D1_DATABASE_ID != '' && env.CLOUDFLARE_PREVIEW_KV_NAMESPACE_ID != '' }}
@@ -202,6 +220,17 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      # Migrations are not applied by any other step. Deploying Functions that
+      # depend on a new migration (e.g. 0003's stripe_events table) before the
+      # schema exists in production makes every request touching that path
+      # 500 until someone notices and runs this manually. Applying it here,
+      # before the Pages deploy, closes that window on every merge to main.
+      - name: Apply pending D1 migrations
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npm run migrate:remote
 
       - name: Deploy production to Cloudflare Pages
         id: production_deploy

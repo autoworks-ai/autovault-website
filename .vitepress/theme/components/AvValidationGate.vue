@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
+import { prefersReducedMotion } from '../utils/motion'
 import UiIcon from './UiIcon.vue'
 import { homepageGateMetrics } from '../data/marketing'
 
@@ -67,6 +68,18 @@ let timer: number | undefined
 
 function start() {
   stop()
+  // The mount-time reduced-motion guard only covers autoplay on load.
+  // chooseScenario() calls replay() -> start() on every scenario click,
+  // which used to ignore the preference entirely and resume the
+  // content-changing interval just from inspecting another scenario. Guard
+  // the single place the interval is created instead of every call site, and
+  // jump straight to the scenario's settled outcome so picking a scenario is
+  // still useful without animating through it.
+  if (prefersReducedMotion()) {
+    tick.value = activeScenario.value.failAt !== null ? activeScenario.value.failAt + 2 : STEPS.length + 1
+    running.value = false
+    return
+  }
   timer = window.setInterval(() => {
     const next = tick.value + 1
     if (activeScenario.value.failAt !== null && next > activeScenario.value.failAt + 1) {
@@ -88,7 +101,14 @@ function toggle() {
   running.value = !running.value
   running.value ? start() : stop()
 }
-onMounted(() => running.value && start())
+onMounted(() => {
+  // The reduced-motion guard and the settling of tick/running both already
+  // live one call away, inside the function invoked below. Checking the
+  // preference again here and returning early instead of delegating to it
+  // left `running` at its initial `true` and `tick` at 0 -- the demo stayed
+  // queued forever and the control read "Pause" for a scan that never ran.
+  if (running.value) start()
+})
 onBeforeUnmount(stop)
 
 function stepState(i: number): StepState {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
+import { prefersReducedMotion } from '../utils/motion'
 import { copyText } from '../utils/clipboard'
 import { AUTOVAULT_INSTALL_COMMAND } from '../../shared/bootstrap'
 
@@ -80,7 +81,7 @@ function cycle() {
   selected.value = TREE[(i + 1) % TREE.length].id
   readPulse.value += 1
 }
-onMounted(() => { timer = window.setInterval(cycle, 2200) })
+onMounted(() => { if (prefersReducedMotion()) return; timer = window.setInterval(cycle, 2200) })
 onBeforeUnmount(() => { if (timer) clearInterval(timer) })
 
 function selectSkill(id: string) {

@@ -159,6 +159,7 @@ describe("v1 content guardrails", () => {
   it("keeps hidden hosted copy reservation-only", () => {
     const hostedCopy = [
       ".vitepress/theme/components/CloudPage.vue",
+      ".vitepress/theme/components/CloudAccountMenu.vue",
       ".vitepress/theme/components/HostedVaultFunnel.vue",
       ".vitepress/shared/pageDocs.ts"
     ].map(read).join("\n");
