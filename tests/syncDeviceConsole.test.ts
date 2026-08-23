@@ -4,6 +4,13 @@ import { createTestEnv, seedUser } from "./support/d1.js";
 import { createSession } from "../functions/api/_lib/auth.js";
 import { onRequestGet as listDevices } from "../functions/api/vaults/current/devices.js";
 import { onRequestPost as decideDevice } from "../functions/api/vaults/current/devices/[device].js";
+import { deviceFingerprint } from "../functions/api/_lib/sync.js";
+import {
+  admitHandshakeState,
+  findAdmitTarget,
+  readAdmitFingerprint,
+  withAdmitParam
+} from "../.vitepress/theme/utils/admit";
 
 const ORIGIN = "https://autovault.dev";
 const cloudPage = readFileSync(
@@ -451,7 +458,18 @@ describe("the console does not cost more than it is worth", () => {
     // never mentions the machine waiting on them.
     expect(cloudPage).toContain("DEVICE_POLL_ACTIVE_MS = 4000");
     expect(cloudPage).toContain("DEVICE_POLL_IDLE_MS = 30_000");
-    expect(cloudPage).toContain('stage.value === "connect" || pendingDevices.value.length > 0');
+
+    // Each term asserted on its own rather than as one source line: the
+    // condition has grown a third case (an inbound `?admit=` machine) and will
+    // grow more. Pinning the exact formatting only guards the layout, and
+    // reflowing it would look like a failure while dropping `pendingDevices`
+    // -- the case this test exists for -- would not.
+    const urgentAt = cloudPage.indexOf("const devicePollUrgent");
+    const urgent = cloudPage.slice(urgentAt, cloudPage.indexOf(");", urgentAt));
+    expect(urgentAt).toBeGreaterThan(-1);
+    expect(urgent).toContain('stage.value === "connect"');
+    expect(urgent).toContain("pendingDevices.value.length > 0");
+
     // The idle branch must still schedule a timer, not clear one.
     const at = cloudPage.indexOf("function startDevicePolling");
     const body = cloudPage.slice(at, at + 600);
@@ -545,5 +563,141 @@ describe("one snapshot, and no claims about a vault that is not there", () => {
     const at = cloudPage.indexOf("No machines linked yet");
     expect(at).toBeGreaterThan(-1);
     expect(cloudPage.slice(at - 200, at)).toContain('v-else-if="vault"');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The CLI admit handshake: /cloud?admit=<url-encoded fingerprint>
+//
+// `autovault link` enrols, prints the fingerprint, and opens this URL. The page
+// selects the row; the owner still clicks Admit. Everything here guards one of
+// those two halves -- that the right row is selected, and that selection never
+// becomes admission.
+// ---------------------------------------------------------------------------
+
+const clerkAuthControls = readFileSync(
+  new URL("../.vitepress/theme/components/ClerkAuthControls.vue", import.meta.url),
+  "utf-8"
+);
+
+function pending(publicKey: string, id: string) {
+  return { id, fingerprint: deviceFingerprint(publicKey), status: "pending" };
+}
+
+describe("the admit link selects a machine", () => {
+  it("derives the fingerprint the CLI prints, U+2026 and all", () => {
+    // Pinned against the CLI's own deviceFingerprint (src/sync/target.ts). If
+    // these ever diverge the URL still parses and simply matches nothing, so
+    // the handshake fails silently -- which is exactly why it is asserted.
+    expect(deviceFingerprint(KEY_A)).toBe("DdiE…NJLw");
+    expect(encodeURIComponent(deviceFingerprint(KEY_A))).toBe("DdiE%E2%80%A6NJLw");
+  });
+
+  it("selects the matching pending device and not a sibling", () => {
+    const devices = [pending(KEY_B, "device-b"), pending(KEY_A, "device-a")];
+    const fingerprint = readAdmitFingerprint("?admit=DdiE%E2%80%A6NJLw");
+
+    expect(fingerprint).toBe("DdiE…NJLw");
+    expect(findAdmitTarget(devices, fingerprint)?.id).toBe("device-a");
+    expect(admitHandshakeState(devices, fingerprint)).toBe("ready");
+  });
+
+  it("selects nothing when the fingerprint is unknown", () => {
+    // Never fall back to "the one that is waiting". With two machines pending,
+    // guessing hands vault access to the box the owner did not mean.
+    const devices = [pending(KEY_A, "device-a"), pending(KEY_B, "device-b")];
+    const fingerprint = readAdmitFingerprint("?admit=Zzzz%E2%80%A6zzzz");
+
+    expect(findAdmitTarget(devices, fingerprint)).toBeNull();
+    expect(admitHandshakeState(devices, fingerprint)).toBe("waiting");
+  });
+
+  it("selects nothing when there is no admit param at all", () => {
+    const devices = [pending(KEY_A, "device-a")];
+
+    expect(readAdmitFingerprint("")).toBeNull();
+    expect(readAdmitFingerprint("?hosted=success")).toBeNull();
+    expect(findAdmitTarget(devices, readAdmitFingerprint("?hosted=success"))).toBeNull();
+    expect(admitHandshakeState(devices, null)).toBe("idle");
+  });
+
+  it("will not select a device that is already admitted or denied", () => {
+    // A settled row is not an error and must not re-arm the waiting state --
+    // otherwise the page nags forever about a machine it already let in.
+    const fingerprint = deviceFingerprint(KEY_A);
+    for (const status of ["active", "revoked"]) {
+      const devices = [{ id: "device-a", fingerprint, status }];
+      expect(findAdmitTarget(devices, fingerprint)).toBeNull();
+      expect(admitHandshakeState(devices, fingerprint)).toBe("settled");
+    }
+  });
+
+  it("waits quietly for a row that has not arrived yet", () => {
+    // The CLI enrols and *then* opens the browser, so an empty list on the
+    // first fetch is the normal path through this code.
+    expect(admitHandshakeState([], deviceFingerprint(KEY_A))).toBe("waiting");
+    expect(cloudPage).toContain("admitState === 'waiting'");
+    expect(cloudPage).toContain("to check in…");
+  });
+});
+
+describe("the admit link survives sign-in", () => {
+  it("keeps admit= on the Clerk return URL, ahead of the fragment", () => {
+    const returnPath = withAdmitParam("/cloud#launch-path", "?admit=DdiE%E2%80%A6NJLw");
+
+    expect(returnPath).toBe("/cloud?admit=DdiE%E2%80%A6NJLw#launch-path");
+    // #launch-path is load-bearing: Stripe's success_url and the Clerk
+    // post-auth redirect both target it.
+    expect(returnPath.endsWith("#launch-path")).toBe(true);
+  });
+
+  it("leaves the return URL alone when no handshake is in progress", () => {
+    expect(withAdmitParam("/cloud#launch-path", "")).toBe("/cloud#launch-path");
+    expect(withAdmitParam("/cloud#launch-path", "?hosted=success")).toBe("/cloud#launch-path");
+  });
+
+  it("wires that through the sign-in buttons rather than a bare constant", () => {
+    // Every Clerk redirect prop on this component reads authReturnPath, so
+    // fixing it in one place covers sign-in, sign-up and their fallbacks.
+    expect(clerkAuthControls).toContain("withAdmitParam(clerkBrand.cloudPath, window.location.search)");
+    expect(clerkAuthControls).toContain(':force-redirect-url="authReturnPath"');
+    expect(clerkAuthControls).toContain(':fallback-redirect-url="authReturnPath"');
+  });
+});
+
+describe("selecting a machine is not admitting it", () => {
+  it("never calls decideDevice from the admit handshake", () => {
+    // The whole safety property in one assertion. If the URL could admit, then
+    // the link the CLI prints -- and anything that copies it -- becomes a
+    // credential that grants a machine access to the vault on page load.
+    const at = cloudPage.indexOf("const admitFingerprint");
+    expect(at).toBeGreaterThan(-1);
+    const handshake = cloudPage.slice(at, cloudPage.indexOf("const devicePollUrgent"));
+
+    expect(handshake).not.toContain("decideDevice");
+    expect(handshake).not.toContain("'admit'");
+  });
+
+  it("only ever reaches admit through a click on the owner's own button", () => {
+    // decideDevice(..., "admit") must have exactly one call site, and it must
+    // be the @click on the Admit button.
+    const calls = cloudPage.match(/decideDevice\([^)]*'admit'\)/g) ?? [];
+    expect(calls).toHaveLength(1);
+    expect(cloudPage).toContain("@click=\"decideDevice(device.id, 'admit')\"");
+  });
+
+  it("does not admit on mount", () => {
+    const at = cloudPage.indexOf("onMounted(() => {");
+    const mount = cloudPage.slice(at, at + 500);
+
+    expect(mount).toContain("readAdmitFingerprint");
+    expect(mount).not.toContain("decideDevice");
+  });
+
+  it("focuses the target row once per machine, not once per poll", () => {
+    // The list reloads every four seconds while this page is open; re-stealing
+    // focus on each response would trap the keyboard on the Admit button.
+    expect(cloudPage).toContain("admitFocusedId");
+    expect(cloudPage).toContain("if (!deviceId || admitFocusedId === deviceId) return;");
   });
 });

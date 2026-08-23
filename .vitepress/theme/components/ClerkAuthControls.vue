@@ -84,6 +84,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { ClerkLoaded, Show, SignInButton, SignUpButton, UserButton } from "@clerk/vue";
 import { clerkBrand, clerkSignInAppearance, clerkUserProfileProps } from "../clerk";
+import { withAdmitParam } from "../utils/admit";
 
 const props = withDefaults(defineProps<{
   ctaLabel?: string;
@@ -114,7 +115,19 @@ type ClerkLike = {
 
 let clerkReadyInterval: number | undefined;
 let sessionRepairInterval: number | undefined;
-const authReturnPath = computed(() => clerkBrand.cloudPath);
+// Carries `?admit=` through the sign-in round trip. A signed-out owner
+// following the link `autovault link` printed would otherwise come back to a
+// bare /cloud, and the handshake would degrade to hunting for the row by hand
+// at exactly the moment it was supposed to help.
+//
+// Safe to read `window` here: every consumer of this computed sits inside the
+// `hydrated && clerkEnabled` branch, which renders nothing during prerender.
+// The guard is belt and braces.
+const authReturnPath = computed(() =>
+  typeof window === "undefined"
+    ? clerkBrand.cloudPath
+    : withAdmitParam(clerkBrand.cloudPath, window.location.search)
+);
 
 onMounted(() => {
   hydrated.value = true;
