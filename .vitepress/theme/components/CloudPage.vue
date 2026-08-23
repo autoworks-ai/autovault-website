@@ -1478,6 +1478,70 @@ watch(
   { immediate: true }
 );
 
+/* ---------------------------------------------------------------------------
+ * A machine checking in, while the card it lands in is off the bottom
+ *
+ * .cv-nextstep promises, in so many words, that your machine will show up
+ * under Machines *below*. On a 2560x1080 screen "below" is 960px down -- the
+ * card is off the bottom of the window at the exact moment it becomes the only
+ * thing left to do, and the bridge is pointing at something you cannot see.
+ * That is the sequencing half of "below the fold": the connect focal, the
+ * terminal and the bridge all sit above the card, and none of them shrink.
+ *
+ * So when a pending row actually lands at connect, bring the card to the
+ * viewport. Same scroll-and-flash the CLI handshake uses -- not a second
+ * mechanism -- and deliberately nothing more: no focus, because nothing here
+ * named a machine, and focus on a button that grants vault access is something
+ * the ?admit= handshake earns by carrying a fingerprint.
+ *
+ * Connect only. From `explore` on, the owner may be reading Billing, and a
+ * page that scrolls itself out from under them is worse than a badge they can
+ * click -- which is exactly what the topbar's "N waiting to be admitted" is.
+ * ------------------------------------------------------------------------ */
+
+// Once per machine, like the admit handshake's latch and for the same reason:
+// the list reloads every four seconds, and re-scrolling on every response
+// would pin the page to this card and make it impossible to read anything else.
+const arrivalShownIds = new Set<string>();
+
+// No `{ immediate: true }`: there is nothing to do before a device list exists,
+// and `revealed` is in the source, so the case this really has to catch -- a
+// row that arrived while the boot veil was still up -- wakes it anyway. That
+// ordering is the regression Task E found one watcher above.
+watch(
+  () =>
+    [
+      pendingDevices.value.map((device) => device.id).join(" "),
+      revealed.value,
+      stage.value,
+    ] as const,
+  async ([, isRevealed, currentStage]) => {
+    const unseen = pendingDevices.value.filter((device) => !arrivalShownIds.has(device.id));
+    if (!unseen.length) return;
+    // Every guard that could mean "this could not have worked" sits before the
+    // latch, so a failed attempt does not spend the one each machine gets.
+    if (!isRevealed) return;
+    if (currentStage !== "connect") return;
+    // The handshake owns the moment when it has a row of its own to reach: it
+    // scrolls, flashes AND focuses, and half of that again on top would restart
+    // the flash mid-flash and scroll a card that is already arriving.
+    if (admitTarget.value) return;
+    for (const device of unseen) arrivalShownIds.add(device.id);
+    // Measured after the flush, and this is not a detail. A watcher callback
+    // runs BEFORE Vue renders, so the card here still holds "Nothing enrolled
+    // yet" -- short enough to sit inside the window, while the rows about to
+    // replace it push it off the bottom. Measured early, the check below said
+    // "already on screen" every time and this never scrolled at all; seen at
+    // 2560x1080, card bottom 1030 before the flush and 1181 after.
+    await nextTick();
+    // Already looking at it -- on a tall window the card is on screen at
+    // connect, and a page that jumps when nothing needed moving is just noise.
+    const box = devicesCard.value?.getBoundingClientRect();
+    if (box && box.top >= 0 && box.bottom <= window.innerHeight) return;
+    await focusDevicesCard();
+  }
+);
+
 // The card used to render a hardcoded "Active" pill and a hardcoded monthly
 // price as static markup, while the real
 // subscription was fetched, typed, normalized — and then never read. A
@@ -2561,13 +2625,24 @@ async function focusDevicesCard() {
   // Read after the tick rather than taken as an argument. The caller may have
   // just switched to the panel that renders this, in which case the ref was
   // still null at call time.
-  // Read here, in the callback, never at setup scope -- the PR #88 hydration
-  // class. Not left to the browser: `behavior: "smooth"` is only *advisory*
-  // under the preference, and the one place this repo already spells motion out
-  // rather than hoping (styles.css, startVaultArrival, the block at the bottom
-  // of this file) is the pattern to follow. A page that jumps is the point.
+  // Two reasons to jump instead of glide, both read here in the callback and
+  // never at setup scope -- the PR #88 hydration class.
+  //
+  // The preference, because `behavior: "smooth"` is only *advisory* under
+  // prefers-reduced-motion, and everywhere else on this page motion is spelled
+  // out rather than hoped for (styles.css, startVaultArrival, the media block
+  // at the bottom of this file).
+  //
+  // And a hidden document, because a smooth scroll is animated and a
+  // background tab does not animate: measured here, `scrollIntoView` with
+  // "smooth" left scrollY at 0 in a hidden tab while "auto" moved it to 531 in
+  // the same frame. /cloud lands in a background tab routinely -- `autovault
+  // link` opens the browser, the Stripe return can arrive in a new tab, people
+  // cmd-click -- and the whole point of scrolling is that the card is in the
+  // right place when they look. Nobody is watching the animation anyway.
+  const jump = prefersReducedMotion() || document.visibilityState === "hidden";
   devicesCard.value?.scrollIntoView({
-    behavior: prefersReducedMotion() ? "auto" : "smooth",
+    behavior: jump ? "auto" : "smooth",
     block: "center",
   });
   devicesFlash.value = true;

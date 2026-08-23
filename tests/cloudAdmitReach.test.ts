@@ -271,7 +271,8 @@ describe("reaching the card does not have to be a journey", () => {
     const at = cloudPage.indexOf("async function focusDevicesCard()");
     expect(at).toBeGreaterThan(-1);
     const body = cloudPage.slice(at, cloudPage.indexOf("\n}", at));
-    expect(body).toContain('behavior: prefersReducedMotion() ? "auto" : "smooth"');
+    expect(body).toContain("const jump = prefersReducedMotion() || document.visibilityState === \"hidden\";");
+    expect(body).toContain('behavior: jump ? "auto" : "smooth"');
     // Read inside the function, never at setup scope -- the PR #88 class.
     expect(body.indexOf("prefersReducedMotion()")).toBeGreaterThan(-1);
     const setupHead = cloudPage.slice(
@@ -279,5 +280,96 @@ describe("reaching the card does not have to be a journey", () => {
       cloudPage.indexOf("async function focusDevicesCard()")
     );
     expect(setupHead).not.toMatch(/^const .*= prefersReducedMotion\(\)/m);
+  });
+
+  it("jumps in a background tab too, because nothing there animates", () => {
+    // Measured: in a hidden document `scrollIntoView({behavior:"smooth"})`
+    // leaves scrollY at 0 while "auto" moves it in the same frame. /cloud lands
+    // in a background tab routinely -- `autovault link` opens the browser, the
+    // Stripe return can arrive in a new one -- and this page has already been
+    // bitten once by assuming a background tab animates (Task E's rAF ceiling).
+    const at = cloudPage.indexOf("async function focusDevicesCard()");
+    const body = cloudPage.slice(at, cloudPage.indexOf("\n}", at));
+    expect(body).toContain('document.visibilityState === "hidden"');
+  });
+});
+
+describe("a machine that checks in reaches the card by itself", () => {
+  const at = cloudPage.indexOf("const arrivalShownIds = new Set<string>();");
+  const watcher = cloudPage.slice(at, cloudPage.indexOf("\n);", at));
+
+  it("exists, and is driven by the list rather than by a click", () => {
+    expect(at).toBeGreaterThan(-1);
+    expect(watcher).toContain("pendingDevices.value.map((device) => device.id)");
+    expect(watcher).toContain("await focusDevicesCard();");
+  });
+
+  it("only at connect, where the page has already pointed at the card", () => {
+    // .cv-nextstep promises the machine shows up "below". From explore on the
+    // owner may be reading Billing, and a page that scrolls out from under them
+    // is worse than the badge they can click.
+    expect(watcher).toContain('if (currentStage !== "connect") return;');
+  });
+
+  it("waits for the veil rather than spending its one attempt behind it", () => {
+    // Task E's regression, one watcher along: `revealed` is in the SOURCE so the
+    // watcher wakes when the veil lifts, and the guard sits BEFORE the latch so
+    // an attempt that could not have worked is not counted.
+    expect(watcher).toContain("revealed.value,");
+    const guard = watcher.indexOf("if (!isRevealed) return;");
+    const latch = watcher.indexOf("arrivalShownIds.add");
+    expect(guard).toBeGreaterThan(-1);
+    expect(latch).toBeGreaterThan(guard);
+  });
+
+  it("yields to the CLI handshake instead of scrolling on top of it", () => {
+    // The handshake scrolls, flashes AND focuses. Half of that again would
+    // restart the flash mid-flash on the one row that named itself.
+    expect(watcher).toContain("if (admitTarget.value) return;");
+    expect(watcher.indexOf("if (admitTarget.value) return;")).toBeLessThan(
+      watcher.indexOf("arrivalShownIds.add")
+    );
+  });
+
+  it("does not steal focus, and cannot admit anything", () => {
+    // Nothing here named a machine. Focus on a button that grants vault access
+    // is what the ?admit= handshake earns by carrying a fingerprint.
+    expect(watcher).not.toContain(".focus()");
+    expect(watcher).not.toContain("decideDevice");
+  });
+
+  it("measures the card after the flush, not before it", () => {
+    // A watcher callback runs before Vue renders, so the card still holds
+    // "Nothing enrolled yet" -- short enough to look like it is on screen while
+    // the rows about to replace it push it off the bottom. Measured early, the
+    // in-view check passed every time and this never scrolled at all.
+    const tick = watcher.indexOf("await nextTick();");
+    const measure = watcher.indexOf("getBoundingClientRect()");
+    expect(tick).toBeGreaterThan(-1);
+    expect(measure).toBeGreaterThan(tick);
+  });
+
+  it("stays quiet when the card is already on screen", () => {
+    // A page that jumps when nothing needed moving is just noise, and on a tall
+    // window the card is visible at connect without any help.
+    expect(watcher).toContain("box.top >= 0 && box.bottom <= window.innerHeight");
+  });
+
+  it("scrolls once per machine, not once per poll", () => {
+    // The list reloads every four seconds. Re-scrolling on every response would
+    // pin the page to this card.
+    expect(watcher).toContain("!arrivalShownIds.has(device.id)");
+    expect(watcher).toContain("for (const device of unseen) arrivalShownIds.add(device.id);");
+  });
+
+  it("runs nothing at setup scope", () => {
+    // The admit watcher above is `{ immediate: true }`; this one deliberately is
+    // not. There is nothing to do before a device list exists, and `revealed`
+    // in the source is what wakes it for a row that arrived behind the veil.
+    const tail = cloudPage.slice(
+      cloudPage.indexOf("\n);", at),
+      cloudPage.indexOf("\n);", at) + 8
+    );
+    expect(tail).not.toContain("immediate");
   });
 });
