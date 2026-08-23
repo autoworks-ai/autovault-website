@@ -253,6 +253,20 @@
               and then waits here for you to admit it.
             </p>
             <div class="cv-connect-terminal">
+              <!-- Terminal chrome, matching the reserve-step block in
+                   HostedVaultFunnel.vue. It lives in THIS template rather
+                   than inside ConnectTerminal for two reasons: it is static,
+                   and markup here gets CloudPage's scoped-style attribute
+                   normally. Vue stamps only a child component's ROOT element
+                   with that attribute, so anything inside ConnectTerminal has
+                   to be styled by a global class or through :deep() — see the
+                   .cv-connect-terminal :deep(...) rules in the style block. -->
+              <div class="terminal-head">
+                <span class="dot" style="background: #d97171"></span>
+                <span class="dot" style="background: #e8a866"></span>
+                <span class="dot live"></span>
+                <span class="ttl">~ — autovault — bash</span>
+              </div>
               <ConnectTerminal :slug="vaultSlug" />
             </div>
 
@@ -261,6 +275,23 @@
                 >Installation guide</a
               >
             </div>
+          </div>
+
+          <!-- "below" made literal. The replay ends on "⧗ waiting for you to
+               admit it below" and, until this existed, nothing on the page
+               connected that sentence to the Machines card that renders next
+               (see showsMachines). This is the bridge between the two: a rule
+               down to the card, and the sentence that names what to do when
+               you get there. Connect stage only — from `explore` on, Machines
+               is a peer panel rather than the next step. -->
+          <div class="cv-nextstep">
+            <span class="cv-nextstep-rule" aria-hidden="true" />
+            <p class="cv-nextstep-copy">
+              <span class="cv-nextstep-caret" aria-hidden="true">↓</span>
+              Next: your machine shows up under
+              <strong>Machines</strong> below. Admit it there and the CLI
+              stops waiting.
+            </p>
           </div>
         </template>
 
@@ -582,7 +613,12 @@
              showsMachines. The `v-if="vault"` gate below is the one that
              decides whether it exists at all. -->
         <template v-if="showsMachines">
-          <div v-if="vault" ref="devicesCard" class="cv-devices standalone" :class="{ focusflash: devicesFlash }" role="region" aria-labelledby="cv-devices-title">
+          <!-- `awaiting` is the other half of .cv-nextstep above: at connect
+               this card IS the next step, so it carries the accent rather
+               than sitting there as one more neutral panel. Added to the
+               existing binding, never replacing it -- `focusflash` is the
+               transient flash the admit handshake drives. -->
+          <div v-if="vault" ref="devicesCard" class="cv-devices standalone" :class="{ focusflash: devicesFlash, awaiting: stage === 'connect' }" role="region" aria-labelledby="cv-devices-title">
             <h3 id="cv-devices-title" class="cv-devices-title">
               Machines
               <span v-if="pendingDevices.length" class="cv-devices-count">
@@ -731,6 +767,13 @@ const ConnectTerminal = defineComponent({
       setTimeout(() => (copied.value = false), 1600);
     }
 
+    // Single root element, on purpose -- the same hazard LocalHandoffTerminal
+    // documents in HostedVaultFunnel.vue. Vue stamps a child component's root,
+    // and only its root, with the parent's scoped-style attribute. Everything
+    // below this div is therefore unreachable from a plain rule in CloudPage's
+    // <style scoped> block; those rules are written as
+    // `.cv-connect-terminal :deep(...)` instead. Returning a fragment here
+    // would strip the attribute off the root too and break even that.
     return () =>
       h("div", { class: "cv-terminal-wrapper" }, [
         // The terminal replay below is aria-hidden because it types character
@@ -761,19 +804,25 @@ const ConnectTerminal = defineComponent({
             ? h("span", { class: "cur cursor cv-cur" })
             : null,
         ]),
-        h(
-          "button",
-          {
-            class: "cv-cmd-copy",
-            type: "button",
-            onClick: handleCopy,
-            "aria-label": copied.value
-              ? "Install commands copied to clipboard"
-              : "Copy install commands",
-            "aria-live": "polite",
-          },
-          copied.value ? "Copied" : "Copy",
-        ),
+        // A footer row rather than an overlay pinned to the body's top-right.
+        // The terminal head now occupies that corner, and the reference card
+        // (.hosted-copy-row in HostedVaultFunnel.vue) already puts its copy
+        // affordance in a row under the terminal. Same shape here.
+        h("div", { class: "cv-copy-row" }, [
+          h(
+            "button",
+            {
+              class: "cv-cmd-copy",
+              type: "button",
+              onClick: handleCopy,
+              "aria-label": copied.value
+                ? "Install commands copied to clipboard"
+                : "Copy install commands",
+              "aria-live": "polite",
+            },
+            copied.value ? "Copied" : "Copy commands",
+          ),
+        ]),
       ]);
   },
 });
@@ -2307,16 +2356,42 @@ const ICON = {
   max-width: 520px;
 }
 
-.cv-terminal-wrapper {
+/* ---------------- connect-stage terminal ----------------
+   The card. Everything from .terminal-head down is inside it, and
+   `overflow: hidden` is what makes the head's top corners follow this
+   radius instead of squaring off over it. Mirrors .hcc-terminal /
+   .hosted-command-card in HostedVaultFunnel.vue -- one terminal language on
+   this site, not two.
+
+   Everything below this rule is inside the ConnectTerminal child, whose
+   non-root elements never receive this block's scope attribute (see the
+   comment on its render function). Written flat, these rules compiled to
+   selectors that matched nothing, which is why the connect terminal shipped
+   with the global 400px .terminal-body and a browser-default "Copy" button.
+   :deep() is what carries them across that boundary; .cv-connect-terminal
+   itself lives in CloudPage's own template, so it anchors them correctly. */
+.cv-connect-terminal {
+  margin-bottom: 4px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--cv-radius-sm);
+  /* The head bar's own colour, from the global .terminal-head rule, so the
+     copy row under the terminal matches it and the whole thing reads as one
+     card. Deliberately NOT var(--bg-1), which the two .cv-devices rules below
+     use and which is defined nowhere in this repo -- it resolves to
+     transparent. */
+  background: var(--bg-2);
+  overflow: hidden;
+}
+.cv-connect-terminal :deep(.cv-terminal-wrapper) {
   position: relative;
 }
-.cv-terminal-body {
+.cv-connect-terminal :deep(.cv-terminal-body) {
   margin: 0;
   padding: 14px 16px;
   overflow-x: auto;
-  border: 1px solid var(--line-2);
-  border-radius: var(--cv-radius-sm);
   background: #0a0f13;
+  /* Beats the global .terminal-body 400px min/max, which sized this for a
+     full-screen demo terminal and left two thirds of it empty here. */
   min-height: auto;
   max-height: none;
   font-family: var(--mono);
@@ -2325,22 +2400,83 @@ const ICON = {
   color: var(--ink);
   white-space: pre;
 }
-.cv-cmd-copy {
-  position: absolute;
-  top: 10px;
-  right: 10px;
+.cv-connect-terminal :deep(.cv-copy-row) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+}
+/* Deliberately the same shape as the global `.hosted-copy-row button` the
+   reference card uses -- mono, 11px, 32px tall, accent on hover -- expressed
+   in this page's own tokens rather than by borrowing that class, so the
+   button sits in the .cv-btn family it is surrounded by. */
+.cv-connect-terminal :deep(.cv-cmd-copy) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  /* The label swaps to "Copied" for 1.6s on click. Without a floor the button
+     shrinks by ~40px and snaps back, which reads as a glitch on the one
+     control this stage is asking people to press. */
+  min-width: 7rem;
+  padding: 7px 11px;
   border: 1px solid var(--line-2);
   border-radius: 6px;
-  background: rgba(15, 22, 28, 0.9);
-  color: var(--accent);
-  font: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 9px;
+  background: var(--bg-2);
+  color: var(--ink-2);
+  font: 11px var(--mono);
   cursor: pointer;
+  transition:
+    border-color 140ms var(--ease),
+    color 140ms var(--ease);
 }
-.cv-cmd-copy:hover {
+.cv-connect-terminal :deep(.cv-cmd-copy:hover) {
   border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---------------- connect → machines bridge ----------------
+   The terminal signs off with "waiting for you to admit it below" and this
+   is what makes "below" point at something. The rule is the physical link
+   down to the Machines card; the sentence says what to do once the eye
+   arrives. Both are connect-stage only. */
+.cv-nextstep {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  margin: 14px 0 0;
+  max-width: 640px;
+}
+.cv-nextstep-rule {
+  width: 1px;
+  height: 22px;
+  /* Lands on the caret's centre, so the rule and the arrow read as one
+     stroke rather than two marks that nearly line up. */
+  margin-left: 4px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--accent) 55%, transparent)
+  );
+}
+.cv-nextstep-copy {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.cv-nextstep-copy strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.cv-nextstep-caret {
+  color: var(--accent);
+  font-size: 12px;
+  line-height: 1;
 }
 
 .cv-devices {
@@ -2359,6 +2495,14 @@ const ICON = {
 }
 .cv-devices.standalone.focusflash {
   border-color: var(--accent);
+}
+/* At connect this card is the next step, not a peer panel -- the same accent
+   focusflash uses, held rather than flashed, so the sentence above it lands
+   somewhere visibly live. Dropped from `explore` on, where Machines stops
+   being the thing to do next and going on shouting would be a lie. */
+.cv-devices.standalone.awaiting {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 .cv-devices-title {
@@ -2553,10 +2697,16 @@ const ICON = {
   box-shadow: none;
 }
 
-/* keyboard focus — interactive elements get a clear mint ring */
+/* keyboard focus — interactive elements get a clear mint ring.
+   The copy button is split out because it lives inside ConnectTerminal and
+   needs :deep() to be reached at all; listed flat here it silently gave that
+   one button no focus ring. */
 .cv-btn:focus-visible,
-.cv-nav-item:focus-visible,
-.cv-cmd-copy:focus-visible {
+.cv-nav-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.cv-connect-terminal :deep(.cv-cmd-copy:focus-visible) {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -3161,8 +3311,13 @@ const ICON = {
   .cv-btn,
   .cv-nav-item,
   .cv-card,
-  .cv-preview,
-  .cv-cmd-copy {
+  .cv-preview {
+    transition: none;
+  }
+  /* Same intent, one selector out on its own: the copy button is inside
+     ConnectTerminal, so a flat .cv-cmd-copy in the list above reaches it no
+     more here than it does anywhere else in this block. */
+  .cv-connect-terminal :deep(.cv-cmd-copy) {
     transition: none;
   }
   .cv-btn:hover:not(:disabled),
