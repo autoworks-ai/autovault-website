@@ -95,7 +95,17 @@
     </div>
 
     <div v-if="showLocalHandoff" class="hosted-command-card">
-      <div class="panel-title">Local handoff</div>
+      <!-- "Install", not the old "Local handoff": this block is only the
+           install half. No namespace exists yet -- reserving it is what the
+           button above does -- so there is no slug to link to and no link
+           command to give. Calling it the handoff invited copying it and
+           expecting a link, which is exactly what happened. -->
+      <div class="panel-title">Install the CLI</div>
+      <p class="hcc-note">
+        Safe to run now — installing takes a moment.
+        <code>autovault link</code> needs the namespace to exist, so it appears
+        once you reserve it above.
+      </p>
       <div class="hcc-terminal">
         <!-- Terminal chrome: header with dots and title -->
         <div class="terminal-head">
@@ -285,7 +295,13 @@ const commandBlock = computed(() => [
   // which was survivable while the auto-provision made that state last one
   // frame; now that reserving waits for a click, it is the durable
   // post-checkout screen -- and the screen-reader transcript.
-  vault.value ? "# Cloud sync is not enabled yet." : "# Checkout is complete. Reserve the namespace above to claim it."
+  vault.value ? "# Cloud sync is not enabled yet." : "# Checkout is complete. Reserve the namespace above to claim it.",
+  // The copied text has to carry the caveat too. Somebody who pastes this into
+  // a terminal is not looking at the page any more, and the block deliberately
+  // has no `autovault link` in it -- there is no namespace to link to yet.
+  // Without this line the paste just ends, and the reasonable conclusion is
+  // that the link command is missing rather than not-yet-applicable.
+  ...(vault.value ? [] : ["# `autovault link` appears here once you reserve it."])
 ].join("\n"));
 
 // Which single action this step needs. CloudPage owns the kicker, heading
@@ -989,6 +1005,21 @@ function canUseBrowser() {
 
 .hosted-command-card > .panel-title {
   padding: 14px 14px 0 14px;
+}
+
+/* Sits between the title and the terminal, so the "this is install only"
+   caveat is read before the commands are copied rather than after. Matches
+   .hosted-namespace-note's size/colour so the two notes in this funnel read
+   as the same kind of aside. */
+.hcc-note {
+  margin: 6px 0 0;
+  padding: 0 14px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.hcc-note code {
+  font-size: 11px;
 }
 
 .hcc-terminal {

@@ -112,4 +112,30 @@ describe("the reserve step's own copy", () => {
     expect(funnel).not.toContain("# Checkout must complete before this namespace is reserved.");
     expect(funnel).toContain("# Checkout is complete. Reserve the namespace above to claim it.");
   });
+
+  it("presents the command card as install-only, since it has no link command to give", () => {
+    // Jack copied this block expecting to link with it and got install commands
+    // ending in `autovault skill list`. That is correct -- at the reserve step
+    // no namespace exists, so there is no slug to link to -- but titling it
+    // "Local handoff" implied it was the whole handoff.
+    expect(funnel).not.toContain('<div class="panel-title">Local handoff</div>');
+    expect(funnel).toContain('<div class="panel-title">Install the CLI</div>');
+    // The caveat must be on screen BEFORE the copy buttons...
+    const title = funnel.indexOf('<div class="panel-title">Install the CLI</div>');
+    const copyRow = funnel.indexOf('class="hosted-copy-row"');
+    const note = funnel.indexOf('class="hcc-note"');
+    expect(note).toBeGreaterThan(title);
+    expect(note).toBeLessThan(copyRow);
+  });
+
+  it("carries the same caveat into the copied text, not just the page", () => {
+    // Someone pasting into a terminal is not looking at the page any more, so
+    // the block itself has to say why it contains no `autovault link`.
+    expect(funnel).toContain("# `autovault link` appears here once you reserve it.");
+    // Only while there is no vault -- once reserved, the connect step owns the
+    // real link command and repeating the caveat there would be wrong.
+    const block = funnel.slice(funnel.indexOf("const commandBlock = computed"));
+    const line = block.indexOf("appears here once you reserve it");
+    expect(block.slice(0, line)).toContain("vault.value ? [] :");
+  });
 });
