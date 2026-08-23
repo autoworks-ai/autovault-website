@@ -3,8 +3,14 @@ name: CI
 on:
   push:
     branches: [main]
+  # Deliberately unfiltered. A `branches:` filter on `pull_request` matches the
+  # PR's BASE branch, so `branches: [main]` fired no event at all for a stacked
+  # PR -- one whose base is another feature branch. Those PRs showed an
+  # all-green checks list having never been built, tested or previewed, which
+  # makes the PR gate documented in AGENTS.md impossible to satisfy. The
+  # `deploy-production` job below is gated on `push` to `refs/heads/main`, so
+  # running on every PR base cannot ship anything.
   pull_request:
-    branches: [main]
   merge_group:
   workflow_dispatch:
 
