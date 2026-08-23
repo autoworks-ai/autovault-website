@@ -5,6 +5,8 @@ import UiIcon from "./UiIcon.vue";
 import ClerkAuthControls from "./ClerkAuthControls.vue";
 import { PRODUCT_VERSION } from "../data/product";
 import { searchResults } from "../data/searchResults";
+import { useClerkApiAuth } from "../utils/clerkApi";
+import { clerkBrand } from "../clerk";
 
 const props = withDefaults(defineProps<{
   active?: string;
@@ -14,13 +16,23 @@ const props = withDefaults(defineProps<{
   showSearch: false
 });
 
-const navItems = [
+const baseNavItems = [
   { label: "Quick start", href: "/quick-start" },
   { label: "Authoring", href: "/authoring" },
   { label: "Examples", href: "/skills-directory" },
   { label: "Compare", href: "/compare" },
   { label: "Security", href: "/security" }
 ];
+
+const { isClerkSignedIn } = useClerkApiAuth();
+
+const navItems = computed(() => {
+  const items = [...baseNavItems];
+  if (isClerkSignedIn.value) {
+    items.push({ label: "Cloud", href: clerkBrand.cloudPath });
+  }
+  return items;
+});
 
 const query = ref("");
 const searchOpen = ref(false);
@@ -34,7 +46,7 @@ const filteredResults = computed(() => {
 
 function isActive(item: { label: string; href: string }) {
   if (props.active) return item.label === props.active;
-  return currentPath.value === item.href || (item.href === "/skills-directory" && currentPath.value.startsWith("/skill"));
+  return currentPath.value === item.href || (item.href === "/skills-directory" && currentPath.value.startsWith("/skill")) || (item.href === clerkBrand.cloudPath && currentPath.value.startsWith("/cloud"));
 }
 
 function handleSearchInput(event: Event) {

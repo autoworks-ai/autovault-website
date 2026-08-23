@@ -239,6 +239,28 @@ describe("v1 content guardrails", () => {
     expect(pageDocsSource).toContain("SkillClone");
   });
 
+  it("gates the cloud nav entry to signed-in users and uses clerkBrand.cloudPath", () => {
+    const topbar = read(".vitepress/theme/components/AvTopbar.vue");
+    const clerk = read(".vitepress/theme/clerk.ts");
+
+    // Verify the cloud entry uses clerkBrand.cloudPath, not a string literal
+    expect(topbar).toContain("useClerkApiAuth");
+    expect(topbar).toContain("clerkBrand");
+    expect(topbar).toContain('{ label: "Cloud", href: clerkBrand.cloudPath }');
+    expect(topbar).not.toContain('{ label: "Cloud", href: "/cloud');
+
+    // Verify the gating condition: isClerkSignedIn computed property
+    expect(topbar).toContain("const { isClerkSignedIn } = useClerkApiAuth()");
+    expect(topbar).toContain("const navItems = computed");
+    expect(topbar).toContain("if (isClerkSignedIn.value)");
+
+    // Verify the isActive special case for /cloud paths
+    expect(topbar).toContain('item.href === clerkBrand.cloudPath && currentPath.value.startsWith("/cloud")');
+
+    // Verify clerkBrand.cloudPath is defined in clerk.ts
+    expect(clerk).toContain("cloudPath");
+  });
+
   it("keeps homepage gate metrics labeled as fixtures", () => {
     expect(homepageGateMetrics.reject).toEqual({
       value: "~1 in 9",

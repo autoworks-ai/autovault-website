@@ -315,3 +315,88 @@ describe("one thing at a time", () => {
     expect(funnel).not.toContain("signedIn.value || paid.value");
   });
 });
+
+describe("local handoff terminal", () => {
+  const funnel = readFileSync(
+    new URL("../.vitepress/theme/components/HostedVaultFunnel.vue", import.meta.url),
+    "utf-8"
+  );
+
+  it("preserves the gating condition unchanged", () => {
+    // showLocalHandoff gating is pinned by tests above and must not change.
+    // This test verifies the gating is still there after the terminal restyle.
+    expect(funnel).toContain("v-if=\"showLocalHandoff\"");
+    expect(funnel).toContain("const showLocalHandoff = computed(() => atReserveStep.value);");
+  });
+
+  it("renders the three real commands, not the combined link command", () => {
+    // Ship the three separate commands, not curl … | sh -s -- link <slug>
+    // (that flag does not exist in the CLI yet). The installer flag is tracked
+    // as a separate issue in the CLI repo.
+    expect(funnel).toContain("AUTOVAULT_INSTALL_COMMAND");
+    expect(funnel).toContain('". \\"$HOME/.autovault/env\\""');
+    expect(funnel).toContain('"autovault skill list"');
+    // Confirm no combined command is present
+    expect(funnel).not.toContain("link ${");
+    expect(funnel).not.toContain("link <slug>");
+  });
+
+  it("wires all three copy handlers to buttons", () => {
+    // Keep the existing three copy handlers and their click bindings.
+    expect(funnel).toContain("@click=\"copyCommands\"");
+    expect(funnel).toContain("@click=\"copyAgentHandoff('claude-code')\"");
+    expect(funnel).toContain("@click=\"copyAgentHandoff('cursor')\"");
+    // Verify the handlers are still defined
+    expect(funnel).toContain("async function copyCommands()");
+    expect(funnel).toContain("async function copyAgentHandoff(agent: \"claude-code\" | \"cursor\")");
+  });
+
+  it("calls useTerminalReplay from a child component's setup(), not a computed read during render", () => {
+    // The critical bug: `terminalReplay` was `computed(() => useTerminalReplay(...))`,
+    // referenced only from the template inside `v-if="showLocalHandoff"`. A
+    // computed getter doesn't run until first read, so useTerminalReplay (and
+    // the onMounted/onBeforeUnmount it registers internally) never executed
+    // during setup() -- only during render, where Vue's currentInstance is
+    // unset and lifecycle-hook registration silently no-ops. The terminal
+    // rendered permanently empty as a result. Pin the buggy pattern gone.
+    expect(funnel).not.toContain("const terminalReplay = computed(");
+    // The fix: a child component (mirroring ConnectTerminal in CloudPage.vue)
+    // whose own setup() calls useTerminalReplay directly, so the call runs
+    // when Vue actually mounts the child -- exactly when showLocalHandoff
+    // flips the card on, not before and not never.
+    expect(funnel).toContain("const LocalHandoffTerminal = defineComponent({");
+    expect(funnel).toContain("useTerminalReplay(LOCAL_HANDOFF_LINES");
+    expect(funnel).toContain("<LocalHandoffTerminal />");
+  });
+
+  it("pairs the .line grid class with .terminal-line on each command line", () => {
+    // .cd-page .terminal-body .line is what makes a long command size to its
+    // content so the terminal body's horizontal scroll works, instead of a
+    // full-width flex box overflowing. ConnectTerminal and TerminalDemo both
+    // render "line terminal-line" together; this component must match, with
+    // no extra classless wrapper div around it.
+    expect(funnel).toContain("\"line terminal-line\"");
+  });
+
+  it("does not shadow the global .hosted-copy-row button styling in scoped CSS", () => {
+    // A scoped .hosted-copy-row button block previously duplicated AND
+    // altered the global rule (different border color, radius, text color,
+    // font-size, plus an extra hover background) purely because the scoped
+    // attribute selector outranks the global rule's specificity. Only
+    // layout properties genuinely specific to this card (padding, margin)
+    // belong in scoped CSS; button appearance comes from the global rule.
+    const styleBlock = funnel.slice(funnel.indexOf("<style scoped>"));
+    expect(styleBlock).not.toContain(".hosted-copy-row button {");
+    expect(styleBlock).not.toContain(".hosted-copy-row button:hover");
+  });
+
+  it("uses the shared copyText helper from utils/clipboard, not a local shadow", () => {
+    // copyCommands/copyAgentHandoff pre-date this branch and used a bare
+    // local `navigator.clipboard?.writeText` with a swallowed catch. The
+    // brief asks for the shared helper (650ms race + textarea/execCommand
+    // fallback) that ConnectTerminal already uses under the alias
+    // `copyToClipboard`.
+    expect(funnel).toContain("import { copyText } from \"../utils/clipboard\";");
+    expect(funnel).not.toContain("async function copyText(text: string) {");
+  });
+});
