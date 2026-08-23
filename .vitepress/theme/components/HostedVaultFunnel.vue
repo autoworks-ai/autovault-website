@@ -58,14 +58,14 @@
 
         <!-- Terminal body with typed replay and accessible transcript -->
         <pre class="visually-hidden"><code>{{ commandBlock }}</code></pre>
-        <div class="hcc-terminal-body" ref="terminalBodyRef" aria-hidden="true">
+        <div class="terminal-body hcc-terminal-body" ref="terminalBodyRef" aria-hidden="true">
           <div
             v-for="(line, index) in terminalReplay.visibleLines.value"
             :key="index"
             :class="[line.type !== 'cmd' && line.type !== 'blank' && line.type]"
           >
             <template v-if="line.type === 'cmd'">
-              <div class="line terminal-line">
+              <div class="terminal-line">
                 <span class="pmt">$</span>
                 <span>{{ line.text }}</span>
               </div>
@@ -75,7 +75,7 @@
             </template>
           </div>
           <!-- Blinking cursor while typing -->
-          <span v-if="!terminalReplay.complete.value" class="cur cursor"></span>
+          <span v-if="!terminalReplay.complete.value" class="cursor"></span>
         </div>
       </div>
 
@@ -233,7 +233,7 @@ const showLocalHandoff = computed(() => atReserveStep.value);
 const terminalBodyRef = ref<HTMLElement | null>(null);
 const terminalLines = computed<TerminalReplayLine[]>(() => [
   { type: "cmd", text: AUTOVAULT_INSTALL_COMMAND },
-  { type: "out", text: ". \"$HOME/.autovault/env\"" },
+  { type: "cmd", text: ". \"$HOME/.autovault/env\"" },
   { type: "cmd", text: "autovault skill list" },
 ]);
 const terminalReplay = computed(() =>
@@ -596,11 +596,6 @@ function canUseBrowser() {
 
 .hosted-command-card > .panel-title {
   padding: 14px 14px 0 14px;
-  margin-bottom: 10px;
-  color: var(--ink);
-  font-family: var(--mono);
-  font-size: 11px;
-  text-transform: uppercase;
 }
 
 .hcc-terminal {
@@ -612,57 +607,7 @@ function canUseBrowser() {
 .hcc-terminal-body {
   min-height: 180px;
   max-height: 180px;
-  overflow-y: auto;
-  scroll-behavior: smooth;
-  padding: 18px 22px;
-  color: var(--ink);
-  line-height: 1.75;
   background: var(--panel);
-  font-family: var(--mono);
-  font-size: 12px;
-}
-
-.hcc-terminal-body .line {
-  display: flex;
-  gap: 10px;
-}
-
-.hcc-terminal-body .out,
-.hcc-terminal-body .ok,
-.hcc-terminal-body .err {
-  padding-left: 22px;
-}
-
-.hcc-terminal-body .ok {
-  color: var(--accent);
-}
-
-.hcc-terminal-body .err {
-  color: var(--bad);
-}
-
-.hcc-terminal-body .out {
-  color: var(--ink-2);
-}
-
-/* Cursor animation */
-.cursor {
-  display: inline-block;
-  width: 7px;
-  height: 14px;
-  margin-left: 2px;
-  background: var(--accent);
-  vertical-align: middle;
-  animation: blink 1s steps(1) infinite;
-}
-
-@keyframes blink {
-  0%, 49% {
-    opacity: 1;
-  }
-  50%, 100% {
-    opacity: 0;
-  }
 }
 
 .hosted-copy-row {

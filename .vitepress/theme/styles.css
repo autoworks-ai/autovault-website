@@ -7653,6 +7653,14 @@ body {
   padding: 14px;
 }
 
+.panel-title {
+  margin-bottom: 10px;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
 .provision-list {
   display: grid;
   gap: 8px;
