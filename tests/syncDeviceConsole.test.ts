@@ -488,3 +488,43 @@ describe("polls do not trip over each other", () => {
     expect(body).toContain("deviceLoadInFlight = false;");
   });
 });
+
+describe("one snapshot, and no claims about a vault that is not there", () => {
+  it("reads live devices and history in a single statement", () => {
+    // Two queries meant another tab revoking between them put the same id in
+    // both halves -- once stale, once revoked -- so the console rendered
+    // duplicate v-for keys and offered a revoke control for a device already
+    // gone. One statement is one snapshot.
+    const source = readFileSync(
+      new URL("../functions/api/vaults/current/devices.js", import.meta.url),
+      "utf-8"
+    );
+    expect(source).toContain("union all");
+    // Exactly one round trip.
+    expect(source.split("await all(env").length - 1).toBe(1);
+    // And the union must not reintroduce the cap on live rows.
+    const live = source.slice(source.indexOf("select id"), source.indexOf("union all"));
+    expect(live).not.toContain("limit");
+  });
+
+  it("returns no duplicate ids even with a device in both halves", async () => {
+    const { db, env, cookie, vaultId } = await seedOwner();
+    addDevice(db, vaultId, "device-a", KEY_A, "active", "2026-08-23T01:00:00.000Z");
+    addDevice(db, vaultId, "device-b", KEY_B, "revoked", "2026-08-23T00:00:00.000Z");
+
+    const payload = await (await listDevices({ request: req(cookie, "/api/vaults/current/devices"), env })).json();
+    const ids = payload.devices.map((d: any) => d.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    // Live still leads.
+    expect(ids[0]).toBe("device-a");
+  });
+
+  it("does not report machine state when there is no vault", () => {
+    // Signed out, mid-checkout, or after a failed load there is no vault whose
+    // device state is known -- and "No machines linked yet" states a fact
+    // about one that may not exist.
+    const at = cloudPage.indexOf("No machines linked yet");
+    expect(at).toBeGreaterThan(-1);
+    expect(cloudPage.slice(at - 200, at)).toContain('v-else-if="vault"');
+  });
+});

@@ -101,7 +101,11 @@
               ><span class="cv-dot" />
               {{ pendingDevices.length }} waiting to be admitted</span
             >
-            <span v-else class="cv-pill mut"
+            <!-- v-else-if, not v-else: signed out, mid-checkout, or after a
+                 failed load there is no vault whose device state we know, and
+                 "no machines linked" states a fact about one that may not
+                 exist. -->
+            <span v-else-if="vault" class="cv-pill mut"
               ><span class="cv-dot" /> No machines linked yet</span
             >
           </div>

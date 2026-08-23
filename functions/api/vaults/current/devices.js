@@ -21,33 +21,43 @@ export async function onRequestGet({ request, env }) {
     const vault = await getCurrentVault(env, user.id);
     if (!vault) throw new ApiError(404, "No hosted vault yet.");
 
-    // Live devices are never capped; only settled history is.
+    // One statement, so live rows and history come from one snapshot.
     //
-    // A single capped query looked fine and was not: with more than the cap in
-    // live devices it starts omitting the oldest ACTIVE rows, and this response
-    // is the console's only source of device ids and revoke controls -- so an
-    // admitted key would become unrevocable through the UI. Whatever else a cap
-    // does, it must never make a key harder to take away.
-    const live = await all(env, `
-      select id, public_key, status, hostname, first_seen_at, last_seen_at, admitted_at, revoked_at
+    // This was two queries -- live uncapped, history capped -- which fixed the
+    // cap hiding revocable devices and bought a new problem: another tab
+    // revoking between them puts the same id in both halves, once stale and
+    // once revoked. The console then renders duplicate v-for keys and offers a
+    // revoke control for a device already gone.
+    //
+    // The union keeps what the split was for. Live devices are still never
+    // capped -- an admitted key that falls off the list is a key that cannot be
+    // taken away -- and the limit still applies only to settled history.
+    const { results } = await all(env, `
+      select id, public_key, status, hostname, first_seen_at, last_seen_at, admitted_at, revoked_at,
+             -- The whole sort rank has to live in a column: a compound
+             -- SELECT's ORDER BY can only reference result columns, not an
+             -- expression over them. 0/1 here, 2 for history below.
+             case status when 'pending' then 0 else 1 end as sort_group
       from sync_devices
       where vault_id = ? and status in ('pending', 'active')
-      order by case status when 'pending' then 0 else 1 end, first_seen_at desc
-    `, vault.id);
 
-    const history = await all(env, `
-      select id, public_key, status, hostname, first_seen_at, last_seen_at, admitted_at, revoked_at
-      from sync_devices
-      where vault_id = ? and status not in ('pending', 'active')
-      order by first_seen_at desc
-      limit ?
-    `, vault.id, MAX_LISTED_HISTORY);
+      union all
 
-    const results = [...(live.results ?? []), ...(history.results ?? [])];
+      select * from (
+        select id, public_key, status, hostname, first_seen_at, last_seen_at, admitted_at, revoked_at,
+               2 as sort_group
+        from sync_devices
+        where vault_id = ? and status not in ('pending', 'active')
+        order by coalesce(revoked_at, first_seen_at) desc
+        limit ?
+      )
+
+      order by sort_group, first_seen_at desc
+    `, vault.id, vault.id, MAX_LISTED_HISTORY);
 
     return json({
       slug: vault.slug,
-      devices: results.map((device) => ({
+      devices: (results ?? []).map((device) => ({
         id: device.id,
         // The console never renders a whole public key. The owner is matching
         // what their terminal printed, and that is the short form.
