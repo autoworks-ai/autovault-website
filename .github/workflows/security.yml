@@ -5,8 +5,18 @@ on:
     - cron: "0 9 * * 1"
   push:
     branches: [main]
+  # Deliberately unfiltered -- see ci.yml. `branches:` matches the PR's BASE
+  # branch, so a stacked PR got no CodeQL scan and no dependency audit.
   pull_request:
-    branches: [main]
+  # `Dependency Audit (production)` is a REQUIRED check on main, and main uses
+  # a merge queue. Without this trigger the job never runs on a
+  # gh-readonly-queue/** branch, so it can never report there -- and the queue
+  # sits in AWAITING_CHECKS waiting for a check that will never arrive, until
+  # checkResponseTimeout (currently 3600 minutes) finally gives up.
+  #
+  # Any workflow owning a required check has to fire on merge_group too, or
+  # enabling the queue silently wedges every merge.
+  merge_group:
   workflow_dispatch:
 
 permissions:

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { prefersReducedMotion } from '../utils/motion'
 import BrandMark from './BrandMark.vue'
 import { copyText } from '../utils/clipboard'
 import { homepageGateMetrics } from '../data/marketing'
@@ -38,6 +39,7 @@ async function copyStart(kind: 'shell' | 'agent') {
 }
 
 onMounted(() => {
+  if (prefersReducedMotion()) return
   t1 = window.setInterval(() => { tickIn.value  = (tickIn.value  + 1) % SOURCES.length  }, 900)
   t2 = window.setInterval(() => { tickOut.value = (tickOut.value + 1) % ADOPTERS.length }, 900)
 })

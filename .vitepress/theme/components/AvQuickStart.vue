@@ -1,8 +1,17 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { prefersReducedMotion } from '../utils/motion'
 import { AUTOVAULT_INSTALL_COMMAND } from '../../shared/bootstrap'
 
 const active = ref(0)
+// Stays `true` regardless of the reduced-motion preference: VitePress
+// prerenders this page, and `prefersReducedMotion()` always reads `false`
+// server-side (no `window`). Deciding the initial value from it here would
+// make the client's first computed value diverge from the server-rendered
+// DOM for any visitor who prefers reduced motion -- a hydration mismatch
+// Vue would silently patch away, but only after rendering the wrong label
+// for an instant. The correction is applied post-mount instead, below,
+// where "client-only" is true by construction.
 const playing = ref(true)
 let timer: number | undefined
 
@@ -31,7 +40,15 @@ function toggle() {
   playing.value ? start() : stop()
 }
 
-onMounted(() => playing.value && start())
+onMounted(() => {
+  if (prefersReducedMotion()) {
+    // Correct the initial value now that we're safely client-side, instead
+    // of never having diverged from the SSR output above.
+    playing.value = false
+    return
+  }
+  if (playing.value) start()
+})
 onBeforeUnmount(stop)
 </script>
 

@@ -14,7 +14,9 @@ permissions:
 jobs:
   conventional-pr-title:
     name: Lint PR Title
-    if: ${{ github.event.pull_request.base.ref == 'main' }}
+    # No base-ref guard: every PR title becomes squash-merge input eventually,
+    # including a stacked PR's once its base lands. `pull_request_target` has no
+    # branches filter, so removing the guard is all that is needed here.
     runs-on: ubuntu-latest
     steps:
       - name: Validate conventional PR title

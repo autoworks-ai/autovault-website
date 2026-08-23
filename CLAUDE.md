@@ -55,11 +55,20 @@ npm run dev:bootstrap                # apply all pending D1 migrations to local 
 ```
 
 `.dev.vars` is gitignored; `.dev.vars.example` documents every required key.
-Clerk keys can be pulled via `clerk env pull --file .dev.vars`. Stripe values
-come from `stripe config --list` and `stripe listen --print-secret`. The
-webhook secret is stable per Stripe account in test mode — don't re-roll it
-casually; just rerun `stripe listen --print-secret` if `.dev.vars` ever
-drifts.
+Clerk keys can be pulled via `clerk env pull --file .dev.vars`.
+
+**`STRIPE_SECRET_KEY` must come from the Stripe Dashboard** (Developers >
+API keys > Secret key, test mode) — *not* from `stripe config --list`.
+That CLI key is minted by `stripe login` and Stripe expires it 90 days
+later, at which point checkout starts failing with "Expired API Key
+provided: sk_test_***" and nothing points at the CLI as the cause. A
+dashboard key does not expire.
+
+`npm run dev:stripe` reads that same key and passes it to the Stripe CLI, so
+one credential covers both the app and webhook forwarding and `stripe login`
+is not required. It refuses to start on a live key. The webhook secret is
+stable per Stripe account in test mode — rerun `stripe listen --print-secret`
+if `.dev.vars` ever drifts.
 
 **Per-session — two terminals**
 
@@ -71,9 +80,24 @@ npm run dev:pages
 npm run dev:stripe
 ```
 
-For iteration on the funnel UI itself, use `npm run dev:pages:live` instead
-of `dev:pages` — it puts Wrangler in front of the live VitePress dev server,
-so component/CSS edits hot-reload without a rebuild.
+For iteration on the funnel UI itself, leave `dev:pages` running and rebuild
+in a third terminal — Wrangler picks the new bundle up without a restart, and
+`--live-reload` reloads the browser for you:
+
+```bash
+npm run docs:build      # ~2s, no restart needed
+```
+
+There used to be a `dev:pages:live` script promising true hot reload. It was
+removed because it silently lied: `wrangler pages dev --proxy 5173` is
+ignored whenever `wrangler.toml` sets `pages_build_output_dir`, so Wrangler
+served a stale `.vitepress/dist` while a VitePress dev server nobody proxied
+to ran alongside it. Verified against wrangler 4.125: edit a string, and
+:5173 shows it while :8788 still serves the previous build.
+
+**`npm run dev` (port 5173) cannot run this funnel at all.** It is VitePress
+only — no Pages Functions — so every `/api/*` call 404s and `/cloud` can
+never leave the signed-out state. The page detects port 5173 and says so.
 
 **Test-mode helpers**
 
@@ -93,8 +117,10 @@ so component/CSS edits hot-reload without a rebuild.
 | Build hooks | `.vitepress/build/agentArtifacts.ts` | Generates agent-readable artifacts at build time |
 | API | `functions/api/` | Pages Functions — Clerk auth, Stripe checkout, vault provisioning |
 | API lib | `functions/api/_lib/` | `auth.js`, `db.js`, `stripe.js`, `vault.js`, `crypto.js`, `http.js` |
+| Sync API | `functions/v/[slug]/` | Device-signed catalog sync. **Never redirect these paths** — see Active feature work |
+| Sync lib | `functions/api/_lib/sync.js` | Ed25519 device auth, fingerprints, KV keys |
 | Middleware | `functions/_middleware.js` | Handles `autovault.sh` installer host redirect |
-| Schema | `migrations/0001_hosted_vault.sql` | users, sessions, oauth_states, customers, subscriptions, vaults |
+| Schema | `migrations/*.sql` | `0001` users, sessions, customers, subscriptions, vaults, pending_skills; `0002` vault progress columns; `0003` stripe_events dedupe + drops oauth_states; `0004` restores oauth_states; `0005` sync_devices |
 | Skill catalog content | `skill/` (rendered) + `public/skills/` (assets) | Static catalog pages |
 | Tests | `tests/*.test.ts` | Vitest, no browser yet |
 
@@ -133,10 +159,19 @@ GET/approve/reject not yet implemented).
    conventional commits (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`).
 8. **No console.* in `functions/api/*.js`** — they emit to Cloudflare logs
    indiscriminately. Use `ApiError` + structured responses.
-9. **Never commit secrets.** Clerk + Stripe keys live in Cloudflare Pages
-   env vars (set via the dashboard or `wrangler pages secret put`).
-10. **Stripe is test-mode by default.** Live keys gated by a deliberate
-    flip; no autonomous agent should set `STRIPE_SECRET_KEY=sk_live_*`.
+9. **Never commit secrets to git.** Keys live in Cloudflare Pages env vars
+   (`wrangler pages secret put`), `.dev.vars`, or `.env.local` — all
+   gitignored. Setting and rotating them is fine; committing them is not,
+   because git history is permanent and this repo is public.
+9b. **New Markdown is not automatically a page.** VitePress globs every `.md`
+   in the repo. Anything not meant to be public must be in `srcExclude` in
+   `.vitepress/config.ts` — `docs/**`, `README.md` and `public/**` are already
+   listed, and `tests/publicSurface.test.ts` asserts it.
+10. **Stripe test mode is the default working mode.** Test-mode work —
+    products, prices, webhook endpoints, checkout configuration,
+    `stripe listen`, `stripe trigger` — needs no permission. Live mode
+    moves real money, so say what you're about to do before the first
+    live-mode write in a session; after that, carry on.
 
 ## Environment / Secrets
 
@@ -152,17 +187,112 @@ Configured in Cloudflare Pages project settings (not `.env`):
 
 ## Active feature work
 
-See `.claude/FEATURE-PLAN.md` for the hosted-portal punch list and worktree
-split. See `.claude/KICKOFF.md` for the orchestrated-build entry prompt.
+The hosted-vault sync loop (signed catalog API + device enrollment) is the
+current build. The client half is already implemented in
+`autoworks-ai/autovault` on `feat/https-sync-upstream`. **That client is the
+spec.** Read `src/sync/contract.ts`, `src/sync/https.ts`, `src/sync/target.ts`
+and `src/cli/link.ts` before touching anything under `functions/v/` — do not
+design a parallel schema from this file.
+
+### Wire contract (implemented)
+
+`autovault link <slug>` expands to `https://autovault.dev/v/<slug>/catalog.json`.
+All four routes live under `functions/v/[slug]/` and every one of them is
+signed:
+
+| Route | Who may call it |
+|---|---|
+| `POST devices` | any key, signed by itself — this is first contact |
+| `GET devices/current` | any enrolled device, including revoked |
+| `GET catalog.json` | pending **or** active |
+| `GET bundles/<bundle_hash>.json` | active only |
+
+Load-bearing details, each of which breaks the CLI if changed:
+
+- **Signed message is `"<METHOD>\n<pathname>\n<unix-seconds>"`**, where
+  pathname is the full request path. Verify against
+  `new URL(request.url).pathname`, never a path rebuilt from route params.
+- Headers are `X-AutoVault-Device` (base64url public key),
+  `X-AutoVault-Timestamp`, `X-AutoVault-Signature`. Ed25519, verified with
+  `crypto.subtle` — available unflagged at this compatibility date.
+- **Never redirect anything under `/v/`.** The CLI fetches with
+  `redirect: "manual"` and throws on any 3xx. `_middleware.js` only redirects
+  the `autovault.sh` host, and a test pins that.
+- The catalog is readable while *pending* on purpose: `autovault link` enrols
+  and then immediately reads the catalog to pin `public_key`, before the owner
+  has admitted anything.
+- Catalog and bundles are served **byte-for-byte** from KV. Re-serialising
+  changes the bytes and every release signature stops verifying.
+- `bundle_path` lives inside the release signature and the client re-derives it
+  as `bundles/<bundle_hash>.json` relative to `catalog.json`. Do not rename,
+  move, or redirect bundles.
+- Release signature domain is exactly `autovault-sync-release-v1`.
+- Device responses are `no-store, private`. They are per-device authorized, so
+  an edge cache keyed on URL alone would hand one device another's content.
+- Beta limitation: `catalog.public_key` is pinned at enrollment, so rotating it
+  hard-fails every device. Document it, do not silently swap keys.
+
+### Getting a catalog into a vault
+
+The owner's machine holds the release signing secret; **Cloud never does**. The
+CLI has no publish path — it is purely a consumer — so signed objects are
+placed in KV out of band. There is deliberately no upload API, because
+inventing one would be a schema the client does not speak.
+
+```bash
+# vault id, which is the KV key prefix
+npx wrangler d1 execute autovault-hosted --remote \
+  --command "select id from vaults where slug = '<slug>'"
+
+npx wrangler kv key put --binding AUTOVAULT_VAULT_OBJECTS \
+  "sync:<vault_id>:catalog" --path ./catalog.json --remote
+
+npx wrangler kv key put --binding AUTOVAULT_VAULT_OBJECTS \
+  "sync:<vault_id>:bundle:<bundle_hash>" --path ./bundles/<bundle_hash>.json --remote
+```
+
+Migrations are NOT applied by CI. Run `npm run migrate:remote` before deploying
+any change that depends on a new migration, or the Functions will 500 against
+the old schema.
+
+## Operating scope
+
+Jack's standing instruction (2026-08-22): **do as much of the work as possible
+directly — in Clerk, Stripe, the live site, and the Cloudflare CLI — rather
+than handing back instructions to run.** All four CLIs are installed and
+authenticated: `wrangler`, `stripe`, `clerk`, `gh`.
+
+In scope, no permission needed:
+
+- **`wrangler.toml`** — including `[vars]`, bindings, and routes.
+- **Cloudflare** — Pages config and deploys, DNS records, D1 (`--remote`
+  included), KV, secrets via `wrangler pages secret put`.
+- **Clerk** — `clerk env pull`, instance and application configuration,
+  redirect and allowed-origin settings, appearance.
+- **Stripe test mode** — products, prices, webhook endpoints, checkout
+  configuration, `stripe listen`, `stripe trigger`.
+- **Remote D1 migrations** — `npm run migrate:remote`.
+- **Production deploys** — CI on merge to `main` is the normal path;
+  `npm run deploy:pages` for a break-glass deploy.
+
+Judgment still applies to things that are hard to undo: dropping a populated
+table, deleting DNS the live site depends on, the first live-mode Stripe
+write, rotating a secret that is in active use. Say what is about to happen,
+then do it. That is being a careful colleague, not asking for permission.
 
 ## Don't / Hard rules
 
-- Don't touch `migrations/0001_hosted_vault.sql` — add new migrations.
-- Don't auto-merge PRs. Stop at green review for human merge (the user's
-  validated `parallel-task-batch` contract).
-- Don't autonomously edit `wrangler.toml` `[vars]` or secrets bindings.
-- Don't add new top-level VitePress pages without adding to nav.
-- Don't introduce `console.log` in functions. Use the error response
-  helpers.
-- Don't widen Clerk publishable-key handling — preview vs production keys
-  are intentionally separate.
+- Don't commit secrets. Everything else about secrets is fair game.
+- Don't edit `migrations/0001_hosted_vault.sql`, or any migration already
+  applied to production — add a new numbered one. This is correctness, not
+  permission: editing an applied migration desynchronizes environments.
+- Don't auto-merge PRs. Stop at green review for human merge (Jack's
+  validated `parallel-task-batch` contract). This one was *not* part of the
+  2026-08-22 broadening — ask if you want it relaxed too.
+- Don't add new top-level VitePress pages without adding to nav, and don't
+  let non-public Markdown escape `srcExclude`.
+- Don't introduce bare `console.log` in functions — it emits to Cloudflare
+  logs indiscriminately. Structured logging through a deliberate sink
+  (Analytics Engine, Tail Worker) is wanted; the API has none today.
+- Don't collapse the Clerk preview and production publishable keys into one.
+  They are intentionally separate and CI verifies it.
