@@ -94,7 +94,14 @@ export async function onRequestPost({ request, env, params }) {
           and id not in (
             select id from sync_devices
             where vault_id = ? and status = 'revoked' and admitted_at is null
-            order by first_seen_at desc
+            -- Ordered by when it was DENIED, not when it first showed up.
+            -- first_seen_at is the enrollment time, so a machine that sat
+            -- pending for a while and was then denied looks old the instant it
+            -- is written and gets pruned by its own denial -- which hands its
+            -- waiting CLI the 404 this tombstone exists to prevent, and frees
+            -- the key to enrol again. coalesce covers rows written before the
+            -- stamp existed.
+            order by coalesce(revoked_at, first_seen_at) desc
             limit ?
           )
       `, vault.id, vault.id, MAX_DENIED_TOMBSTONES);

@@ -1131,8 +1131,11 @@ function formatWhen(iso: string): string {
   return new Date(when).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+let deviceLoadInFlight = false;
+
 async function loadDevices() {
   if (!vault.value) return;
+  deviceLoadInFlight = true;
   const requestSeq = ++devicesRequestSeq;
   try {
     const headers = await authHeaders({ accept: "application/json" }, {
@@ -1151,6 +1154,8 @@ async function loadDevices() {
   } catch {
     // Silent on purpose. This runs on a timer; a transient failure must not
     // stack up notices on a page the owner is reading.
+  } finally {
+    deviceLoadInFlight = false;
   }
 }
 
@@ -1198,6 +1203,13 @@ function startDevicePolling() {
   devicePollInterval = wanted;
   devicePollTimer = setInterval(() => {
     if (document.visibilityState === "hidden") return;
+    // Skip the tick rather than stacking a second request. Each call bumps
+    // devicesRequestSeq, so an overlapping poll invalidates the one already in
+    // flight -- and if latency stays above the interval, every response is
+    // superseded before it lands and the list never updates at all, while the
+    // backend takes the load of all of them. Explicit refreshes after an
+    // action still go through: those are newer on purpose.
+    if (deviceLoadInFlight) return;
     void loadDevices();
   }, wanted);
 }

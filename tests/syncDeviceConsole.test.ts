@@ -440,3 +440,51 @@ describe("the console does not cost more than it is worth", () => {
     expect(body).toContain("setInterval");
   });
 });
+
+describe("the tombstone survives its own pruning", () => {
+  it("keeps the device just denied, even when it enrolled long ago", async () => {
+    // first_seen_at is enrollment time. A machine that sat pending for a while
+    // and is then denied looks old the instant its tombstone is written, so
+    // ordering the prune by it deletes the row by its own denial -- handing
+    // that machine's CLI the 404 the tombstone exists to prevent, and freeing
+    // the key to enrol again.
+    const { db, env, cookie, vaultId } = await seedOwner();
+    for (let index = 0; index < 30; index += 1) {
+      db.prepare(
+        `insert into sync_devices (id, vault_id, public_key, status, first_seen_at, revoked_at)
+         values (?, ?, ?, 'revoked', ?, ?)`
+      ).run(`recent-${index}`, vaultId, `recent-key-${index}`,
+            "2026-08-22T00:00:00.000Z", "2026-08-22T00:00:00.000Z");
+    }
+    // Enrolled before every one of those, denied after all of them.
+    addDevice(db, vaultId, "old-pending", KEY_A, "pending", "2026-01-01T00:00:00.000Z");
+
+    await decideDevice({
+      request: req(cookie, "/api/vaults/current/devices/old-pending", { action: "revoke" }),
+      env,
+      params: { device: "old-pending" }
+    });
+
+    const row = db.prepare("select status from sync_devices where id = 'old-pending'").get() as
+      { status: string } | undefined;
+    expect(row?.status).toBe("revoked");
+  });
+});
+
+describe("polls do not trip over each other", () => {
+  it("skips a tick while a request is still in flight", () => {
+    // Every call bumps devicesRequestSeq, so an overlapping poll invalidates
+    // the one already running. Above the poll interval that means every
+    // response is superseded before it lands: the list never updates, a
+    // pending machine never appears, and the backend carries all of it.
+    const at = cloudPage.indexOf("devicePollTimer = setInterval");
+    expect(at).toBeGreaterThan(-1);
+    expect(cloudPage.slice(at, at + 700)).toContain("if (deviceLoadInFlight) return;");
+    // The flag has to clear on the failure path too, or one error stops
+    // polling for the life of the page.
+    const load = cloudPage.indexOf("async function loadDevices");
+    const body = cloudPage.slice(load, cloudPage.indexOf("function stopDevicePolling", load));
+    expect(body).toContain("finally {");
+    expect(body).toContain("deviceLoadInFlight = false;");
+  });
+});
