@@ -219,9 +219,17 @@ describe("the arrival cannot disturb the first-machine celebration", () => {
     expect(cloudPage).toContain("watch(ambientVault, (visible) => {");
     expect(cloudPage).not.toContain("watch(vaultOpen");
     expect(cloudPage).not.toContain("watch(() => vaultOpen");
+    // The gate is the moment the veil ACTUALLY lifts, which stopped being
+    // `hydrated` when the loading stage landed: `hydrated` now means only that
+    // some /api/me response arrived, and the first one is anonymous and lands
+    // while the veil is still up. Keyed to it, the arrival would start behind
+    // an opaque overlay and consumeVaultArrival would spend the occasion on a
+    // frame nobody saw — once per session, so it would not come back.
     expect(cloudPage).toContain(
-      "const ambientVault = computed(() => hydrated.value && signedIn.value);"
+      "const ambientVault = computed(() => settled.value && signedIn.value);"
     );
+    expect(cloudPage).toContain('const settled = computed(() => stage.value !== "loading");');
+    expect(cloudPage).toContain('<div v-if="!settled" class="cv-boot">');
   });
 
   it("consumes the occasion rather than peeking at it", () => {
@@ -280,10 +288,15 @@ describe("reduced motion gets a vault, just not a moving one", () => {
 
   it("adds nothing to the prerendered HTML, so there is nothing to mismatch", () => {
     // `hydrated` is false at setup on the server AND on the client's first
-    // render, so this element is in neither. No media query is read at setup
+    // render, which makes stage "loading" and therefore `settled` false on
+    // both, so this element is in neither. No media query is read at setup
     // scope, which is the PR #88 hydration class.
     expect(cloudPage).toContain('v-if="ambientVault"');
     expect(cloudPage).toContain("const hydrated = ref(false);");
+    // The chain that carries that from `hydrated` to `settled`: nothing in
+    // cloudStateKnown can be true before a response lands. The rule itself is
+    // executed in cloudLoadState.test.ts.
+    expect(cloudPage).toContain("hydrated: hydrated.value,");
   });
 });
 

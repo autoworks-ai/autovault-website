@@ -8,12 +8,20 @@
     id="launch-path"
     class="cv-page"
     :class="`cv-stage-${stage}`"
-    :aria-busy="!hydrated"
+    :aria-busy="!settled"
   >
     <!-- Loading veil. An OVERLAY rather than a branch, so the shell below is
          present in the prerendered HTML and there is no layout jump when
-         /api/me resolves. -->
-    <div v-if="!hydrated" class="cv-boot">
+         /api/me resolves.
+
+         It is also what makes stage "loading" safe: the shell underneath is
+         still rendering the pre-vault card, funnel and all, because keeping
+         that component mounted across provisioning is load-bearing (see the
+         v-show below). This veil is opaque and covers the whole shell, and
+         `inert` takes the shell out of the focus and accessibility trees, so
+         a checkout button behind it is unreachable rather than merely
+         unpainted. Both of those properties are pinned by a test. -->
+    <div v-if="!settled" class="cv-boot">
       <span class="cv-boot-mark"
         ><BrandMark :size="30" state="locked" show-depth
       /></span>
@@ -26,8 +34,8 @@
          Only the main area changes now; the chrome never moves. -->
     <div
       class="cv-shell"
-      :class="{ locked: !signedIn, booting: !hydrated }"
-      :inert="!hydrated">
+      :class="{ locked: !signedIn, booting: !settled }"
+      :inert="!settled">
       <aside class="cv-side" aria-label="Vault navigation">
         <div class="cv-brand">
           <span class="cv-brand-mark"
@@ -758,6 +766,7 @@ import { copyText as copyToClipboard } from "../utils/clipboard";
 import { prefersReducedMotion } from "../utils/motion";
 import { formatPriceLabel } from "../utils/money";
 import { consumeVaultArrival } from "../utils/vaultArrival";
+import { cloudStateIsKnown, deviceListIsKnown } from "../utils/cloudLoadState";
 import {
   admitHandshakeState,
   findAdmitTarget,
@@ -897,7 +906,20 @@ type CloudStatePayload = {
   subscription?: CloudSubscription;
   vault?: CloudVault;
 };
-type Stage = "error" | "account" | "subscription" | "setup" | "connect" | "explore" | "ready";
+// "loading" is not a step in the funnel -- it is the honest answer while this
+// page still has none. Every other member below is a claim about the account,
+// and each one is read off state that starts empty, so without a member for
+// "not yet known" the empty state is indistinguishable from a real answer.
+// "error" stays first: cloudDashboardHonesty pins `type Stage = "error"`.
+type Stage =
+  | "error"
+  | "loading"
+  | "account"
+  | "subscription"
+  | "setup"
+  | "connect"
+  | "explore"
+  | "ready";
 // The main area renders exactly one of these at a time, chosen from the
 // sidebar. Adding one means four edits and nothing else: a member here, a row
 // in SECTION_REVEAL, an item() line in navItems, and a block in the template.
@@ -930,6 +952,42 @@ const cloudState = ref<CloudState>({
   vault: null,
 });
 const hydrated = ref(false);
+// The auth context the last completed /api/me was sent under, or null while no
+// response has landed at all.
+//
+// `hydrated` alone was never enough, and that is the whole of the flash. This
+// page fires /api/me on mount, before Clerk has resolved, so that request goes
+// out ANONYMOUS -- see the note on celebrateUnlock, which already documented
+// the double load. It comes back "no user, no subscription, no vault" quickly,
+// which is true of the request and says nothing about the person. Flipping
+// `hydrated` on it dropped the boot veil and let the page announce a stage it
+// had no evidence for: a paid, provisioned owner was shown a checkout button
+// for the length of a Clerk round trip.
+//
+// Compared against Clerk's own answer below. A response only speaks for the
+// visitor if it was sent under the auth context Clerk finally reports.
+const loadedSignedIn = ref<boolean | null>(null);
+// A bound on waits this page does not control. Clerk's script has no failure
+// signal -- a blocked bundle leaves `isLoaded` false forever -- and the device
+// list is deliberately silent on failure because it runs on a poll. Neither
+// can be waited on indefinitely: /cloud is also the public sign-up entry
+// point, and a veil that never lifts there is worse than the wrong-state flash
+// this whole change exists to remove. Generous on purpose. The normal path is
+// well under a second, so this is a backstop, not a budget: when it fires the
+// page degrades to exactly the behaviour it had before this change.
+const LOAD_PATIENCE_MS = 8000;
+const loadPatienceExpired = ref(false);
+let loadPatienceTimer: ReturnType<typeof setTimeout> | undefined;
+
+// Called from onMounted, never at setup scope: on the server there is nothing
+// to wait for and no timer to leak.
+function armLoadPatience() {
+  if (loadPatienceTimer) clearTimeout(loadPatienceTimer);
+  loadPatienceTimer = setTimeout(() => {
+    loadPatienceExpired.value = true;
+    loadPatienceTimer = undefined;
+  }, LOAD_PATIENCE_MS);
+}
 // Set when /api/me could not be resolved because auth failed — as opposed to
 // resolving successfully and reporting no vault. Without this the two cases
 // are indistinguishable downstream, and a signed-in, paying, provisioned user
@@ -1043,6 +1101,11 @@ watch(
 
 onBeforeUnmount(clearAdmitWaitTimer);
 
+onBeforeUnmount(() => {
+  if (loadPatienceTimer) clearTimeout(loadPatienceTimer);
+  loadPatienceTimer = undefined;
+});
+
 function isAdmitTarget(device: SyncDevice) {
   return admitTarget.value?.id === device.id;
 }
@@ -1087,8 +1150,74 @@ const signedIn = computed(
 );
 const paid = computed(() => Boolean(subscription.value?.active));
 
+/* ---------------------------------------------------------------------------
+ * What this page actually knows
+ *
+ * Three separate questions, and the page used to answer all of them from
+ * whatever happened to be in the refs:
+ *
+ *   1. Has Clerk decided whether there is a session?      authSettled
+ *   2. Do we hold an /api/me sent under that decision?    cloudStateKnown
+ *   3. Has the device list answered for this vault?       devicesKnown
+ *
+ * Each starts out unknown and each has an empty value that looks exactly like
+ * a real negative answer. Keeping them as named facts is what lets `stage`
+ * say "loading" instead of guessing.
+ * ------------------------------------------------------------------------ */
+
+// Clerk is the authority on whether anyone is signed in; `user` from /api/me
+// only ever confirms it. `clerkAuthEnabled` is false during SSR and in the
+// legacy cookie mode, and isClerkLoaded is hardcoded true there, so this is
+// settled from the start in both.
+const authSettled = computed(() => !clerkAuthEnabled || isClerkLoaded.value);
+
+// The rule itself lives in utils/cloudLoadState.ts so it can be tested by
+// running it. This file's tests are source assertions -- they can see that a
+// branch exists and cannot see that it decides correctly, and deciding
+// correctly is the entire fix.
+const cloudStateKnown = computed(() =>
+  cloudStateIsKnown({
+    hydrated: hydrated.value,
+    loadedSignedIn: loadedSignedIn.value,
+    authSettled: authSettled.value,
+    clerkSignedIn: isClerkSignedIn.value,
+    patienceExpired: loadPatienceExpired.value,
+  }),
+);
+
+// Whether the device list has answered for the vault currently in state. Reset
+// whenever that vault changes, set only by a response this page actually
+// parsed -- see loadDevices.
+const devicesKnown = ref(false);
+// Whether `cliLinked` is a question worth waiting for. Latched once, at the
+// moment the account's real state first lands.
+//
+// A vault that already existed then may already have a machine linked, and
+// `devices` starts empty, so reading cliLinked before the list answers is the
+// same unknown-vs-false conflation one level down: it renders the connect
+// terminal, with its typed replay, to someone who connected months ago.
+//
+// A vault provisioned later in this same session is seconds old and cannot
+// have one, so the checkout path is never held behind a list whose answer is
+// already known. Without the latch it would be: provisioning flips `vault`
+// from null to a row, which resets devicesKnown, which would veil the owner
+// who has just paid.
+const devicesGateArmed = ref(false);
+let devicesGateDecided = false;
+
+watch(cloudStateKnown, (known) => {
+  if (!known || devicesGateDecided) return;
+  devicesGateDecided = true;
+  devicesGateArmed.value = Boolean(vault.value);
+});
+
 const stage = computed<Stage>(() => {
   if (loadError.value && !vault.value) return "error";
+  // Before this branch existed the three tests below ran against empty refs on
+  // every load, and empty reads as "signed out, nothing bought, no vault" --
+  // a confident, wrong claim, made to the one visitor who has already done all
+  // three. Not knowing is a state of its own, and this is it.
+  if (!cloudStateKnown.value) return "loading";
   // Vault first. A reserved vault is proof the first three steps completed,
   // so checking `paid` ahead of it would bounce a past_due or canceled holder
   // back to "Finish checkout" -- getSubscription derives `active` from
@@ -1096,6 +1225,18 @@ const stage = computed<Stage>(() => {
   // survives untouched. A lapse belongs on the Subscription card, not in the
   // signup funnel.
   if (vault.value) {
+    // Same rule as above, one level down: `devices` starts empty, so cliLinked
+    // is false before the list has said anything. See devicesGateArmed for why
+    // this only holds a vault that predates this page load.
+    if (
+      !deviceListIsKnown({
+        gateArmed: devicesGateArmed.value,
+        listAnswered: devicesKnown.value,
+        patienceExpired: loadPatienceExpired.value,
+      })
+    ) {
+      return "loading";
+    }
     if (!cliLinked.value) return "connect";
     if (!earlyAccess.value) return "explore";
     return "ready";
@@ -1104,6 +1245,16 @@ const stage = computed<Stage>(() => {
   if (!paid.value) return "subscription";
   return "setup";
 });
+
+// "The page is showing something it knows." Everything that used to key off
+// `hydrated` keys off this instead, so the boot veil, the inert shell and the
+// ambient vault all follow the one derivation rather than a flag that meant
+// "a response landed" and was read as "the answer is in".
+//
+// Deliberately derived from `stage` rather than from cloudStateKnown: a load
+// that fails outright reaches "error", and the error card has a Try again
+// button on it. Veiling that would be the permanent spinner.
+const settled = computed(() => stage.value !== "loading");
 
 // The card used to render a hardcoded "Active" pill and a hardcoded monthly
 // price as static markup, while the real
@@ -1269,9 +1420,12 @@ const onboardingSteps = computed<OnboardingStep[]>(() =>
     detail: stepDetail.value[key],
     // A failed /api/me leaves every downstream fact unknowable. Ticking step
     // one off isClerkSignedIn while greying the rest as "pending" would claim
-    // knowledge we do not have.
+    // knowledge we do not have. "loading" is the same situation before the
+    // fact rather than after it -- the rail is behind the boot veil there, but
+    // "unknown" is what it actually is, and RAIL_STATE_LABEL already speaks
+    // it to assistive tech.
     state:
-      stage.value === "error"
+      stage.value === "error" || stage.value === "loading"
         ? "unknown"
         : stepDone.value[key]
           ? "done"
@@ -1387,8 +1541,11 @@ const SECTION_TITLE: Record<Section, string> = {
   catalog: "Vault catalog",
 };
 
-// -1 for "error", which is deliberate: at that stage nothing but overview is
-// reachable, and overview passes on the null branch.
+// "error" and "loading" are deliberately absent, so indexOf returns -1 for
+// both: at either one nothing but overview is reachable, and overview passes
+// on the null branch. Adding "loading" to the front of this array would make
+// every gated panel compare against it as if it were a step in the funnel,
+// which is exactly what it is not.
 function stageReached(at: Stage | null, current: Stage) {
   return at === null || STAGE_ORDER.indexOf(current) >= STAGE_ORDER.indexOf(at);
 }
@@ -1414,6 +1571,11 @@ const activeSection = computed<Section>(() =>
 // things about where the reader is. Lives here, below activeSection, because
 // that is what the last branch reads.
 const pageTitle = computed(() => {
+  // Ahead of the pre-vault branch below, which reads `!vault.value` -- true
+  // while loading for the same reason it is true for a new visitor. The
+  // heading is behind the boot veil either way, but it is also the accessible
+  // name every panel region points at, so it must not name a step.
+  if (stage.value === "loading") return "Opening your hosted vault…";
   if (stage.value === "error") return "We couldn't load your vault";
   if (!vault.value) return "Reserve a hosted AutoVault namespace";
   if (stage.value === "connect") return "Connect your CLI";
@@ -1525,6 +1687,7 @@ onMounted(() => {
   // replaceState once provisioning settles, and the arrival fires after
   // /api/me -- later than that. See arrivalSearch.
   arrivalSearch.value = window.location.search;
+  armLoadPatience();
 });
 
 watch([isClerkLoaded, isClerkSignedIn], ([loaded]) => {
@@ -1537,6 +1700,8 @@ watch([isClerkLoaded, isClerkSignedIn], ([loaded]) => {
 watch(
   () => vault.value?.id ?? null,
   (vaultId) => {
+    // Whatever the list said was about a different vault, or about no vault.
+    devicesKnown.value = false;
     if (!vaultId) {
       // Bump the sequence, do not just clear. A list request already in flight
       // for the OLD vault would otherwise pass both staleness checks and
@@ -1555,6 +1720,12 @@ watch(
 
 async function loadCloudState(initial = false) {
   const requestSeq = ++cloudStateRequestSeq;
+  // Captured here, not in the finally. This is the context the request is
+  // actually sent under -- authHeaders reads isClerkSignedIn synchronously on
+  // the line below -- and Clerk can resolve while the fetch is in flight.
+  // Reading it back at completion time would relabel an anonymous request as
+  // an authenticated one, which is the flash wearing a different hat.
+  const requestSignedIn = isClerkSignedIn.value;
   try {
     const headers = await authHeaders({ accept: "application/json" }, {
       required: clerkAuthEnabled && isClerkSignedIn.value,
@@ -1585,6 +1756,16 @@ async function loadCloudState(initial = false) {
     // `initial` used to set hydrated outside the staleness guard, so a slow
     // first request could un-veil the page using a superseded response.
     if (requestSeq === cloudStateRequestSeq || initial) hydrated.value = true;
+    // NOT under `|| initial`, and that difference is load-bearing. The mount
+    // request is the anonymous one; if it lands after the authenticated
+    // follow-up has already resolved, recording its context here would flip
+    // cloudStateKnown back to false and pull the veil down over a page that
+    // was already correct. It is stale, so it says nothing.
+    //
+    // Set in the finally rather than on success so a network failure still
+    // resolves the wait: /api/me failing leaves loadError null and the state
+    // empty, and that has to reach a rendered stage rather than spin.
+    if (requestSeq === cloudStateRequestSeq) loadedSignedIn.value = requestSignedIn;
   }
 }
 
@@ -1617,6 +1798,10 @@ function syncCloudState(payload: CloudStatePayload) {
   cloudState.value = normalizeCloudState(payload);
   loadError.value = null;
   hydrated.value = true;
+  // The funnel only emits what it knows to be true, and it is signed in to
+  // have learned it, so this payload speaks for the current context. Without
+  // this line the page would stay veiled behind an /api/me it no longer needs.
+  loadedSignedIn.value = isClerkSignedIn.value;
 }
 
 function normalizeCloudState(payload: CloudStatePayload): CloudState {
@@ -1733,6 +1918,14 @@ async function loadDevices() {
     const payload = (await response.json()) as { devices?: SyncDevice[] };
     if (requestSeq !== devicesRequestSeq) return;
     devices.value = payload.devices ?? [];
+    // Only here: inside the staleness guard, and only for a response this
+    // page actually parsed. The two early returns above -- a superseded
+    // request and a non-2xx -- have not answered the question, and a transient
+    // 401 marked "known" would drop a linked owner onto the connect terminal,
+    // which is the exact symptom this flag exists to prevent. The poll retries
+    // every four seconds, and loadPatienceExpired is the backstop if it never
+    // succeeds.
+    devicesKnown.value = true;
   } catch {
     // Silent on purpose. This runs on a timer; a transient failure must not
     // stack up notices on a page the owner is reading.
@@ -1782,7 +1975,7 @@ const vaultOpen = computed(() => stage.value === "explore" || stage.value === "r
 // a dial that turns forever reads as a component somebody forgot to stop.
 const vaultWorking = computed(
   () =>
-    !hydrated.value ||
+    !settled.value ||
     // Same predicate the poll uses. A stale, malformed, or wrong-account
     // `?admit=` never matches a row, so `waiting` is permanent — and without
     // this the dial advertised active work forever, long after the budget had
@@ -1861,10 +2054,20 @@ const VAULT_ARRIVAL_MS = 1800;
 // window.location.search then would miss the one arrival the ask named first.
 const arrivalSearch = ref("");
 
-// Signed up, and past the boot veil. `hydrated` is false in the prerendered
-// HTML and in the client's first render, so this element is absent from both
+// Signed up, and past the boot veil. `settled` is false in the prerendered
+// HTML and in the client's first render -- `hydrated` starts false on both
+// sides, which makes stage "loading" -- so this element is absent from both
 // and cannot contribute a hydration mismatch.
-const ambientVault = computed(() => hydrated.value && signedIn.value);
+//
+// It gates on `settled` rather than on `hydrated` for a reason worth stating,
+// because the two used to be the same moment and are not any more. The
+// arrival is spent once per occasion (consumeVaultArrival), and the watcher
+// below fires the instant this flips. Keyed to `hydrated` it would flip while
+// the boot veil was still up -- the veil is opaque, so the whole 1800ms swell
+// would run behind it and the occasion would be spent on a frame nobody saw.
+// Keyed to `settled` it flips in the same tick the veil is removed, which is
+// the first frame of the real page.
+const ambientVault = computed(() => settled.value && signedIn.value);
 
 const vaultArriving = ref(false);
 let vaultArrivalTimer: ReturnType<typeof setTimeout> | undefined;
