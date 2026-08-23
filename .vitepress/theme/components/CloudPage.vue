@@ -388,13 +388,39 @@
             </span>
           </h3>
 
-          <p v-if="!devices.length" class="cv-devices-empty">
+          <!-- The CLI enrols and only then opens this page, so arriving before
+               the row exists is the normal case, not an error. Say what is
+               happening and let the poll catch up -- never a warning notice. -->
+          <p
+            v-if="admitState === 'waiting'"
+            class="cv-devices-waiting"
+            :class="{ stalled: admitWaitExpired }"
+          >
+            <span class="cv-dot" />
+            <!-- Once the budget is spent nothing is arriving, and a spinner
+                 that never resolves is worse than saying so. -->
+            <template v-if="admitWaitExpired">
+              No machine matching <code>{{ admitFingerprint }}</code> has checked
+              in. If you closed that terminal, run
+              <code>autovault link</code> there again.
+            </template>
+            <template v-else>
+              Waiting for <code>{{ admitFingerprint }}</code> to check in…
+            </template>
+          </p>
+
+          <p v-else-if="!devices.length" class="cv-devices-empty">
             Nothing enrolled yet. Run the command above and this machine
             will appear here within a few seconds.
           </p>
 
-          <ul v-else class="cv-device-list">
-            <li v-for="device in devices" :key="device.id" class="cv-device" :class="device.status">
+          <ul v-if="devices.length" class="cv-device-list">
+            <li
+              v-for="device in devices"
+              :key="device.id"
+              class="cv-device"
+              :class="[device.status, { 'admit-target': isAdmitTarget(device) }]"
+            >
               <span class="cv-device-id">
                 <strong>{{ device.hostname || "Unnamed machine" }}</strong>
                 <!-- Matches what the CLI printed on that machine, so the
@@ -412,6 +438,7 @@
                   v-if="device.status === 'pending'"
                   type="button"
                   class="cv-btn small"
+                  :data-admit-target="isAdmitTarget(device) ? 'true' : undefined"
                   :disabled="deviceBusy === device.id"
                   @click="decideDevice(device.id, 'admit')"
                 >
@@ -451,6 +478,11 @@ import BrandMark from "./BrandMark.vue";
 import CloudAccountMenu from "./CloudAccountMenu.vue";
 import { copyText as copyToClipboard } from "../utils/clipboard";
 import { formatPriceLabel } from "../utils/money";
+import {
+  admitHandshakeState,
+  findAdmitTarget,
+  readAdmitFingerprint,
+} from "../utils/admit";
 import { clerkAuthRecoveryMessage, isClerkApiAuthError, useClerkApiAuth } from "../utils/clerkApi";
 import {
   useTerminalReplay,
@@ -640,6 +672,89 @@ const vault = computed(() => cloudState.value.vault);
 const activeDevices = computed(() => devices.value.filter((device) => device.status === "active"));
 const pendingDevices = computed(() => devices.value.filter((device) => device.status === "pending"));
 const cliLinked = computed(() => activeDevices.value.length > 0);
+
+// ---- CLI admit handshake -------------------------------------------------
+//
+// `autovault link` prints a fingerprint and opens /cloud?admit=<fingerprint>.
+// All this does is *select* the row that is waiting: scroll to it, flash it,
+// and put focus on its Admit button. The owner still clicks, exactly as they
+// would confirm a code on GitHub's device page.
+//
+// Nothing below ever calls decideDevice(). If it did, the URL the CLI prints
+// would become a credential that admits a machine to the vault on load.
+const admitFingerprint = ref<string | null>(null);
+
+const admitTarget = computed(() => findAdmitTarget(devices.value, admitFingerprint.value));
+
+const admitState = computed(() => admitHandshakeState(devices.value, admitFingerprint.value));
+
+// A `waiting` handshake is normally seconds long: the CLI enrols, then opens
+// this page, so the row is usually one poll behind. But a stale, malformed, or
+// wrong-account `?admit=` link never matches anything, and `waiting` would then
+// be permanent -- pinning the poll at four seconds for the life of the tab.
+// /api/vaults/current/devices goes through requireUser, which in Clerk mode
+// does a profile lookup per call, so that is ~900 requests an hour in the one
+// case where not one of them can succeed.
+//
+// Two minutes is far longer than the real path needs (a sign-in round trip
+// reloads the page, restarting this) and short enough that a dead link stops
+// costing anything.
+const ADMIT_WAIT_BUDGET_MS = 120_000;
+const admitWaitExpired = ref(false);
+let admitWaitTimer: ReturnType<typeof setTimeout> | undefined;
+
+function clearAdmitWaitTimer() {
+  if (admitWaitTimer) clearTimeout(admitWaitTimer);
+  admitWaitTimer = undefined;
+}
+
+watch(
+  admitState,
+  (state) => {
+    if (state !== "waiting") {
+      // Covers the row arriving late: expiry is reset, not latched, so a
+      // machine that shows up after the budget still gets the full treatment.
+      clearAdmitWaitTimer();
+      admitWaitExpired.value = false;
+      return;
+    }
+    if (admitWaitTimer) return;
+    admitWaitTimer = setTimeout(() => {
+      admitWaitExpired.value = true;
+      admitWaitTimer = undefined;
+    }, ADMIT_WAIT_BUDGET_MS);
+  },
+  { immediate: true }
+);
+
+onBeforeUnmount(clearAdmitWaitTimer);
+
+function isAdmitTarget(device: SyncDevice) {
+  return admitTarget.value?.id === device.id;
+}
+
+// Focus the row once per machine, not once per poll tick. The device list
+// reloads every four seconds while this is open, and re-stealing focus (and
+// re-running the flash) on every response would make the Admit button
+// impossible to tab away from.
+let admitFocusedId: string | null = null;
+
+watch(
+  () => admitTarget.value?.id ?? null,
+  async (deviceId) => {
+    if (!deviceId || admitFocusedId === deviceId) return;
+    admitFocusedId = deviceId;
+    await focusCard("devices", devicesCard.value);
+    await nextTick();
+    // Queried rather than held as a template ref: the button lives inside a
+    // v-for, and the row it belongs to can arrive several polls after mount.
+    const button = devicesCard.value?.querySelector<HTMLButtonElement>(
+      "[data-admit-target='true']"
+    );
+    button?.focus();
+  },
+  { immediate: true }
+);
 const earlyAccess = computed(() => Boolean(vault.value?.early_access_at));
 
 const subscription = computed(() => cloudState.value.subscription);
@@ -968,6 +1083,10 @@ const navItems = computed<NavItem[]>(() => {
 onMounted(() => {
   void loadCloudState(true);
   void loadPricing();
+  // Read once, on mount, rather than tracking the URL. The CLI opens this page
+  // with the fingerprint already in it; nothing later in the session changes
+  // which machine is asking.
+  admitFingerprint.value = readAdmitFingerprint(window.location.search);
 });
 
 watch([isClerkLoaded, isClerkSignedIn], ([loaded]) => {
@@ -1190,7 +1309,16 @@ let devicePollTimer: ReturnType<typeof setInterval> | undefined;
 let devicePollInterval = 0;
 
 const devicePollUrgent = computed(
-  () => stage.value === "connect" || pendingDevices.value.length > 0
+  () =>
+    stage.value === "connect" ||
+    pendingDevices.value.length > 0 ||
+    // A machine linking against an already-set-up vault reaches neither of the
+    // conditions above until its row lands, so on the idle 30s cadence the
+    // owner could sit for half a minute on a page that came from the CLI and
+    // shows nothing. `?admit=` is positive evidence that a row is inbound --
+    // but only until the budget above runs out, because a link that matches
+    // nothing is evidence of nothing.
+    (admitState.value === "waiting" && !admitWaitExpired.value)
 );
 
 function stopDevicePolling() {
@@ -1786,6 +1914,43 @@ const ICON = {
 }
 .cv-device.pending {
   border-color: rgba(230, 180, 90, 0.4);
+}
+/* The row the CLI sent this owner here to act on. Focus lands on its Admit
+   button, so this only has to make the target obvious among siblings -- the
+   keyboard affordance is already handled. */
+.cv-device.admit-target {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.cv-devices-waiting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.cv-devices-waiting code {
+  font-size: 11.5px;
+  color: var(--ink-2);
+}
+.cv-devices-waiting .cv-dot {
+  animation: cv-admit-pulse 1.6s ease-in-out infinite;
+}
+/* Stop pulsing once nothing is coming — the animation reads as progress. */
+.cv-devices-waiting.stalled .cv-dot {
+  animation: none;
+  opacity: 0.35;
+}
+@keyframes cv-admit-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 .cv-device-id {
   display: flex;
@@ -2427,7 +2592,8 @@ const ICON = {
   .cv-status-card,
   .cv-appsync,
   .cv-focal-glow,
-  .cv-appskel {
+  .cv-appskel,
+  .cv-devices-waiting .cv-dot {
     animation: none;
   }
   .cv-appskel {
