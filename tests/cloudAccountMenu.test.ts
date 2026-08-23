@@ -152,6 +152,19 @@ describe("cloud account menu", () => {
     expect(repos.slice(0, 700)).toContain("menu: measureUnconstrained(menu)");
   });
 
+  it("closes itself when the session ends underneath it", () => {
+    // Expiry, or a sign-out in another tab: items empties and the trigger is
+    // replaced by the static signed-out footer, but the disclosure stayed
+    // open -- an empty teleported role="menu" labelled by an id that no longer
+    // exists, focus stranded on a button Vue had just removed.
+    const at = menu.indexOf("() => props.signedIn && items.value.length > 0");
+    expect(at).toBeGreaterThan(-1);
+    const body = menu.slice(at, at + 200);
+    expect(body).toContain("if (!usable) closeMenu();");
+    // Not restoreFocus: the trigger it would restore to no longer exists.
+    expect(body).not.toContain("restoreFocus");
+  });
+
   it("re-measures when Clerk changes the item list, not just the index", () => {
     // A changed list changes the menu's height, and the placement was computed
     // for the old one: an above-placed menu grows down over its own trigger,
