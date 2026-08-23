@@ -167,6 +167,23 @@ describe("funnel/shell handoff", () => {
     const fn = cloudPage.slice(cloudPage.indexOf("function syncCloudState"));
     expect(fn.slice(0, 900)).toContain("cloudStateRequestSeq += 1;");
   });
+
+  it("only hands over state the funnel actually knows to be true", () => {
+    // The invalidation above is a side effect a guess cannot afford. The shell
+    // cancels its own in-flight load for every payload it receives, so a
+    // failed child request that broadcast an anonymous payload would discard a
+    // possibly-successful parent load and demote a signed-in subscriber back
+    // to the checkout step. A non-OK response means "could not find out", not
+    // "signed out": /api/me answers a genuinely signed-out visitor with 200
+    // and a null user, so the ok path is the only authoritative one.
+    const at = funnel.indexOf("async function loadMe()");
+    const end = funnel.indexOf("async function startCheckout", at);
+    expect(at).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(at);
+    const body = funnel.slice(at, end);
+    expect(body.split('emit("stateChange"').length - 1).toBe(1);
+    expect(body).not.toContain("me.value = { user: null }");
+  });
 });
 
 describe("provisioning transition", () => {

@@ -935,6 +935,11 @@ function syncCloudState(payload: CloudStatePayload) {
   // anonymous and slow), while the funnel reconciles and provisions. Without
   // this bump the stale anonymous response wins on arrival and drops a user
   // who has just paid straight back to "Finish checkout".
+  //
+  // The contract that makes the bump safe: the funnel only emits payloads it
+  // actually knows to be true -- a 200 from /api/me, or a vault it just
+  // provisioned. It stays silent when a request fails, precisely because
+  // cancelling this page's own load is a side effect a guess cannot afford.
   cloudStateRequestSeq += 1;
   cloudState.value = normalizeCloudState(payload);
   loadError.value = null;

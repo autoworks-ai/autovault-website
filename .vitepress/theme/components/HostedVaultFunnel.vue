@@ -259,8 +259,16 @@ async function loadMe() {
     const response = await fetch("/api/me", { credentials: "include", headers });
     if (requestSeq !== meRequestSeq) return;
     if (!response.ok) {
-      me.value = { user: null };
-      emit("stateChange", me.value);
+      // A non-OK /api/me means "we could not find out", not "signed out", so
+      // it must not be broadcast. The shell treats every payload it receives
+      // as authoritative and bumps its own request sequence on arrival, so a
+      // single transient failure here would cancel the shell's in-flight --
+      // possibly successful -- load and install an anonymous state over it,
+      // dropping a signed-in subscriber back to the checkout step.
+      //
+      // Nothing authoritative is lost by staying quiet: /api/me answers a
+      // genuinely signed-out visitor with 200 and a null user, which does get
+      // emitted, and the shell runs its own load with its own error handling.
       return;
     }
     me.value = await response.json() as MeResponse;
@@ -273,8 +281,8 @@ async function loadMe() {
       }
       return;
     }
-    me.value = { user: null };
-    emit("stateChange", me.value);
+    // Same reasoning as the non-OK branch above: a thrown fetch is not
+    // evidence that anybody signed out. Leave the last known state alone.
   }
 }
 
