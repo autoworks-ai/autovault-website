@@ -127,6 +127,39 @@ describe("unified shell", () => {
     expect(cloudPage).toContain('"unknown"');
   });
 
+  it("shows the correct heading for each stage, especially 'Connect your CLI' at connect", () => {
+    // pageTitle used to key on vault truthiness alone, so the heading flipped
+    // to "Overview" at the moment a vault row existed, including during the
+    // "connect" stage where the content is "Connect your CLI". The fix: check
+    // stage === "connect" BEFORE falling back to "Overview".
+    const titleStart = cloudPage.indexOf("const pageTitle = computed");
+    const titleEnd = cloudPage.indexOf("});", titleStart) + 3;
+    expect(titleEnd).toBeGreaterThan(titleStart);
+    const pageTitle = cloudPage.slice(titleStart, titleEnd);
+
+    // All four branches exist and in order:
+    // 1. error
+    expect(pageTitle).toContain('if (stage.value === "error")');
+    expect(pageTitle).toContain('"We couldn\'t load your vault"');
+
+    // 2. no vault
+    expect(pageTitle).toContain('if (!vault.value)');
+    expect(pageTitle).toContain('"Reserve a hosted AutoVault namespace"');
+
+    // 3. connect stage (must be checked BEFORE the fallthrough to "Overview")
+    expect(pageTitle).toContain('if (stage.value === "connect")');
+    expect(pageTitle).toContain('"Connect your CLI"');
+
+    // 4. else → Overview
+    expect(pageTitle).toContain('return "Overview"');
+
+    // The key assertion: connect is checked BEFORE "Overview" fallthrough
+    const connectCheck = pageTitle.indexOf('stage.value === "connect"');
+    const overviewFallthrough = pageTitle.indexOf('return "Overview"');
+    expect(connectCheck).toBeGreaterThan(-1);
+    expect(overviewFallthrough).toBeGreaterThan(connectCheck);
+  });
+
   it("stacks the rail on narrow viewports instead of wrapping it per character", () => {
     // Four labelled steps flexed across a 375px viewport wrap one character
     // per line. Verified in a real browser before this was written.

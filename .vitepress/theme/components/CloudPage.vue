@@ -1032,7 +1032,9 @@ const activeStepNumber = computed(() =>
 // which was only ever correct once a vault existed.
 const pageTitle = computed(() => {
   if (stage.value === "error") return "We couldn't load your vault";
-  return vault.value ? "Overview" : "Reserve a hosted AutoVault namespace";
+  if (!vault.value) return "Reserve a hosted AutoVault namespace";
+  if (stage.value === "connect") return "Connect your CLI";
+  return "Overview";
 });
 
 // Headline and lede follow the active step, so the focal card always names
