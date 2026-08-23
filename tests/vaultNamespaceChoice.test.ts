@@ -499,6 +499,47 @@ describe("the namespace field in the funnel", () => {
     expect(fn.slice(0, fn.indexOf("const payload"))).toContain("slug: namespaceSlug.value || undefined");
   });
 
+  it("does not take money for a namespace it has already refused", () => {
+    // The checkout button only tested `busy`, and startFlow never consulted the
+    // verdict -- so a name the availability check had already refused (reserved,
+    // taken, or malformed) could still be paid for, and the user found out at
+    // the reserve click, after the charge.
+    expect(funnel).toContain("const namespaceRefused = computed(");
+    expect(funnel).toContain("const canCheckout = computed(() => canReserve.value && !namespaceRefused.value);");
+    expect(funnel).toContain(':disabled="busy || !canCheckout"');
+    // A stale verdict, about a string the user has since changed, gates nothing.
+    expect(funnel).toContain("verdict.slug === namespaceSlug.value");
+
+    const fn = funnel.slice(funnel.indexOf("async function startCheckout"));
+    const head = fn.slice(0, fn.indexOf("checkoutStarted.value = true;"));
+    expect(head).toContain("if (!canCheckout.value)");
+    expect(head).toContain("focusNamespaceField()");
+
+    // Reserve stays gated on shape only, on purpose: a lost race is the
+    // server's to answer, and it does, with the 409 that lands on the field.
+    expect(funnel).toContain(':disabled="busy || !canReserve"');
+  });
+
+  it("does not promise on the payment page what the funnel no longer does", () => {
+    // wrangler.toml's Stripe submit text renders on the live Checkout page, so
+    // it is read at the moment money changes hands. It said AutoVault reserves
+    // the namespace "once Stripe confirms this subscription" -- true while
+    // provisioning happened on the Stripe return, false now that reserving is a
+    // deliberate click afterwards. The accepted check-then-claim race means the
+    // name can even be gone by then, so this may promise the step, never the
+    // outcome.
+    const wrangler = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf-8");
+    const submit = wrangler.match(/^STRIPE_CHECKOUT_CUSTOM_TEXT_SUBMIT = "(.*)"$/m)?.[1];
+    expect(submit).toBeTruthy();
+    expect(submit).not.toMatch(/reserves your hosted namespace once/i);
+    // The sync limitation still has to be stated, and still may not overclaim --
+    // same three rules the rest of the hidden hosted copy is held to.
+    expect(submit).toContain("Cloud sync remains disabled until the CLI handoff ships.");
+    expect(submit).not.toMatch(/live vault|provisioned runtime/i);
+    expect(submit).not.toMatch(/cloud sync is enabled|enabled cloud sync|sync now/i);
+    expect(submit).not.toMatch(/prototype mode/i);
+  });
+
   it("refuses to reserve with no namespace rather than deriving one", () => {
     // Clearing the field left the button enabled, and the request then omits
     // `slug` -- which provisionVault reads as a legacy caller and answers with a

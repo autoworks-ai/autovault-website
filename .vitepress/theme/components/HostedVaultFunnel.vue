@@ -73,7 +73,7 @@
         @click.capture="persistDraft"
         @signed-in-action="startFlow"
       />
-      <button v-else-if="actionKind === 'checkout'" class="hosted-primary" type="button" :disabled="busy" @click="startFlow">
+      <button v-else-if="actionKind === 'checkout'" class="hosted-primary" type="button" :disabled="busy || !canCheckout" @click="startFlow">
         {{ checkoutStarted ? "Opening Checkout..." : "Open checkout" }}
       </button>
       <button v-else-if="actionKind === 'reserve'" class="hosted-primary" type="button" :disabled="busy || !canReserve" @click="startFlow">
@@ -447,6 +447,26 @@ const namespaceState = computed<{ tone: "ok" | "warn" | "fail" | "muted"; text: 
 // arrived unbidden" defect this whole change set exists to remove.
 const canReserve = computed(() => Boolean(namespaceSlug.value) && !localSlugProblem(namespaceSlug.value));
 
+// A verdict that refuses the name currently in the field. `namespaceVerdict` is
+// cleared on every edit, so a stale answer cannot gate anything; comparing the
+// slug as well is belt and braces.
+const namespaceRefused = computed(() => {
+  if (namespaceRefusal.value) return true;
+  const verdict = namespaceVerdict.value;
+  return Boolean(verdict && verdict.slug === namespaceSlug.value && !verdict.available);
+});
+
+// Checkout must not take money for a name we have already refused ON SCREEN --
+// malformed, reserved, or known-taken. It deliberately does NOT require a
+// POSITIVE verdict: a transient 401 or 5xx on the availability read must not
+// stand between somebody and paying, and the accepted check-then-claim race
+// means even a clean "available" can go stale before the reserve click. This
+// narrows the window to "we already said no"; it cannot close it, and the
+// reserve step's 409 stays the authority. Reserve itself is deliberately NOT
+// gated on the verdict for that reason -- there the server answers a lost race
+// directly, and refusing client-side would only duplicate it worse.
+const canCheckout = computed(() => canReserve.value && !namespaceRefused.value);
+
 // Shape only, matching the server's rule. Anything this rejects never reaches
 // the network: an invalid string cannot become available, so a round trip per
 // keystroke would buy nothing.
@@ -715,6 +735,16 @@ async function fetchMe() {
 }
 
 async function startCheckout() {
+  // The button is disabled for this, but the refusal lives here too: charging
+  // for a name the screen has already refused is the one outcome this step must
+  // never produce. No message is written onto the field -- it is already showing
+  // the specific reason, and a generic one would overwrite it.
+  if (!canCheckout.value) {
+    notice.value = { kind: "warn", text: "Choose an available namespace before checking out." };
+    await nextTick();
+    focusNamespaceField();
+    return;
+  }
   checkoutStarted.value = true;
   trackPirsch("Hosted Vault: Checkout Started", { entry: props.entry });
   const headers = await protectedAuthHeaders({ "content-type": "application/json", accept: "application/json" });
