@@ -1145,33 +1145,11 @@ function isAdmitTarget(device: SyncDevice) {
   return admitTarget.value?.id === device.id;
 }
 
-// Focus the row once per machine, not once per poll tick. The device list
-// reloads every four seconds while this is open, and re-stealing focus (and
-// re-running the flash) on every response would make the Admit button
-// impossible to tab away from.
-let admitFocusedId: string | null = null;
+// The CLI admit handoff -- selecting the waiting row, flashing it and focusing
+// its Admit button -- lives further down the file, below `revealed`. It has to
+// wait for the boot veil to lift, and it cannot name `revealed` before that
+// constant exists. See "the admit handoff waits for the veil".
 
-watch(
-  () => admitTarget.value?.id ?? null,
-  async (deviceId) => {
-    if (!deviceId || admitFocusedId === deviceId) return;
-    admitFocusedId = deviceId;
-    // Put the panel that holds the row on screen before reaching for it. At
-    // connect the overview already shows the machines list, but a second
-    // machine can check in while the owner is reading Billing -- and then the
-    // button below is in a panel Vue is not rendering.
-    selectedSection.value = "machines";
-    await focusDevicesCard();
-    await nextTick();
-    // Queried rather than held as a template ref: the button lives inside a
-    // v-for, and the row it belongs to can arrive several polls after mount.
-    const button = devicesCard.value?.querySelector<HTMLButtonElement>(
-      "[data-admit-target='true']"
-    );
-    button?.focus();
-  },
-  { immediate: true }
-);
 const earlyAccess = computed(() => Boolean(vault.value?.early_access_at));
 
 const subscription = computed(() => cloudState.value.subscription);
@@ -1422,6 +1400,61 @@ onBeforeUnmount(() => {
   if (bootOpenTimer) clearTimeout(bootOpenTimer);
   bootOpenTimer = undefined;
 });
+
+/* ---------------------------------------------------------------------------
+ * The admit handoff waits for the veil
+ *
+ * Moved down here from beside admitTarget, because it now reads `revealed` and
+ * a watcher source is evaluated the moment the watcher is created -- naming a
+ * `const` declared further down would be a temporal-dead-zone throw at setup.
+ *
+ * Why it needs `revealed` at all: extending the loading state pushed `inert`
+ * out from "the first /api/me returned" to "the device list returned, plus a
+ * paint, plus up to 700ms of gesture" -- and the device list landing is the
+ * very event that produces the row this reaches for. Both flush together, so
+ * without the guard `button.focus()` ran while `.cv-shell` still carried
+ * `inert`. Inert elements are not focusable, so it was a silent no-op, the
+ * scroll and the flash were spent behind an opaque veil, and `admitFocusedId`
+ * had already latched -- so it never tried again. Measured, on the flow this
+ * branch is named after: the Admit button appeared at t=7452 with inert still
+ * set, and focus was still on <body> at t=20000.
+ *
+ * `revealed` is in the SOURCE rather than only read inside the callback, so
+ * the watcher re-fires when the veil lifts. Re-reading it inside would not
+ * help: the four-second poll does not change `admitTarget.value?.id`, so
+ * nothing else would ever wake this up.
+ * ------------------------------------------------------------------------ */
+
+// Focus the row once per machine, not once per poll tick. The device list
+// reloads every four seconds while this is open, and re-stealing focus (and
+// re-running the flash) on every response would make the Admit button
+// impossible to tab away from.
+let admitFocusedId: string | null = null;
+
+watch(
+  () => [admitTarget.value?.id ?? null, revealed.value] as const,
+  async ([deviceId, isRevealed]) => {
+    if (!deviceId || admitFocusedId === deviceId) return;
+    // Before the latch, never after: an attempt that could not have worked
+    // must not be counted as the one attempt this machine gets.
+    if (!isRevealed) return;
+    admitFocusedId = deviceId;
+    // Put the panel that holds the row on screen before reaching for it. At
+    // connect the overview already shows the machines list, but a second
+    // machine can check in while the owner is reading Billing -- and then the
+    // button below is in a panel Vue is not rendering.
+    selectedSection.value = "machines";
+    await focusDevicesCard();
+    await nextTick();
+    // Queried rather than held as a template ref: the button lives inside a
+    // v-for, and the row it belongs to can arrive several polls after mount.
+    const button = devicesCard.value?.querySelector<HTMLButtonElement>(
+      "[data-admit-target='true']"
+    );
+    button?.focus();
+  },
+  { immediate: true }
+);
 
 // The card used to render a hardcoded "Active" pill and a hardcoded monthly
 // price as static markup, while the real

@@ -548,6 +548,46 @@ describe("the load screen is the vault, not a new graphic", () => {
   });
 });
 
+describe("the CLI admit handoff survives the longer veil", () => {
+  it("does not reach for a button while the shell is still inert", () => {
+    // A regression this change introduced, caught by watching the flow rather
+    // than by any assertion here: `inert` used to end at the first /api/me and
+    // now ends after the device list, a paint, and up to 700ms of gesture --
+    // and the device list landing is the very event that produces the row.
+    // `devicesKnown` and `devices` are written in the same synchronous block,
+    // so both flush together and focus() ran against an inert shell. Measured:
+    // Admit button present at t=7452 with inert still set, focus still on
+    // <body> at t=20000.
+    const at = cloudPage.indexOf("let admitFocusedId");
+    expect(at, "no admit focus watcher").toBeGreaterThan(-1);
+    const body = cloudPage.slice(at, cloudPage.indexOf("{ immediate: true }", at));
+    // `revealed` in the SOURCE, so the watcher wakes when the veil lifts.
+    // Reading it only inside would never re-fire: the 4s poll does not change
+    // admitTarget.value?.id.
+    expect(body).toContain("[admitTarget.value?.id ?? null, revealed.value] as const");
+    expect(body).toContain("if (!isRevealed) return;");
+    // And the guard sits BEFORE the latch, so an attempt that could not have
+    // worked does not spend the one attempt this machine gets.
+    expect(body.indexOf("if (!isRevealed) return;")).toBeLessThan(
+      body.indexOf("admitFocusedId = deviceId;")
+    );
+    // The once-per-machine guard itself is unchanged (pinned verbatim in
+    // syncDeviceConsole.test.ts) and still runs first.
+    expect(body.indexOf("if (!deviceId || admitFocusedId === deviceId) return;")).toBeLessThan(
+      body.indexOf("if (!isRevealed) return;")
+    );
+  });
+
+  it("is declared after `revealed`, or it would throw at setup", () => {
+    // A watcher source is evaluated when the watcher is created, so naming a
+    // const declared further down is a temporal-dead-zone throw -- which takes
+    // the whole page with it, not just the handoff.
+    expect(cloudPage.indexOf("const revealed = computed(")).toBeLessThan(
+      cloudPage.indexOf("let admitFocusedId")
+    );
+  });
+});
+
 describe("nothing in the new code logs", () => {
   it("adds no console calls", () => {
     const util = readFileSync(
