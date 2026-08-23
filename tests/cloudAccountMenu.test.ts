@@ -119,6 +119,27 @@ describe("cloud account menu", () => {
     expect(guard).toContain("notice.value =");
   });
 
+  it("re-resolves the roving index when Clerk grows the item list", () => {
+    // Opened before Clerk loads, Billing is the only item and activeIndex is
+    // 0. When Profile is prepended, Vue keeps focus on the keyed Billing
+    // button while the index still says 0, so the next arrow key jumps
+    // somewhere the user did not ask for. Track the key, not the position.
+    expect(menu).toContain("items.value.map((item) => item.key).join(\"|\")");
+    const at = menu.indexOf("watch(\n  () => items.value.map");
+    expect(at).toBeGreaterThan(-1);
+    const body = menu.slice(at, at + 700);
+    expect(body).toContain("previous.split(\"|\")[activeIndex.value]");
+    expect(body).toContain("activeIndex.value = moved");
+  });
+
+  it("caps the teleported popover to the viewport", () => {
+    // Its content is nowrap, so a long account email makes it intrinsically
+    // wider than a phone screen; without a cap the right edge stays offscreen
+    // and the email's ellipsis never engages.
+    expect(menu).toContain("maxWidth: `${placement.value?.maxWidth ?? 0}px`");
+    expect(menu).toContain("min-width: 0");
+  });
+
   it("routes Clerk through composables, never window.Clerk", () => {
     expect(menu).not.toContain("window.Clerk");
     expect(clerkAccount).not.toContain("window.Clerk");

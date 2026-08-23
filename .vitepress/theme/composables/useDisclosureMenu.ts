@@ -12,6 +12,7 @@ export type MenuPlacement = {
   top: number;
   left: number;
   minWidth: number;
+  maxWidth: number;
   placement: "above" | "below";
 };
 
@@ -40,8 +41,15 @@ export function computeMenuPosition(input: {
 }): MenuPlacement {
   const gutter = input.gutter ?? 8;
   const margin = input.margin ?? 12;
-  const minWidth = Math.max(input.trigger.width, MENU_MIN_WIDTH);
-  const width = Math.max(input.menu.width, minWidth);
+  // The menu's content sets its own intrinsic width -- the account email is
+  // nowrap -- so on a narrow viewport a long address can make it wider than
+  // the screen. Clamping `left` alone just pins the overflow to the right
+  // edge instead of the left. The width has to be capped as well, and the cap
+  // is what finally lets the email's ellipsis engage: its container was
+  // unconstrained, so there was never anything to ellipsize against.
+  const available = Math.max(0, input.viewport.width - margin * 2);
+  const minWidth = Math.min(Math.max(input.trigger.width, MENU_MIN_WIDTH), available);
+  const width = Math.min(Math.max(input.menu.width, minWidth), available);
 
   const roomBelow = input.viewport.height - input.trigger.bottom;
   const fitsBelow = roomBelow >= input.menu.height + gutter + margin;
@@ -54,7 +62,7 @@ export function computeMenuPosition(input: {
   const maxLeft = Math.max(margin, input.viewport.width - width - margin);
   const left = Math.min(Math.max(input.trigger.left, margin), maxLeft);
 
-  return { top, left, minWidth, placement };
+  return { top, left, minWidth, maxWidth: available, placement };
 }
 
 const MENU_NAVIGATION_KEYS = new Set(["ArrowDown", "ArrowUp", "Home", "End"]);

@@ -138,3 +138,32 @@ describe("isMenuNavigationKey", () => {
     expect(nextMenuIndex(0, "ArrowUp", 1)).toBe(0);
   });
 });
+
+describe("computeMenuPosition width clamp", () => {
+  it("never renders wider than the viewport allows", () => {
+    // The account email is nowrap, so a long address gives the menu an
+    // intrinsic width larger than a phone screen. Clamping `left` alone only
+    // moves the overflow from one edge to the other.
+    const placed = computeMenuPosition({
+      trigger: { top: 700, left: 12, bottom: 740, right: 363, width: 351 },
+      menu: { width: 520, height: 180 },
+      viewport: { width: 375, height: 812 }
+    });
+
+    expect(placed.maxWidth).toBe(375 - 12 * 2);
+    expect(placed.left + placed.maxWidth).toBeLessThanOrEqual(375);
+    // minWidth must not fight the cap, or the menu is pinned wide anyway.
+    expect(placed.minWidth).toBeLessThanOrEqual(placed.maxWidth);
+  });
+
+  it("leaves a roomy viewport alone", () => {
+    const placed = computeMenuPosition({
+      trigger: { top: 700, left: 24, bottom: 740, right: 224, width: 200 },
+      menu: { width: 208, height: 180 },
+      viewport: { width: 1280, height: 800 }
+    });
+
+    expect(placed.maxWidth).toBe(1280 - 24);
+    expect(placed.minWidth).toBe(MENU_MIN_WIDTH);
+  });
+});
