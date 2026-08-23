@@ -54,16 +54,29 @@
             </UserButton.MenuItems>
             <UserButton.UserProfilePage label="account" />
             <UserButton.UserProfilePage label="security" />
+            <!--
+              ClerkCloudTab fetches /api/me (and, if a vault exists, a device
+              count) on its own onMounted -- which is safe here specifically
+              because UserProfilePage's default slot is a Clerk custom page:
+              Clerk only mounts a custom page's content once the popover is
+              routed to it, never as part of the popover's own initial
+              render. Verified in the browser: opening the UserButton
+              popover alone never puts this page's content in the DOM, only
+              clicking "Cloud namespace" does. ClerkAuthControls mounts on
+              every page of the site, signed in or not -- do NOT lift this
+              fetch (or one like it) up into this component's own onMounted
+              above, and do NOT reuse ClerkCloudTab anywhere that isn't this
+              exact lazily-routed slot. That is the P1 this repo already
+              paid for once (see tests/clerkProductionConfig.test.ts and
+              commit 2a81d91): two independent owners of /api/me state,
+              one of them running unconditionally on a page that has nothing
+              to do with cloud status.
+            -->
             <UserButton.UserProfilePage label="AutoVault cloud" url="autovault-cloud">
               <template #labelIcon>
                 <span class="clerk-menu-glyph clerk-menu-glyph--cloud" aria-hidden="true"></span>
               </template>
-              <div class="clerk-profile-page">
-                <p class="clerk-profile-kicker">Hosted namespace</p>
-                <h2>AutoVault cloud</h2>
-                <p>Manage your reserved namespace from the cloud dashboard. Account identity and security stay in Clerk.</p>
-                <a :href="clerkBrand.cloudPath">Open cloud dashboard</a>
-              </div>
+              <ClerkCloudTab />
             </UserButton.UserProfilePage>
           </UserButton>
         </Show>
@@ -85,6 +98,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { ClerkLoaded, Show, SignInButton, SignUpButton, UserButton } from "@clerk/vue";
 import { clerkBrand, clerkSignInAppearance, clerkUserProfileProps } from "../clerk";
 import { withAdmitParam } from "../utils/admit";
+import ClerkCloudTab from "./ClerkCloudTab.vue";
 
 const props = withDefaults(defineProps<{
   ctaLabel?: string;

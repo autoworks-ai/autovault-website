@@ -36,6 +36,22 @@ describe("Clerk appearance — native AutoVault theming", () => {
     expect(elements.userButtonPopoverFooter.borderTop).toContain("#1f2c37");
   });
 
+  it("matches custom UserButton items (Cloud namespace, Docs, Support) to the built-in action buttons", () => {
+    // Clerk renders UserButton.Action/Link custom items with the
+    // `userButtonPopoverCustomItemButton` descriptor, distinct from the
+    // built-in Account settings / Sign out actions' descriptor
+    // (`userButtonPopoverActionButton`). Without a matching entry for the
+    // custom-item key, Clerk falls back to its own default: a greyed,
+    // low-alpha color and a near-invisible hover, so the menu reads as two
+    // different styles. Assert structural equality against the built-ins
+    // (not just pinned literals) so this stays true even if the built-in
+    // treatment changes later.
+    expect(elements.userButtonPopoverCustomItemButton).toBeDefined();
+    expect(elements.userButtonPopoverCustomItemButton.color).toBe(elements.userButtonPopoverActionButton.color);
+    expect(elements.userButtonPopoverCustomItemButton.transition).toBe(elements.userButtonPopoverActionButton.transition);
+    expect(elements.userButtonPopoverCustomItemButton["&:hover"]).toEqual(elements.userButtonPopoverActionButton["&:hover"]);
+  });
+
   it("routes accents through links, spinner, and badges", () => {
     expect(elements.footerActionLink.color).toBe(ACCENT);
     expect(elements.formResendCodeLink.color).toBe(ACCENT);
