@@ -77,6 +77,28 @@ describe("the unlock fires on the event, not on the render", () => {
     expect(body).toContain('status: action === "admit" ? "active" : "revoked"');
   });
 
+  it("celebrates in the same tick as the state change", () => {
+    // Awaiting first let Vue paint once with vaultOpen true and vaultUnlocking
+    // still false — focal mark gone, strip in its place — then reverse it when
+    // the celebration started. A hanging refresh meant no animation at all.
+    const body = cloudPage.slice(cloudPage.indexOf("async function decideDevice"));
+    const optimistic = body.indexOf("devices.value = devices.value.map(");
+    const celebrate = body.indexOf("if (opened) celebrateUnlock();");
+    const refreshed = body.indexOf("await loadDevices();");
+    expect(optimistic).toBeLessThan(celebrate);
+    expect(celebrate).toBeLessThan(refreshed);
+  });
+
+  it("stops the sweep once the admit wait has given up", () => {
+    // A stale ?admit= never matches, so `waiting` is permanent. Without the
+    // budget check the dial advertised work forever, after polling had already
+    // dropped to idle and the copy had switched to explaining nothing is
+    // coming. Same predicate as devicePollUrgent, deliberately.
+    const w = cloudPage.slice(cloudPage.indexOf("const vaultWorking = computed("));
+    const body = w.slice(0, w.indexOf(");"));
+    expect(body).toContain('admitState.value === "waiting" && !admitWaitExpired.value');
+  });
+
   it("compares against the state the owner saw, not the refreshed one", () => {
     // `wasOpen` has to be read before loadDevices(), or it already reflects the
     // admit and the vault never appears to have changed.

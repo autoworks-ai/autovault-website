@@ -1360,7 +1360,15 @@ const vaultOpen = computed(() => stage.value === "explore" || stage.value === "r
 // The dial sweeps only while something is genuinely in flight. Not a spinner:
 // a dial that turns forever reads as a component somebody forgot to stop.
 const vaultWorking = computed(
-  () => !hydrated.value || admitState.value === "waiting" || deviceBusy.value !== null
+  () =>
+    !hydrated.value ||
+    // Same predicate the poll uses. A stale, malformed, or wrong-account
+    // `?admit=` never matches a row, so `waiting` is permanent — and without
+    // this the dial advertised active work forever, long after the budget had
+    // expired, polling had dropped to idle, and the copy had already switched
+    // to explaining that nothing was coming.
+    (admitState.value === "waiting" && !admitWaitExpired.value) ||
+    deviceBusy.value !== null
 );
 
 const vaultUnlocking = ref(false);
@@ -1491,8 +1499,14 @@ async function decideDevice(deviceId: string, action: "admit" | "revoke") {
         : device
     );
 
-    await loadDevices();
+    // Same tick as the write above, before anything yields. Awaiting first let
+    // Vue render once with vaultOpen already true and vaultUnlocking still
+    // false — the focal mark gone, the strip in its place — and then reverse
+    // that when the celebration finally started. A slow refresh made the
+    // teleport conspicuous; a hanging one meant no animation at all.
     if (opened) celebrateUnlock();
+
+    await loadDevices();
     notice.value = {
       kind: "ok",
       text: action === "admit"
