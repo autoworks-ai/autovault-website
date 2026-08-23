@@ -158,7 +158,7 @@ export default defineConfig({
           { text: "Quick start", link: "/quick-start" },
           { text: "Installation", link: "/quick-start#install" },
           { text: "Agent-assisted setup", link: "/quick-start#agent-assisted" },
-          { text: "Setup wizard", link: "/quick-start#setup" },
+          { text: "Finish setup", link: "/quick-start#setup" },
           { text: "Your first skill", link: "/quick-start#first" }
         ]
       },

@@ -5,7 +5,7 @@
         <AvDocBreadcrumb section="Get started" page="Quick start" />
         <div class="eyebrow"><span class="dash" /> Install · 5 minutes</div>
         <h1>Install AutoVault.<br><span class="ital">One command. No daemon.</span></h1>
-        <p class="lede">Create the local vault, admit a signed skill, scope it to the agents that need it, and run the same capability from Claude Code, Codex, or Cursor without maintaining forks.</p>
+        <p class="lede">Install the CLI, add a skill once, then use it from Claude Code, Codex, or Cursor — with no forks to keep in sync.</p>
 
         <div class="install-final-card" aria-label="Install command">
           <div class="install-tabs" aria-label="Install method">
@@ -20,7 +20,7 @@
               {{ method }}
             </button>
             <span class="tabs-sep" />
-            <span class="tabs-meta">{{ PRODUCT_VERSION_BADGE }}</span>
+            <span class="tabs-meta">{{ installMeta }}</span>
           </div>
           <div class="install-cmd">
             <span class="prompt">$</span>
@@ -46,8 +46,8 @@
       <TerminalDemo />
     </section>
 
-    <h2 id="install">Step 1 — Install the local vault</h2>
-    <p>Pick any channel; each installs the same published CLI release. npm is the fastest path for Node 24+ environments, Homebrew is convenient on macOS, and the shell installer additionally provisions <code>~/.autovault</code>, preserves it as user-owned storage, and bootstraps bundled skills unless <code>AUTOVAULT_NO_BOOTSTRAP=1</code> is set. Nothing runs as a background daemon; local MCP hosts spawn stdio on demand.</p>
+    <h2 id="install">Step 1 · Install</h2>
+    <p>All three channels install the same release, so pick whichever you already use. The shell installer does the most: it creates <code>~/.autovault</code>, leaves the folder owned by you, and seeds the bundled skills — set <code>AUTOVAULT_NO_BOOTSTRAP=1</code> if you would rather start empty. Nothing runs in the background; your agent starts AutoVault only when it needs it.</p>
     <CodeBlock lang="bash"><span class="yaml-comment"># Node 24+: install the published npm package</span><br />
 <span class="pmt">$</span> {{ INSTALL_COMMANDS.npm }}<br />
 <span class="yaml-comment"># Or run the installer script end-to-end</span><br />
@@ -57,18 +57,18 @@
 <span class="pmt">$</span> autovault skill list</CodeBlock>
     <div class="callout tip"><div class="callout-dot" /><div><strong>Bundled skills.</strong> Installer and setup flows seed first-party bundled skills through the same validation path used by remote installs and proposals, then refresh discovered host profiles.</div></div>
 
-    <h2 id="agent-assisted">Agent-assisted setup</h2>
+    <h2 id="agent-assisted">Rather have your agent do it?</h2>
     <p>If you want Claude Code to configure its own AutoVault bootstrap skill, give it this prompt. The hosted skill is a raw <code>SKILL.md</code>; the agent should fetch it, show you the behavior, install it locally only after approval, then run it.</p>
     <CodeBlock lang="text" file="Claude Code prompt">{{ AGENT_SETUP_PROMPT }}</CodeBlock>
     <div class="callout warn"><div class="callout-dot" /><div><strong>Opt-in by design.</strong> The bootstrap skill stages the installer for inspection, asks before shell execution, then runs <code>autovault doctor</code> and <code>autovault sync-profiles --discover</code>.</div></div>
 
-    <h2 id="setup">Step 2 — Run the setup wizard</h2>
-    <p>After install, <code>autovault setup</code> scans the vault, the bundled skills root, and any discovered native agent skill roots (<code>~/.claude/skills</code>, <code>~/.codex/skills</code>, <code>~/.cursor/skills</code>), then asks you per skill how to adopt it. Re-run any time to re-scan.</p>
+    <h2 id="setup">Finish setup</h2>
+    <p><code>autovault setup</code> finds the agents already on your machine — it looks in <code>~/.claude/skills</code>, <code>~/.codex/skills</code> and <code>~/.cursor/skills</code> — then walks you through each skill it found and asks what you want done with it. Safe to run again whenever you install a new agent.</p>
     <CodeBlock lang="bash"><span class="pmt">$</span> autovault setup <span class="arg">--review</span></CodeBlock>
     <div class="callout warn"><div class="callout-dot" /><div><strong>Installed via Claude Code or another agent's shell tool?</strong> The install ran without a TTY, so the wizard was silently skipped. Open a real terminal and run <code>autovault setup</code> to finish onboarding. If your existing <code>~/.claude/skills</code> didn't import, pick the <code>backup</code> adoption mode (not the <code>augment</code> default). See <a href="/troubleshooting">Troubleshooting</a> for the full recovery.</div></div>
 
-    <h2 id="verify">Step 3 — Verify the install</h2>
-    <p>One command confirms the binary, local vault folder, profile discovery, and signing key are ready before any skill enters the vault.</p>
+    <h2 id="verify">Check it worked</h2>
+    <p>One command tells you whether the CLI, the vault folder, your signing key, and agent discovery are all in place.</p>
     <div class="terminal static-terminal">
       <div class="terminal-head"><span class="dot live" /><span class="dot" /><span class="dot" /><span class="ttl">autovault doctor</span></div>
       <div class="terminal-body compact">
@@ -81,8 +81,8 @@
       </div>
     </div>
 
-    <h2 id="first">Step 4 — Add a skill source</h2>
-    <p><code>autovault add</code> accepts local paths, GitHub identifiers or URLs, agentskills slugs, and direct <code>SKILL.md</code> URLs. Every source runs through the same validation, signing, provenance, and profile-sync gate.</p>
+    <h2 id="first">Step 2 · Add your first skill</h2>
+    <p>Point <code>autovault add</code> at a folder, a GitHub repo, an agentskills slug, or a direct <code>SKILL.md</code> URL. Wherever it came from, it goes through the same gate before it reaches your vault — the frontmatter is repaired, the contents are scanned, what the skill declares is checked against what it actually does, and the result is signed.</p>
     <CodeBlock lang="bash"><span class="pmt">$</span> autovault add ./skills/skill-author <span class="arg">--sync-profiles</span> <span class="arg">--yes</span></CodeBlock>
     <div class="terminal static-terminal">
       <div class="terminal-head"><span class="dot live" /><span class="dot" /><span class="dot" /><span class="ttl">gate run · skill-author</span></div>
@@ -125,8 +125,8 @@
       </aside>
     </div>
 
-    <h2 id="scope">Step 5 — Sync it to local agents</h2>
-    <p>Profile sync projects admitted skills into agent-native roots while preserving user-managed files on conflict. Visibility comes from skill metadata plus optional named profiles in <code>profiles.config.json</code>; remote clients should read through MCP instead of expecting local symlinks.</p>
+    <h2 id="scope">How skills reach each agent</h2>
+    <p>Every agent reads skills from its own folder. Syncing links the skills you have admitted into those folders, and never overwrites a file you put there yourself. Which skills go where comes from each skill's own metadata, or from named profiles in <code>profiles.config.json</code>. Remote clients read over MCP rather than expecting symlinks on the machine.</p>
     <CodeBlock lang="bash"><span class="pmt">$</span> autovault sync-profiles <span class="arg">--discover</span></CodeBlock>
 
     <div class="access-table" aria-label="How agents read from the vault">
@@ -142,7 +142,7 @@
       </div>
     </div>
 
-    <h2 id="run">Step 6 — Run it from your agent</h2>
+    <h2 id="run">Step 3 · Run it from your agent</h2>
     <p>The same skill is now validated, scoped, and rendered for each target agent. The skill name stays stable, while tool names are transformed to match the caller.</p>
     <div class="agent-tabs" aria-label="Agent">
       <button v-for="item in agentOptions" :key="item.id" :class="{ active: agent === item.id }" type="button" :aria-pressed="agent === item.id" @click="agent = item.id"><span class="agent-dot" :style="{ background: item.color }" />{{ item.label }}</button>
@@ -184,7 +184,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, h, ref } from "vue";
+import { computed, defineComponent, h, onMounted, ref } from "vue";
 import AvDocBreadcrumb from "./AvDocBreadcrumb.vue";
 import CodeBlock from "./CodeBlock.vue";
 import { useTerminalReplay, type TerminalReplayLine } from "../composables/useTerminalReplay";
@@ -204,6 +204,45 @@ const INSTALL_COMMANDS: Record<Method, string> = {
 const selectedMethod = ref<Method>("npm");
 const copied = ref(false);
 const AGENT_SETUP_PROMPT = AUTOVAULT_AGENT_SETUP_PROMPT;
+
+// Which command a visitor should actually run depends on the machine they are
+// sitting at, and until now the page made them work that out. Everyone landed
+// on npm, including people on a Mac who have never installed Node.
+//
+// Detected in onMounted and never at setup scope: `navigator` does not exist
+// during prerender, so choosing here would make the server HTML disagree with
+// the first client render -- a hydration mismatch on the one element the whole
+// page exists for.
+const detectedPlatform = ref<string | null>(null);
+
+function detectInstallMethod(): { method: Method; label: string } | null {
+  const ua = navigator.userAgent;
+  // Windows first: `curl … | sh` has no shell to run in on PowerShell or cmd,
+  // and brew does not exist there, so npm is the only line that works. A WSL2
+  // user still reports a Windows UA, and npm works there too.
+  if (/Windows|Win64|Win32/i.test(ua)) return { method: "npm", label: "Windows" };
+  // curl elsewhere, because it is the only channel with no prerequisite of its
+  // own -- brew needs Homebrew, npm needs Node 24+ -- and it is the one that
+  // provisions ~/.autovault and bootstraps the bundled skills for you.
+  if (/Mac OS X|Macintosh/i.test(ua)) return { method: "curl", label: "macOS" };
+  if (/Linux|X11/i.test(ua)) return { method: "curl", label: "Linux" };
+  return null;
+}
+
+onMounted(() => {
+  const detected = detectInstallMethod();
+  if (!detected) return;
+  selectedMethod.value = detected.method;
+  detectedPlatform.value = detected.label;
+});
+
+// Says *why* a tab is preselected. A guess that explains itself is a help; a
+// silent one just looks like the page picked at random.
+const installMeta = computed(() =>
+  detectedPlatform.value
+    ? `${detectedPlatform.value} · ${PRODUCT_VERSION_BADGE}`
+    : PRODUCT_VERSION_BADGE
+);
 
 async function copyInstall() {
   copied.value = await copyText(INSTALL_COMMANDS[selectedMethod.value]);
@@ -279,20 +318,8 @@ const TerminalDemo = defineComponent({
       { type: "out", text: "↳ verifying installer signature" },
       { type: "ok", text: `✓ signature ok · ${PRODUCT_VERSION}` },
       { type: "out", text: "↳ installed to ~/.autovault" },
-      { type: "out", text: "↳ refreshing managed profile links:" },
-      { type: "out", text: "    ~/.claude/skills/autovault-skill → ~/.autovault/profiles/claude-code/autovault-skill" },
-      { type: "out", text: "    ~/.codex/skills/autovault-skill  → ~/.autovault/profiles/codex/autovault-skill" },
-      { type: "out", text: "    ~/.autojack/skills/autovault-skill → ~/.autovault/profiles/autojack/autovault-skill" },
-      { type: "ok", text: "✓ vault ready · bundled skills bootstrapped · profiles synced" },
-      { type: "blank", text: "" },
-      { type: "cmd", text: "autovault add ./skills/skill-author --sync-profiles --yes" },
-      { type: "out", text: "↳ scanning ./skills/skill-author" },
-      { type: "out", text: "↳ [1/5] yaml-repair    : ok" },
-      { type: "out", text: "↳ [2/5] denylist       : ok" },
-      { type: "out", text: "↳ [3/5] cap/behavior   : ok" },
-      { type: "out", text: "↳ [4/5] dedup          : ok" },
-      { type: "out", text: "↳ [5/5] sign           : ed25519" },
-      { type: "ok", text: "✓ admitted to vault · profiles refreshed" }
+      { type: "out", text: "↳ linking skills into claude-code, codex, autojack" },
+      { type: "ok", text: "✓ vault ready · bundled skills bootstrapped · profiles synced" }
     ];
     const replay = useTerminalReplay(lines, { autoStart: true, scrollTarget: () => bodyRef.value });
 
