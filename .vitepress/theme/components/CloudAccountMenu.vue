@@ -43,24 +43,6 @@ const items = computed<MenuItem[]>(() => {
 const menu = useDisclosureMenu(() => items.value.length);
 const { open, activeIndex, triggerRef, menuRef, placement, toggle, closeMenu, reposition, onTriggerKeydown, onMenuKeydown, setItemRef } = menu;
 
-// A session can end while this menu is open -- an expiry, or a sign-out in
-// another tab that Clerk propagates here. `items` empties and the trigger is
-// replaced by the static signed-out footer, and nothing was closing the
-// disclosure: an empty teleported role="menu" stayed on screen, labelled by an
-// id that no longer existed, with focus stranded on a button Vue had just
-// removed.
-//
-// Closed without restoring focus, deliberately. The trigger is gone, so there
-// is nothing to restore to; focus falling to the document is the honest
-// outcome when the page has changed underneath the user rather than because
-// of something they did.
-watch(
-  () => props.signedIn && items.value.length > 0,
-  (usable) => {
-    if (!usable) closeMenu();
-  }
-);
-
 // Clerk finishes loading after first paint, so this list can GROW while the
 // menu is open: Billing on its own becomes Profile / Billing / Sign out. Vue
 // keeps DOM focus on the keyed button it was already on, but the composable's
