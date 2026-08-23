@@ -209,6 +209,28 @@ describe("funnel/shell handoff", () => {
   });
 });
 
+describe("account menu and session end", () => {
+  const accountMenuSrc = readFileSync(
+    new URL("../.vitepress/theme/components/CloudAccountMenu.vue", import.meta.url),
+    "utf-8"
+  );
+
+  it("closes itself when the session ends underneath it", () => {
+    // Expiry, or a sign-out in another tab: items empties and the trigger is
+    // replaced by the static signed-out footer, but the disclosure stayed
+    // open -- an empty teleported role="menu" labelled by an id that no longer
+    // exists, with focus stranded on a button Vue had just removed. Lives here
+    // rather than in cloudAccountMenu.test.ts because props.signedIn only
+    // exists once the unified shell passes it.
+    const at = accountMenuSrc.indexOf("() => props.signedIn && items.value.length > 0");
+    expect(at).toBeGreaterThan(-1);
+    const body = accountMenuSrc.slice(at, at + 200);
+    expect(body).toContain("if (!usable) closeMenu();");
+    // Not restoreFocus: the trigger it would restore to no longer exists.
+    expect(body).not.toContain("restoreFocus");
+  });
+});
+
 describe("checkout cannot double-charge", () => {
   const checkout = readFileSync(
     new URL("../functions/api/checkout/hosted-vault.js", import.meta.url),
