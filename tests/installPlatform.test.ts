@@ -125,3 +125,42 @@ describe("the rendered TOC keeps up with the page", () => {
     }
   });
 });
+
+// The hero section carries BOTH `qs-hero` and `qs-final-hero`, and
+// `.cd-docs-content .qs-hero` / `.cd-docs-content .qs-final-hero` have equal
+// specificity — so source order decides, and the later one wins. The first
+// pass of this PR changed the ratio on the earlier rule, which resolved to
+// exactly nothing; measured in the browser, the columns stayed 500/494 with
+// the install card no wider than the illustration beside it.
+describe("the hero gives the install card the wider column", () => {
+  const styles = readFileSync(
+    new URL("../.vitepress/theme/styles.css", import.meta.url),
+    "utf-8"
+  );
+
+  it("puts the ratio on the declaration that actually wins", () => {
+    const early = styles.indexOf(".cd-docs-content .qs-hero {");
+    const late = styles.indexOf(".cd-docs-content .qs-final-hero {");
+    expect(early).toBeGreaterThan(-1);
+    expect(late).toBeGreaterThan(-1);
+    // If these ever swap order, the winning rule swaps with them.
+    expect(late).toBeGreaterThan(early);
+
+    const rule = styles.slice(late, styles.indexOf("}", late));
+    const columns = rule.match(/grid-template-columns:\s*([^;]+);/)?.[1] ?? "";
+    const [first, second] = [...columns.matchAll(/([\d.]+)fr/g)].map((m) => Number(m[1]));
+
+    expect(first, `qs-final-hero columns: ${columns}`).toBeGreaterThan(second);
+  });
+
+  it("only ever applies both classes to the same element", () => {
+    // The reasoning above holds only because nothing uses `qs-hero` alone. If
+    // something did, the earlier rule would be live for that page and leaving
+    // it stale would be a real bug rather than a documented no-op.
+    const users = readFileSync(
+      new URL("../.vitepress/theme/components/QuickStartPage.vue", import.meta.url),
+      "utf-8"
+    );
+    expect(users).toContain('class="docs-hero qs-hero qs-final-hero"');
+  });
+});
