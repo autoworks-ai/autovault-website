@@ -54,3 +54,5 @@ describe("pull_request triggers cover stacked PRs", () => {
     expect(condition).toContain("refs/heads/main");
   });
 });
+
+// Probe commit: verifies CI fires for a PR based on a feature branch.
