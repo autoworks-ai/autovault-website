@@ -11,11 +11,16 @@ const cloudPage = read(".vitepress/theme/components/CloudPage.vue");
  * that pattern is wrong — the same shape as a `merge_group` mention in a YAML
  * comment masking a deleted trigger. A guard that a comment can satisfy is not
  * a guard, and rewording the comment only defers the problem to the next one.
+ *
+ * Script comments only. An earlier version also stripped `<!-- -->`, which
+ * CodeQL flagged as incomplete multi-character sanitization — correctly, in
+ * the general case. It was never needed here: the sole assertion is that the
+ * file contains no `watch(stage`, which lives in the script block where a
+ * template comment cannot reach.
  */
 const cloudCode = cloudPage
   .replace(/\/\*[\s\S]*?\*\//g, "")
-  .replace(/^\s*\/\/.*$/gm, "")
-  .replace(/<!--[\s\S]*?-->/g, "");
+  .replace(/^\s*\/\/.*$/gm, "");
 const brandMark = read(".vitepress/theme/components/BrandMark.vue");
 const styles = read(".vitepress/theme/styles.css");
 
@@ -38,9 +43,23 @@ describe("the unlock fires on the event, not on the render", () => {
     const calls = cloudPage.match(/celebrateUnlock\(\)/g) ?? [];
     // One definition, one call site.
     expect(calls).toHaveLength(2);
-    expect(cloudPage).toContain(
-      'if (action === "admit" && !wasOpen && vaultOpen.value) celebrateUnlock();'
-    );
+    // The condition itself is asserted by the two tests below — this one only
+    // pins that there is exactly one place it can fire from, and that the
+    // place is inside decideDevice rather than anywhere a render can reach.
+    const body = cloudPage.slice(cloudPage.indexOf("async function decideDevice"));
+    expect(body).toContain("celebrateUnlock();");
+  });
+
+  it("does not let a failed refresh swallow the celebration", () => {
+    // loadDevices() is silent on failure by design — it also runs on a timer.
+    // Reading vaultOpen back from it meant a transient blip on the follow-up
+    // list request skipped the one celebration that matters, and with no stage
+    // watcher nothing catches it later. A 2xx from the admit endpoint is
+    // already proof the server activated the device.
+    const body = cloudPage.slice(cloudPage.indexOf("async function decideDevice"));
+    expect(body).toContain('const opened = action === "admit" && !wasOpen;');
+    expect(body).toContain("if (opened) celebrateUnlock();");
+    expect(body).not.toContain("!wasOpen && vaultOpen.value");
   });
 
   it("compares against the state the owner saw, not the refreshed one", () => {
@@ -111,6 +130,25 @@ describe("the keyframe lands on the resting state", () => {
     // left at its pre-unlock state instead of its resting one.
     const rm = styles.slice(styles.indexOf(".brand-mark-svg.is-working .brand-mark-dial,\n  .brand-mark-svg.is-working"));
     expect(rm).toContain("transform: rotate(140deg) scale(0)");
+  });
+});
+
+describe("the sweep is visible on a vault that is already open", () => {
+  it("restates opacity and scale on every scan frame", () => {
+    // `.is-unlocked` rests the dial at opacity 0 / scale 0. A keyframe that
+    // animated only rotation left the sweep invisible in exactly the
+    // open-and-working case the separate boolean was introduced for.
+    const kf = styles.slice(
+      styles.indexOf("@keyframes brand-mark-scan"),
+      styles.indexOf("@keyframes brand-mark-breathe")
+    );
+    const frames = kf.split("%").length - 1;
+    expect(frames).toBeGreaterThan(1);
+    expect((kf.match(/opacity: 1/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    expect((kf.match(/scale\(1\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    // Not `forwards`: dropping is-working must return the dial to its state rule.
+    const rule = styles.slice(styles.indexOf(".brand-mark-svg.is-working .brand-mark-dial {"));
+    expect(rule.slice(0, rule.indexOf("}"))).not.toContain("forwards");
   });
 });
 

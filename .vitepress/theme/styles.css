@@ -262,12 +262,21 @@ body {
 }
 
 @keyframes brand-mark-scan {
+  /* opacity and scale are restated on every frame on purpose. `.is-unlocked`
+     rests the dial at opacity 0 / scale 0, so a keyframe that animated only
+     rotation left the sweep invisible in exactly the open-and-working case
+     the separate boolean exists for — a second machine checking in against a
+     vault that is already open. Animated properties outrank the resting rule
+     while running, and the animation is not `forwards`, so dropping
+     `is-working` returns the dial to whatever its state rule says. */
   0%,
   100% {
-    transform: rotate(-32deg);
+    opacity: 1;
+    transform: rotate(-32deg) scale(1);
   }
   50% {
-    transform: rotate(32deg);
+    opacity: 1;
+    transform: rotate(32deg) scale(1);
   }
 }
 

@@ -1462,8 +1462,17 @@ async function decideDevice(deviceId: string, action: "admit" | "revoke") {
     }
     // Only a closed vault becoming open celebrates — admitting a second
     // machine to an already-open vault is routine.
+    //
+    // Deliberately NOT gated on vaultOpen.value after the refresh. A 2xx from
+    // the admit endpoint means the server activated the device, so a vault
+    // that had no active machine before now has one — whether or not the
+    // follow-up list request succeeded. loadDevices() is silent on failure by
+    // design (it also runs on a timer), so reading state back from it made a
+    // transient network blip swallow the one celebration that matters, with
+    // no stage watcher to catch it later.
+    const opened = action === "admit" && !wasOpen;
     await loadDevices();
-    if (action === "admit" && !wasOpen && vaultOpen.value) celebrateUnlock();
+    if (opened) celebrateUnlock();
     notice.value = {
       kind: "ok",
       text: action === "admit"
