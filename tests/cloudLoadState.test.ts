@@ -521,6 +521,20 @@ describe("the load screen is the vault, not a new graphic", () => {
     expect(cloudPage).toContain('if (!isSettled || bootPhase.value !== "waiting") return;');
   });
 
+  it("stays on screen once the shell stacks", () => {
+    // Seen at 375px: the veil covers the whole shell, and a stacked sidebar
+    // makes that far taller than the screen, so centring in it put the vault
+    // most of a viewport below the fold and the load screen read as a blank
+    // page. Anchored near the top there; desktop keeps the centring, which is
+    // right because the shell and the viewport are about the same height.
+    const at = cloudPage.indexOf("@media (max-width: 960px)");
+    expect(at, "no 960px block").toBeGreaterThan(-1);
+    const block = cloudPage.slice(at, cloudPage.indexOf("\n}", cloudPage.indexOf(".cv-boot {", at)));
+    expect(block).toContain("align-content: start;");
+    const base = cloudPage.slice(cloudPage.indexOf(".cv-boot {"), cloudPage.indexOf("}", cloudPage.indexOf(".cv-boot {")));
+    expect(base).toContain("align-content: center;");
+  });
+
   it("clears its timer on unmount and leaves no dead keyframes behind", () => {
     expect(cloudPage).toContain("if (bootOpenTimer) clearTimeout(bootOpenTimer);");
     const style = cloudPage.slice(cloudPage.indexOf("<style scoped>"));

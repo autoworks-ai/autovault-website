@@ -4079,6 +4079,16 @@ const ICON = {
   .cv-shell {
     grid-template-columns: 1fr;
   }
+  /* The veil covers the whole shell, and once the sidebar stacks, the shell is
+     far taller than the screen -- so centring in it put the vault most of a
+     viewport below the fold, leaving the load screen looking like an empty
+     page. Seen at 375px. Anchored near the top instead, where the composition
+     is the first thing on screen; desktop keeps the centring, which is right
+     there because the shell and the viewport are about the same height. */
+  .cv-boot {
+    align-content: start;
+    padding-top: 88px;
+  }
   .cv-side {
     flex-direction: row;
     align-items: center;
