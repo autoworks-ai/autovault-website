@@ -37,8 +37,14 @@ const items = computed<MenuItem[]>(() => {
   if (canManageAccount.value) {
     entries.push({ key: "profile", label: "Profile", run: onProfile });
   }
-  // Billing is the only item whose action shares the shell's request lock, so
-  // it is the only one that can be picked and then quietly do nothing.
+  // Billing is the only item whose action can share the shell's request lock,
+  // so it is the only one that can be picked and then quietly do nothing.
+  //
+  // Kept after Billing became a panel selection rather than a portal call. The
+  // page still falls through to the portal at the stages where no Billing panel
+  // exists yet -- see showBilling in CloudPage.vue -- so the lock really is
+  // shared on that path. Once every stage has a panel this guard can come off,
+  // and the menu's whole disabled-item affordance goes with it.
   entries.push({ key: "billing", label: "Billing", disabled: props.busy, run: onBilling });
   if (canManageAccount.value) {
     entries.push({ key: "signout", label: "Sign out", danger: true, run: onSignOut });
@@ -135,13 +141,14 @@ function onProfile() {
   openProfile();
 }
 
-// Billing is the exception, and restores focus. Its action is an async fetch
-// that only sometimes navigates away: a 409 (no billing account yet) or a
-// Stripe/auth/network failure ends with a notice rendered elsewhere on the
-// page and nothing claiming focus, so a bare close would drop the keyboard
-// user onto <body> and make them tab in from the top of the document again.
-// On the success path the browser navigates to Stripe, so restoring focus to
-// the trigger costs nothing.
+// Billing is the exception, and restores focus. Its action never reliably
+// takes focus somewhere else: it now selects the page's Billing panel, and at
+// the stages with no panel yet it falls through to the portal, where a 409 (no
+// billing account yet) or a Stripe/auth/network failure ends with a notice
+// rendered elsewhere on the page and nothing claiming focus. A bare close would
+// drop the keyboard user onto <body> and make them tab in from the top of the
+// document again. On the one path that does navigate away — the portal
+// succeeding — restoring focus to the trigger costs nothing.
 function onBilling() {
   closeMenu({ restoreFocus: true });
   emit("billing");

@@ -72,7 +72,7 @@
           :avatar-style="avatarStyle"
           :signed-in="signedIn"
           :busy="busy"
-          @billing="openBillingPortal"
+          @billing="showBilling"
         />
       </aside>
 
@@ -1357,6 +1357,27 @@ function normalizeCloudState(payload: CloudStatePayload): CloudState {
     subscription: payload.subscription ?? null,
     vault: payload.vault ?? null,
   };
+}
+
+// What the account menu's Billing item does. It selects the panel rather than
+// jumping straight to Stripe: every other item that navigates this page now
+// selects a section, and the panel is where the plan, price, status and period
+// end are. Being handed to Stripe's portal without seeing any of that first is
+// exactly what the panel exists to fix — the portal is one click further, on
+// the panel's own Manage billing button.
+//
+// Before `explore` there IS no panel (SECTION_REVEAL.billing), and this menu is
+// rendered from sign-in onward, so those stages fall through to the portal as
+// they did before. Otherwise the item would become a live-looking command that
+// does nothing and says nothing, which is the defect openBillingPortal's own
+// busy guard was written against. That path stays useful even with no billing
+// account yet: the endpoint's 409 wording lands in the notice channel.
+function showBilling() {
+  if (!stageReached(SECTION_REVEAL.billing, stage.value)) {
+    void openBillingPortal();
+    return;
+  }
+  selectedSection.value = "billing";
 }
 
 async function openBillingPortal() {

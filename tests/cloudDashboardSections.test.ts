@@ -191,17 +191,44 @@ describe("the Billing panel", () => {
     expect(panel).toContain("subscriptionNeedsAttention");
   });
 
-  it("opens the real portal, and the account menu still does too", () => {
-    // Two entry points, one handler: openBillingPortal already handles the 409
-    // "no billing account yet" case and works for a canceled subscriber.
+  it("is where the portal is opened from", () => {
+    // The panel's own button is the thing that reaches Stripe. It reuses
+    // openBillingPortal untouched, which already handles the 409 "no billing
+    // account yet" case and works for a canceled subscriber.
     expect(panel).toContain('@click="openBillingPortal"');
     expect(panel).toContain("Manage billing");
-    // The button shares the shell's request lock, like the menu item does.
+    // It shares the shell's request lock.
     expect(panel).toContain(':disabled="busy"');
-    expect(cloudPage).toContain('@billing="openBillingPortal"');
-    expect(accountMenu).toContain('emit("billing")');
     // Exactly one transport, not a copy of it inside the panel.
     expect((cloudPage.match(/api\/billing\/portal/g) ?? []).length).toBe(1);
+  });
+
+  it("is what the account menu's Billing item selects, rather than Stripe", () => {
+    // The menu item used to call openBillingPortal directly, so the one place
+    // that shows plan, price, status and period end was skipped on the way to
+    // Stripe -- which is the thing this panel exists to stop. Every other item
+    // that navigates this page selects a section; Billing is not an exception.
+    expect(accountMenu).toContain('emit("billing")');
+    expect(cloudPage).toContain('@billing="showBilling"');
+    expect(cloudPage).not.toContain('@billing="openBillingPortal"');
+
+    const at = cloudPage.indexOf("function showBilling()");
+    expect(at, "no showBilling handler").toBeGreaterThan(-1);
+    const body = cloudPage.slice(at, cloudPage.indexOf("\n}", at));
+    expect(body).toContain('selectedSection.value = "billing";');
+
+    // ...except before `explore`, where there is no panel to select and the
+    // menu is already rendered. Falling through to the portal there is what
+    // keeps the item from becoming a live-looking command that does nothing.
+    expect(body).toContain("stageReached(SECTION_REVEAL.billing, stage.value)");
+    expect(body).toContain("void openBillingPortal();");
+    // The fallback is the guarded branch, not the default one.
+    expect(body.indexOf("void openBillingPortal();")).toBeLessThan(
+      body.indexOf('selectedSection.value = "billing";')
+    );
+    // And because that branch survives, the menu item can still take the
+    // shell's request lock -- so its aria-disabled guard stays load-bearing.
+    expect(accountMenu).toContain("disabled: props.busy");
   });
 
   it("is the page's only subscription display", () => {
