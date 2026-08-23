@@ -15,6 +15,55 @@
       This preview can show Clerk, but the checkout and provisioning APIs run through Cloudflare Pages Functions. Use http://127.0.0.1:8788/cloud for an end-to-end local test.
     </div>
 
+    <!--
+      The namespace field. Rendered at every pre-vault step rather than only at
+      the reserve step, and that is not a lapse of the "one thing at a time"
+      rule the starter-skill and local-handoff panels obey.
+
+      Two facts force it. The slug is chosen at step one because that is where
+      the user asked to choose it, and it is permanent -- the CLI's link command
+      resolves it to a catalog URL that enrolled machines then pin, and there is
+      no rename path -- so the value also has to be on screen at the moment it is
+      actually claimed, three steps later. Hiding it in between would mean
+      clicking "Reserve namespace" without seeing the name being reserved.
+
+      Nothing is written to the database until that click. The value rides
+      through Stripe in the same sessionStorage draft the skill playground uses.
+    -->
+    <div v-if="!vault" class="hosted-namespace">
+      <label class="hosted-namespace-label" for="hosted-namespace">Your namespace</label>
+      <div class="hosted-namespace-field" :class="namespaceState.tone">
+        <span class="hosted-namespace-prefix" aria-hidden="true">vault.autovault.dev/</span>
+        <input
+          id="hosted-namespace"
+          ref="namespaceInputRef"
+          class="hosted-namespace-input"
+          type="text"
+          autocomplete="off"
+          autocapitalize="none"
+          spellcheck="false"
+          placeholder="your-team"
+          :maxlength="VAULT_SLUG_MAX_LENGTH"
+          :value="namespaceInput"
+          :aria-invalid="namespaceState.tone === 'fail' ? 'true' : undefined"
+          aria-describedby="hosted-namespace-status hosted-namespace-note"
+          @input="onNamespaceInput"
+        />
+      </div>
+      <!--
+        Described-by, not a live region. CloudPage owns the one aria-live region
+        on this page; a second one that re-announces on every debounced keystroke
+        would talk over it. The result of the action itself -- reserved, refused,
+        already taken -- goes through that single region as a notice.
+      -->
+      <p id="hosted-namespace-status" class="hosted-namespace-status" :class="namespaceState.tone">
+        {{ namespaceState.text }}
+      </p>
+      <p id="hosted-namespace-note" class="hosted-namespace-note">
+        Your CLI links to this name and it cannot be changed later.
+      </p>
+    </div>
+
     <div v-if="!vault" class="hosted-stage-action">
       <ClerkAuthControls
         v-if="actionKind === 'auth'"
@@ -85,6 +134,16 @@ import { useTerminalReplay, type TerminalReplayLine } from "../composables/useTe
 
 const PENDING_DRAFT_KEY = "autovault.hostedVault.pendingDraft";
 
+// Mirrors functions/api/_lib/vault.js. Shape only, and only so the field can
+// answer instantly: the server re-validates everything, owns the reserved-word
+// list, and is the only thing that decides what gets written. Duplicating the
+// reserved list here would be a second copy to drift -- the server reports
+// `reserved` through /api/vaults/availability instead.
+const VAULT_SLUG_MIN_LENGTH = 3;
+const VAULT_SLUG_MAX_LENGTH = 32;
+const VAULT_SLUG_SHAPE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const NAMESPACE_CHECK_DELAY_MS = 350;
+
 type Notice = { kind: "ok" | "warn" | "fail"; text: string };
 type MeResponse = {
   user: { id: string; email?: string | null; name?: string | null; avatar_url?: string | null } | null;
@@ -98,7 +157,18 @@ type PendingDraft = {
   version?: string;
   sourceLabel?: string;
   signature?: string;
+  // The namespace the user typed before leaving for Stripe. Carried in the
+  // existing draft rather than a second storage key: one thing already survives
+  // checkout in this browser, and two would drift.
+  desiredSlug?: string;
   createdAt: string;
+};
+
+type NamespaceVerdict = {
+  slug: string;
+  available: boolean;
+  code: string;
+  message: string;
 };
 
 const props = withDefaults(defineProps<{
@@ -130,6 +200,23 @@ const pendingSaved = ref(false);
 const checkoutStarted = ref(false);
 const staticPreview = ref(false);
 const queuedSkillNames = ref<string[]>(skills.filter((skill) => skill.featured).slice(0, 2).map((skill) => skill.name));
+
+// Starts empty rather than pre-seeded, because this component server-renders:
+// the suggestion depends on /api/me and on Clerk, neither of which exists during
+// SSR, so seeding it here would put one value in the server's HTML and a
+// different one in the first client render. Filled on mount instead.
+const namespaceInput = ref("");
+const namespaceInputRef = ref<HTMLInputElement | null>(null);
+// Once they have typed, the prefill stops overwriting them -- /api/me can land
+// after the first keystroke and would otherwise clobber it.
+const namespaceEdited = ref(false);
+const namespaceVerdict = ref<NamespaceVerdict | null>(null);
+const namespaceChecking = ref(false);
+// A refusal from the reserve attempt itself, which outranks any earlier
+// availability answer: it is the newer and more authoritative fact.
+const namespaceRefusal = ref("");
+let namespaceCheckSeq = 0;
+let namespaceCheckTimer: ReturnType<typeof setTimeout> | null = null;
 const { authHeaders, clerkAuthEnabled, isClerkLoaded, isClerkSignedIn, clerkUserLabel, clerkUserSlugSeed } = useClerkApiAuth();
 
 function trackPirsch(name: string, meta: Record<string, unknown> = {}) {
@@ -165,7 +252,18 @@ const current = computed<MeResponse | null>(() => props.state ?? me.value);
 const signedIn = computed(() => Boolean(current.value?.user) || isClerkSignedIn.value);
 const paid = computed(() => Boolean(current.value?.subscription?.active));
 const vault = computed(() => current.value?.vault ?? null);
-const teamSlug = computed(() => vault.value?.slug ?? slugify(current.value?.user?.email || current.value?.user?.name || clerkUserSlugSeed.value || "your-team"));
+// What the funnel proposes when the user expresses no preference. Mirrors the
+// server's derived slug minus its six-hex suffix -- the suffix exists to
+// guarantee uniqueness for a name nobody chose, and a name somebody IS about to
+// choose does not need it. The availability check is what settles uniqueness
+// here, and a clean "johngarturo" is the whole point of letting them pick.
+const namespaceSuggestion = computed(() => clampSlug(
+  slugify(current.value?.user?.email || current.value?.user?.name || clerkUserSlugSeed.value || "your-team")
+));
+const namespaceSlug = computed(() => namespaceInput.value.trim().toLowerCase());
+// Follows the field before a vault exists, so the endpoint quoted in the local
+// handoff card is the one they are about to reserve.
+const teamSlug = computed(() => vault.value?.slug || namespaceSlug.value || namespaceSuggestion.value);
 const hostedEndpoint = computed(() => vault.value?.public_url ?? `https://vault.autovault.dev/${teamSlug.value}`);
 const namespaceStatusLabel = computed(() => vault.value ? "Hosted namespace reserved:" : "Planned namespace:");
 const commandBlock = computed(() => [
@@ -281,11 +379,128 @@ const LocalHandoffTerminal = defineComponent({
   },
 });
 
+// One sentence about the field, in priority order: the newest refusal beats an
+// older availability answer, a broken shape beats a network round trip, and a
+// verdict about a different string than the one on screen is stale.
+const namespaceState = computed<{ tone: "ok" | "warn" | "fail" | "muted"; text: string }>(() => {
+  if (namespaceRefusal.value) return { tone: "fail", text: namespaceRefusal.value };
+
+  const slug = namespaceSlug.value;
+  if (!slug) return { tone: "muted", text: "Choose the name your CLI will link to." };
+
+  const problem = localSlugProblem(slug);
+  if (problem) return { tone: "fail", text: problem };
+
+  // /api/vaults/availability requires a session, so before sign-in there is
+  // genuinely nothing to report. Saying "available" here would be a guess, and
+  // the guess a user acts on is the one that hurts.
+  if (!signedIn.value) return { tone: "muted", text: "Availability is confirmed once your account exists." };
+
+  const verdict = namespaceVerdict.value;
+  if (namespaceChecking.value || verdict?.slug !== slug) return { tone: "muted", text: "Checking availability…" };
+  return verdict.available
+    ? { tone: "ok", text: `${slug} is available.` }
+    : { tone: "fail", text: verdict.message };
+});
+
+// Shape only, matching the server's rule. Anything this rejects never reaches
+// the network: an invalid string cannot become available, so a round trip per
+// keystroke would buy nothing.
+function localSlugProblem(slug: string) {
+  if (slug.length < VAULT_SLUG_MIN_LENGTH) return `Namespaces are at least ${VAULT_SLUG_MIN_LENGTH} characters.`;
+  if (slug.length > VAULT_SLUG_MAX_LENGTH) return `Namespaces are at most ${VAULT_SLUG_MAX_LENGTH} characters.`;
+  if (!VAULT_SLUG_SHAPE.test(slug)) return "Use lowercase letters and numbers, with single hyphens between them.";
+  return "";
+}
+
+function onNamespaceInput(event: Event) {
+  const input = event.target as HTMLInputElement;
+  // Drop characters that could never be part of a slug rather than letting the
+  // user type them and then explaining why they are wrong. Hyphens survive --
+  // they are legal in the middle, and the message handles the edges.
+  const cleaned = input.value.toLowerCase().replace(/[\s_.]+/g, "-").replace(/[^a-z0-9-]/g, "");
+  namespaceEdited.value = true;
+  namespaceInput.value = cleaned;
+  // Vue only patches the DOM when the bound value changed. When normalising
+  // produced the same string as last render (typing a second "!" for instance)
+  // it did not, so the rejected character would sit in the field. Write it back.
+  if (input.value !== cleaned) input.value = cleaned;
+  scheduleNamespaceCheck();
+}
+
+function syncNamespaceFromDraft() {
+  if (namespaceEdited.value) return;
+  const next = readDraft()?.desiredSlug || namespaceSuggestion.value;
+  if (!next || next === namespaceInput.value) return;
+  namespaceInput.value = next;
+  scheduleNamespaceCheck();
+}
+
+function scheduleNamespaceCheck() {
+  namespaceRefusal.value = "";
+  namespaceVerdict.value = null;
+  if (namespaceCheckTimer) clearTimeout(namespaceCheckTimer);
+  // Invalidate anything already in flight: its answer is about a string the
+  // user has since changed.
+  namespaceCheckSeq += 1;
+  namespaceChecking.value = false;
+  if (!canUseBrowser()) return;
+  if (!namespaceSlug.value || localSlugProblem(namespaceSlug.value) || !signedIn.value) return;
+  namespaceChecking.value = true;
+  namespaceCheckTimer = setTimeout(() => void runNamespaceCheck(), NAMESPACE_CHECK_DELAY_MS);
+}
+
+async function runNamespaceCheck() {
+  const slug = namespaceSlug.value;
+  const seq = ++namespaceCheckSeq;
+  try {
+    // Not protectedAuthHeaders: that asks Clerk for a FRESH token every call,
+    // which is the right cost for an action and the wrong one for something
+    // that fires while somebody types. A failure here also must not raise a
+    // notice -- it is a read whose answer is optional.
+    const headers = await authHeaders({ accept: "application/json" }, {
+      required: clerkAuthEnabled && isClerkSignedIn.value
+    });
+    const response = await fetch(`/api/vaults/availability?slug=${encodeURIComponent(slug)}`, {
+      credentials: "include",
+      headers
+    });
+    if (seq !== namespaceCheckSeq) return;
+    // Same reasoning as fetchMe's non-OK branch: "could not find out" is not a
+    // verdict, and rendering one would be inventing an answer.
+    if (!response.ok) return;
+    const payload = await response.json() as NamespaceVerdict;
+    if (seq !== namespaceCheckSeq) return;
+    namespaceVerdict.value = payload;
+  } catch {
+    /* leave the field without a verdict rather than asserting a wrong one */
+  } finally {
+    if (seq === namespaceCheckSeq) namespaceChecking.value = false;
+  }
+}
+
+function focusNamespaceField() {
+  const input = namespaceInputRef.value;
+  if (!input) return;
+  input.focus();
+  input.select();
+}
+
 onMounted(async () => {
   staticPreview.value = canUseBrowser() && window.location.port === "5173";
+  // Before the /api/me round trip, so a value carried through Stripe is on
+  // screen immediately rather than after the network settles.
+  syncNamespaceFromDraft();
   if (clerkAuthEnabled && !isClerkLoaded.value) return;
   await loadMe();
   await resumeCheckoutReturn();
+});
+
+// The suggestion only resolves once the user is known, and signing in is what
+// makes the availability endpoint answerable at all.
+watch([namespaceSuggestion, signedIn], () => {
+  syncNamespaceFromDraft();
+  if (signedIn.value && namespaceSlug.value && !namespaceVerdict.value) scheduleNamespaceCheck();
 });
 
 watch([isClerkLoaded, isClerkSignedIn], ([loaded]) => {
@@ -324,13 +539,18 @@ function persistDraft() {
 
 function buildDraft(): PendingDraft | null {
   const sourceText = props.skillSource.trim();
-  if (!sourceText) return null;
+  const desiredSlug = namespaceSlug.value;
+  // A chosen namespace is now reason enough to keep a draft on its own. On
+  // /cloud there is never a pasted skill, so before this the draft was always
+  // null there and nothing survived the trip to Stripe.
+  if (!sourceText && !desiredSlug) return null;
   return {
     sourceText,
     skillName: props.skillName || props.evaluation?.skill?.name || "pasted-skill",
     version: props.evaluation?.skill?.version,
     sourceLabel: props.sourceLabel || "browser playground",
     signature: props.evaluation?.signature ?? undefined,
+    desiredSlug: desiredSlug || undefined,
     createdAt: new Date().toISOString()
   };
 }
@@ -438,12 +658,31 @@ async function provisionVault() {
       method: "POST",
       credentials: "include",
       headers,
-      body: JSON.stringify({ queued_skills: queuedSkillNames.value })
+      body: JSON.stringify({
+        queued_skills: queuedSkillNames.value,
+        // Omitted when empty, so the server falls back to its derived slug
+        // rather than being handed a blank string to reject.
+        slug: namespaceSlug.value || undefined
+      })
     });
     const payload = await response.json().catch(() => ({}));
 
     if (response.status === 402) {
       notice.value = { kind: "warn", text: "Checkout completed, but the Stripe webhook has not marked the subscription active yet. Refresh in a moment." };
+      return;
+    }
+
+    // The name was refused: 400 for shape or a reserved word, 409 for the race
+    // this flow knowingly accepts -- available when they looked, claimed by
+    // somebody else before they clicked. Nothing is broken and nothing was
+    // charged twice, so it must not read as a crash: put the message on the
+    // field, put the cursor back in it, and let them pick again.
+    if (response.status === 400 || response.status === 409) {
+      namespaceRefusal.value = payload.error || "That namespace is not available. Choose another.";
+      namespaceVerdict.value = null;
+      notice.value = { kind: "warn", text: namespaceRefusal.value };
+      await nextTick();
+      focusNamespaceField();
       return;
     }
 
@@ -463,10 +702,10 @@ async function provisionVault() {
     // their namespace was created.
     me.value = { ...(current.value ?? { user: null }), vault: payload.vault };
     emit("stateChange", me.value);
-    // Same reason loadMe settles one: the state this just handed up comes back
-    // as a prop, and resumeCheckoutReturn reads vault.value immediately after
-    // awaiting this call -- to decide whether to clear ?hosted=success from
-    // the URL. Without settling, that read races Vue's render flush.
+    // The state just handed up comes back as a PROP, so `vault` is still null
+    // until Vue flushes. Settle it before the finally blocks re-enable the
+    // button: otherwise it renders clickable for one frame at a step the shell
+    // has already left, and a fast second click double-provisions.
     await nextTick();
     // Runs after the shell has already advanced. It only persists queued
     // skills; nothing user-visible depends on its result.
@@ -478,7 +717,10 @@ async function provisionVault() {
 
 async function savePendingImport() {
   const draft = buildDraft() || readDraft();
-  if (!draft && queuedSkillNames.value.length === 0) return;
+  // Keyed on the draft's source text, not on the draft existing. A draft now
+  // exists whenever a namespace was typed, and posting one with no skill and no
+  // queued starters is a request the API answers 400 for by design.
+  if (!draft?.sourceText && queuedSkillNames.value.length === 0) return;
   const headers = await protectedAuthHeaders({ "content-type": "application/json", accept: "application/json" });
   if (!headers) return;
 
@@ -625,12 +867,102 @@ function slugify(value: string) {
   return slug || "your-team";
 }
 
+// A suggestion the validator would reject is not a suggestion. Long email local
+// parts are the real case: without this the field would open on an over-length
+// value and greet a first-time visitor with an error about a name they did not
+// choose.
+function clampSlug(slug: string) {
+  const clamped = slug.slice(0, VAULT_SLUG_MAX_LENGTH).replace(/-+$/, "");
+  return clamped.length >= VAULT_SLUG_MIN_LENGTH ? clamped : "";
+}
+
 function canUseBrowser() {
   return typeof window !== "undefined";
 }
 </script>
 
 <style scoped>
+.hosted-namespace {
+  display: grid;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.hosted-namespace-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+/* One bordered box holding an inert prefix and the input, so the field reads
+   as the URL it becomes rather than as a bare text box. */
+.hosted-namespace-field {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  font-family: var(--mono);
+  font-size: 13px;
+  overflow: hidden;
+}
+
+.hosted-namespace-field:focus-within {
+  border-color: color-mix(in srgb, var(--ink-2) 45%, var(--line));
+}
+
+.hosted-namespace-field.ok {
+  border-color: color-mix(in srgb, var(--ok) 50%, var(--line));
+}
+
+.hosted-namespace-field.fail {
+  border-color: color-mix(in srgb, var(--bad) 55%, var(--line));
+}
+
+.hosted-namespace-prefix {
+  padding: 8px 0 8px 10px;
+  color: var(--ink-2);
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.hosted-namespace-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 10px 8px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.hosted-namespace-input:focus {
+  outline: none;
+}
+
+.hosted-namespace-status,
+.hosted-namespace-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.hosted-namespace-status.ok {
+  color: var(--ok);
+}
+
+.hosted-namespace-status.fail {
+  color: var(--bad);
+}
+
+.hosted-namespace-status.warn {
+  color: var(--warn);
+}
+
+.hosted-namespace-note {
+  opacity: 0.75;
+}
+
 .hosted-command-card {
   border: 1px solid var(--line);
   border-radius: 8px;
