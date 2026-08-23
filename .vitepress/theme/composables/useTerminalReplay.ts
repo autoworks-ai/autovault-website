@@ -1,4 +1,5 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { prefersReducedMotion } from "../utils/motion";
 
 export type TerminalLineType = "cmd" | "out" | "ok" | "err" | "blank";
 
@@ -20,7 +21,7 @@ export function getTerminalLineDelay(line: TerminalReplayLine): number {
 }
 
 function hasReducedMotion() {
-  return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return prefersReducedMotion();
 }
 
 export function useTerminalReplay(lines: readonly TerminalReplayLine[], options: TerminalReplayOptions = {}) {

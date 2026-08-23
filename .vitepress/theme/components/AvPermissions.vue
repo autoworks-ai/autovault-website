@@ -4,6 +4,7 @@ import { computed, ref } from 'vue'
 const cards = [
   {
     axis: 'Axis 01 / Agent',
+    enforcement: 'enforced by sync-profiles',
     title: 'Per-caller profiles',
     body: 'Codex, Claude Code, Cursor, AutoHub, custom — each gets its own filtered view, transformed to its native tool names.',
     chips: [['claude-code', true], ['codex', true], ['cursor', false], ['autohub', false]] as [string, boolean][],
@@ -12,6 +13,7 @@ const cards = [
   },
   {
     axis: 'Axis 02 / Device',
+    enforcement: 'host policy',
     title: 'Machine-bound skills',
     body: 'Laptop, server, ephemeral CI runner — different sets per machine. Production never sees the dev sandbox.',
     chips: [['laptop-jack', true], ['prod-runner-3', false], ['ci-ephemeral', false]] as [string, boolean][],
@@ -20,6 +22,7 @@ const cards = [
   },
   {
     axis: 'Axis 03 / Project',
+    enforcement: 'host policy',
     title: 'Project boundaries',
     body: 'Project-scoped skills don\'t leak across repos. Client work stays inside the client\'s namespace.',
     chips: [['autovault', true], ['client-foo', false], ['internal/ops', false]] as [string, boolean][],
@@ -28,6 +31,7 @@ const cards = [
   },
   {
     axis: 'Axis 04 / Tool · User',
+    enforcement: 'host policy',
     title: 'Fine-grained access',
     body: 'Per-tool permissions, role-based access. Read-only roles see read-only skills.',
     chips: [['role:engineer', true], ['role:design', false], ['role:ops', false]] as [string, boolean][],
@@ -50,6 +54,12 @@ const activeCard = computed(() => cards[active.value])
     <p class="av-lede" style="margin-top: 16px">
       Every request carries a context. Same folder, filtered four ways — agent, device, project, tool. Dev-machine skills don't surface on a CI runner. Client A skills don't leak into Client B's project.
     </p>
+    <p class="av-perm-note">
+      The agent axis is enforced at sync time by <code>autovault sync-profiles</code>.
+      Device, project and tool scoping are host-policy hooks the local installer
+      composes — they are not validated by the admission gate.
+      <a href="/permissions#install-scope">How the three layers differ →</a>
+    </p>
 
     <div class="av-perm-grid">
       <button
@@ -61,7 +71,10 @@ const activeCard = computed(() => cards[active.value])
         @click="active = index"
         @mouseenter="active = index"
       >
-        <span class="axis">{{ c.axis }}</span>
+        <span class="axis"
+          >{{ c.axis }}
+          <span class="axis-enforcement">{{ c.enforcement }}</span></span
+        >
         <h4>{{ c.title }}</h4>
         <p style="margin: 0; color: var(--ink-2); font-size: 13.5px">{{ c.body }}</p>
         <div class="examples">

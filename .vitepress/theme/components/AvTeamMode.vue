@@ -30,15 +30,16 @@ import UiIcon from './UiIcon.vue'
           <div class="route">
             <div class="route-num">B</div>
             <div class="route-body">
-              <div class="route-title">Hosted at autovault.dev</div>
-              <div class="route-desc">For teams who'd rather not run a server. Reserved namespace, audit log, SSO. Same engine, same gate.</div>
+              <div class="route-title">Hosted at autovault.dev <span class="route-tag">private beta</span></div>
+              <div class="route-desc">For teams who'd rather not run a server. Reserved namespace today; device enrollment and signed skill sync are not enabled yet. Same engine, same gate once they ship.</div>
             </div>
           </div>
         </div>
       </div>
 
       <div class="av-team-diagram">
-        <div class="av-team-cloud">
+        <p class="av-team-caption">Illustration — not a live deployment.</p>
+        <div class="av-team-cloud" aria-hidden="true">
           <div class="cloud-head">
             <UiIcon name="check" :size="11" />
             <span>vault.team.acme.dev</span>
@@ -47,12 +48,12 @@ import UiIcon from './UiIcon.vue'
           <div class="cloud-body">
             <div class="cloud-row"><span class="lbl">skills</span><span class="val">142 signed</span></div>
             <div class="cloud-row"><span class="lbl">members</span><span class="val">28</span></div>
-            <div class="cloud-row"><span class="lbl">scopes</span><span class="val">14 projects · 4 roles</span></div>
+            <div class="cloud-row"><span class="lbl">scopes</span><span class="val">14 projects · 3 roles</span></div>
             <div class="cloud-row"><span class="lbl">protocol</span><span class="val">remote MCP</span></div>
           </div>
         </div>
 
-        <div class="av-team-clients">
+        <div class="av-team-clients" aria-hidden="true">
           <div class="client">
             <span class="cdot" /><span>jack@laptop</span><span class="ago">just now</span>
           </div>
@@ -72,6 +73,28 @@ import UiIcon from './UiIcon.vue'
 </template>
 
 <style scoped>
+.av-team-caption {
+  margin: 0 0 10px;
+  color: var(--ink-4);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.route-tag {
+  margin-left: 8px;
+  padding: 2px 7px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
 .av-team-grid {
   display: grid;
   grid-template-columns: 1fr 0.85fr;

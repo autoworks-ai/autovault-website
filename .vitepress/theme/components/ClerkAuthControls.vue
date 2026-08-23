@@ -84,6 +84,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { ClerkLoaded, Show, SignInButton, SignUpButton, UserButton } from "@clerk/vue";
 import { clerkBrand, clerkSignInAppearance, clerkUserProfileProps } from "../clerk";
+import { withAdmitParam } from "../utils/admit";
 
 const props = withDefaults(defineProps<{
   ctaLabel?: string;
@@ -103,8 +104,30 @@ const hostedPath = clerkBrand.cloudPath;
 const hydrated = ref(false);
 const clerkFailed = ref(false);
 let clerkLoadTimer: number | undefined;
+// Minimal shape of the bits of the Clerk global this component touches. The
+// full type lives behind the plugin, which is not installed during prerender.
+type ClerkLike = {
+  loaded?: boolean;
+  session?: unknown;
+  client?: { sessions?: Array<{ id: string; status: string }> };
+  setActive?: (opts: { session: string }) => Promise<unknown>;
+};
+
 let clerkReadyInterval: number | undefined;
-const authReturnPath = computed(() => clerkBrand.cloudPath);
+let sessionRepairInterval: number | undefined;
+// Carries `?admit=` through the sign-in round trip. A signed-out owner
+// following the link `autovault link` printed would otherwise come back to a
+// bare /cloud, and the handshake would degrade to hunting for the row by hand
+// at exactly the moment it was supposed to help.
+//
+// Safe to read `window` here: every consumer of this computed sits inside the
+// `hydrated && clerkEnabled` branch, which renders nothing during prerender.
+// The guard is belt and braces.
+const authReturnPath = computed(() =>
+  typeof window === "undefined"
+    ? clerkBrand.cloudPath
+    : withAdmitParam(clerkBrand.cloudPath, window.location.search)
+);
 
 onMounted(() => {
   hydrated.value = true;
@@ -117,6 +140,7 @@ onMounted(() => {
     if (!(window as unknown as { Clerk?: unknown }).Clerk) clerkFailed.value = true;
   }, 8000);
   clerkReadyInterval = window.setInterval(markClerkReady, 500);
+  sessionRepairInterval = window.setInterval(activatePendingSession, 400);
 });
 
 onBeforeUnmount(() => {
@@ -125,6 +149,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("unhandledrejection", handleUnhandledRejection);
   if (clerkLoadTimer) window.clearTimeout(clerkLoadTimer);
   if (clerkReadyInterval) window.clearInterval(clerkReadyInterval);
+  stopSessionRepair();
 });
 
 function handleWindowError(event: ErrorEvent) {
@@ -142,6 +167,64 @@ function handleUnhandledRejection(event: PromiseRejectionEvent) {
 function isClerkLoadFailure(value: unknown) {
   const message = value instanceof Error ? value.message : String(value ?? "");
   return /failed_to_load_clerk|failed to load clerk/i.test(message);
+}
+
+// Clerk's modal sign-up finishes by navigating to its forced redirect URL.
+// On /cloud that URL IS /cloud#launch-path -- the page the user is already
+// on -- so the browser performs a same-document hash change, never reloads,
+// and Clerk does not finish activating the session it just created.
+//
+// The observable result is a dead end: client.sessions holds a session with
+// status "active" while Clerk.session and Clerk.user stay null, so BOTH
+// <Show when="signed-out"> and <Show when="signed-in"> render nothing. The
+// user sees step 1 with an empty action slot and no way forward but a manual
+// reload -- which works, because a fresh load re-reads the __client cookie
+// and activates the session properly.
+//
+// Reconcile it here instead of asking the user to guess. setActive is
+// idempotent and this no-ops in every state except the broken one.
+let repairingSession = false;
+
+// This is a one-shot rescue, not a poller, and the distinction is load-bearing
+// because the interval is 400ms. A Clerk or network failure that leaves the
+// created session visible while setActive keeps rejecting would otherwise
+// retry about 150 times a minute, forever, in every affected tab. The budget
+// is per session id, so a genuinely new sign-up still gets its own attempts
+// rather than inheriting a spent counter.
+const SESSION_REPAIR_ATTEMPTS = 3;
+let repairTargetId: string | null = null;
+let repairsLeft = SESSION_REPAIR_ATTEMPTS;
+
+function stopSessionRepair() {
+  if (sessionRepairInterval) window.clearInterval(sessionRepairInterval);
+  sessionRepairInterval = undefined;
+}
+
+async function activatePendingSession() {
+  const clerk = (window as unknown as { Clerk?: ClerkLike }).Clerk;
+  if (!clerk?.loaded || clerk.session || repairingSession) return;
+
+  const pending = clerk.client?.sessions?.find((s) => s.status === "active");
+  if (!pending) return;
+
+  if (pending.id !== repairTargetId) {
+    repairTargetId = pending.id;
+    repairsLeft = SESSION_REPAIR_ATTEMPTS;
+  }
+  if (repairsLeft <= 0) return;
+
+  repairingSession = true;
+  try {
+    await clerk.setActive?.({ session: pending.id });
+  } catch {
+    // A failed repair is not worth surfacing: the sign-in controls are still
+    // rendered and a reload remains a working fallback. Give up once the
+    // budget is spent so a persistent failure cannot become a retry storm.
+    repairsLeft -= 1;
+    if (repairsLeft <= 0) stopSessionRepair();
+  } finally {
+    repairingSession = false;
+  }
 }
 
 function markClerkReady() {
