@@ -118,8 +118,11 @@ describe("namespace validation", () => {
 
   it("refuses every entry on the reserved list, and the brand prefix as a rule", () => {
     // Enumerated from the real list rather than a copy of it, so adding an
-    // entry cannot quietly go untested.
-    expect(RESERVED_VAULT_SLUGS.size).toBeGreaterThan(40);
+    // entry cannot quietly go untested. Pinned to the exact size, not a floor:
+    // the count is quoted in the task report and in the commit message, and a
+    // floor lets those drift out of date silently. Adding an entry is meant to
+    // be a deliberate act with prose attached.
+    expect(RESERVED_VAULT_SLUGS.size).toBe(53);
     for (const reserved of RESERVED_VAULT_SLUGS) {
       const verdict = validateVaultSlug(reserved);
       expect(verdict.ok, reserved).toBe(false);
@@ -414,6 +417,17 @@ describe("the namespace field in the funnel", () => {
     // atReserveStep in cloudDashboardHonesty.test.ts.
     expect(funnel).toContain("const showSetupDetails = computed(() => atReserveStep.value);");
     expect(funnel).toContain("const showLocalHandoff = computed(() => atReserveStep.value);");
+  });
+
+  it("never suggests an empty namespace", () => {
+    // clampSlug used to return "" for an email local part under three
+    // characters. That is not "no opinion", it is three separate regressions:
+    // syncNamespaceFromDraft reads "" as nothing to fill so the field never
+    // prefills, the one-click default path disappears, and teamSlug collapses
+    // hostedEndpoint to a bare origin -- which the local handoff card reads out
+    // as the screen-reader transcript.
+    expect(funnel).not.toContain('return clamped.length >= VAULT_SLUG_MIN_LENGTH ? clamped : "";');
+    expect(funnel).toContain('return clamped.length >= VAULT_SLUG_MIN_LENGTH ? clamped : "your-team";');
   });
 
   it("says the choice is permanent, because it is", () => {

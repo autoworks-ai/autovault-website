@@ -876,9 +876,18 @@ function slugify(value: string) {
 // parts are the real case: without this the field would open on an over-length
 // value and greet a first-time visitor with an error about a name they did not
 // choose.
+//
+// The short case falls back rather than returning "", mirroring what
+// vaultSlugForUser does server-side. An empty suggestion is worse than a generic
+// one three ways over: syncNamespaceFromDraft treats it as nothing to fill so
+// the field never prefills at all, the default path stops being one click, and
+// teamSlug collapses hostedEndpoint to a bare "https://vault.autovault.dev/" --
+// which is the string the screen-reader transcript in the local handoff card
+// reads out. "your-team" is also exactly what this surface showed before there
+// was a field.
 function clampSlug(slug: string) {
   const clamped = slug.slice(0, VAULT_SLUG_MAX_LENGTH).replace(/-+$/, "");
-  return clamped.length >= VAULT_SLUG_MIN_LENGTH ? clamped : "";
+  return clamped.length >= VAULT_SLUG_MIN_LENGTH ? clamped : "your-team";
 }
 
 function canUseBrowser() {
