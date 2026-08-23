@@ -612,9 +612,34 @@ describe("one snapshot, and no claims about a vault that is not there", () => {
     // Signed out, mid-checkout, or after a failed load there is no vault whose
     // device state is known -- and "No machines linked yet" states a fact
     // about one that may not exist.
+    //
+    // This used to pin the literal `v-else-if="vault"`. The condition grew a
+    // second clause when the "waiting to be admitted" badge stopped being
+    // chained onto this one (it had to: as a v-else-if it went silent the
+    // moment any machine was linked, hiding the second machine still waiting).
+    // The guard this test exists for is unchanged and asserted below; what is
+    // new is that the badge which now runs ahead of it is held to the same
+    // standard, so the chain cannot be reordered into claiming device facts
+    // without a vault.
     const at = cloudPage.indexOf("No machines linked yet");
     expect(at).toBeGreaterThan(-1);
-    expect(cloudPage.slice(at - 200, at)).toContain('v-else-if="vault"');
+    const branch = cloudPage.slice(at - 260, at);
+    expect(branch).toMatch(/v-else-if="vault\b/);
+    expect(branch).toContain('v-else-if="vault && !activeDevices.length"');
+  });
+
+  it("empties the device list the moment a vault stops existing", () => {
+    // The badge ahead of "No machines linked yet" is gated on
+    // pendingDevices.length rather than on `vault`, so what keeps IT honest is
+    // that the list itself is cleared -- not a condition in the template.
+    const at = cloudPage.indexOf("() => vault.value?.id ?? null");
+    expect(at).toBeGreaterThan(-1);
+    const body = cloudPage.slice(at, cloudPage.indexOf("{ immediate: true }", at));
+    expect(body).toContain("if (!vaultId) {");
+    expect(body).toContain("devices.value = [];");
+    // Bumped, not just cleared: a request already in flight for the old vault
+    // would otherwise repopulate it.
+    expect(body).toContain("devicesRequestSeq += 1;");
   });
 });
 

@@ -212,3 +212,72 @@ describe("the Admit control travels with the machine it admits", () => {
     expect(seen?.declarations).toContain("min-width: 0");
   });
 });
+
+describe("the topbar says a machine is waiting even once one is linked", () => {
+  const badges = cloudTemplate.slice(
+    cloudTemplate.indexOf('<div class="cv-badges">'),
+    cloudTemplate.indexOf("</header>")
+  );
+
+  it("reports pending alongside linked rather than instead of it", () => {
+    // This was `v-else-if` on the "N machines linked" pill, so one active plus
+    // one pending reported only "1 machine linked" -- and a second machine
+    // running `autovault link` against a set-up vault is precisely the case
+    // devicePollUrgent refuses to stop polling for. The badge went silent in
+    // the one state where the poll was working hardest.
+    expect(badges).toContain('v-if="activeDevices.length"');
+    expect(badges).toContain('v-if="pendingDevices.length"');
+    expect(badges).not.toContain('v-else-if="pendingDevices.length"');
+    // Order matters: the thing asking for something comes after the statement
+    // of fact, but it is its own branch, not a continuation of it.
+    expect(badges.indexOf('v-if="activeDevices.length"')).toBeLessThan(
+      badges.indexOf('v-if="pendingDevices.length"')
+    );
+  });
+
+  it("is a control, and the only one among the badges", () => {
+    // The Machines card is ~960px down the connect stage on a 2560x1080
+    // screen. This is the handle back to it from where the count is announced.
+    const at = badges.indexOf('v-if="pendingDevices.length"');
+    const element = badges.slice(badges.lastIndexOf("<", at), badges.indexOf(">", at));
+    expect(element).toContain("<button");
+    expect(element).toContain('type="button"');
+    expect(element).toContain('class="cv-pill warn cv-pill-jump"');
+    expect(element).toContain('@click="jumpToMachines()"');
+    // Every other badge in this row is a statement, and stays one.
+    expect(badges.match(/<button/g)).toHaveLength(1);
+  });
+
+  it("routes through the same scroll the CLI handshake uses", () => {
+    // Not a second scroll mechanism: one way to reach the machines list.
+    const at = cloudPage.indexOf("function jumpToMachines()");
+    expect(at).toBeGreaterThan(-1);
+    const body = cloudPage.slice(at, cloudPage.indexOf("\n}", at));
+    expect(body).toContain('selectedSection.value = "machines";');
+    expect(body).toContain("focusDevicesCard()");
+    // Selecting a panel is not admitting anything, and a badge that named no
+    // particular machine has no business putting focus on an Admit button.
+    expect(body).not.toContain("decideDevice");
+    expect(body).not.toContain(".focus()");
+  });
+});
+
+describe("reaching the card does not have to be a journey", () => {
+  it("jumps rather than glides when motion is turned down", () => {
+    // `behavior: "smooth"` is advisory under prefers-reduced-motion, not
+    // binding. Everywhere else on this page motion is spelled out rather than
+    // left to the browser, and this is now on two paths (the CLI handshake and
+    // the badge above), so it is worth being explicit about.
+    const at = cloudPage.indexOf("async function focusDevicesCard()");
+    expect(at).toBeGreaterThan(-1);
+    const body = cloudPage.slice(at, cloudPage.indexOf("\n}", at));
+    expect(body).toContain('behavior: prefersReducedMotion() ? "auto" : "smooth"');
+    // Read inside the function, never at setup scope -- the PR #88 class.
+    expect(body.indexOf("prefersReducedMotion()")).toBeGreaterThan(-1);
+    const setupHead = cloudPage.slice(
+      cloudPage.indexOf("<script setup"),
+      cloudPage.indexOf("async function focusDevicesCard()")
+    );
+    expect(setupHead).not.toMatch(/^const .*= prefersReducedMotion\(\)/m);
+  });
+});

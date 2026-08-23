@@ -176,15 +176,37 @@
               {{ activeDevices.length }}
               {{ activeDevices.length === 1 ? "machine" : "machines" }} linked</span
             >
-            <span v-else-if="pendingDevices.length" class="cv-pill warn"
-              ><span class="cv-dot" />
-              {{ pendingDevices.length }} waiting to be admitted</span
+            <!-- Deliberately NOT chained onto the pill above. As a v-else-if
+                 this said nothing whenever a machine was already linked -- and
+                 a second box running `autovault link` against a set-up vault is
+                 the exact case the device poll refuses to stop for (see
+                 devicePollUrgent). One active and one pending reported "1
+                 machine linked" and left the machine still waiting on a click
+                 unmentioned anywhere above the fold.
+
+                 A button, because this is the one badge here that names
+                 something only the owner can finish. The Machines card is
+                 ~960px down the connect stage on a 2560x1080 screen, which is
+                 the other half of "below the fold"; this is the handle back to
+                 it, and it reuses the scroll-and-flash the CLI handshake
+                 already uses rather than inventing a second one. -->
+            <button
+              v-if="pendingDevices.length"
+              type="button"
+              class="cv-pill warn cv-pill-jump"
+              title="Show the machines waiting to be admitted"
+              @click="jumpToMachines()"
             >
+              <span class="cv-dot" />
+              {{ pendingDevices.length }} waiting to be admitted
+              <span class="cv-pill-caret" aria-hidden="true">↓</span>
+            </button>
             <!-- v-else-if, not v-else: signed out, mid-checkout, or after a
                  failed load there is no vault whose device state we know, and
                  "no machines linked" states a fact about one that may not
-                 exist. -->
-            <span v-else-if="vault" class="cv-pill mut"
+                 exist. The added !activeDevices.length keeps this the last word
+                 of a chain that now starts one pill earlier. -->
+            <span v-else-if="vault && !activeDevices.length" class="cv-pill mut"
               ><span class="cv-dot" /> No machines linked yet</span
             >
           </div>
@@ -2519,6 +2541,17 @@ function onNavClick(item: NavItem) {
   if (item.section === "machines") void focusDevicesCard();
 }
 
+// The topbar's "N waiting to be admitted" badge. Same two moves the nav item
+// makes -- render the panel, then scroll to it -- so there is one way this page
+// gets you to the machines list, not three. It deliberately does NOT focus the
+// Admit button: focus is the CLI handshake's move, where a fingerprint in the
+// URL says which machine you came for. Nothing here says that, and stealing
+// focus onto a button that grants vault access is not a thing to do on a hunch.
+function jumpToMachines() {
+  selectedSection.value = "machines";
+  void focusDevicesCard();
+}
+
 let devicesFlashTimer: ReturnType<typeof setTimeout> | undefined;
 
 // Scroll the machines list into view and flash it. The admit handshake is the
@@ -2528,7 +2561,15 @@ async function focusDevicesCard() {
   // Read after the tick rather than taken as an argument. The caller may have
   // just switched to the panel that renders this, in which case the ref was
   // still null at call time.
-  devicesCard.value?.scrollIntoView({ behavior: "smooth", block: "center" });
+  // Read here, in the callback, never at setup scope -- the PR #88 hydration
+  // class. Not left to the browser: `behavior: "smooth"` is only *advisory*
+  // under the preference, and the one place this repo already spells motion out
+  // rather than hoping (styles.css, startVaultArrival, the block at the bottom
+  // of this file) is the pattern to follow. A page that jumps is the point.
+  devicesCard.value?.scrollIntoView({
+    behavior: prefersReducedMotion() ? "auto" : "smooth",
+    block: "center",
+  });
   devicesFlash.value = true;
   if (devicesFlashTimer) clearTimeout(devicesFlashTimer);
   devicesFlashTimer = setTimeout(() => {
@@ -2942,6 +2983,35 @@ const ICON = {
 }
 .cv-pill.mut {
   color: var(--ink-3);
+}
+/* The one pill that is a control. A <button> arrives with a UA font, a grey
+   background and a border of its own, all of which have to be handed back to
+   .cv-pill before it reads as a sibling of the badges beside it. Restrained on
+   purpose: the caret and the hover are the whole affordance, because this sits
+   next to two pills that are only ever statements. */
+.cv-pill-jump {
+  font-family: inherit;
+  line-height: inherit;
+  cursor: pointer;
+  appearance: none;
+  transition:
+    border-color var(--dur-base) var(--ease),
+    background var(--dur-base) var(--ease);
+}
+.cv-pill-jump:hover {
+  border-color: var(--warn);
+  background: rgba(232, 168, 102, 0.16);
+}
+.cv-pill-jump:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* Same glyph and the same job as .cv-nextstep-caret: the thing you want is
+   further down the page. */
+.cv-pill-caret {
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.75;
 }
 
 .cv-sub-warn {
@@ -4128,6 +4198,7 @@ const ICON = {
   .cv-btn,
   .cv-nav-item,
   .cv-card,
+  .cv-pill-jump,
   .cv-preview {
     transition: none;
   }
