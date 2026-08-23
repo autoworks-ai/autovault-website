@@ -178,6 +178,19 @@ export const clerkAppearance = {
     userButtonPopoverActionButtonIcon: {
       color: INK_3
     },
+    // Custom UserButton.Action/Link items (Cloud namespace, Docs, Support)
+    // render with a different Clerk descriptor than the built-in actions
+    // (Account settings, Sign out), so they need this key too or they fall
+    // back to Clerk's default greyed-out, unstyled-hover treatment instead
+    // of matching the rest of the menu.
+    userButtonPopoverCustomItemButton: {
+      color: INK_2,
+      transition: `background-color 120ms ${EASE}, color 120ms ${EASE}`,
+      "&:hover": {
+        backgroundColor: "rgba(90, 214, 192, 0.08)",
+        color: INK
+      }
+    },
     userButtonPopoverFooter: {
       borderTop: `1px solid ${LINE}`
     },
