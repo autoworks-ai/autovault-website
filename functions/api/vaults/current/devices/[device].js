@@ -9,6 +9,11 @@ import { getCurrentVault, getSubscription } from "../../../_lib/vault.js";
 // caller's own vault by the where clause, not by trusting the id: device ids
 // are server-generated but they travel through a CLI and a browser, and an id
 // alone must never be enough to admit a device on somebody else's vault.
+// How many denied-and-never-admitted devices stay visible per vault. Enough
+// that a real denial is still reported to the machine that asked, small enough
+// that spam cannot accumulate.
+const MAX_DENIED_TOMBSTONES = 25;
+
 const ACTIONS = {
   admit: { status: "active", stamp: "admitted_at" },
   revoke: { status: "revoked", stamp: "revoked_at" }
@@ -49,25 +54,16 @@ export async function onRequestPost({ request, env, params }) {
       throw new ApiError(409, "This device was revoked. Re-link it from that machine to enrol a new key.");
     }
 
-    // Denying a device that was never admitted DELETES it rather than leaving a
-    // revoked tombstone.
+    // Denying keeps a tombstone, and prunes old ones. Deleting the row
+    // outright was the obvious way to stop denied devices accumulating, and it
+    // broke the machine on the other end: `autovault link` polls
+    // devices/current, and a missing row 404s, so the CLI dumps a raw HTTP
+    // error instead of its clean "device was revoked" exit. Verified against
+    // the real CLI, not assumed.
     //
-    // A pending row is a queue entry, not an access grant -- there is nothing
-    // to revoke, because it never had any. Keeping it would also be an
-    // unbounded leak: denying frees a pending slot while the row stays for
-    // ever, so a spam-and-clear loop grows the console's list without limit.
-    //
-    // A device that WAS admitted keeps its row. There the tombstone is the
-    // point: it blocks the key and it is how the CLI hears "revoked" and exits.
-    if (body.action === "revoke" && device.status === "pending" && !device.admitted_at) {
-      const removed = await run(env, `
-        delete from sync_devices where id = ? and vault_id = ? and status = 'pending'
-      `, device.id, vault.id);
-      if (!removed?.meta?.changes) {
-        throw new ApiError(409, "That device changed while you were deciding. Reload and try again.");
-      }
-      return json({ device: { id: device.id, status: "denied" } });
-    }
+    // Marking revoked frees the pending slot (the cap counts `pending`), lets
+    // the CLI hear what happened, and blocks the key. Growth is bounded below
+    // instead.
 
     // Conditional on the state we read, not just on the id.
     //
@@ -83,6 +79,25 @@ export async function onRequestPost({ request, env, params }) {
 
     if (!result?.meta?.changes) {
       throw new ApiError(409, "That device changed while you were deciding. Reload and try again.");
+    }
+
+    // Bound the tombstones. Denying frees a pending slot, so without this a
+    // spam-and-clear loop grows this table for ever -- the finding the delete
+    // was meant to fix. Only never-admitted rows are pruned, and only the
+    // oldest beyond the keep-window: a device that was genuinely admitted and
+    // then revoked keeps its tombstone permanently, because that one is a
+    // security record rather than queue litter.
+    if (action.status === "revoked") {
+      await run(env, `
+        delete from sync_devices
+        where vault_id = ? and status = 'revoked' and admitted_at is null
+          and id not in (
+            select id from sync_devices
+            where vault_id = ? and status = 'revoked' and admitted_at is null
+            order by first_seen_at desc
+            limit ?
+          )
+      `, vault.id, vault.id, MAX_DENIED_TOMBSTONES);
     }
 
     return json({ device: { id: device.id, status: action.status } });

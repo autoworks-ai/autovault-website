@@ -318,11 +318,11 @@ describe("nav items only enable once their destination exists", () => {
 });
 
 describe("the console does not cost more than it is worth", () => {
-  it("denies a never-admitted device by removing it, not by leaving a tombstone", async () => {
-    // A pending row is a queue entry, not an access grant -- there is nothing
-    // to revoke. Keeping it would also leak: denying frees a pending slot
-    // while the row stays for ever, so spam-and-clear grows the list without
-    // bound and the four-second poll carries all of it.
+  it("leaves a tombstone when denying, so the waiting machine hears about it", async () => {
+    // Deleting the row outright is the obvious way to stop denied devices
+    // accumulating, and it breaks the machine on the other end: `autovault
+    // link` polls devices/current, and a missing row 404s, so the CLI dumps a
+    // raw HTTP error instead of its clean "device was revoked" exit.
     const { db, env, cookie, vaultId } = await seedOwner();
     addDevice(db, vaultId, "device-1", KEY_A, "pending", "2026-08-23T01:00:00.000Z");
 
@@ -333,8 +333,43 @@ describe("the console does not cost more than it is worth", () => {
     });
 
     expect(response.status).toBe(200);
-    expect((await response.json()).device.status).toBe("denied");
-    expect(Number((db.prepare("select count(*) as n from sync_devices").get() as { n: number }).n)).toBe(0);
+    expect(deviceRow(db, "device-1").status).toBe("revoked");
+    // And the pending slot is freed, since the cap counts `pending`.
+    expect(
+      Number((db.prepare("select count(*) as n from sync_devices where status='pending'").get() as { n: number }).n)
+    ).toBe(0);
+  });
+
+  it("prunes old denied tombstones so spam-and-clear cannot grow the table", async () => {
+    // Denying frees a pending slot, so without a bound a spam-and-clear loop
+    // accumulates rows for ever -- which is the growth this whole thread is
+    // about. Only never-admitted rows are pruned.
+    const { db, env, cookie, vaultId } = await seedOwner();
+    for (let index = 0; index < 40; index += 1) {
+      db.prepare(
+        `insert into sync_devices (id, vault_id, public_key, status, first_seen_at)
+         values (?, ?, ?, 'revoked', ?)`
+      ).run(`old-${index}`, vaultId, `old-key-${index}`, `2026-08-0${(index % 9) + 1}T01:00:00.000Z`);
+    }
+    // A genuinely admitted-then-revoked device must survive the prune: that
+    // row is a security record, not queue litter.
+    db.prepare(
+      `insert into sync_devices (id, vault_id, public_key, status, first_seen_at, admitted_at)
+       values ('real-device', ?, 'real-key', 'revoked', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z')`
+    ).run(vaultId);
+    addDevice(db, vaultId, "device-new", KEY_A, "pending", "2026-08-23T01:00:00.000Z");
+
+    await decideDevice({
+      request: req(cookie, "/api/vaults/current/devices/device-new", { action: "revoke" }),
+      env,
+      params: { device: "device-new" }
+    });
+
+    const denied = Number((db.prepare(
+      "select count(*) as n from sync_devices where status='revoked' and admitted_at is null"
+    ).get() as { n: number }).n);
+    expect(denied).toBeLessThanOrEqual(25);
+    expect(deviceRow(db, "real-device").status).toBe("revoked");
   });
 
   it("keeps the row when revoking a device that WAS admitted", async () => {
