@@ -944,7 +944,10 @@ const navItems = computed<NavItem[]>(() => {
 
   return [
     item("overview", "Overview", ICON.grid, { active: true }),
-    item("skills", "Skills", ICON.book, { revealAt: "connect", action: "preview" }),
+    // revealAt explore, not connect: this scrolls to previewCard, which only
+    // exists inside the explore/ready template. Enabled any earlier it is a
+    // live-looking nav item that silently does nothing.
+    item("skills", "Skills", ICON.book, { revealAt: "explore", action: "preview" }),
     // Lands on the machines list. That IS the sync state today: which devices
     // are enrolled, which are admitted, and when each was last seen. Fuller
     // per-release history arrives with catalog publishing.
@@ -974,6 +977,11 @@ watch(
   () => vault.value?.id ?? null,
   (vaultId) => {
     if (!vaultId) {
+      // Bump the sequence, do not just clear. A list request already in flight
+      // for the OLD vault would otherwise pass both staleness checks and
+      // repopulate this, leaving a dashboard with no vault claiming machines
+      // are linked -- the same race the shell's own /api/me load guards.
+      devicesRequestSeq += 1;
       devices.value = [];
       return;
     }

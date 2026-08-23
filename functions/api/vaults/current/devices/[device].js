@@ -1,7 +1,7 @@
 import { requireUser } from "../../../_lib/auth.js";
 import { first, nowIso, run } from "../../../_lib/db.js";
 import { ApiError, handleApi, json, readJson } from "../../../_lib/http.js";
-import { getCurrentVault } from "../../../_lib/vault.js";
+import { getCurrentVault, getSubscription } from "../../../_lib/vault.js";
 
 // POST /api/vaults/current/devices/<device_id>  { action: "admit" | "revoke" }
 //
@@ -24,6 +24,18 @@ export async function onRequestPost({ request, env, params }) {
     const action = ACTIONS[body.action];
     if (!action) throw new ApiError(400, "Action must be 'admit' or 'revoke'.");
 
+    // Admission is the grant, so it follows entitlement. Listing and revoking
+    // deliberately do not: someone whose billing lapsed still needs to see and
+    // remove the machines holding their catalog, and taking that away would be
+    // a security regression dressed as a paywall. Granting new access on a
+    // lapsed account is the opposite case.
+    if (body.action === "admit") {
+      const subscription = await getSubscription(env, user.id);
+      if (!subscription.active) {
+        throw new ApiError(402, "Reactivate the hosted subscription before admitting new machines.");
+      }
+    }
+
     const device = await first(env, `
       select id, status from sync_devices where id = ? and vault_id = ?
     `, params.device, vault.id);
@@ -37,9 +49,21 @@ export async function onRequestPost({ request, env, params }) {
       throw new ApiError(409, "This device was revoked. Re-link it from that machine to enrol a new key.");
     }
 
-    await run(env, `
-      update sync_devices set status = ?, ${action.stamp} = ? where id = ? and vault_id = ?
-    `, action.status, nowIso(), device.id, vault.id);
+    // Conditional on the state we read, not just on the id.
+    //
+    // The guard above is a check-then-act, and two tabs are enough to lose the
+    // race: admit reads `pending`, revoke commits, then the admit writes
+    // `active` over it and a revoked key has bundle access again. Narrowing
+    // the update to the status we saw makes the transition atomic in SQLite,
+    // so the loser of the race changes nothing.
+    const result = await run(env, `
+      update sync_devices set status = ?, ${action.stamp} = ?
+      where id = ? and vault_id = ? and status = ?
+    `, action.status, nowIso(), device.id, vault.id, device.status);
+
+    if (!result?.meta?.changes) {
+      throw new ApiError(409, "That device changed while you were deciding. Reload and try again.");
+    }
 
     return json({ device: { id: device.id, status: action.status } });
   });

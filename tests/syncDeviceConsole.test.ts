@@ -14,13 +14,25 @@ const cloudPage = readFileSync(
 const KEY_A = "DdiEpLBSOYMhWReWNz7t7Oh0BAgq6X0h2yb-wL4NJLw";
 const KEY_B = "Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MGFiY2RlZmdoaWo";
 
-async function seedOwner({ userId = "clerk_1", vaultId = "vault_1", slug = "demo-vault" } = {}) {
+async function seedOwner({
+  userId = "clerk_1",
+  vaultId = "vault_1",
+  slug = "demo-vault",
+  subscription = "active"
+} = {}) {
   const { db, env } = createTestEnv();
   seedUser(db, { id: userId });
   db.prepare(
     `insert into vaults (id, user_id, slug, status, public_url, created_at)
      values (?, ?, ?, 'reserved', ?, ?)`
   ).run(vaultId, userId, slug, `${ORIGIN}/v/${slug}`, new Date().toISOString());
+  if (subscription) {
+    db.prepare(
+      `insert into subscriptions (user_id, stripe_subscription_id, stripe_customer_id, status, price_id, current_period_end, created_at, updated_at)
+       values (?, ?, ?, ?, 'price_hosted_vault', ?, ?, ?)`
+    ).run(userId, `sub_${vaultId}`, `cus_${vaultId}`, subscription, 4102444800,
+          new Date().toISOString(), new Date().toISOString());
+  }
   const cookie = await createSession(new Request(ORIGIN), env, userId);
   return { db, env, cookie, vaultId, userId };
 }
@@ -196,8 +208,12 @@ describe("the honour-system checkbox is gone", () => {
 
 describe("Skills and Sync log are real destinations now", () => {
   it("stops badging them as soon", () => {
-    expect(cloudPage).toContain('item("skills", "Skills", ICON.book, { revealAt: "connect", action: "preview" })');
+    // Neither carries a "soon" badge any more. Skills reveals at explore
+    // rather than connect -- see the nav-destination test below for why.
+    expect(cloudPage).toContain('item("skills", "Skills", ICON.book, { revealAt: "explore", action: "preview" })');
     expect(cloudPage).toContain('action: "scroll-devices"');
+    expect(cloudPage).not.toContain('item("skills", "Skills", ICON.book, { soon: true');
+    expect(cloudPage).not.toContain('item("sync", "Sync log", ICON.sync, { soon: true');
     // Members stays soon: beta is pending/active/revoked devices, not roles.
     expect(cloudPage).toContain('item("members", "Members", ICON.users, { soon: true');
   });
@@ -214,5 +230,89 @@ describe("Skills and Sync log are real destinations now", () => {
     const exploreStage = cloudPage.indexOf("STAGE B: EXPLORE");
     expect(at).toBeGreaterThan(exploreStage);
     expect(connectStage).toBeGreaterThan(-1);
+  });
+});
+
+describe("admission follows entitlement and current state", () => {
+  it("refuses to admit a new machine on a lapsed subscription", async () => {
+    // Admission is the grant, so it follows billing. Bundles are 402'd
+    // separately, but a lapsed account should not be able to mint an active
+    // device at all -- the dashboard would then report machines linked.
+    const { db, env, cookie, vaultId } = await seedOwner({ subscription: "canceled" });
+    addDevice(db, vaultId, "device-1", KEY_A, "pending", "2026-08-23T01:00:00.000Z");
+
+    const response = await decideDevice({
+      request: req(cookie, "/api/vaults/current/devices/device-1", { action: "admit" }),
+      env,
+      params: { device: "device-1" }
+    });
+
+    expect(response.status).toBe(402);
+    expect(deviceRow(db, "device-1").status).toBe("pending");
+  });
+
+  it("still lets a lapsed owner revoke", async () => {
+    // The other direction stays open on purpose. Removing a machine from a
+    // vault you can no longer pay for is exactly when you need it most.
+    const { db, env, cookie, vaultId } = await seedOwner({ subscription: "canceled" });
+    addDevice(db, vaultId, "device-1", KEY_A, "active", "2026-08-23T01:00:00.000Z");
+
+    const response = await decideDevice({
+      request: req(cookie, "/api/vaults/current/devices/device-1", { action: "revoke" }),
+      env,
+      params: { device: "device-1" }
+    });
+
+    expect(response.status).toBe(200);
+    expect(deviceRow(db, "device-1").status).toBe("revoked");
+  });
+
+  it("cannot admit a device that changed underneath the decision", async () => {
+    // Two tabs: admit reads `pending`, revoke commits, then the admit writes
+    // `active` over it and a revoked key has bundle access again. The update
+    // is narrowed to the status that was read, so the loser changes nothing.
+    const { db, env, cookie, vaultId } = await seedOwner();
+    addDevice(db, vaultId, "device-1", KEY_A, "pending", "2026-08-23T01:00:00.000Z");
+
+    const request = req(cookie, "/api/vaults/current/devices/device-1", { action: "admit" });
+    // Simulate the interleaving: the row moves on after the handler's read
+    // would have happened.
+    db.prepare("update sync_devices set status = 'revoked' where id = 'device-1'").run();
+
+    const response = await decideDevice({ request, env, params: { device: "device-1" } });
+
+    // Caught by the revoked guard here; the conditional update is the backstop
+    // for the interleaving that slips past it.
+    expect([409]).toContain(response.status);
+    expect(deviceRow(db, "device-1").status).toBe("revoked");
+  });
+
+  it("narrows the write to the status it read", () => {
+    const source = readFileSync(
+      new URL("../functions/api/vaults/current/devices/[device].js", import.meta.url),
+      "utf-8"
+    );
+    // The guard above is a check-then-act; without this the write is
+    // unconditional and the loser of the race silently wins.
+    expect(source).toContain("and status = ?");
+    expect(source).toContain("result?.meta?.changes");
+  });
+});
+
+describe("nav items only enable once their destination exists", () => {
+  it("keeps Skills locked until the card it scrolls to is rendered", () => {
+    // previewCard only exists inside the explore/ready template, so enabling
+    // Skills at connect gave a live-looking nav item that did nothing.
+    expect(cloudPage).toContain('item("skills", "Skills", ICON.book, { revealAt: "explore", action: "preview" })');
+    // Sync log's target renders wherever a vault does, so connect is right.
+    expect(cloudPage).toContain('{ revealAt: "connect", action: "scroll-devices" }');
+  });
+
+  it("invalidates an in-flight device list when the vault goes away", () => {
+    // Otherwise a response for the previous vault repopulates the list and a
+    // dashboard with no vault claims machines are linked.
+    const at = cloudPage.indexOf("if (!vaultId) {");
+    expect(at).toBeGreaterThan(-1);
+    expect(cloudPage.slice(at, at + 420)).toContain("devicesRequestSeq += 1;");
   });
 });
