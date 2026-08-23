@@ -445,6 +445,24 @@ describe("the namespace field in the funnel", () => {
     expect(funnel).not.toMatch(/sessionStorage\.setItem\((?!PENDING_DRAFT_KEY)/);
   });
 
+  it("carries a choice through Stripe, not the anonymous placeholder", () => {
+    // A signed-out visitor is shown "your-team" -- a proposal, not a choice.
+    // buildDraft stored it as `desiredSlug` on the account-creation click, and
+    // syncNamespaceFromDraft preferred that stored value over the suggestion,
+    // which only becomes personalised once Clerk supplies the email. So every
+    // default signup reached checkout carrying "your-team": the first one to
+    // reserve claims it permanently, and each later one is refused after paying
+    // for a name nobody ever chose.
+    expect(funnel).toContain('const desiredSlug = namespaceEdited.value ? namespaceSlug.value : "";');
+    expect(funnel).toContain('const chosen = readDraft()?.desiredSlug || "";');
+    expect(funnel).toContain("const next = chosen || namespaceSuggestion.value;");
+    // Restoring a real choice re-marks it as one, so the suggestion cannot
+    // overwrite it when /api/me lands and the next saveDraft still keeps it.
+    expect(funnel).toContain("if (chosen) namespaceEdited.value = true;");
+    // The unconditional preference for whatever was stored is what caused it.
+    expect(funnel).not.toContain("readDraft()?.desiredSlug || namespaceSuggestion.value");
+  });
+
   it("sends the chosen slug on the reserve click", () => {
     const fn = funnel.slice(funnel.indexOf("async function provisionVault"));
     expect(fn.slice(0, fn.indexOf("const payload"))).toContain("slug: namespaceSlug.value || undefined");
@@ -472,6 +490,36 @@ describe("the namespace field in the funnel", () => {
     // And an invalid shape never reaches the network -- it cannot become
     // available, so the round trip buys nothing.
     expect(funnel).toContain("if (!namespaceSlug.value || localSlugProblem(namespaceSlug.value) || !namespaceCheckReady.value) return;");
+  });
+
+  it("stops reporting a check that is no longer running", () => {
+    // A non-2xx answer, or a fetch/JSON throw, left namespaceVerdict null and
+    // cleared namespaceChecking in `finally`. The old single-line branch read a
+    // missing verdict as a slug mismatch, so the field rendered "Checking
+    // availability…" forever: a claim about the app's own state that was false,
+    // with nothing in flight and no retry scheduled.
+    expect(funnel).toContain("const namespaceCheckFailed = ref(false);");
+
+    const computedStart = funnel.indexOf("const namespaceState = computed");
+    const state = funnel.slice(computedStart, funnel.indexOf("function localSlugProblem", computedStart));
+    expect(state).toContain('if (namespaceChecking.value) return { tone: "muted", text: "Checking availability…" };');
+    expect(state).not.toContain("namespaceChecking.value || verdict?.slug !== slug");
+    expect(state).toContain("namespaceCheckFailed.value");
+    // Exactly one branch may say it is checking, and it is the one gated on an
+    // actually-running check.
+    expect(state.match(/Checking availability…/g)?.length).toBe(1);
+    // The no-usable-verdict fall-through has to say something true instead.
+    expect(state).toContain("if (!verdict || verdict.slug !== slug)");
+
+    const checkStart = funnel.indexOf("async function runNamespaceCheck");
+    const check = funnel.slice(checkStart, funnel.indexOf("function focusNamespaceField", checkStart));
+    expect(check).toContain("namespaceCheckFailed.value = true;");
+    // A stale failure must not land on the string the user has since typed.
+    expect(check).toContain("if (seq === namespaceCheckSeq) namespaceCheckFailed.value = true;");
+
+    const scheduleStart = funnel.indexOf("function scheduleNamespaceCheck");
+    const schedule = funnel.slice(scheduleStart, checkStart);
+    expect(schedule).toContain("namespaceCheckFailed.value = false;");
   });
 
   it("waits for the credential rather than firing a guaranteed 401", () => {

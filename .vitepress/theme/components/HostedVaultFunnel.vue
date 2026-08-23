@@ -222,6 +222,11 @@ const namespaceInputRef = ref<HTMLInputElement | null>(null);
 const namespaceEdited = ref(false);
 const namespaceVerdict = ref<NamespaceVerdict | null>(null);
 const namespaceChecking = ref(false);
+// The endpoint could not answer -- a transient 401, a 5xx, or the network. It is
+// a third state, not "no verdict yet": the field has to stop reporting progress
+// for a check that has already stopped, without inventing a verdict it does not
+// have.
+const namespaceCheckFailed = ref(false);
 // A refusal from the reserve attempt itself, which outranks any earlier
 // availability answer: it is the newer and more authoritative fact.
 const namespaceRefusal = ref("");
@@ -417,8 +422,18 @@ const namespaceState = computed<{ tone: "ok" | "warn" | "fail" | "muted"; text: 
   // the guess a user acts on is the one that hurts.
   if (!namespaceCheckReady.value) return { tone: "muted", text: "Availability is confirmed once your account exists." };
 
+  // Only a check that is actually debouncing or in flight may claim to be one.
+  if (namespaceChecking.value) return { tone: "muted", text: "Checking availability…" };
+  // A failed lookup is not a verdict, but a progress line for a request that
+  // already stopped is worse than saying nothing: it is a claim about the app's
+  // own state that is false, and it never resolves because nothing retries.
+  if (namespaceCheckFailed.value) {
+    return { tone: "warn", text: "Could not check availability just now. Reserving confirms the name." };
+  }
   const verdict = namespaceVerdict.value;
-  if (namespaceChecking.value || verdict?.slug !== slug) return { tone: "muted", text: "Checking availability…" };
+  // Structural rather than a reachability argument: whatever else leaves the
+  // field with no usable answer and nothing running, it must not say "checking".
+  if (!verdict || verdict.slug !== slug) return { tone: "muted", text: "Availability is confirmed when you reserve." };
   return verdict.available
     ? { tone: "ok", text: `${slug} is available.` }
     : { tone: "fail", text: verdict.message };
@@ -451,7 +466,15 @@ function onNamespaceInput(event: Event) {
 
 function syncNamespaceFromDraft() {
   if (namespaceEdited.value) return;
-  const next = readDraft()?.desiredSlug || namespaceSuggestion.value;
+  // A stored slug is a choice -- buildDraft now keeps one only when the user
+  // typed it -- so it outranks the suggestion. Anything else means no choice has
+  // been made yet, and the suggestion wins: after sign-in it stops being
+  // "your-team" and becomes a name worth offering.
+  const chosen = readDraft()?.desiredSlug || "";
+  // Restoring their own choice makes it a choice again, so /api/me landing later
+  // cannot overwrite it and the next saveDraft still keeps it.
+  if (chosen) namespaceEdited.value = true;
+  const next = chosen || namespaceSuggestion.value;
   if (!next || next === namespaceInput.value) return;
   namespaceInput.value = next;
   scheduleNamespaceCheck();
@@ -460,6 +483,7 @@ function syncNamespaceFromDraft() {
 function scheduleNamespaceCheck() {
   namespaceRefusal.value = "";
   namespaceVerdict.value = null;
+  namespaceCheckFailed.value = false;
   if (namespaceCheckTimer) clearTimeout(namespaceCheckTimer);
   // Invalidate anything already in flight: its answer is about a string the
   // user has since changed.
@@ -489,12 +513,18 @@ async function runNamespaceCheck() {
     if (seq !== namespaceCheckSeq) return;
     // Same reasoning as fetchMe's non-OK branch: "could not find out" is not a
     // verdict, and rendering one would be inventing an answer.
-    if (!response.ok) return;
+    if (!response.ok) {
+      namespaceCheckFailed.value = true;
+      return;
+    }
     const payload = await response.json() as NamespaceVerdict;
     if (seq !== namespaceCheckSeq) return;
     namespaceVerdict.value = payload;
   } catch {
-    /* leave the field without a verdict rather than asserting a wrong one */
+    // Still no verdict -- but the field says so rather than showing a check that
+    // is not running. Guarded on seq so a stale failure cannot land on the
+    // string the user has since typed.
+    if (seq === namespaceCheckSeq) namespaceCheckFailed.value = true;
   } finally {
     if (seq === namespaceCheckSeq) namespaceChecking.value = false;
   }
@@ -560,7 +590,14 @@ function persistDraft() {
 
 function buildDraft(): PendingDraft | null {
   const sourceText = props.skillSource.trim();
-  const desiredSlug = namespaceSlug.value;
+  // Only a namespace the user actually typed. An unedited field is showing a
+  // PROPOSAL -- "your-team" before sign-in, the derived suggestion after -- and
+  // storing a proposal as `desiredSlug` is how it outlives what proposed it:
+  // syncNamespaceFromDraft prefers the stored value, so a visitor who never
+  // touched the field carried "your-team" through signup and checkout. The
+  // first one to reserve claims it permanently; every later default signup is
+  // then refused a name it never chose, after paying.
+  const desiredSlug = namespaceEdited.value ? namespaceSlug.value : "";
   // A chosen namespace is now reason enough to keep a draft on its own. On
   // /cloud there is never a pasted skill, so before this the draft was always
   // null there and nothing survived the trip to Stripe.
