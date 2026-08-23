@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeMenuPosition, nextMenuIndex, MENU_MIN_WIDTH } from "../.vitepress/theme/composables/useDisclosureMenu";
+import { computeMenuPosition, nextMenuIndex, isMenuNavigationKey, MENU_MIN_WIDTH } from "../.vitepress/theme/composables/useDisclosureMenu";
 
 const VIEWPORT = { width: 1280, height: 800 };
 const MENU = { width: 208, height: 180 };
@@ -106,5 +106,35 @@ describe("nextMenuIndex", () => {
 
   it("degrades safely with no items", () => {
     expect(nextMenuIndex(0, "ArrowDown", 0)).toBe(-1);
+  });
+});
+
+describe("isMenuNavigationKey", () => {
+  it("claims every key the menu moves focus with", () => {
+    for (const key of ["ArrowDown", "ArrowUp", "Home", "End"]) {
+      expect(isMenuNavigationKey(key)).toBe(true);
+    }
+  });
+
+  it("leaves everything else to the page", () => {
+    for (const key of ["Tab", "Escape", "Enter", " ", "a", "PageDown", "ArrowLeft"]) {
+      expect(isMenuNavigationKey(key)).toBe(false);
+    }
+  });
+
+  it("stays true for handled keys that cannot move, which nextMenuIndex cannot express", () => {
+    // This separation is the whole point. Home on the first item, End on the
+    // last, and any arrow in a one-item menu all resolve to where they
+    // started, so the index alone cannot tell "not handled" from "handled,
+    // already there" -- and gating preventDefault on the index let those keys
+    // through to scroll the page behind an open menu.
+    expect(nextMenuIndex(0, "Home", 3)).toBe(0);
+    expect(isMenuNavigationKey("Home")).toBe(true);
+
+    expect(nextMenuIndex(2, "End", 3)).toBe(2);
+    expect(isMenuNavigationKey("End")).toBe(true);
+
+    expect(nextMenuIndex(0, "ArrowDown", 1)).toBe(0);
+    expect(nextMenuIndex(0, "ArrowUp", 1)).toBe(0);
   });
 });
