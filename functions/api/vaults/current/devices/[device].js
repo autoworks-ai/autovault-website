@@ -26,8 +26,16 @@ export async function onRequestPost({ request, env, params }) {
     if (!vault) throw new ApiError(404, "No hosted vault yet.");
 
     const body = await readJson(request, 4_000);
+    // hasOwn, not a plain lookup. `constructor`, `toString` and `__proto__`
+    // all resolve to inherited Object properties, so the truthiness guard
+    // passed them through -- and `action.stamp` was then undefined, which got
+    // interpolated straight into the update's SET clause. Not injectable (the
+    // value is undefined, not attacker-controlled) but it turned a 400 into a
+    // 500, and a request body should not be able to reach a SQL error.
+    if (!Object.hasOwn(ACTIONS, body.action)) {
+      throw new ApiError(400, "Action must be 'admit' or 'revoke'.");
+    }
     const action = ACTIONS[body.action];
-    if (!action) throw new ApiError(400, "Action must be 'admit' or 'revoke'.");
 
     // Admission is the grant, so it follows entitlement. Listing and revoking
     // deliberately do not: someone whose billing lapsed still needs to see and

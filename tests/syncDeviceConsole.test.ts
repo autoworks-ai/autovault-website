@@ -159,6 +159,25 @@ describe("owner device console", () => {
     expect(deviceRow(db, "device-theirs").status).toBe("pending");
   });
 
+  it("rejects inherited property names, not just unknown ones", async () => {
+    // ACTIONS[body.action] resolves `constructor`, `toString` and `__proto__`
+    // to inherited Object properties, so a truthiness guard waves them past --
+    // and action.stamp is then undefined, interpolated into the update's SET
+    // clause. A request body should not be able to reach a SQL error.
+    const { db, env, cookie, vaultId } = await seedOwner();
+    addDevice(db, vaultId, "device-1", KEY_A, "pending", "2026-08-23T01:00:00.000Z");
+
+    for (const action of ["constructor", "toString", "__proto__", "valueOf", "hasOwnProperty"]) {
+      const response = await decideDevice({
+        request: req(cookie, "/api/vaults/current/devices/device-1", { action }),
+        env,
+        params: { device: "device-1" }
+      });
+      expect(response.status, action).toBe(400);
+    }
+    expect(deviceRow(db, "device-1").status).toBe("pending");
+  });
+
   it("rejects an unknown action rather than guessing", async () => {
     const { db, env, cookie, vaultId } = await seedOwner();
     addDevice(db, vaultId, "device-1", KEY_A, "pending", "2026-08-23T01:00:00.000Z");
