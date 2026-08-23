@@ -991,12 +991,28 @@ const loadedSignedIn = ref<boolean | null>(null);
 // list is deliberately silent on failure because it runs on a poll. Neither
 // can be waited on indefinitely: /cloud is also the public sign-up entry
 // point, and a veil that never lifts there is worse than the wrong-state flash
-// this whole change exists to remove. Generous on purpose. The normal path is
-// well under a second, so this is a backstop, not a budget: when it fires the
-// page degrades to exactly the behaviour it had before this change.
-const LOAD_PATIENCE_MS = 8000;
+// this whole change exists to remove.
+//
+// This is a FAILURE signal, not a slowness budget, and the number says so.
+// When it fires the page degrades to exactly its pre-fix behaviour -- which
+// for a signed-in owner IS the wrong-state flash. So it must never fire on a
+// page that is merely slow. Twenty seconds is far past any real Clerk load
+// (sub-second in practice) and past any /api/me that is going to arrive at
+// all; whoever reaches it has a Clerk bundle blocked outright, and could not
+// have signed in either way.
+//
+// Written as 8s first, and watching it load is how that got caught: with the
+// window widened the deadline landed while the authenticated /api/me was
+// still on its way, un-veiled the page using the anonymous response, and
+// reproduced the exact defect this task exists to remove. Both halves of the
+// repair are here -- the long deadline, and the in-flight guard.
+const LOAD_PATIENCE_MS = 20_000;
 const loadPatienceExpired = ref(false);
 let loadPatienceTimer: ReturnType<typeof setTimeout> | undefined;
+// How many /api/me calls are outstanding. A request still in flight is a wait
+// WITH an end -- it settles, or the browser ends it -- so giving up on it is
+// never right. The deadline exists for the wait that has no end at all.
+const cloudLoadsInFlight = ref(0);
 
 // Called from onMounted, never at setup scope: on the server there is nothing
 // to wait for and no timer to leak.
@@ -1200,7 +1216,7 @@ const cloudStateKnown = computed(() =>
     loadedSignedIn: loadedSignedIn.value,
     authSettled: authSettled.value,
     clerkSignedIn: isClerkSignedIn.value,
-    patienceExpired: loadPatienceExpired.value,
+    patienceExpired: loadPatienceExpired.value && cloudLoadsInFlight.value === 0,
   }),
 );
 
@@ -1341,9 +1357,26 @@ const revealed = computed(() => settled.value && bootPhase.value === "open");
 //
 // Two frames: the first is the style and layout pass Vue's flush schedules,
 // the second is evidence it was painted rather than merely scheduled.
+//
+// Raced against a deadline, and that is not defensive padding -- it is a bug
+// found by watching this load. requestAnimationFrame does not fire in a
+// background tab, and /cloud is opened in one routinely: people cmd-click, and
+// the Stripe return can land in a new tab. Waiting on a frame that will never
+// come held an opaque veil over the whole page until the tab was focused.
+// Two frames is ~33ms at 60fps and ~66ms at 30, so this ceiling is generous
+// where frames are being produced and instant where they are not.
+const PAINT_WAIT_MAX_MS = 120;
+
 function afterNextPaint(): Promise<void> {
   return new Promise((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      resolve();
+    };
+    requestAnimationFrame(() => requestAnimationFrame(finish));
+    setTimeout(finish, PAINT_WAIT_MAX_MS);
   });
 }
 
@@ -1854,6 +1887,7 @@ async function loadCloudState(initial = false) {
   // Reading it back at completion time would relabel an anonymous request as
   // an authenticated one, which is the flash wearing a different hat.
   const requestSignedIn = isClerkSignedIn.value;
+  cloudLoadsInFlight.value += 1;
   try {
     const headers = await authHeaders({ accept: "application/json" }, {
       required: clerkAuthEnabled && isClerkSignedIn.value,
@@ -1881,6 +1915,7 @@ async function loadCloudState(initial = false) {
     cloudState.value = { user: null, subscription: null, vault: null };
     loadError.value = null;
   } finally {
+    cloudLoadsInFlight.value -= 1;
     // `initial` used to set hydrated outside the staleness guard, so a slow
     // first request could un-veil the page using a superseded response.
     if (requestSeq === cloudStateRequestSeq || initial) hydrated.value = true;

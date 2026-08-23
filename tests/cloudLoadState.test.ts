@@ -333,7 +333,7 @@ describe("the device gate is latched and guarded", () => {
 
 describe("the wait is bounded", () => {
   it("arms a backstop on mount and clears it on unmount", () => {
-    expect(cloudPage).toContain("const LOAD_PATIENCE_MS = 8000;");
+    expect(cloudPage).toContain("const LOAD_PATIENCE_MS = 20_000;");
     const mountAt = cloudPage.indexOf("onMounted(() => {");
     const mount = cloudPage.slice(mountAt, cloudPage.indexOf("\n});", mountAt));
     expect(mount).toContain("armLoadPatience();");
@@ -346,10 +346,31 @@ describe("the wait is bounded", () => {
   it("feeds both gates, so neither can hang the page alone", () => {
     const body = stageBody();
     expect(body).toContain("patienceExpired: loadPatienceExpired.value,");
-    expect(cloudPage).toContain("patienceExpired: loadPatienceExpired.value,");
     const known = cloudPage.indexOf("const cloudStateKnown = computed(");
     const block = cloudPage.slice(known, cloudPage.indexOf("\n);", known));
-    expect(block).toContain("patienceExpired: loadPatienceExpired.value,");
+    expect(block).toContain("patienceExpired: loadPatienceExpired.value");
+  });
+
+  it("never gives up on a request that is still coming", () => {
+    // Watched at 8s and observed to be wrong: with the window widened, the
+    // deadline landed while the authenticated /api/me was still in flight,
+    // un-veiled the page using the anonymous response, and reproduced the
+    // exact defect this task removes. A request in flight is a wait WITH an
+    // end. The deadline is for the wait that has none -- a Clerk bundle that
+    // never resolves -- which is also why it is 20s and not 8: it is a failure
+    // signal, and it must never fire on a page that is merely slow.
+    const known = cloudPage.indexOf("const cloudStateKnown = computed(");
+    const block = cloudPage.slice(known, cloudPage.indexOf("\n);", known));
+    expect(block).toContain(
+      "patienceExpired: loadPatienceExpired.value && cloudLoadsInFlight.value === 0,"
+    );
+    const load = fnBody("loadCloudState");
+    expect(load).toContain("cloudLoadsInFlight.value += 1;");
+    // Decremented in the finally, so a throw cannot strand the counter above
+    // zero and disable the backstop for the life of the page.
+    expect(load.indexOf("cloudLoadsInFlight.value -= 1;")).toBeGreaterThan(
+      load.indexOf("} finally {")
+    );
   });
 });
 
@@ -428,9 +449,22 @@ describe("the load screen is the vault, not a new graphic", () => {
     );
     expect(body).toContain("await nextTick();");
     expect(body).toContain("await afterNextPaint();");
-    expect(cloudPage).toContain(
-      "requestAnimationFrame(() => requestAnimationFrame(() => resolve()));"
-    );
+    expect(cloudPage).toContain("requestAnimationFrame(() => requestAnimationFrame(finish));");
+  });
+
+  it("does not wait for a frame that will never come", () => {
+    // Found by watching this load, and invisible to every other test here:
+    // requestAnimationFrame does not fire in a background tab, and /cloud is
+    // opened in one routinely -- people cmd-click, and the Stripe return can
+    // land in a new tab. Unraced, the paint wait held an opaque veil over the
+    // whole page until the tab was focused.
+    expect(cloudPage).toContain("const PAINT_WAIT_MAX_MS = 120;");
+    const at = cloudPage.indexOf("function afterNextPaint()");
+    expect(at, "no afterNextPaint").toBeGreaterThan(-1);
+    const body = cloudPage.slice(at, cloudPage.indexOf("\n}", at));
+    expect(body).toContain("setTimeout(finish, PAINT_WAIT_MAX_MS);");
+    // Whichever wins, the other must not resolve a second time and re-enter.
+    expect(body).toContain("if (done) return;");
   });
 
   it("does not celebrate a failed load, and does not move under reduced motion", () => {
