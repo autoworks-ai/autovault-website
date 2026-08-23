@@ -86,6 +86,45 @@
       </aside>
 
       <main class="cv-content">
+        <!-- Ambient vault. The page's subject, present in its own background
+             at every stage rather than only where a card happens to show a
+             mark. Decorative and inert: aria-hidden, pointer-events none, and
+             it sits behind the content on z-index -1 (see .cv-content's
+             stacking context in the style block).
+
+             `state` follows vaultOpen because this page's rule is that the
+             mark IS the progress indicator -- a background vault that showed
+             "open" while the rail still had steps left would be the one
+             element on the page saying something untrue.
+
+             `unlocking` is the SAME BrandMark machinery the focal mark uses,
+             driven by a separate ref: the arrival is a load-time gesture and
+             the celebration is an event-time one, and giving them one ref
+             would put the first-machine-admit ordering (PR #106) at the mercy
+             of a page load. Only bound while the vault is genuinely open,
+             because brand-mark-unlock ends on the UNLOCKED resting state --
+             played over a locked mark it would animate the dial away and then
+             transition it back, a vault that opens and shuts.
+
+             No `working`: a dial sweeping in the background during a routine
+             device poll is noise, and the focal/strip marks already report it. -->
+        <div
+          v-if="ambientVault"
+          class="cv-ambient"
+          :class="{ arriving: vaultArriving }"
+          aria-hidden="true"
+        >
+          <span class="cv-ambient-halo" />
+          <span class="cv-ambient-mark">
+            <BrandMark
+              :size="300"
+              :state="vaultOpen ? 'unlocked' : 'locked'"
+              :unlocking="vaultArriving && vaultOpen"
+              show-depth
+            />
+          </span>
+        </div>
+
         <header class="cv-topbar">
           <div>
             <div class="cv-eyebrow"><span class="cv-spark" /> Hosted vault</div>
@@ -718,6 +757,7 @@ import CloudAccountMenu from "./CloudAccountMenu.vue";
 import { copyText as copyToClipboard } from "../utils/clipboard";
 import { prefersReducedMotion } from "../utils/motion";
 import { formatPriceLabel } from "../utils/money";
+import { consumeVaultArrival } from "../utils/vaultArrival";
 import {
   admitHandshakeState,
   findAdmitTarget,
@@ -1481,6 +1521,10 @@ onMounted(() => {
   // with the fingerprint already in it; nothing later in the session changes
   // which machine is asking.
   admitFingerprint.value = readAdmitFingerprint(window.location.search);
+  // Same idiom, sharper need: the funnel strips ?hosted=success with
+  // replaceState once provisioning settles, and the arrival fires after
+  // /api/me -- later than that. See arrivalSearch.
+  arrivalSearch.value = window.location.search;
 });
 
 watch([isClerkLoaded, isClerkSignedIn], ([loaded]) => {
@@ -1760,6 +1804,14 @@ let vaultUnlockTimer: ReturnType<typeof setTimeout> | undefined;
 // form "previous was non-null" celebrates on EVERY reload for EVERY returning
 // customer, which is exactly how an animation stops meaning anything.
 function celebrateUnlock() {
+  // The event beats the load. If the ambient arrival is still running -- which
+  // needs an admit within ~1.8s of the page settling, so it is rare rather
+  // than impossible -- it is dropped here rather than left to finish
+  // underneath. Two vaults moving at once is the same defect the
+  // `v-show="!vaultUnlocking"` on the status mark exists to prevent, one layer
+  // further back. Deliberately BEFORE the reduced-motion return: this is
+  // cleanup, and a preference that changed mid-session must not strand it.
+  cancelVaultArrival();
   // Inside the handler, never at setup scope: this only ever runs from a user
   // action, so it cannot contribute to a hydration mismatch the way a
   // setup-time media query read would.
@@ -1775,6 +1827,83 @@ function celebrateUnlock() {
 onBeforeUnmount(() => {
   if (vaultUnlockTimer) clearTimeout(vaultUnlockTimer);
 });
+
+// ---- ambient vault -------------------------------------------------------
+//
+// "Ambient always, celebrate once." The mark above is the page's progress
+// indicator and only exists where a card puts it; this is the same vault
+// living in the dashboard's own background at every stage, so the page reads
+// as a vault rather than as a form that mentions one.
+//
+// It is a SECOND, deliberately separate gesture from celebrateUnlock. Note
+// the bare identifier in this comment: the call-site count in
+// vaultMotion.test.ts reads the raw file, so writing it with parentheses here
+// would fail a test whose whole job is to notice a second caller.
+//
+//   celebrateUnlock    the owner's first machine is admitted. One call site,
+//                      inside decideDevice, captured against the state the
+//                      owner saw when they clicked (PR #106). Untouched here.
+//   vaultArriving      this page arrived. Fires from a load, never from a
+//                      state transition, and at most once per occasion.
+//
+// Routing the load trigger through that function was the obvious
+// alternative and is what puts the first-machine ordering at risk: the two
+// would share `vaultUnlocking` and `vaultUnlockTimer`, so an overlap could
+// leave the transient flag stuck on -- and vaultMotion.test.ts pins the single
+// call site precisely because that is the invariant worth keeping. Separate
+// ref, separate timer, one stated precedence rule in both directions.
+const VAULT_ARRIVAL_MS = 1800;
+
+// Read once, on mount, for the same reason readAdmitFingerprint is: the
+// checkout return carries ?hosted=success, and HostedVaultFunnel strips it
+// with history.replaceState as soon as provisioning settles. This trigger runs
+// after /api/me resolves, which can be well after that -- reading
+// window.location.search then would miss the one arrival the ask named first.
+const arrivalSearch = ref("");
+
+// Signed up, and past the boot veil. `hydrated` is false in the prerendered
+// HTML and in the client's first render, so this element is absent from both
+// and cannot contribute a hydration mismatch.
+const ambientVault = computed(() => hydrated.value && signedIn.value);
+
+const vaultArriving = ref(false);
+let vaultArrivalTimer: ReturnType<typeof setTimeout> | undefined;
+
+function cancelVaultArrival() {
+  if (vaultArrivalTimer) clearTimeout(vaultArrivalTimer);
+  vaultArrivalTimer = undefined;
+  vaultArriving.value = false;
+}
+
+function startVaultArrival() {
+  // In a watcher callback, never at setup scope -- the same hydration hazard,
+  // and the same placement, as the admit celebration's own guard.
+  if (prefersReducedMotion()) return;
+  // The other half of the precedence rule its counterpart states: whichever
+  // gesture is already running owns the moment, and neither can start on top
+  // of the other.
+  if (vaultUnlocking.value) return;
+  // Consume, don't peek. Returns true at most once per occasion, so a reload,
+  // an SPA navigation back to /cloud, or a second render of this component
+  // cannot re-celebrate.
+  if (!consumeVaultArrival(arrivalSearch.value)) return;
+  if (vaultArrivalTimer) clearTimeout(vaultArrivalTimer);
+  vaultArriving.value = true;
+  vaultArrivalTimer = setTimeout(() => {
+    vaultArriving.value = false;
+    vaultArrivalTimer = undefined;
+  }, VAULT_ARRIVAL_MS);
+}
+
+// Not `{ immediate: true }`: immediate runs at setup scope, where reading the
+// motion preference is the hydration-mismatch class fixed in PR #88.
+// `ambientVault` is false at setup on both server and client anyway -- it
+// cannot flip before /api/me lands, which is post-mount by construction.
+watch(ambientVault, (visible) => {
+  if (visible) startVaultArrival();
+});
+
+onBeforeUnmount(cancelVaultArrival);
 
 const devicePollUrgent = computed(
   () =>
@@ -2195,8 +2324,77 @@ const ICON = {
 
 /* main content */
 .cv-content {
+  /* Both properties are load-bearing for the ambient vault below, and
+     `z-index: 0` is the half that is easy to delete as redundant. `position:
+     relative` alone does NOT create a stacking context, so .cv-ambient's
+     `z-index: -1` would escape to whatever ancestor does -- landing behind
+     .cv-shell's opaque `background: var(--bg)`, where it is invisible.
+     Together they make this element the context, so -1 means "above this
+     element's own background, below its in-flow children", which is exactly
+     what a page background is. */
+  position: relative;
+  z-index: 0;
   padding: 26px 30px 40px;
   min-width: 0;
+}
+
+/* ---------------- ambient vault ----------------
+   Subtle by construction, and kept out of .cv-focal-glow's way on every axis
+   that could make the two read as one effect: opposite corner of the content
+   area (that glow is 220px at the focal card's top-right, this is bottom-right
+   of the whole column), three times slower, and an order of magnitude fainter
+   -- 0.055 alpha against the glow's 0.16. It is also BEHIND every card, so
+   wherever the glow is on screen this is painted under an opaque panel.
+
+   The resting opacity and transform are declared here rather than living only
+   in the keyframes. Under `prefers-reduced-motion` the block at the bottom of
+   this file kills the animation, and an element whose rest state existed only
+   in a 0% frame would be left wherever the UA put it. Same hazard styles.css
+   documents for brand-mark-unlock. */
+.cv-ambient {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.cv-ambient-halo {
+  position: absolute;
+  right: -150px;
+  bottom: -170px;
+  width: 540px;
+  height: 540px;
+  border-radius: 50%;
+  opacity: 1;
+  transform: scale(1);
+  background: radial-gradient(
+    circle,
+    rgba(90, 214, 192, 0.075),
+    transparent 68%
+  );
+}
+.cv-ambient-mark {
+  position: absolute;
+  right: -44px;
+  bottom: -30px;
+  display: block;
+  line-height: 0;
+  color: var(--accent);
+  opacity: 0.055;
+  transform: scale(1);
+  animation: cv-ambient-drift 18s var(--ease) infinite;
+}
+
+/* The arrival: one swell, then it settles into the resting values above. Both
+   keyframes end exactly on those values -- if they did not, dropping
+   `.arriving` would snap, the same rule brand-mark-unlock's 100% frame
+   follows. `both` holds the 0% frame during any delay and the 100% frame
+   after, so there is no flash of full-strength ambient before it starts. */
+.cv-ambient.arriving .cv-ambient-mark {
+  animation: cv-ambient-arrive 1800ms var(--ease) both;
+}
+.cv-ambient.arriving .cv-ambient-halo {
+  animation: cv-ambient-arrive-halo 1800ms var(--ease) both;
 }
 .cv-topbar {
   display: flex;
@@ -2376,9 +2574,10 @@ const ICON = {
   border-radius: var(--cv-radius-sm);
   /* The head bar's own colour, from the global .terminal-head rule, so the
      copy row under the terminal matches it and the whole thing reads as one
-     card. Deliberately NOT var(--bg-1), which the two .cv-devices rules below
-     use and which is defined nowhere in this repo -- it resolves to
-     transparent. */
+     card. Not var(--panel), which is what the .cv-devices.standalone card
+     below uses: this one has to agree with .terminal-head, that one with
+     .cv-card. Neither is the --bg-1 token, which this repo never declares --
+     that is why the card below used to paint transparent. */
   background: var(--bg-2);
   overflow: hidden;
 }
@@ -2491,7 +2690,12 @@ const ICON = {
   padding: 16px 18px 18px;
   border: 1px solid var(--line);
   border-radius: var(--cv-radius);
-  background: var(--bg-1);
+  /* Was the --bg-1 token, which is declared nowhere in this repo -- so this
+     card, the one the connect stage points at, painted transparent and read as
+     a bare border on the page background. --panel is what .cv-card uses, and
+     this is a card in the same column; the .cv-device rows inside stay on the
+     darker --bg-2 and now read as inset rather than as the card itself. */
+  background: var(--panel);
 }
 .cv-devices.standalone.focusflash {
   border-color: var(--accent);
@@ -2761,7 +2965,8 @@ const ICON = {
   color: var(--accent);
 }
 .cv-vaultfocal :deep(.brand-mark-svg),
-.cv-status-mark :deep(.brand-mark-svg) {
+.cv-status-mark :deep(.brand-mark-svg),
+.cv-ambient-mark :deep(.brand-mark-svg) {
   color: inherit;
 }
 /* Compact once the vault is open: it states the one fact this strip exists
@@ -3292,6 +3497,51 @@ const ICON = {
   }
 }
 
+/* 18s, and 0.055 -> 0.085. Slow and shallow enough that it reads as the room
+   the dashboard is in rather than as something asking to be looked at --
+   cv-breathe next door is 6s and swings 0.6 -> 1. */
+@keyframes cv-ambient-drift {
+  0%,
+  100% {
+    opacity: 0.055;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.085;
+    transform: scale(1.035);
+  }
+}
+/* The 100% frames below are the resting declarations on .cv-ambient-mark and
+   .cv-ambient-halo, restated. Keep them in step. */
+@keyframes cv-ambient-arrive {
+  0% {
+    opacity: 0;
+    transform: scale(0.84);
+  }
+  34% {
+    opacity: 0.2;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 0.055;
+    transform: scale(1);
+  }
+}
+@keyframes cv-ambient-arrive-halo {
+  0% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+  34% {
+    opacity: 1;
+    transform: scale(1.22);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cv-reveal,
   .cv-nav-item.revealed,
@@ -3301,6 +3551,13 @@ const ICON = {
   .cv-appsync,
   .cv-focal-glow,
   .cv-appskel,
+  /* Both halves of the ambient vault. Killing the animation leaves each at
+     the resting opacity/transform declared on its own rule, so the vault is
+     still there -- just still. The JS half never sets `arriving` under this
+     preference either (startVaultArrival), so this is the second of two
+     independent guards, not the only one. */
+  .cv-ambient-mark,
+  .cv-ambient-halo,
   .cv-devices-waiting .cv-dot {
     animation: none;
   }
