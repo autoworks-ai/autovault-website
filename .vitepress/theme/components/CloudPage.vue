@@ -70,6 +70,7 @@
           :status-text="subscriptionState.text"
           :avatar-style="avatarStyle"
           :signed-in="signedIn"
+          :busy="busy"
           @billing="openBillingPortal"
         />
       </aside>
@@ -955,7 +956,14 @@ function normalizeCloudState(payload: CloudStatePayload): CloudState {
 }
 
 async function openBillingPortal() {
-  if (busy.value) return;
+  if (busy.value) {
+    // The menu already renders Billing as aria-disabled while this lock is
+    // held, so reaching here means the lock was taken between paint and
+    // click. Say so rather than swallowing the choice: an apparently live
+    // command that does nothing and explains nothing reads as a broken app.
+    notice.value = { kind: "warn", text: "Just a moment — finishing the last request." };
+    return;
+  }
   busy.value = true;
   notice.value = null;
   try {

@@ -57,9 +57,23 @@ export function computeMenuPosition(input: {
   return { top, left, minWidth, placement };
 }
 
+const MENU_NAVIGATION_KEYS = new Set(["ArrowDown", "ArrowUp", "Home", "End"]);
+
 /**
- * Roving-focus index for a menu. Returns `current` for keys it doesn't
- * handle so the caller can decide whether to preventDefault.
+ * Whether the menu owns this key. Deliberately separate from nextMenuIndex:
+ * a handled key can legitimately resolve to the index it started on -- Home on
+ * the first item, End on the last, any arrow while the menu holds a single
+ * item -- so "the index did not move" says nothing about whether the browser
+ * should still act on the key.
+ */
+export function isMenuNavigationKey(key: string): boolean {
+  return MENU_NAVIGATION_KEYS.has(key);
+}
+
+/**
+ * Roving-focus index for a menu. Returns `current` for keys it doesn't handle,
+ * and also for handled keys already at their destination -- use
+ * isMenuNavigationKey to tell those apart.
  */
 export function nextMenuIndex(current: number, key: string, count: number): number {
   if (count <= 0) return -1;
@@ -205,10 +219,13 @@ export function useDisclosureMenu(itemCount: () => number): DisclosureMenu {
       closeMenu({ restoreFocus: true });
       return;
     }
-    const next = nextMenuIndex(activeIndex.value, event.key, itemCount());
-    if (next !== activeIndex.value) {
+    if (isMenuNavigationKey(event.key)) {
+      // Gate on the key, not on whether the index moved. Home at the first
+      // item, End at the last, and every arrow while the menu holds a single
+      // item all resolve to the current index; letting those reach the browser
+      // scrolls the page behind an open menu.
       event.preventDefault();
-      focusItem(next);
+      focusItem(nextMenuIndex(activeIndex.value, event.key, itemCount()));
     }
   }
 

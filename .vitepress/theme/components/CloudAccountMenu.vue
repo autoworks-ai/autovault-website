@@ -9,13 +9,23 @@ const props = defineProps<{
   statusText: string;
   avatarStyle: Record<string, string>;
   signedIn: boolean;
+  busy: boolean;
 }>();
 
 const emit = defineEmits<{ billing: [] }>();
 
 const { canManageAccount, openProfile, signOutOfVault } = useClerkAccount();
 
-type MenuItem = { key: string; label: string; danger?: boolean; run: () => void };
+type MenuItem = {
+  key: string;
+  label: string;
+  danger?: boolean;
+  // aria-disabled rather than the disabled attribute: a disabled button cannot
+  // hold focus, which would punch a hole in the roving tabindex the moment the
+  // shell got busy.
+  disabled?: boolean;
+  run: () => void;
+};
 
 // canManageAccount only reports whether the Clerk SDK loaded, which is true
 // for a signed-out visitor too -- so it cannot gate these on its own.
@@ -27,7 +37,9 @@ const items = computed<MenuItem[]>(() => {
   if (canManageAccount.value) {
     entries.push({ key: "profile", label: "Profile", run: onProfile });
   }
-  entries.push({ key: "billing", label: "Billing", run: onBilling });
+  // Billing is the only item whose action shares the shell's request lock, so
+  // it is the only one that can be picked and then quietly do nothing.
+  entries.push({ key: "billing", label: "Billing", disabled: props.busy, run: onBilling });
   if (canManageAccount.value) {
     entries.push({ key: "signout", label: "Sign out", danger: true, run: onSignOut });
   }
@@ -63,6 +75,14 @@ function onProfile() {
 function onBilling() {
   closeMenu({ restoreFocus: true });
   emit("billing");
+}
+
+// An aria-disabled item stays focusable on purpose, so it also stays
+// clickable -- the handler is what has to refuse. Leaving the menu open is
+// the honest outcome: nothing happened, and the item says why.
+function runItem(item: MenuItem) {
+  if (item.disabled) return;
+  item.run();
 }
 
 async function onSignOut() {
@@ -130,8 +150,9 @@ async function onSignOut() {
           role="menuitem"
           tabindex="-1"
           class="cv-acct-item"
-          :class="{ danger: item.danger }"
-          @click="item.run()"
+          :class="{ danger: item.danger, 'is-disabled': item.disabled }"
+          :aria-disabled="item.disabled ? 'true' : undefined"
+          @click="runItem(item)"
         >
           {{ item.label }}
         </button>
@@ -286,6 +307,20 @@ async function onSignOut() {
 .cv-acct-item.danger:hover,
 .cv-acct-item.danger:focus-visible {
   color: #d97171;
+}
+/*
+ * Still focusable -- see the aria-disabled note in the script block -- so it
+ * keeps a focus-visible treatment and only loses the pointer affordance and
+ * the hover highlight.
+ */
+.cv-acct-item.is-disabled {
+  color: var(--ink-3, var(--ink-2));
+  opacity: 0.55;
+  cursor: default;
+}
+.cv-acct-item.is-disabled:hover {
+  background: none;
+  color: var(--ink-3, var(--ink-2));
 }
 
 /*

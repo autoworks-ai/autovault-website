@@ -88,6 +88,37 @@ describe("cloud account menu", () => {
     expect(composable.slice(tabAt, afterTab)).toContain("closeMenu({ restoreFocus: true })");
   });
 
+  it("preventDefaults on the key, not on whether focus moved", () => {
+    // Gating on a changed index let Home-at-first, End-at-last, and every
+    // arrow in a one-item menu fall through to the browser, which scrolled the
+    // page behind the open menu. Anchor on the branch, not on the prose.
+    const at = composable.indexOf("function onMenuKeydown");
+    const body = composable.slice(at, composable.indexOf("function onPointerDown", at));
+    expect(body).toContain("isMenuNavigationKey(event.key)");
+    expect(body).not.toContain("next !== activeIndex.value");
+  });
+
+  it("does not offer Billing as live while the shell's request lock is held", () => {
+    // openBillingPortal returns early when the lock is taken, so an
+    // apparently-live command did nothing and said nothing. aria-disabled
+    // rather than the disabled attribute, because a disabled button cannot
+    // hold focus and would punch a hole in the roving tabindex.
+    expect(menu).toContain("busy: boolean;");
+    expect(menu).toContain("disabled: props.busy");
+    expect(menu).toContain(":aria-disabled=");
+    expect(menu).toContain("@click=\"runItem(item)\"");
+    expect(cloudPage).toContain(':busy="busy"');
+  });
+
+  it("says something when the lock is taken between paint and click", () => {
+    // The disabled state closes the common case; this closes the race. A
+    // command that silently no-ops reads as a broken app.
+    const at = cloudPage.indexOf("async function openBillingPortal");
+    const guard = cloudPage.slice(at, at + 700);
+    expect(guard).toContain("if (busy.value) {");
+    expect(guard).toContain("notice.value =");
+  });
+
   it("routes Clerk through composables, never window.Clerk", () => {
     expect(menu).not.toContain("window.Clerk");
     expect(clerkAccount).not.toContain("window.Clerk");
