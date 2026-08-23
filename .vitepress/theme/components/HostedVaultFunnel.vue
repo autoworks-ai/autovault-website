@@ -56,27 +56,11 @@
           <span class="ttl">~ — autovault — bash</span>
         </div>
 
-        <!-- Terminal body with typed replay and accessible transcript -->
+        <!-- Accessible transcript: the animated body below is aria-hidden and
+             types character by character, so this static copy (which also
+             carries the namespace status lines) is what screen readers get. -->
         <pre class="visually-hidden"><code>{{ commandBlock }}</code></pre>
-        <div class="terminal-body hcc-terminal-body" ref="terminalBodyRef" aria-hidden="true">
-          <div
-            v-for="(line, index) in terminalReplay.visibleLines.value"
-            :key="index"
-            :class="[line.type !== 'cmd' && line.type !== 'blank' && line.type]"
-          >
-            <template v-if="line.type === 'cmd'">
-              <div class="terminal-line">
-                <span class="pmt">$</span>
-                <span>{{ line.text }}</span>
-              </div>
-            </template>
-            <template v-else-if="line.type !== 'blank'">
-              {{ line.text }}
-            </template>
-          </div>
-          <!-- Blinking cursor while typing -->
-          <span v-if="!terminalReplay.complete.value" class="cursor"></span>
-        </div>
+        <LocalHandoffTerminal />
       </div>
 
       <!-- Copy buttons -->
@@ -90,12 +74,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, defineComponent, h, nextTick, onMounted, ref, watch } from "vue";
 import ClerkAuthControls from "./ClerkAuthControls.vue";
 import { skills } from "../data/skills";
 import type { GateEvaluation } from "../utils/skillGate";
 import { clerkAuthRecoveryMessage, isClerkApiAuthError, useClerkApiAuth } from "../utils/clerkApi";
 import { AUTOVAULT_INSTALL_COMMAND } from "../../shared/bootstrap";
+import { copyText } from "../utils/clipboard";
 import { useTerminalReplay, type TerminalReplayLine } from "../composables/useTerminalReplay";
 
 const PENDING_DRAFT_KEY = "autovault.hostedVault.pendingDraft";
@@ -229,19 +214,65 @@ const atReserveStep = computed(() => actionKind.value === "reserve");
 const showSetupDetails = computed(() => atReserveStep.value);
 const showLocalHandoff = computed(() => atReserveStep.value);
 
-// Terminal setup for the local handoff command display
-const terminalBodyRef = ref<HTMLElement | null>(null);
-const terminalLines = computed<TerminalReplayLine[]>(() => [
+// Terminal setup for the local handoff command display.
+//
+// This used to be `terminalReplay = computed(() => useTerminalReplay(...))`,
+// read only from the template inside `v-if="showLocalHandoff"`. A computed
+// getter doesn't run until first read, so `useTerminalReplay` (and the
+// onMounted/onBeforeUnmount it registers internally) never executed during
+// this component's setup() -- only during render, by which point Vue's
+// lifecycle-hook registration (keyed off the module-scoped `currentInstance`,
+// which is only set while setup() runs) silently no-ops. Result: the replay
+// never started and the terminal rendered permanently empty.
+//
+// A top-level `useTerminalReplay(...)` call right here would run into a
+// different problem: this component mounts at page load, long before
+// showLocalHandoff flips true, so the whole 3-line replay would finish
+// off-screen and the card would appear already fully typed with no cursor.
+//
+// Extracting the replay into its own child component -- mirroring
+// ConnectTerminal (CloudPage.vue) -- fixes both: the child's setup() (which
+// calls useTerminalReplay directly, not through a computed) only runs once
+// Vue actually mounts it, which is exactly when `v-if="showLocalHandoff"`
+// makes the card appear.
+const LOCAL_HANDOFF_LINES: TerminalReplayLine[] = [
   { type: "cmd", text: AUTOVAULT_INSTALL_COMMAND },
   { type: "cmd", text: ". \"$HOME/.autovault/env\"" },
   { type: "cmd", text: "autovault skill list" },
-]);
-const terminalReplay = computed(() =>
-  useTerminalReplay(terminalLines.value, {
-    autoStart: true,
-    scrollTarget: () => terminalBodyRef.value,
-  })
-);
+];
+
+const LocalHandoffTerminal = defineComponent({
+  setup() {
+    const bodyRef = ref<HTMLElement | null>(null);
+    const replay = useTerminalReplay(LOCAL_HANDOFF_LINES, {
+      autoStart: true,
+      scrollTarget: () => bodyRef.value,
+    });
+
+    // Single root element, on purpose: Vue stamps a child component's root
+    // (and only its root) with the parent's scoped-style attribute, which is
+    // what lets the parent's `<style scoped>` .hcc-terminal-body rule (the
+    // 180px height / mono font override) keep matching this div. Returning a
+    // fragment/array here would drop that and silently revert to the global
+    // 400px terminal-body height.
+    return () =>
+      h(
+        "div",
+        { class: "terminal-body hcc-terminal-body", ref: bodyRef, "aria-hidden": "true" },
+        [
+          ...replay.visibleLines.value.map((line, index) =>
+            line.type === "cmd"
+              ? h("div", { class: "line terminal-line", key: index }, [
+                  h("span", { class: "pmt" }, "$"),
+                  h("span", line.text),
+                ])
+              : h("div", { class: line.type, key: index }, line.text)
+          ),
+          !replay.complete.value ? h("span", { class: "cursor" }) : null,
+        ]
+      );
+  },
+});
 
 onMounted(async () => {
   staticPreview.value = canUseBrowser() && window.location.port === "5173";
@@ -565,14 +596,6 @@ async function copyAgentHandoff(agent: "claude-code" | "cursor") {
   notice.value = { kind: "ok", text: `${label} handoff copied.` };
 }
 
-async function copyText(text: string) {
-  try {
-    await navigator.clipboard?.writeText(text);
-  } catch {
-    // Copy buttons are a browser convenience; the command block remains visible.
-  }
-}
-
 function slugify(value: string) {
   const slug = value.split("@")[0].toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   return slug || "your-team";
@@ -612,32 +635,18 @@ function canUseBrowser() {
   font-size: 12px;
 }
 
+/* display/flex-wrap/gap match the global `.hosted-auth-actions,
+   .hosted-copy-row` rule in styles.css exactly -- only padding and
+   margin-top are genuinely specific to this card's layout (it has no
+   ancestor padding to inherit spacing from, unlike .hosted-panel), so only
+   those live here. Button appearance is intentionally NOT overridden here
+   any more: the global `.hosted-copy-row button` rules already style these
+   buttons the same as .hosted-primary/.hosted-auth-btn/.starter-skills
+   button elsewhere on this panel, and a scoped duplicate previously drifted
+   from those values (different border color, radius, text color, font-size,
+   plus a hover background the global rule doesn't have). */
 .hosted-copy-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
   padding: 14px;
   margin-top: 0;
-}
-
-.hosted-copy-row button {
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  padding: 7px 10px;
-  text-decoration: none;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--bg);
-  color: var(--ink);
-  cursor: pointer;
-  font-size: 12px;
-  transition: all 0.15s;
-}
-
-.hosted-copy-row button:hover {
-  border-color: var(--accent);
-  background: var(--panel);
-  color: var(--accent);
 }
 </style>
