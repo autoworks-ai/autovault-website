@@ -5,8 +5,9 @@ on:
     - cron: "0 9 * * 1"
   push:
     branches: [main]
+  # Deliberately unfiltered -- see ci.yml. `branches:` matches the PR's BASE
+  # branch, so a stacked PR got no CodeQL scan and no dependency audit.
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
