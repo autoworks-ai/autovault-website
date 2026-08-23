@@ -136,7 +136,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("unhandledrejection", handleUnhandledRejection);
   if (clerkLoadTimer) window.clearTimeout(clerkLoadTimer);
   if (clerkReadyInterval) window.clearInterval(clerkReadyInterval);
-  if (sessionRepairInterval) window.clearInterval(sessionRepairInterval);
+  stopSessionRepair();
 });
 
 function handleWindowError(event: ErrorEvent) {
@@ -172,6 +172,21 @@ function isClerkLoadFailure(value: unknown) {
 // idempotent and this no-ops in every state except the broken one.
 let repairingSession = false;
 
+// This is a one-shot rescue, not a poller, and the distinction is load-bearing
+// because the interval is 400ms. A Clerk or network failure that leaves the
+// created session visible while setActive keeps rejecting would otherwise
+// retry about 150 times a minute, forever, in every affected tab. The budget
+// is per session id, so a genuinely new sign-up still gets its own attempts
+// rather than inheriting a spent counter.
+const SESSION_REPAIR_ATTEMPTS = 3;
+let repairTargetId: string | null = null;
+let repairsLeft = SESSION_REPAIR_ATTEMPTS;
+
+function stopSessionRepair() {
+  if (sessionRepairInterval) window.clearInterval(sessionRepairInterval);
+  sessionRepairInterval = undefined;
+}
+
 async function activatePendingSession() {
   const clerk = (window as unknown as { Clerk?: ClerkLike }).Clerk;
   if (!clerk?.loaded || clerk.session || repairingSession) return;
@@ -179,12 +194,21 @@ async function activatePendingSession() {
   const pending = clerk.client?.sessions?.find((s) => s.status === "active");
   if (!pending) return;
 
+  if (pending.id !== repairTargetId) {
+    repairTargetId = pending.id;
+    repairsLeft = SESSION_REPAIR_ATTEMPTS;
+  }
+  if (repairsLeft <= 0) return;
+
   repairingSession = true;
   try {
     await clerk.setActive?.({ session: pending.id });
   } catch {
     // A failed repair is not worth surfacing: the sign-in controls are still
-    // rendered and a reload remains a working fallback.
+    // rendered and a reload remains a working fallback. Give up once the
+    // budget is spent so a persistent failure cannot become a retry storm.
+    repairsLeft -= 1;
+    if (repairsLeft <= 0) stopSessionRepair();
   } finally {
     repairingSession = false;
   }

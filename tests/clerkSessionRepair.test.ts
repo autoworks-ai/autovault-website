@@ -33,8 +33,28 @@ describe("Clerk modal sign-up session repair", () => {
     expect(body).toContain("repairingSession");
   });
 
+  it("gives up rather than retrying a failing activation forever", () => {
+    // The interval is 400ms. If Clerk keeps rejecting while the created
+    // session stays visible -- a persistent outage, an offline tab -- an
+    // unbounded retry is roughly 150 failed activation calls a minute, per
+    // tab, indefinitely. The budget is keyed to the session id so a genuinely
+    // new sign-up still gets its own attempts instead of inheriting a spent
+    // counter. Anchor on the identifiers, not on the comment explaining them.
+    expect(controls).toContain("SESSION_REPAIR_ATTEMPTS");
+    expect(controls).toContain("repairTargetId");
+    const fn = controls.slice(controls.indexOf("async function activatePendingSession"));
+    const body = fn.slice(0, 1200);
+    expect(body).toContain("if (repairsLeft <= 0) return;");
+    expect(body).toContain("repairsLeft -= 1;");
+    expect(body).toContain("stopSessionRepair()");
+  });
+
   it("tears its interval down on unmount", () => {
     expect(controls).toContain("sessionRepairInterval = window.setInterval");
     expect(controls).toContain("if (sessionRepairInterval) window.clearInterval(sessionRepairInterval)");
+    // The teardown moved into stopSessionRepair when the retry budget landed;
+    // assert unmount still reaches it, or this guard stops guarding.
+    const unmount = controls.slice(controls.indexOf("onBeforeUnmount(()"));
+    expect(unmount.slice(0, 400)).toContain("stopSessionRepair()");
   });
 });

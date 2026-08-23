@@ -385,6 +385,7 @@ import HostedVaultFunnel from "./HostedVaultFunnel.vue";
 import BrandMark from "./BrandMark.vue";
 import CloudAccountMenu from "./CloudAccountMenu.vue";
 import { copyText as copyToClipboard } from "../utils/clipboard";
+import { formatPriceLabel } from "../utils/money";
 import { clerkAuthRecoveryMessage, isClerkApiAuthError, useClerkApiAuth } from "../utils/clerkApi";
 import {
   useTerminalReplay,
@@ -759,13 +760,8 @@ const hostedPrice = ref<HostedPrice | null>(null);
 // drifts silently the moment the price changes in Stripe.
 const hostedPriceLabel = computed(() => {
   const price = hostedPrice.value;
-  if (!price || price.amount === null || !price.currency) return null;
-  const money = new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency: price.currency.toUpperCase(),
-    minimumFractionDigits: price.amount % 100 === 0 ? 0 : 2,
-  }).format(price.amount / 100);
-  return price.interval ? `${money} / ${price.interval}` : money;
+  if (!price) return null;
+  return formatPriceLabel(price.amount, price.currency, price.interval);
 });
 
 async function loadPricing() {
