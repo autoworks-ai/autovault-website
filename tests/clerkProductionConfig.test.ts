@@ -117,6 +117,106 @@ describe("Clerk production deployment configuration", () => {
     }
   });
 
+  it("waits out Cloudflare Pages propagation before scanning the deployment URL", async () => {
+    const { port, close } = await startScanServer(() => `<!doctype html><html><body>cloud</body></html>`, 2);
+
+    try {
+      const result = await runNode([
+        resolve(repoRoot, "scripts/scan-clerk-production-url.mjs"),
+        `http://127.0.0.1:${port}/cloud`,
+        "--ready-timeout-ms=2000",
+        "--ready-interval-ms=100"
+      ]);
+
+      expect(result.stderr).not.toContain("returned 404");
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("no development Clerk markers found");
+    } finally {
+      await close();
+    }
+  });
+
+  it("still fails a propagation-delayed deployment that ships a development Clerk key", async () => {
+    const devKey = publishableKey("test", "arriving-yak-2.clerk.accounts.dev");
+    const { port, close } = await startScanServer(() => `<!doctype html><html><body>${devKey}</body></html>`, 2);
+
+    try {
+      const result = await runNode([
+        resolve(repoRoot, "scripts/scan-clerk-production-url.mjs"),
+        `http://127.0.0.1:${port}/cloud`,
+        "--ready-timeout-ms=2000",
+        "--ready-interval-ms=100"
+      ]);
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("development Clerk marker");
+    } finally {
+      await close();
+    }
+  });
+
+  it("waits out propagation on linked assets, not just the entry point", async () => {
+    let themeRequests = 0;
+    const server = createServer((request, response) => {
+      if (request.url === "/assets/theme.js") {
+        themeRequests += 1;
+
+        if (themeRequests === 1) {
+          response.writeHead(404, { "content-type": "text/plain" });
+          response.end("Not found");
+          return;
+        }
+
+        response.writeHead(200, { "content-type": "text/javascript" });
+        response.end('window.__clerk="configured";');
+        return;
+      }
+
+      response.writeHead(200, { "content-type": "text/html" });
+      response.end('<script type="module" src="/assets/theme.js"></script>');
+    });
+
+    await new Promise<void>((ready) => {
+      server.listen(0, "127.0.0.1", ready);
+    });
+
+    try {
+      const address = server.address();
+      const port = typeof address === "object" && address ? address.port : 0;
+      const result = await runNode([
+        resolve(repoRoot, "scripts/scan-clerk-production-url.mjs"),
+        `http://127.0.0.1:${port}/cloud`
+      ]);
+
+      expect(result.stderr).not.toContain("returned 404");
+      expect(result.status).toBe(0);
+      expect(themeRequests).toBeGreaterThan(1);
+    } finally {
+      await new Promise<void>((closed) => {
+        server.close(() => closed());
+      });
+    }
+  });
+
+  it("fails when the deployment never becomes reachable within the retry budget", async () => {
+    const { port, close } = await startScanServer(() => "", Number.POSITIVE_INFINITY);
+
+    try {
+      const result = await runNode([
+        resolve(repoRoot, "scripts/scan-clerk-production-url.mjs"),
+        `http://127.0.0.1:${port}/cloud`,
+        "--ready-timeout-ms=600",
+        "--ready-interval-ms=100"
+      ]);
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("did not become reachable");
+      expect(result.stderr).toContain("404");
+    } finally {
+      await close();
+    }
+  });
+
   it("centralizes Clerk brand configuration for plugin, modal, and account UI", () => {
     const theme = read(".vitepress/theme/index.ts");
     const controls = read(".vitepress/theme/components/ClerkAuthControls.vue");
@@ -242,6 +342,38 @@ function verifyKey(target: string, key: string) {
 function publishableKey(mode: "live" | "test", frontendApi: string) {
   const encoded = Buffer.from(`${frontendApi}$`, "utf8").toString("base64url");
   return `pk_${mode}_${encoded}`;
+}
+
+// Emulates the Cloudflare Pages propagation race the deployment scan hit on main:
+// the deployment URL 404s for the first `notFoundResponses` requests, then serves
+// `body`. Pass Infinity to model a deployment that never becomes reachable.
+async function startScanServer(body: () => string, notFoundResponses: number) {
+  let requests = 0;
+  const server = createServer((_request, response) => {
+    requests += 1;
+
+    if (requests <= notFoundResponses) {
+      response.writeHead(404, { "content-type": "text/html" });
+      response.end("<!doctype html><html><body>Not found</body></html>");
+      return;
+    }
+
+    response.writeHead(200, { "content-type": "text/html" });
+    response.end(body());
+  });
+
+  await new Promise<void>((ready) => {
+    server.listen(0, "127.0.0.1", ready);
+  });
+
+  const address = server.address();
+
+  return {
+    port: typeof address === "object" && address ? address.port : 0,
+    close: () => new Promise<void>((closed) => {
+      server.close(() => closed());
+    })
+  };
 }
 
 function runNode(args: string[]) {
