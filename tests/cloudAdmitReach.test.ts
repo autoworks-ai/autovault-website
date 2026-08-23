@@ -338,21 +338,26 @@ describe("a machine that checks in reaches the card by itself", () => {
     expect(watcher).not.toContain("decideDevice");
   });
 
-  it("measures the card after the flush, not before it", () => {
-    // A watcher callback runs before Vue renders, so the card still holds
-    // "Nothing enrolled yet" -- short enough to look like it is on screen while
-    // the rows about to replace it push it off the bottom. Measured early, the
-    // in-view check passed every time and this never scrolled at all.
+  it("waits for the flush before it touches the DOM", () => {
+    // A watcher callback runs before Vue renders, so at this point the card
+    // still holds "Nothing enrolled yet" and the rows that are about to replace
+    // it are not in the document.
     const tick = watcher.indexOf("await nextTick();");
-    const measure = watcher.indexOf("getBoundingClientRect()");
+    const scroll = watcher.indexOf("await focusDevicesCard();");
     expect(tick).toBeGreaterThan(-1);
-    expect(measure).toBeGreaterThan(tick);
+    expect(scroll).toBeGreaterThan(tick);
   });
 
-  it("stays quiet when the card is already on screen", () => {
-    // A page that jumps when nothing needed moving is just noise, and on a tall
-    // window the card is visible at connect without any help.
-    expect(watcher).toContain("box.top >= 0 && box.bottom <= window.innerHeight");
+  it("does not try to decide whether the card is already visible", () => {
+    // The connect stage grows while this runs: ConnectTerminal types its replay
+    // out a line at a time and each line pushes the card down. Traced at
+    // 2560x1080 the card's bottom went 1053 -> 1074 -> 1181 over seven seconds,
+    // crossing the fold partway through -- so an in-view check measured at
+    // arrival read "already visible" and skipped the scroll for a card that was
+    // about to leave the window. It was flaky in the worst direction: it worked
+    // whenever someone was watching it.
+    expect(watcher).not.toContain("window.innerHeight");
+    expect(watcher).not.toContain("getBoundingClientRect");
   });
 
   it("scrolls once per machine, not once per poll", () => {

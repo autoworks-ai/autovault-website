@@ -1534,10 +1534,19 @@ watch(
     // "already on screen" every time and this never scrolled at all; seen at
     // 2560x1080, card bottom 1030 before the flush and 1181 after.
     await nextTick();
-    // Already looking at it -- on a tall window the card is on screen at
-    // connect, and a page that jumps when nothing needed moving is just noise.
-    const box = devicesCard.value?.getBoundingClientRect();
-    if (box && box.top >= 0 && box.bottom <= window.innerHeight) return;
+    // No "is it already on screen?" check, and that is a decision rather than
+    // an omission. The connect stage is GROWING while this runs: ConnectTerminal
+    // types its replay out a line at a time, and each line pushes this card
+    // further down. Traced at 2560x1080, the card's bottom went 1053 -> 1074 ->
+    // 1181 over the first seven seconds, crossing the fold partway through. A
+    // measurement taken when the row lands is provisional, so the guard read
+    // "already visible" and skipped the scroll for a card that was about to
+    // drop off the bottom -- flaky in exactly the way that is worst, because it
+    // worked whenever the page happened to be watched.
+    //
+    // Scrolling a card that was already visible costs a centring nudge and a
+    // flash; not scrolling one that has just left the viewport costs the whole
+    // point. On a window tall enough to hold the page this is a no-op anyway.
     await focusDevicesCard();
   }
 );
