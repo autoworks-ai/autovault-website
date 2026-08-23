@@ -234,14 +234,52 @@ describe("the honour-system checkbox is gone", () => {
 
 describe("Skills and Sync log are real destinations now", () => {
   it("stops badging them as soon", () => {
-    // Neither carries a "soon" badge any more. Skills reveals at explore
-    // rather than connect -- see the nav-destination test below for why.
-    expect(cloudPage).toContain('item("skills", "Skills", ICON.book, { revealAt: "explore", action: "preview" })');
-    expect(cloudPage).toContain('action: "scroll-devices"');
+    // Neither carries a "soon" badge any more. Both now name the panel they
+    // select rather than a scroll target; the reveal stage comes from
+    // SECTION_REVEAL -- see the nav-destination test below.
+    expect(cloudPage).toContain('item("skills", "Skills", ICON.book, { section: "skills" })');
+    expect(cloudPage).toContain('item("sync", "Sync log", ICON.sync, { section: "machines" })');
     expect(cloudPage).not.toContain('item("skills", "Skills", ICON.book, { soon: true');
     expect(cloudPage).not.toContain('item("sync", "Sync log", ICON.sync, { soon: true');
     // Members stays soon: beta is pending/active/revoked devices, not roles.
     expect(cloudPage).toContain('item("members", "Members", ICON.users, { soon: true');
+  });
+
+  it("reaches those destinations by selecting a panel, not by scrolling", () => {
+    // Replaces the old `action: "preview"` / `action: "scroll-devices"`
+    // literals, which pinned a dispatch into scrollIntoView plus a 1400ms
+    // flash. The intent they guarded -- that clicking these two items reaches
+    // the skills surface and the machines list -- is now guarded end to end:
+    // the item names a section, the click assigns it, and the main area has a
+    // block keyed on that exact value.
+    const sectionOf = (key: string) => {
+      const at = cloudPage.indexOf(`item("${key}"`);
+      expect(at, `no nav item named ${key}`).toBeGreaterThan(-1);
+      return /section: "([a-z]+)"/.exec(cloudPage.slice(at, cloudPage.indexOf("\n", at)))?.[1];
+    };
+
+    expect(cloudPage).toContain("selectedSection.value = item.section;");
+
+    // Skills -> the panel holding the app preview and the early-access ask.
+    expect(sectionOf("skills")).toBe("skills");
+    const skillsPanel = cloudPage.indexOf(`v-else-if="activeSection === 'skills'"`);
+    expect(skillsPanel, "no skills panel").toBeGreaterThan(-1);
+    expect(cloudPage.slice(skillsPanel)).toContain("Manage your vault from the web");
+
+    // Sync log -> the machines list, which the overview also shows.
+    expect(sectionOf("sync")).toBe("machines");
+    const shown = cloudPage.indexOf("const showsMachines = computed(");
+    expect(shown, "no showsMachines").toBeGreaterThan(-1);
+    expect(cloudPage.slice(shown, cloudPage.indexOf(");", shown))).toContain(
+      'activeSection.value === "machines"'
+    );
+    expect(cloudPage).toContain('<template v-if="showsMachines">');
+
+    // And the scroll-and-flash dispatch they replaced is gone, so neither
+    // assertion above can be satisfied by leftover machinery.
+    expect(cloudPage).not.toContain('action: "preview"');
+    expect(cloudPage).not.toContain('action: "scroll-devices"');
+    expect(cloudPage).not.toContain('action: "scroll-billing"');
   });
 
   it("keeps the machines list reachable after the connect step", () => {
@@ -326,12 +364,24 @@ describe("admission follows entitlement and current state", () => {
 });
 
 describe("nav items only enable once their destination exists", () => {
-  it("keeps Skills locked until the card it scrolls to is rendered", () => {
-    // previewCard only exists inside the explore/ready template, so enabling
-    // Skills at connect gave a live-looking nav item that did nothing.
-    expect(cloudPage).toContain('item("skills", "Skills", ICON.book, { revealAt: "explore", action: "preview" })');
-    // Sync log's target renders wherever a vault does, so connect is right.
-    expect(cloudPage).toContain('{ revealAt: "connect", action: "scroll-devices" }');
+  it("keeps Skills locked until the panel it selects is rendered", () => {
+    // The skills panel only exists inside the explore/ready template, so
+    // enabling Skills at connect gave a live-looking nav item that did
+    // nothing. The reveal stage is no longer repeated on the item: it is read
+    // off SECTION_REVEAL, so the lock cannot drift from the panel it guards.
+    expect(cloudPage).toContain('item("skills", "Skills", ICON.book, { section: "skills" })');
+    // Sync log's panel renders wherever a vault does, so connect is right.
+    expect(cloudPage).toContain('item("sync", "Sync log", ICON.sync, { section: "machines" })');
+
+    const at = cloudPage.indexOf("const SECTION_REVEAL");
+    expect(at, "no SECTION_REVEAL table").toBeGreaterThan(-1);
+    const table = cloudPage.slice(at, cloudPage.indexOf("};", at));
+    expect(table).toContain('skills: "explore"');
+    expect(table).toContain('machines: "connect"');
+    // And the item factory has to actually read it, or the table is decoration.
+    expect(cloudPage).toContain(
+      "const revealAt = opts.revealAt ?? (opts.section ? SECTION_REVEAL[opts.section] : null);"
+    );
   });
 
   it("invalidates an in-flight device list when the vault goes away", () => {

@@ -52,6 +52,7 @@
             class="cv-nav-item"
             :class="item.cls"
             :disabled="item.disabled"
+            :aria-current="item.active ? 'true' : undefined"
             @click="onNavClick(item)"
           >
             <span class="cv-nav-ic" aria-hidden="true" v-html="item.icon" />
@@ -251,9 +252,19 @@
           </div>
         </template>
 
-        <!-- ---------- STAGE B: EXPLORE  &  STAGE C: READY ---------- -->
+        <!-- ---------- STAGE B: EXPLORE  &  STAGE C: READY ----------
+             From here the sidebar is a real switcher: exactly one of the
+             panels below is on screen, chosen by activeSection. The chain is
+             deliberately flat and uniform — a new section is one more
+             `v-else-if="activeSection === '…'"` template and nothing else. -->
         <template v-if="stage === 'explore' || stage === 'ready'">
-          <!-- progress summary card (collapses stage A) -->
+          <!-- Progress summary, collapsing stage A. Stage chrome, ABOVE the
+               panel chain and outside it: this is what the 72px focal mark
+               shrinks into when a machine is admitted, and admitting happens
+               from the machines panel. Inside `overview` it did not render at
+               that moment, so the mark played its 700ms unlock and then
+               vanished into nothing — the one gesture on the whole page that
+               has to land somewhere. -->
           <div class="cv-status-card" :class="{ allset: stage === 'ready' }">
             <!-- The same mark, compact. It carries the one fact this strip
                  exists to state — the vault is open — so the pill beside it
@@ -284,216 +295,256 @@
             </span>
           </div>
 
-          <!-- reserved + sync engine -->
-          <div class="cv-reveal cv-two" :style="revealDelay(0)">
-            <article
-              ref="billingCard"
-              class="cv-card"
-              :class="{ focusflash: focusedCard === 'billing' }"
-            >
-              <div class="cv-card-label">Subscription</div>
-              <ul class="cv-kv">
-                <li><span>Plan</span><strong>Hosted</strong></li>
-                <li v-if="renewalLabel">
-                  <span>Billing</span><strong>{{ renewalLabel }}</strong>
-                </li>
-                <li>
-                  <span>Status</span
-                  ><span
-                    class="cv-pill sm"
-                    :class="subscriptionState.tone"
-                    ><span class="cv-dot" /> {{ subscriptionState.text }}</span
-                  >
-                </li>
-              </ul>
-              <p v-if="subscriptionNeedsAttention" class="cv-muted cv-sub-warn">
-                Hosted access follows this status. If that looks wrong, reload
-                after Stripe finishes processing, or contact support.
-              </p>
-              <ul class="cv-reserved">
-                <li>
-                  <span class="cv-chk">✓</span> Public + private namespace
-                </li>
-                <li>
-                  <span class="cv-chk">✓</span> Starter skill slots, ready to
-                  fill
-                </li>
-              </ul>
-            </article>
-            <article class="cv-card soft">
-              <div class="cv-card-label">Sync engine</div>
-              <span class="cv-pill warn"
-                ><span class="cv-dot" /> Building — you'll be first to
-                know</span
-              >
-              <p class="cv-muted">
-                Until hosted sync ships, your local CLI is fully usable offline.
-                Nothing is gated behind the cloud — this namespace and any
-                skills carry over automatically.
-              </p>
-            </article>
-          </div>
-
-          <!-- app preview + early access -->
-          <div ref="previewCard" class="cv-reveal" :style="revealDelay(1)">
-            <article
-              class="cv-preview"
-              :class="{ focusflash: focusedCard === 'preview' }"
-            >
-              <div class="cv-appframe" aria-hidden="true">
-                <div class="cv-appbar">
-                  <span class="cv-tdot bad" /><span class="cv-tdot warn" /><span
-                    class="cv-tdot ok"
-                  />
-                  <span class="cv-appurl"
-                    >vault.autovault.dev/{{ vaultSlug }}</span
-                  >
-                </div>
-                <div class="cv-appbody">
-                  <div class="cv-appnav">
-                    <span class="on">Skills</span><span>Sync log</span
-                    ><span>Members</span><span>Settings</span>
-                  </div>
-                  <div class="cv-appmain">
-                    <div class="cv-appsearch" />
-                    <div
-                      v-for="row in previewRows"
-                      :key="row.w"
-                      class="cv-approw"
-                    >
-                      <span class="cv-appicon" />
-                      <span class="cv-appskel" :style="{ width: row.w }" />
-                      <span class="cv-appsync">● synced</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="cv-preview-copy">
-                <div class="cv-card-label violet">
-                  {{
-                    stage === "ready"
-                      ? "You're on the list · preview"
-                      : "Coming soon · preview"
-                  }}
-                </div>
-                <h2>Manage your vault from the web</h2>
-                <p>
-                  Browse and search every synced skill, watch the live sync log
-                  between your machines, and manage who has access — without
-                  leaving the browser.
+          <!-- ---------- SECTION: OVERVIEW ---------- -->
+          <template v-if="activeSection === 'overview'">
+            <div class="cv-reveal" :style="revealDelay(0)">
+              <article class="cv-card soft">
+                <div class="cv-card-label">Sync engine</div>
+                <span class="cv-pill warn"
+                  ><span class="cv-dot" /> Building — you'll be first to
+                  know</span
+                >
+                <p class="cv-muted">
+                  Until hosted sync ships, your local CLI is fully usable offline.
+                  Nothing is gated behind the cloud — this namespace and any
+                  skills carry over automatically.
                 </p>
-                <div class="cv-feats">
-                  <span>Skill browser</span><span>Live sync log</span
-                  ><span>Team access</span>
-                </div>
-                <div v-if="stage === 'ready'" class="cv-confirm">
-                  <span class="cv-confirm-ic">✓</span>
-                  <span
-                    >You're on the early-access list.<small
-                      >Requested {{ earlyAccessDate }} · we'll email
-                      {{ accountEmailShort }} first.</small
-                    ></span
-                  >
-                </div>
-                <template v-else>
+              </article>
+            </div>
+          </template>
+
+          <!-- ---------- SECTION: BILLING ----------
+               The Subscription card, relocated rather than rebuilt: the same
+               plan/period/status rows and the same label vocabulary, now with
+               the price it never showed and the portal button that was only
+               ever reachable from the account menu. This is the page's only
+               subscription display — there is deliberately no second one on
+               the overview. -->
+          <template v-else-if="activeSection === 'billing'">
+            <div class="cv-reveal" :style="revealDelay(0)">
+              <article class="cv-card">
+                <div class="cv-card-label">Subscription</div>
+                <ul class="cv-kv">
+                  <li><span>Plan</span><strong>Hosted</strong></li>
+                  <!-- "Plan price", not "You pay": /api/pricing reports what the
+                       configured plan costs in Stripe today, and nothing in
+                       /api/me exposes what this particular subscription is
+                       charged. Never a literal — see loadPricing. -->
+                  <li v-if="hostedPriceLabel">
+                    <span>Plan price</span><strong>{{ hostedPriceLabel }}</strong>
+                  </li>
+                  <li v-if="renewalLabel">
+                    <span>Billing</span><strong>{{ renewalLabel }}</strong>
+                  </li>
+                  <li>
+                    <span>Status</span
+                    ><span
+                      class="cv-pill sm"
+                      :class="subscriptionState.tone"
+                      ><span class="cv-dot" /> {{ subscriptionState.text }}</span
+                    >
+                  </li>
+                </ul>
+                <p v-if="subscriptionNeedsAttention" class="cv-muted cv-sub-warn">
+                  Hosted access follows this status. If that looks wrong, reload
+                  after Stripe finishes processing, or contact support.
+                </p>
+                <ul class="cv-reserved">
+                  <li>
+                    <span class="cv-chk">✓</span> Public + private namespace
+                  </li>
+                  <li>
+                    <span class="cv-chk">✓</span> Starter skill slots, ready to
+                    fill
+                  </li>
+                </ul>
+                <div class="cv-card-actions">
                   <button
                     type="button"
                     class="cv-btn"
                     :disabled="busy"
-                    @click="markProgress('early_access')"
+                    @click="openBillingPortal"
                   >
-                    {{ busy ? "Saving…" : "Get early access →" }}
+                    {{ busy ? "Opening…" : "Manage billing" }}
                   </button>
-                  <p class="cv-muted sm">
-                    We'll email <strong>{{ accountEmailShort }}</strong> the
-                    moment it's live.
+                </div>
+                <p class="cv-muted sm">
+                  Cards, invoices and cancellation live in Stripe's billing
+                  portal — the same one the account menu opens.
+                </p>
+              </article>
+            </div>
+          </template>
+
+          <!-- ---------- SECTION: SKILLS ----------
+               A preview, and labelled as one. The browser-side skill list does
+               not exist yet; what is real here is the early-access request. -->
+          <template v-else-if="activeSection === 'skills'">
+            <div class="cv-reveal" :style="revealDelay(0)">
+              <article class="cv-preview">
+                <div class="cv-appframe" aria-hidden="true">
+                  <div class="cv-appbar">
+                    <span class="cv-tdot bad" /><span class="cv-tdot warn" /><span
+                      class="cv-tdot ok"
+                    />
+                    <span class="cv-appurl"
+                      >vault.autovault.dev/{{ vaultSlug }}</span
+                    >
+                  </div>
+                  <div class="cv-appbody">
+                    <div class="cv-appnav">
+                      <span class="on">Skills</span><span>Sync log</span
+                      ><span>Members</span><span>Settings</span>
+                    </div>
+                    <div class="cv-appmain">
+                      <div class="cv-appsearch" />
+                      <div
+                        v-for="row in previewRows"
+                        :key="row.w"
+                        class="cv-approw"
+                      >
+                        <span class="cv-appicon" />
+                        <span class="cv-appskel" :style="{ width: row.w }" />
+                        <span class="cv-appsync">● synced</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="cv-preview-copy">
+                  <div class="cv-card-label violet">
+                    {{
+                      stage === "ready"
+                        ? "You're on the list · preview"
+                        : "Coming soon · preview"
+                    }}
+                  </div>
+                  <h2>Manage your vault from the web</h2>
+                  <p>
+                    Browse and search every synced skill, watch the live sync log
+                    between your machines, and manage who has access — without
+                    leaving the browser.
                   </p>
-                </template>
-              </div>
-            </article>
-          </div>
+                  <div class="cv-feats">
+                    <span>Skill browser</span><span>Live sync log</span
+                    ><span>Team access</span>
+                  </div>
+                  <div v-if="stage === 'ready'" class="cv-confirm">
+                    <span class="cv-confirm-ic">✓</span>
+                    <span
+                      >You're on the early-access list.<small
+                        >Requested {{ earlyAccessDate }} · we'll email
+                        {{ accountEmailShort }} first.</small
+                      ></span
+                    >
+                  </div>
+                  <template v-else>
+                    <button
+                      type="button"
+                      class="cv-btn"
+                      :disabled="busy"
+                      @click="markProgress('early_access')"
+                    >
+                      {{ busy ? "Saving…" : "Get early access →" }}
+                    </button>
+                    <p class="cv-muted sm">
+                      We'll email <strong>{{ accountEmailShort }}</strong> the
+                      moment it's live.
+                    </p>
+                  </template>
+                </div>
+              </article>
+            </div>
+          </template>
         </template>
-        <!-- Enrolled machines. This list IS the link step: there is no
+        <!-- ---------- SECTION: MACHINES ----------
+             Enrolled machines. This list IS the link step: there is no
              button to say a CLI is connected, because saying so was never
              evidence of anything. A row appears here when a real machine
-             signs a real enrollment request. -->
-        <div v-if="vault" ref="devicesCard" class="cv-devices standalone" :class="{ focusflash: focusedCard === 'devices' }" role="region" aria-labelledby="cv-devices-title">
-          <h3 id="cv-devices-title" class="cv-devices-title">
-            Machines
-            <span v-if="pendingDevices.length" class="cv-devices-count">
-              {{ pendingDevices.length }} waiting
-            </span>
-          </h3>
+             signs a real enrollment request.
 
-          <!-- The CLI enrols and only then opens this page, so arriving before
-               the row exists is the normal case, not an error. Say what is
-               happening and let the poll catch up -- never a warning notice. -->
-          <p
-            v-if="admitState === 'waiting'"
-            class="cv-devices-waiting"
-            :class="{ stalled: admitWaitExpired }"
-          >
-            <span class="cv-dot" />
-            <!-- Once the budget is spent nothing is arriving, and a spinner
-                 that never resolves is worse than saying so. -->
-            <template v-if="admitWaitExpired">
-              No machine matching <code>{{ admitFingerprint }}</code> has checked
-              in. If you closed that terminal, run
-              <code>autovault link</code> there again.
-            </template>
-            <template v-else>
-              Waiting for <code>{{ admitFingerprint }}</code> to check in…
-            </template>
-          </p>
+             Outside the stage template because it renders from `connect` on,
+             and shown on the overview as well as on its own panel — see
+             showsMachines. The `v-if="vault"` gate below is the one that
+             decides whether it exists at all. -->
+        <template v-if="showsMachines">
+          <div v-if="vault" ref="devicesCard" class="cv-devices standalone" :class="{ focusflash: devicesFlash }" role="region" aria-labelledby="cv-devices-title">
+            <h3 id="cv-devices-title" class="cv-devices-title">
+              Machines
+              <span v-if="pendingDevices.length" class="cv-devices-count">
+                {{ pendingDevices.length }} waiting
+              </span>
+            </h3>
 
-          <p v-else-if="!devices.length" class="cv-devices-empty">
-            Nothing enrolled yet. Run the command above and this machine
-            will appear here within a few seconds.
-          </p>
-
-          <ul v-if="devices.length" class="cv-device-list">
-            <li
-              v-for="device in devices"
-              :key="device.id"
-              class="cv-device"
-              :class="[device.status, { 'admit-target': isAdmitTarget(device) }]"
+            <!-- The CLI enrols and only then opens this page, so arriving before
+                 the row exists is the normal case, not an error. Say what is
+                 happening and let the poll catch up -- never a warning notice. -->
+            <p
+              v-if="admitState === 'waiting'"
+              class="cv-devices-waiting"
+              :class="{ stalled: admitWaitExpired }"
             >
-              <span class="cv-device-id">
-                <strong>{{ device.hostname || "Unnamed machine" }}</strong>
-                <!-- Matches what the CLI printed on that machine, so the
-                     owner can tell two pending devices apart. -->
-                <code>ed25519 {{ device.fingerprint }}</code>
-              </span>
-              <span class="cv-device-seen">
-                <span class="cv-pill" :class="device.status === 'active' ? 'ok' : ''">
-                  <span class="cv-dot" />{{ device.status }}
+              <span class="cv-dot" />
+              <!-- Once the budget is spent nothing is arriving, and a spinner
+                   that never resolves is worse than saying so. -->
+              <template v-if="admitWaitExpired">
+                No machine matching <code>{{ admitFingerprint }}</code> has checked
+                in. If you closed that terminal, run
+                <code>autovault link</code> there again.
+              </template>
+              <template v-else>
+                Waiting for <code>{{ admitFingerprint }}</code> to check in…
+              </template>
+            </p>
+
+            <p v-else-if="!devices.length" class="cv-devices-empty">
+              Nothing enrolled yet. Run the command above and this machine
+              will appear here within a few seconds.
+            </p>
+
+            <ul v-if="devices.length" class="cv-device-list">
+              <li
+                v-for="device in devices"
+                :key="device.id"
+                class="cv-device"
+                :class="[device.status, { 'admit-target': isAdmitTarget(device) }]"
+              >
+                <span class="cv-device-id">
+                  <strong>{{ device.hostname || "Unnamed machine" }}</strong>
+                  <!-- Matches what the CLI printed on that machine, so the
+                       owner can tell two pending devices apart. -->
+                  <code>ed25519 {{ device.fingerprint }}</code>
                 </span>
-                <small>first seen {{ formatWhen(device.first_seen_at) }}</small>
-              </span>
-              <span class="cv-device-actions">
-                <button
-                  v-if="device.status === 'pending'"
-                  type="button"
-                  class="cv-btn small"
-                  :data-admit-target="isAdmitTarget(device) ? 'true' : undefined"
-                  :disabled="deviceBusy === device.id"
-                  @click="decideDevice(device.id, 'admit')"
-                >
-                  {{ deviceBusy === device.id ? "Working…" : "Admit" }}
-                </button>
-                <button
-                  v-if="device.status !== 'revoked'"
-                  type="button"
-                  class="cv-btn ghost small"
-                  :disabled="deviceBusy === device.id"
-                  @click="decideDevice(device.id, 'revoke')"
-                >
-                  {{ device.status === "pending" ? "Deny" : "Revoke" }}
-                </button>
-              </span>
-            </li>
-          </ul>
-        </div>
+                <span class="cv-device-seen">
+                  <span class="cv-pill" :class="device.status === 'active' ? 'ok' : ''">
+                    <span class="cv-dot" />{{ device.status }}
+                  </span>
+                  <small>first seen {{ formatWhen(device.first_seen_at) }}</small>
+                </span>
+                <span class="cv-device-actions">
+                  <button
+                    v-if="device.status === 'pending'"
+                    type="button"
+                    class="cv-btn small"
+                    :data-admit-target="isAdmitTarget(device) ? 'true' : undefined"
+                    :disabled="deviceBusy === device.id"
+                    @click="decideDevice(device.id, 'admit')"
+                  >
+                    {{ deviceBusy === device.id ? "Working…" : "Admit" }}
+                  </button>
+                  <button
+                    v-if="device.status !== 'revoked'"
+                    type="button"
+                    class="cv-btn ghost small"
+                    :disabled="deviceBusy === device.id"
+                    @click="decideDevice(device.id, 'revoke')"
+                  >
+                    {{ device.status === "pending" ? "Deny" : "Revoke" }}
+                  </button>
+                </span>
+              </li>
+            </ul>
+          </div>
+        </template>
       </main>
     </div>
   </section>
@@ -642,6 +693,10 @@ type CloudStatePayload = {
   vault?: CloudVault;
 };
 type Stage = "error" | "account" | "subscription" | "setup" | "connect" | "explore" | "ready";
+// The main area renders exactly one of these at a time, chosen from the
+// sidebar. Adding one means four edits and nothing else: a member here, a row
+// in SECTION_REVEAL, an item() line in navItems, and a block in the template.
+type Section = "overview" | "billing" | "machines" | "skills";
 type NavItem = {
   key: string;
   label: string;
@@ -649,8 +704,12 @@ type NavItem = {
   badge?: "soon" | "new";
   locked: boolean;
   disabled: boolean;
+  active: boolean;
   cls: Record<string, boolean>;
-  action: "none" | "preview" | "scroll-billing" | "scroll-devices";
+  // Which panel this item selects, or null for an item that has none: Members
+  // is permanently locked, and Settings has no panel built yet. A null section
+  // is what makes onNavClick a no-op even if the disabled attribute were lost.
+  section: Section | null;
 };
 
 const cloudState = ref<CloudState>({
@@ -675,10 +734,15 @@ const notice = ref<CloudNotice | null>(null);
 function setNotice(next: CloudNotice | null) {
   notice.value = next;
 }
-const focusedCard = ref<"preview" | "billing" | "devices" | null>(null);
-const previewCard = ref<HTMLElement | null>(null);
-const billingCard = ref<HTMLElement | null>(null);
+// The panel the owner picked. What is actually on screen is `activeSection`,
+// which falls back to overview whenever this one is not reachable at the
+// current stage -- declared with SECTION_REVEAL and the nav, further down.
+const selectedSection = ref<Section>("overview");
 const devicesCard = ref<HTMLElement | null>(null);
+// The machines list is the one thing still worth scrolling to and flashing:
+// the CLI's ?admit= link points a person at one specific row. Nav items switch
+// panels rather than scrolling now, so nothing else uses this.
+const devicesFlash = ref(false);
 const previewRows = [{ w: "55%" }, { w: "42%" }, { w: "60%" }];
 
 const { authHeaders, clerkAuthEnabled, isClerkLoaded, isClerkSignedIn, clerkUserLabel } =
@@ -782,7 +846,12 @@ watch(
   async (deviceId) => {
     if (!deviceId || admitFocusedId === deviceId) return;
     admitFocusedId = deviceId;
-    await focusCard("devices", devicesCard.value);
+    // Put the panel that holds the row on screen before reaching for it. At
+    // connect the overview already shows the machines list, but a second
+    // machine can check in while the owner is reading Billing -- and then the
+    // button below is in a panel Vue is not rendering.
+    selectedSection.value = "machines";
+    await focusDevicesCard();
     await nextTick();
     // Queried rather than held as a template ref: the button lives inside a
     // v-for, and the row it belongs to can arrive several polls after mount.
@@ -827,9 +896,13 @@ const stage = computed<Stage>(() => {
 // The card used to render a hardcoded "Active" pill and a hardcoded monthly
 // price as static markup, while the real
 // subscription was fetched, typed, normalized — and then never read. A
-// past_due or canceled subscriber was told everything was fine. Price is not
-// rendered at all any more: the API does not expose the amount, and inventing
-// one is how the "$12" got there in the first place.
+// past_due or canceled subscriber was told everything was fine.
+//
+// The Billing panel does show a price again, but never a literal: it comes
+// from /api/pricing, which reads the configured plan out of Stripe. That is
+// the plan's LIST price, not this subscription's charge — subscriptions.price_id
+// is in D1 but /api/me exposes no amount — so it is labelled "Plan price" and
+// Stripe's own portal remains the authority on what anyone is actually billed.
 const SUBSCRIPTION_LABELS: Record<string, { text: string; tone: "ok" | "warn" | "bad" }> = {
   active: { text: "Active", tone: "ok" },
   trialing: { text: "Trialing", tone: "ok" },
@@ -1061,61 +1134,118 @@ const earlyAccessDate = computed(() =>
   formatDate(vault.value?.early_access_at),
 );
 
+/* ---------------------------------------------------------------------------
+ * Section switcher
+ *
+ * No router. /cloud is one page whose main area swaps panels, and a URL that
+ * named a panel would have to survive the Stripe and Clerk round trips that
+ * already own this page's query string and fragment.
+ *
+ * The switcher only does real work at explore/ready. Before that nearly every
+ * nav item is still locked, so there is nothing to switch between and the
+ * stage templates simply render — which is why this is a ref and a computed
+ * rather than a routing layer.
+ * ------------------------------------------------------------------------ */
+const STAGE_ORDER: Stage[] = ["account", "subscription", "setup", "connect", "explore", "ready"];
+
+// The stage at which each panel's content first exists, and the single source
+// of truth for it: the nav item that selects a panel is locked until this
+// stage, and a panel already selected stops being shown if the stage falls
+// back below it. Keeping one table is what stops a nav item unlocking before
+// the thing it selects is rendered — the defect the old per-item `revealAt`
+// duplication invited.
+const SECTION_REVEAL: Record<Section, Stage | null> = {
+  overview: null,
+  machines: "connect",
+  skills: "explore",
+  billing: "explore",
+};
+
+// -1 for "error", which is deliberate: at that stage nothing but overview is
+// reachable, and overview passes on the null branch.
+function stageReached(at: Stage | null, current: Stage) {
+  return at === null || STAGE_ORDER.indexOf(current) >= STAGE_ORDER.indexOf(at);
+}
+
+// What is actually on screen. Revoking the last machine drops the stage from
+// explore back to connect, which re-locks Billing and Skills — so a selection
+// made before that has to stop being honoured rather than leaving the main
+// area rendering a panel whose nav item is disabled.
+const activeSection = computed<Section>(() =>
+  stageReached(SECTION_REVEAL[selectedSection.value], stage.value)
+    ? selectedSection.value
+    : "overview",
+);
+
+// Machines is the one panel that is also part of the overview. At connect it
+// is the only thing to look at — the CLI is sitting in a spinner waiting to be
+// admitted — and once the vault is open, which machines hold it IS the state
+// of the vault. Sync log then gives the same list a panel of its own.
+const showsMachines = computed(
+  () => activeSection.value === "overview" || activeSection.value === "machines",
+);
+
 const navItems = computed<NavItem[]>(() => {
   const s = stage.value;
+  const current = activeSection.value;
   const item = (
     key: string,
     label: string,
     icon: string,
     opts: {
-      active?: boolean;
       soon?: boolean;
       revealAt?: Stage;
-      action?: NavItem["action"];
+      section?: Section;
     } = {},
   ): NavItem => {
-    const order: Stage[] = ["account", "subscription", "setup", "connect", "explore", "ready"];
-    const revealed = opts.revealAt
-      ? order.indexOf(s) >= order.indexOf(opts.revealAt)
-      : true;
-    const justRevealed = opts.revealAt === s;
-    const locked = Boolean(opts.soon) || (opts.revealAt ? !revealed : false);
+    // Resolved once and read by all three of revealed/justRevealed/locked. An
+    // item that selects a panel inherits that panel's reveal stage, so the two
+    // cannot drift apart; `revealAt` stays available for an item with no panel.
+    const revealAt = opts.revealAt ?? (opts.section ? SECTION_REVEAL[opts.section] : null);
+    const revealed = stageReached(revealAt, s);
+    const justRevealed = revealAt !== null && revealAt === s;
+    const locked = Boolean(opts.soon) || !revealed;
+    const section = opts.section ?? null;
+    const active = !locked && section !== null && section === current;
     return {
       key,
       label,
       icon,
-      badge: opts.soon
-        ? "soon"
-        : justRevealed && !opts.active
-          ? "new"
-          : undefined,
+      // Not `justRevealed && !active`. That term was vestigial — it only ever
+      // suppressed the badge on Overview, which has no reveal stage and so
+      // never carried one — and once `active` started moving with the
+      // selection it made the badge blink off on the panel you were reading
+      // and back on when you left. "New" is a fact about the stage having just
+      // unlocked this item, not about what you happen to be looking at.
+      badge: opts.soon ? "soon" : justRevealed ? "new" : undefined,
       locked,
       disabled: locked,
-      action: opts.action ?? "none",
+      active,
+      section,
       cls: {
-        active: Boolean(opts.active),
+        active,
         soon: Boolean(opts.soon),
         dimmed: !opts.soon && !revealed,
-        revealed: justRevealed && !opts.active,
+        revealed: justRevealed,
       },
     };
   };
 
   return [
-    item("overview", "Overview", ICON.grid, { active: true }),
-    // revealAt explore, not connect: this scrolls to previewCard, which only
-    // exists inside the explore/ready template. Enabled any earlier it is a
-    // live-looking nav item that silently does nothing.
-    item("skills", "Skills", ICON.book, { revealAt: "explore", action: "preview" }),
+    item("overview", "Overview", ICON.grid, { section: "overview" }),
+    // The skills panel only exists inside the explore/ready template, which is
+    // what SECTION_REVEAL.skills says. Enabled any earlier it is a live-looking
+    // nav item that silently does nothing.
+    item("skills", "Skills", ICON.book, { section: "skills" }),
     // Lands on the machines list. That IS the sync state today: which devices
     // are enrolled, which are admitted, and when each was last seen. Fuller
     // per-release history arrives with catalog publishing.
-    item("sync", "Sync log", ICON.sync, { revealAt: "connect", action: "scroll-devices" }),
-    item("members", "Members", ICON.users, { soon: true, action: "preview" }),
-    item("billing", "Billing", ICON.card, {
-      revealAt: "explore",
-      action: "scroll-billing",
-    }),
+    item("sync", "Sync log", ICON.sync, { section: "machines" }),
+    item("members", "Members", ICON.users, { soon: true }),
+    item("billing", "Billing", ICON.card, { section: "billing" }),
+    // No panel of its own yet, so this stays what it has always been: an item
+    // that reveals at ready and does nothing when clicked. Giving it a section
+    // would mean inventing settings there are none of.
     item("settings", "Settings", ICON.gear, { revealAt: "ready" }),
   ];
 });
@@ -1572,21 +1702,35 @@ async function markProgress(step: "early_access") {
 }
 
 function onNavClick(item: NavItem) {
-  if (item.action === "preview") void focusCard("preview", previewCard.value);
-  else if (item.action === "scroll-billing")
-    void focusCard("billing", billingCard.value);
-  else if (item.action === "scroll-devices")
-    void focusCard("devices", devicesCard.value);
+  // Belt and braces with :disabled on the button. A locked item has no panel
+  // to show — Members has none at all, a stage-gated one has not been reached
+  // — so selecting it would leave the sidebar highlighting something the main
+  // area cannot render.
+  if (item.locked || !item.section) return;
+  selectedSection.value = item.section;
 }
 
-async function focusCard(name: "preview" | "billing" | "devices", el: HTMLElement | null) {
+let devicesFlashTimer: ReturnType<typeof setTimeout> | undefined;
+
+// Scroll the machines list into view and flash it. The admit handshake is the
+// only caller: nav items switch panels instead of scrolling now.
+async function focusDevicesCard() {
   await nextTick();
-  el?.scrollIntoView({ behavior: "smooth", block: "center" });
-  focusedCard.value = name;
-  setTimeout(() => {
-    if (focusedCard.value === name) focusedCard.value = null;
+  // Read after the tick rather than taken as an argument. The caller may have
+  // just switched to the panel that renders this, in which case the ref was
+  // still null at call time.
+  devicesCard.value?.scrollIntoView({ behavior: "smooth", block: "center" });
+  devicesFlash.value = true;
+  if (devicesFlashTimer) clearTimeout(devicesFlashTimer);
+  devicesFlashTimer = setTimeout(() => {
+    devicesFlash.value = false;
+    devicesFlashTimer = undefined;
   }, 1400);
 }
+
+onBeforeUnmount(() => {
+  if (devicesFlashTimer) clearTimeout(devicesFlashTimer);
+});
 
 function revealDelay(index: number) {
   return { animationDelay: `${index * 90}ms` };
@@ -2148,7 +2292,10 @@ const ICON = {
   }
 }
 
-.cv-focal-actions {
+.cv-focal-actions,
+/* Same row, inside a card rather than a focal block — the Billing panel's
+   Manage-billing button. */
+.cv-card-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -2448,11 +2595,6 @@ const ICON = {
   animation: cv-reveal 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   margin-bottom: 16px;
 }
-.cv-two {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
 .cv-card {
   border: 1px solid var(--line);
   border-radius: var(--cv-radius);
@@ -2464,13 +2606,6 @@ const ICON = {
 }
 .cv-card.soft {
   background: var(--bg-2);
-}
-.cv-card.focusflash,
-.cv-preview.focusflash {
-  border-color: var(--accent);
-  box-shadow:
-    0 0 0 1px var(--accent),
-    0 0 30px rgba(90, 214, 192, 0.18);
 }
 .cv-card-label {
   font-family: var(--mono);
@@ -2842,8 +2977,7 @@ const ICON = {
   .cv-nav-label {
     flex: none;
   }
-  .cv-preview,
-  .cv-two {
+  .cv-preview {
     grid-template-columns: 1fr;
   }
   .cv-appframe {
