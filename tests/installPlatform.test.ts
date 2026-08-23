@@ -19,7 +19,10 @@ const UA = {
   linux: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
   windows: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
   // ChromeOS carries X11, same as a Linux desktop.
-  chromeos: "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+  chromeos: "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  // X11 without Linux. There is no build for these.
+  freebsd: "Mozilla/5.0 (X11; FreeBSD amd64; rv:126.0) Gecko/20100101 Firefox/126.0",
+  openbsd: "Mozilla/5.0 (X11; OpenBSD amd64; rv:126.0) Gecko/20100101 Firefox/126.0"
 } as const;
 
 describe("preselecting an install command", () => {
@@ -66,6 +69,18 @@ describe("preselecting an install command", () => {
     // Touch does not save us here: many Chromebooks report 0.
     expect(installMethodFor(UA.chromeos, 5)).toBeNull();
     // A real Linux desktop still resolves.
+    expect(installMethodFor(UA.linux, 0)).toEqual({ method: "curl", label: "Linux" });
+  });
+
+  it("does not read every X11 desktop as Linux", () => {
+    // FreeBSD, OpenBSD and Solaris report X11 without Linux. Matching bare X11
+    // labelled them "Linux" and offered an installer with no build behind it.
+    expect(UA.freebsd).toContain("X11");
+    expect(UA.freebsd).not.toContain("Linux");
+    expect(installMethodFor(UA.freebsd, 0)).toBeNull();
+    expect(installMethodFor(UA.openbsd, 0)).toBeNull();
+    // The real thing still resolves — its UA carries both.
+    expect(UA.linux).toContain("X11");
     expect(installMethodFor(UA.linux, 0)).toEqual({ method: "curl", label: "Linux" });
   });
 

@@ -57,7 +57,10 @@ export function installMethodFor(
   // (brew needs Homebrew, npm needs Node 24+) and the one that provisions
   // ~/.autovault and bootstraps the bundled skills.
   if (/Mac OS X|Macintosh/i.test(userAgent)) return { method: "curl", label: "macOS" };
-  if (/Linux|X11/i.test(userAgent)) return { method: "curl", label: "Linux" };
+  // `Linux` only, never bare `X11`: a FreeBSD, OpenBSD or Solaris desktop
+  // reports "X11" without "Linux", and there is no build for those — labelling
+  // one "Linux" would claim a platform this page does not document at all.
+  if (/Linux/i.test(userAgent)) return { method: "curl", label: "Linux" };
 
   return null;
 }
