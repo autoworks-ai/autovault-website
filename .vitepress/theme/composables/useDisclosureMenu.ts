@@ -196,7 +196,13 @@ export function useDisclosureMenu(itemCount: () => number): DisclosureMenu {
       return;
     }
     if (event.key === "Tab") {
-      closeMenu();
+      // restoreFocus, not a bare close. The menu is teleported to the end of
+      // <body> and its items are tabindex="-1", so sequential navigation would
+      // resume from that teleported position -- or from <body> once Vue removes
+      // the node -- and dump the user at the top or bottom of the page. Moving
+      // focus to the trigger synchronously and letting the default Tab run
+      // continues the tab order from where the menu actually appears.
+      closeMenu({ restoreFocus: true });
       return;
     }
     const next = nextMenuIndex(activeIndex.value, event.key, itemCount());
