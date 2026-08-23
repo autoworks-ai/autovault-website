@@ -321,6 +321,7 @@
             <HostedVaultFunnel
               entry="deploy"
               :state="cloudState"
+              :marked-action="nextAction === 'funnel'"
               @state-change="syncCloudState"
               @notice="setNotice"
             />
@@ -444,6 +445,7 @@
               v-if="stage !== 'ready'"
               type="button"
               class="cv-btn cv-status-cta"
+              :class="{ 'av-nextaction': nextAction === 'early-access' }"
               :disabled="busy"
               @click="markProgress('early_access')"
             >
@@ -764,6 +766,7 @@
                     v-if="device.status === 'pending'"
                     type="button"
                     class="cv-btn small"
+                    :class="{ 'av-nextaction': isNextAction(device) }"
                     :data-admit-target="isAdmitTarget(device) ? 'true' : undefined"
                     :disabled="deviceBusy === device.id"
                     @click="decideDevice(device.id, 'admit')"
@@ -808,6 +811,7 @@ import { prefersReducedMotion } from "../utils/motion";
 import { formatPriceLabel } from "../utils/money";
 import { consumeVaultArrival, isAuthenticatedCloudState } from "../utils/vaultArrival";
 import { cloudStateIsKnown, deviceListIsKnown } from "../utils/cloudLoadState";
+import { cloudNextAction, type CloudNextAction } from "../utils/nextAction";
 import {
   admitHandshakeState,
   findAdmitTarget,
@@ -1963,6 +1967,60 @@ const pageTitle = computed(() => {
 const showsMachines = computed(
   () => activeSection.value === "overview" || activeSection.value === "machines",
 );
+
+/* ---------------------------------------------------------------------------
+ * The one thing to do next, marked wherever it happens to be
+ *
+ * "there's one button on each page that completes that page and it moves
+ * around sometimes in the center, sometimes it's in the far right ... Maybe it
+ * would be enough just to highlight the button somehow with a sort of glow or
+ * indicator to show that that's what they have to do to continue."
+ *
+ * Moving the buttons to a common position was considered and rejected: Admit
+ * belongs to a specific device row, and a centred Admit with two machines
+ * pending is ambiguous about which one — the wrong-machine hazard the previous
+ * task removed. So the treatment travels instead of the control. The decision
+ * itself lives in cloudNextAction() rather than in the three template bindings
+ * that consume it, so "exactly one marker" is a property of a function with a
+ * truth table and not a coincidence between three `v-if`s in two components.
+ * ------------------------------------------------------------------------ */
+
+/**
+ * The single pending machine this page is entitled to point at.
+ *
+ * The `?admit=` target qualifies by construction — the CLI put that
+ * fingerprint in the URL, so the page is repeating a name rather than choosing
+ * one. Failing that, one pending row is equally unambiguous: there is only one
+ * Admit button on screen and no other machine it could mean.
+ *
+ * Two or more pending with nothing naming one returns null on purpose. A
+ * marker there would be the page guessing, in the voice it uses for
+ * instructions, about which box gets vault access.
+ */
+const markedDevice = computed(() => {
+  const target = admitTarget.value;
+  // findAdmitTarget already returns pending-only, so this is the same row the
+  // ?admit= handshake focuses — never a machine that has since been admitted.
+  if (target) return target;
+  const pending = pendingDevices.value;
+  return pending.length === 1 ? pending[0] : null;
+});
+
+const nextAction = computed<CloudNextAction>(() =>
+  cloudNextAction({
+    stage: stage.value,
+    namedPendingMachine: Boolean(markedDevice.value),
+    // Both halves of "the Admit button is actually rendered": the card is
+    // gated on `vault` existing, and on being one of the two panels that show
+    // it. Reading the panel alone would mark a button in a template Vue is not
+    // rendering.
+    machinesOnScreen: Boolean(vault.value) && showsMachines.value,
+  }),
+);
+
+function isNextAction(device: SyncDevice) {
+  return nextAction.value === "admit" && markedDevice.value?.id === device.id;
+}
 
 const navItems = computed<NavItem[]>(() => {
   const s = stage.value;

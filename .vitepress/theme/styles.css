@@ -7591,6 +7591,15 @@ button.clerk-profile-action:disabled {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  /* Room for the button to be a button. Measured at the reserve step: the
+     namespace note's box ended at y=690 and this row started at y=690, and the
+     starter-skills panel began at its bottom edge -- zero either side. That
+     was already cramped, and it made `.av-nextaction` impossible: a marker
+     that sits outside the control has nowhere to sit. Unconditional on
+     purpose. Reserving the space only while marked would move the button at
+     the moment it gets marked, which is the same layout shift the connect
+     terminal's reserved height exists to remove. */
+  margin: 12px 0;
 }
 
 .hosted-flow {
@@ -13514,5 +13523,82 @@ button.clerk-profile-action:disabled {
 
   .cd-docs-content .install-cmd {
     padding: 18px 16px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   .av-nextaction — the one thing to do next
+   ---------------------------------------------------------------------------
+   "Maybe it would be enough just to highlight the button somehow with a sort
+   of glow or indicator to show that that's what they have to do to continue."
+
+   One marker, worn by whichever control is currently the single required
+   action: the funnel's primary (Create your account / Open checkout / Reserve
+   namespace), the Admit button on a named pending machine, or the status
+   strip's "Get early access". Which one that is at any moment is decided in
+   ONE place — cloudNextAction() in utils/nextAction.ts — so the class cannot
+   land on two controls at once.
+
+   Global rather than scoped on purpose. These three controls live in three
+   different components, and a `<style scoped>` rule in one of them compiles to
+   `.foo[data-v-…]` and matches nothing in the other two. A global class is the
+   only shape that can genuinely be the *same* treatment in all three places,
+   and it sidesteps the dead-rule trap that has already cost this page five
+   rules.
+
+   Drawn on a pseudo-element rather than the button's own box-shadow, for two
+   reasons that are really the same reason: `.cv-btn:hover` and `.cv-btn:active`
+   both set `box-shadow`, so a marker written that way would vanish under the
+   pointer at the moment of use; and a separate layer *composes* with the three
+   emphases this page already has instead of replacing one of them. It sits
+   behind the button, outside it, and moves with the hover lift.
+
+   Steady, not pulsing. At the connect stage the owner leaves the page to run
+   CLI commands and comes back, and something throbbing for minutes is
+   fatiguing. The only motion is a single fade-in when the marker first
+   appears; see the reduced-motion rule below it, which lands on the same
+   resting state. */
+.av-nextaction {
+  position: relative;
+}
+
+.av-nextaction::after {
+  content: "";
+  position: absolute;
+  /* Clear of the control on every side. 5px is deliberately small enough that
+     on a device row -- where Admit and Deny sit 6px apart -- the halo reads as
+     belonging to one button rather than enclosing the pair. */
+  inset: -5px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 52%, transparent);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent),
+    0 0 16px 1px color-mix(in srgb, var(--accent) 26%, transparent);
+  pointer-events: none;
+  animation: av-nextaction-in 320ms var(--ease, ease) both;
+}
+
+@keyframes av-nextaction-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Belt and braces, the way this file already handles `both`/`forwards`
+     animations (see the .brand-mark-svg block): the site-wide `*` rule above
+     zeroes the duration, but an animation that is filled in both directions
+     and never actually runs is exactly how a state gets frozen at `from`.
+     Naming it here lands the marker on its resting state -- fully drawn,
+     still -- rather than on an invisible one. */
+  .av-nextaction::after {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }
