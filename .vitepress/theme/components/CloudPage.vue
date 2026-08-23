@@ -10,7 +10,9 @@
     :class="`cv-stage-${stage}`"
     :aria-busy="!hydrated"
   >
-    <!-- Loading veil: avoids a flash of the setup funnel before /api/me resolves -->
+    <!-- Loading veil. An OVERLAY rather than a branch, so the shell below is
+         present in the prerendered HTML and there is no layout jump when
+         /api/me resolves. -->
     <div v-if="!hydrated" class="cv-boot">
       <span class="cv-boot-mark"
         ><BrandMark :size="30" state="locked" show-depth
@@ -18,42 +20,26 @@
       <p>Opening your hosted vault…</p>
     </div>
 
-    <!-- Auth resolved to an error, not to "no vault". Showing the sign-up
-         funnel here would tell an existing paying customer to create an
-         account they already have. -->
-    <div v-else-if="stage === 'error'" class="cv-setup">
-      <header class="cv-setup-head">
-        <div class="cv-eyebrow"><span class="cv-spark" /> Hosted vault</div>
-        <h1>We couldn't load your vault</h1>
-        <p>{{ loadError }}</p>
-      </header>
-      <div class="cv-setup-body">
-        <button class="cv-btn" type="button" :disabled="busy" @click="retryLoad">
-          Try again
-        </button>
-      </div>
-    </div>
-
-    <!-- ============ PRE-VAULT: focused sign-up funnel ============ -->
-    <div v-else-if="stage === 'setup'" class="cv-setup">
-      <header class="cv-setup-head">
-        <div class="cv-eyebrow"><span class="cv-spark" /> Hosted vault</div>
-        <h1>Set up your hosted vault</h1>
-        <p>{{ setupLede }}</p>
-      </header>
-      <div class="cv-setup-body">
-        <HostedVaultFunnel entry="deploy" @state-change="syncCloudState" />
-      </div>
-    </div>
-
-    <!-- ============ POST-VAULT: progressive product shell ============ -->
-    <div v-else class="cv-shell">
+    <!-- One shell, every stage. Signup used to render as a separate page with
+         its own visual language and its own four-step rail, then hard-switch
+         to this shell and a different two-step rail once a vault existed.
+         Only the main area changes now; the chrome never moves. -->
+    <div
+      class="cv-shell"
+      :class="{ locked: !signedIn, booting: !hydrated }"
+      :inert="!hydrated">
       <aside class="cv-side" aria-label="Vault navigation">
         <div class="cv-brand">
           <span class="cv-brand-mark"
-            ><BrandMark :size="22" state="unlocked"
+            ><BrandMark
+              :size="22"
+              :state="vault ? 'unlocked' : 'locked'"
+              show-depth
           /></span>
-          <span class="cv-brand-ns"
+          <span
+            class="cv-brand-ns"
+            :class="{ pending: !vault }"
+            :title="vault ? undefined : 'Reserved after checkout'"
             ><span class="cv-slash">/</span>{{ vaultSlug }}</span
           >
         </div>
@@ -78,33 +64,68 @@
           </button>
         </nav>
 
-        <div class="cv-side-foot">
-          <span class="cv-avatar" :style="avatarStyle" aria-hidden="true" />
-          <span class="cv-who">
-            <strong>{{ accountName }}</strong>
-            <small>Hosted · {{ subscriptionState.text }}</small>
-          </span>
-        </div>
+        <CloudAccountMenu
+          :name="accountName"
+          :email="accountEmailShort"
+          :status-text="subscriptionState.text"
+          :avatar-style="avatarStyle"
+          :signed-in="signedIn"
+          :busy="busy"
+          @billing="openBillingPortal"
+        />
       </aside>
 
       <main class="cv-content">
         <header class="cv-topbar">
           <div>
+            <div class="cv-eyebrow"><span class="cv-spark" /> Hosted vault</div>
             <div class="cv-crumb">
               <span class="cv-crumb-host">vault.autovault.dev</span> /
               {{ vaultSlug }}
             </div>
-            <h1>Overview</h1>
+            <h1>{{ pageTitle }}</h1>
           </div>
           <div class="cv-badges">
-            <span class="cv-pill ok"
+            <span v-if="vault" class="cv-pill ok"
               ><span class="cv-dot" /> Namespace reserved</span
             >
             <span class="cv-pill mut"
-              ><span class="cv-dot" /> Hosted sync · building</span
+              ><span class="cv-dot" /> Cloud CLI sync is coming soon</span
             >
           </div>
         </header>
+
+        <!-- The single progress model. Present at every stage, so nothing
+             resets or re-numbers as the user advances. -->
+        <ol
+          class="cv-rail"
+          :class="{ complete: onboardingComplete }"
+          aria-label="Hosted vault setup progress"
+        >
+          <li
+            v-for="(step, i) in onboardingSteps"
+            :key="step.key"
+            class="cv-rail-step"
+            :class="step.state"
+            :aria-current="step.state === 'active' ? 'step' : undefined"
+          >
+            <span class="cv-rail-dot" aria-hidden="true">{{
+              step.state === "done" ? "✓" : step.index
+            }}</span>
+            <span class="cv-rail-copy">
+              <strong>{{ step.label }}</strong>
+              <small>{{ step.detail }}</small>
+              <span class="visually-hidden">{{
+                RAIL_STATE_LABEL[step.state]
+              }}</span>
+            </span>
+            <span
+              v-if="i < onboardingSteps.length - 1"
+              class="cv-rail-line"
+              aria-hidden="true"
+            />
+          </li>
+        </ol>
 
         <p
           v-if="notice"
@@ -116,6 +137,52 @@
           {{ notice.text }}
         </p>
 
+        <!-- ---------- STAGE: ERROR ---------- -->
+        <template v-if="stage === 'error'">
+          <div class="cv-focal">
+            <h2>We couldn't load your vault</h2>
+            <p class="cv-focal-body">{{ loadError }}</p>
+            <div class="cv-focal-actions">
+              <button
+                class="cv-btn"
+                type="button"
+                :disabled="busy"
+                @click="retryLoad"
+              >
+                Try again
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <!-- ---------- PRE-VAULT: account / subscription / reserve ----------
+             v-show, not v-if. provisionVault emits stateChange the moment a
+             vault comes back, which flips this condition -- under v-if that
+             destroyed the component mid-function, throwing away its success
+             notice and the result of the savePendingImport still in flight.
+             Kept mounted, it simply hides. -->
+        <template v-if="stage !== 'error'">
+          <div v-show="!vault" class="cv-focal">
+            <div class="cv-focal-glow" aria-hidden="true" />
+            <div class="cv-step-kicker">
+              Step {{ activeStepNumber }} of {{ onboardingSteps.length }} · the
+              only thing to do right now
+            </div>
+            <h2>{{ setupHeadline }}</h2>
+            <p class="cv-focal-body">{{ setupLede }}</p>
+            <p v-if="hostedPriceLabel && !paid" class="cv-price">
+              <strong>{{ hostedPriceLabel }}</strong>
+              <span>Cancel any time from the billing portal.</span>
+            </p>
+            <HostedVaultFunnel
+              entry="deploy"
+              :state="cloudState"
+              @state-change="syncCloudState"
+              @notice="setNotice"
+            />
+          </div>
+        </template>
+
         <!-- ---------- STAGE A: CONNECT ---------- -->
         <template v-if="stage === 'connect'">
           <p class="cv-greeting">
@@ -126,9 +193,6 @@
             <div class="cv-focal-ns">
               <span class="cv-pill ok"><span class="cv-dot" /> Reserved</span>
               <span class="cv-endpoint-mono">{{ hostedEndpoint }}</span>
-            </div>
-            <div class="cv-step-kicker">
-              Step 1 of 2 · the only thing to do right now
             </div>
             <h2>Connect your local CLI</h2>
             <p class="cv-focal-body">
@@ -151,20 +215,11 @@
                 >Installation guide</a
               >
             </div>
-            <div class="cv-rail">
-              <div class="cv-rail-step now">
-                <span class="cv-rail-dot">1</span> Connect CLI
-              </div>
-              <span class="cv-rail-line" />
-              <div class="cv-rail-step">
-                <span class="cv-rail-dot">2</span> Explore what's next
-              </div>
-            </div>
           </div>
         </template>
 
         <!-- ---------- STAGE B: EXPLORE  &  STAGE C: READY ---------- -->
-        <template v-else>
+        <template v-if="stage === 'explore' || stage === 'ready'">
           <!-- progress summary card (collapses stage A) -->
           <div class="cv-status-card" :class="{ allset: stage === 'ready' }">
             <span class="cv-pill ok"
@@ -329,7 +384,9 @@ import {
 } from "vue";
 import HostedVaultFunnel from "./HostedVaultFunnel.vue";
 import BrandMark from "./BrandMark.vue";
+import CloudAccountMenu from "./CloudAccountMenu.vue";
 import { copyText as copyToClipboard } from "../utils/clipboard";
+import { formatPriceLabel } from "../utils/money";
 import { clerkAuthRecoveryMessage, isClerkApiAuthError, useClerkApiAuth } from "../utils/clerkApi";
 import {
   useTerminalReplay,
@@ -446,7 +503,7 @@ type CloudStatePayload = {
   subscription?: CloudSubscription;
   vault?: CloudVault;
 };
-type Stage = "error" | "setup" | "connect" | "explore" | "ready";
+type Stage = "error" | "account" | "subscription" | "setup" | "connect" | "explore" | "ready";
 type NavItem = {
   key: string;
   label: string;
@@ -470,7 +527,16 @@ const hydrated = ref(false);
 // whose token refresh blipped was shown "Set up your hosted vault".
 const loadError = ref<string | null>(null);
 const busy = ref(false);
-const notice = ref<{ kind: "ok" | "warn"; text: string } | null>(null);
+type CloudNotice = { kind: "ok" | "warn" | "fail"; text: string };
+const notice = ref<CloudNotice | null>(null);
+
+// The funnel used to render its own notice element. Now that it is chrome-
+// free, its failures surface through this page's single live region --
+// otherwise a cancelled Checkout or the expected webhook-delay 402 would
+// leave the button simply re-enabling with no explanation.
+function setNotice(next: CloudNotice | null) {
+  notice.value = next;
+}
 const focusedCard = ref<"preview" | "billing" | null>(null);
 const previewCard = ref<HTMLElement | null>(null);
 const billingCard = ref<HTMLElement | null>(null);
@@ -485,15 +551,34 @@ const vault = computed(() => cloudState.value.vault);
 const cliLinked = computed(() => Boolean(vault.value?.cli_linked_at));
 const earlyAccess = computed(() => Boolean(vault.value?.early_access_at));
 
+const subscription = computed(() => cloudState.value.subscription);
+
+// ORs in the live Clerk flag, not just the /api/me payload. Clerk resolves
+// after mount, so between those two moments `user` is still null -- without
+// this the shell would blink back to "create an account" for someone who is
+// demonstrably signed in.
+const signedIn = computed(
+  () => Boolean(user.value) || isClerkSignedIn.value,
+);
+const paid = computed(() => Boolean(subscription.value?.active));
+
 const stage = computed<Stage>(() => {
   if (loadError.value && !vault.value) return "error";
-  if (!vault.value) return "setup";
-  if (!cliLinked.value) return "connect";
-  if (!earlyAccess.value) return "explore";
-  return "ready";
+  // Vault first. A reserved vault is proof the first three steps completed,
+  // so checking `paid` ahead of it would bounce a past_due or canceled holder
+  // back to "Finish checkout" -- getSubscription derives `active` from
+  // isPaidStatus(status), so a lapse flips `paid` false while the vault row
+  // survives untouched. A lapse belongs on the Subscription card, not in the
+  // signup funnel.
+  if (vault.value) {
+    if (!cliLinked.value) return "connect";
+    if (!earlyAccess.value) return "explore";
+    return "ready";
+  }
+  if (!signedIn.value) return "account";
+  if (!paid.value) return "subscription";
+  return "setup";
 });
-
-const subscription = computed(() => cloudState.value.subscription);
 
 // The card used to render a hardcoded "Active" pill and a hardcoded monthly
 // price as static markup, while the real
@@ -565,20 +650,164 @@ const accountEmailShort = computed(() => {
   const [name, domain] = email.split("@");
   return domain ? `${name}@${domain}` : email;
 });
-const avatarStyle = computed(() =>
-  user.value?.avatar_url
-    ? {
-        backgroundImage: `url(${user.value.avatar_url})`,
-        backgroundColor: "transparent",
-      }
-    : {},
+// Typed rather than an inline `{}`: in a ternary/union position TS widens the
+// empty branch to `{ backgroundImage?: undefined }`, which then fails the
+// Record<string, string> index signature the menu prop expects.
+const NO_AVATAR_STYLE: Record<string, string> = {};
+
+const avatarStyle = computed<Record<string, string>>(() => {
+  const avatarUrl = user.value?.avatar_url;
+  if (!avatarUrl) return NO_AVATAR_STYLE;
+  return {
+    backgroundImage: `url(${avatarUrl})`,
+    backgroundColor: "transparent",
+  };
+});
+
+/* ---------------------------------------------------------------------------
+ * Onboarding rail
+ *
+ * One derivation, replacing four that used to disagree: the funnel's
+ * "Step N of 4" kicker, its four status cards, its five-row provisioning
+ * checklist, and this page's own two-step rail. Those four are why the page
+ * announced four steps and then switched to a different two-step model
+ * partway through.
+ *
+ * "Sync" is deliberately NOT a step. Hosted sync does not exist server-side,
+ * and a step you cannot complete is not a step -- it stays a locked
+ * destination in the sidebar instead.
+ * ------------------------------------------------------------------------ */
+type StepKey = "account" | "subscription" | "namespace" | "connect";
+type StepState = "done" | "active" | "pending" | "unknown";
+type OnboardingStep = {
+  key: StepKey;
+  index: number;
+  label: string;
+  detail: string;
+  state: StepState;
+};
+
+const ONBOARDING_STEP_KEYS: StepKey[] = [
+  "account",
+  "subscription",
+  "namespace",
+  "connect",
+];
+const ONBOARDING_STEP_LABELS: Record<StepKey, string> = {
+  account: "Account",
+  subscription: "Subscription",
+  namespace: "Namespace",
+  connect: "Connect CLI",
+};
+const RAIL_STATE_LABEL: Record<StepState, string> = {
+  done: "completed",
+  active: "current step",
+  pending: "not started",
+  unknown: "status unavailable",
+};
+
+const stepDone = computed<Record<StepKey, boolean>>(() => ({
+  account: signedIn.value,
+  // Stays ticked once a vault exists. A later lapse must not un-tick a step
+  // the user genuinely completed -- it surfaces on the Subscription card.
+  subscription: paid.value || Boolean(vault.value),
+  namespace: Boolean(vault.value),
+  connect: cliLinked.value,
+}));
+
+const activeStepKey = computed<StepKey | null>(
+  () => ONBOARDING_STEP_KEYS.find((key) => !stepDone.value[key]) ?? null,
 );
 
-const setupLede = computed(() =>
-  isClerkSignedIn.value
-    ? "A couple of steps left — finish checkout to reserve your namespace. Signing and serving stay on the local CLI today."
-    : "Create your account, reserve a stable namespace, and keep your local CLI as the source of truth. Hosted sync ships next.",
+const stepDetail = computed<Record<StepKey, string>>(() => ({
+  account: signedIn.value ? accountEmailShort.value : "Create an account or sign in",
+  subscription: paid.value
+    ? subscriptionState.value.text
+    : vault.value
+      ? `${subscriptionState.value.text} — needs attention`
+      : "Stripe-hosted payment form",
+  namespace: vault.value ? hostedEndpoint.value : "Reserved after checkout",
+  connect: cliLinked.value
+    ? "Linked from your machine"
+    : "Point your CLI at the namespace",
+}));
+
+const onboardingSteps = computed<OnboardingStep[]>(() =>
+  ONBOARDING_STEP_KEYS.map((key, index) => ({
+    key,
+    index: index + 1,
+    label: ONBOARDING_STEP_LABELS[key],
+    detail: stepDetail.value[key],
+    // A failed /api/me leaves every downstream fact unknowable. Ticking step
+    // one off isClerkSignedIn while greying the rest as "pending" would claim
+    // knowledge we do not have.
+    state:
+      stage.value === "error"
+        ? "unknown"
+        : stepDone.value[key]
+          ? "done"
+          : key === activeStepKey.value
+            ? "active"
+            : "pending",
+  })),
 );
+
+type HostedPrice = { amount: number | null; currency: string | null; interval: string | null };
+const hostedPrice = ref<HostedPrice | null>(null);
+
+// What the plan costs, read from Stripe. The funnel previously sent people to
+// Checkout without naming a price anywhere -- the first number you saw was on
+// Stripe's own page, after committing. A literal here would be worse: it
+// drifts silently the moment the price changes in Stripe.
+const hostedPriceLabel = computed(() => {
+  const price = hostedPrice.value;
+  if (!price) return null;
+  return formatPriceLabel(price.amount, price.currency, price.interval);
+});
+
+async function loadPricing() {
+  // Never blocks or breaks the funnel: if Stripe is unreachable the price
+  // line simply does not render.
+  try {
+    const response = await fetch("/api/pricing", { headers: { accept: "application/json" } });
+    if (!response.ok) return;
+    hostedPrice.value = await response.json();
+  } catch {
+    /* leave hostedPrice null */
+  }
+}
+
+const onboardingComplete = computed(() => activeStepKey.value === null);
+const activeStepNumber = computed(() =>
+  activeStepKey.value
+    ? ONBOARDING_STEP_KEYS.indexOf(activeStepKey.value) + 1
+    : ONBOARDING_STEP_KEYS.length,
+);
+
+// Header copy follows the stage rather than being hardcoded to "Overview",
+// which was only ever correct once a vault existed.
+const pageTitle = computed(() => {
+  if (stage.value === "error") return "We couldn't load your vault";
+  return vault.value ? "Overview" : "Reserve a hosted AutoVault namespace";
+});
+
+// Headline and lede follow the active step, so the focal card always names
+// the one thing to do rather than describing the whole journey.
+const setupHeadline = computed(() => {
+  if (stage.value === "account") return "Create your AutoVault account";
+  if (stage.value === "subscription") return "Finish checkout";
+  return "Reserve your namespace";
+});
+
+const setupLede = computed(() => {
+  if (stage.value === "account") {
+    return "Create your account, reserve a stable namespace, and keep your local CLI as the source of truth. Hosted sync ships next.";
+  }
+  if (stage.value === "subscription") {
+    return "Stripe records the subscription through a webhook before AutoVault reserves your namespace.";
+  }
+  return "Your subscription is active. Reserve the namespace to finish setup — signing and serving stay on the local CLI today.";
+});
 
 const installDocsHref = "/quick-start#install";
 
@@ -599,7 +828,7 @@ const navItems = computed<NavItem[]>(() => {
       action?: NavItem["action"];
     } = {},
   ): NavItem => {
-    const order: Stage[] = ["setup", "connect", "explore", "ready"];
+    const order: Stage[] = ["account", "subscription", "setup", "connect", "explore", "ready"];
     const revealed = opts.revealAt
       ? order.indexOf(s) >= order.indexOf(opts.revealAt)
       : true;
@@ -641,6 +870,7 @@ const navItems = computed<NavItem[]>(() => {
 
 onMounted(() => {
   void loadCloudState(true);
+  void loadPricing();
 });
 
 watch([isClerkLoaded, isClerkSignedIn], ([loaded]) => {
@@ -695,6 +925,20 @@ async function retryLoad() {
 }
 
 function syncCloudState(payload: CloudStatePayload) {
+  // Bump the sequence so any /api/me this page already has in flight bails
+  // out instead of overwriting freshly provisioned state.
+  //
+  // The race is real and lands exactly where it hurts: on a Stripe return
+  // this page fires an /api/me before Clerk resolves (so it comes back
+  // anonymous and slow), while the funnel reconciles and provisions. Without
+  // this bump the stale anonymous response wins on arrival and drops a user
+  // who has just paid straight back to "Finish checkout".
+  //
+  // The contract that makes the bump safe: the funnel only emits payloads it
+  // actually knows to be true -- a 200 from /api/me, or a vault it just
+  // provisioned. It stays silent when a request fails, precisely because
+  // cancelling this page's own load is a side effect a guess cannot afford.
+  cloudStateRequestSeq += 1;
   cloudState.value = normalizeCloudState(payload);
   loadError.value = null;
   hydrated.value = true;
@@ -706,6 +950,52 @@ function normalizeCloudState(payload: CloudStatePayload): CloudState {
     subscription: payload.subscription ?? null,
     vault: payload.vault ?? null,
   };
+}
+
+async function openBillingPortal() {
+  if (busy.value) {
+    // The menu already renders Billing as aria-disabled while this lock is
+    // held, so reaching here means the lock was taken between paint and
+    // click. Say so rather than swallowing the choice: an apparently live
+    // command that does nothing and explains nothing reads as a broken app.
+    notice.value = { kind: "warn", text: "Just a moment — finishing the last request." };
+    return;
+  }
+  busy.value = true;
+  notice.value = null;
+  try {
+    const headers = await authHeaders({
+      "content-type": "application/json",
+      accept: "application/json",
+    }, { required: true, fresh: true });
+    const response = await fetch("/api/billing/portal", {
+      method: "POST",
+      credentials: "include",
+      headers,
+      body: JSON.stringify({ return_to: "/cloud#launch-path" }),
+    });
+    const payload = await response.json().catch(() => ({})) as { url?: string; error?: string };
+    if (!response.ok || !payload.url) {
+      // Covers the 409 "no billing account yet" case as well as a Stripe
+      // outage — the server's own wording is more useful than anything
+      // generic we could invent here.
+      notice.value = {
+        kind: "warn",
+        text: payload.error || "Couldn't open billing just now. Try again in a moment.",
+      };
+      return;
+    }
+    window.location.assign(payload.url);
+  } catch (error) {
+    notice.value = {
+      kind: "warn",
+      text: isClerkApiAuthError(error)
+        ? clerkAuthRecoveryMessage(error)
+        : "Couldn't reach the server. Try again in a moment.",
+    };
+  } finally {
+    busy.value = false;
+  }
 }
 
 async function markProgress(step: "cli_linked" | "early_access") {
@@ -799,17 +1089,25 @@ const ICON = {
 .cv-page {
   --cv-radius: 14px;
   --cv-radius-sm: 9px;
+  position: relative;
   width: 100%;
   padding-top: 24px;
   color: var(--ink);
 }
 
 /* ---------------- boot veil ---------------- */
+/* Overlays the shell rather than replacing it, so the prerendered HTML
+   already contains the real layout and nothing jumps when /api/me lands. */
 .cv-boot {
+  position: absolute;
+  inset: 24px 0 0;
+  z-index: 2;
   display: grid;
+  align-content: center;
   justify-items: center;
   gap: 14px;
-  padding: 120px 0;
+  border-radius: var(--cv-radius);
+  background: var(--bg);
   color: var(--ink-3);
   font-size: 14px;
 }
@@ -818,14 +1116,8 @@ const ICON = {
   animation: cv-pulse 1.8s var(--ease) infinite;
 }
 
-/* ---------------- pre-vault setup ---------------- */
-.cv-setup {
-  max-width: 760px;
-  margin: 0 auto;
-}
-.cv-setup-head {
-  margin-bottom: 26px;
-}
+/* Eyebrow + spark moved from the deleted pre-vault header into the topbar,
+   where they now render at every stage as persistent chrome. */
 .cv-eyebrow {
   display: inline-flex;
   align-items: center;
@@ -841,20 +1133,6 @@ const ICON = {
   height: 1px;
   background: var(--accent);
   box-shadow: 0 0 8px var(--accent);
-}
-.cv-setup-head h1 {
-  margin: 14px 0 8px;
-  font-size: 40px;
-  font-weight: 500;
-  letter-spacing: -0.03em;
-  line-height: 1.05;
-}
-.cv-setup-head p {
-  margin: 0;
-  max-width: 580px;
-  color: var(--ink-2);
-  font-size: 15px;
-  line-height: 1.55;
 }
 
 /* ---------------- product shell ---------------- */
@@ -986,40 +1264,6 @@ const ICON = {
   opacity: 0.5;
 }
 
-.cv-side-foot {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 8px;
-  padding-top: 13px;
-  border-top: 1px solid var(--line-2);
-}
-.cv-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  flex: none;
-  background: linear-gradient(135deg, var(--blue), var(--violet));
-  background-size: cover;
-  background-position: center;
-}
-.cv-who {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.cv-who strong {
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.cv-who small {
-  font-size: 11px;
-  color: var(--ink-3);
-}
 
 /* main content */
 .cv-content {
@@ -1112,6 +1356,13 @@ const ICON = {
   color: var(--warn);
   border: 1px solid rgba(232, 168, 102, 0.3);
   background: rgba(232, 168, 102, 0.07);
+}
+/* The funnel emits a third tone for hard failures (Stripe not configured,
+   provisioning refused). Without this rule those rendered unstyled. */
+.cv-notice.fail {
+  color: var(--bad);
+  border: 1px solid rgba(217, 113, 113, 0.3);
+  background: rgba(217, 113, 113, 0.07);
 }
 
 .cv-greeting {
@@ -1274,18 +1525,41 @@ const ICON = {
 
 .cv-rail {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0;
-  margin-top: 22px;
+  margin: 0 0 24px;
+  padding: 0;
+  list-style: none;
 }
 .cv-rail-step {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 0;
   font-size: 12px;
   color: var(--ink-3);
 }
-.cv-rail-step.now {
+.cv-rail-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.cv-rail-copy strong {
+  font-weight: 500;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.cv-rail-copy small {
+  font-size: 11px;
+  color: var(--ink-4);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 150px;
+}
+.cv-rail-step.active .cv-rail-copy strong,
+.cv-rail-step.done .cv-rail-copy strong {
   color: var(--ink);
 }
 .cv-rail-dot {
@@ -1294,21 +1568,111 @@ const ICON = {
   justify-content: center;
   width: 19px;
   height: 19px;
+  margin-top: 1px;
   border-radius: 50%;
   border: 1.5px solid var(--line-2);
   font-size: 10px;
   flex: none;
+  transition:
+    border-color var(--dur-base) var(--ease),
+    color var(--dur-base) var(--ease);
 }
-.cv-rail-step.now .cv-rail-dot {
+.cv-rail-step.active .cv-rail-dot {
   border-color: var(--accent);
   color: var(--accent);
 }
+.cv-rail-step.done .cv-rail-dot {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+/* A failed /api/me means we know nothing about any step -- render that
+   honestly rather than implying "not started". */
+.cv-rail-step.unknown .cv-rail-dot {
+  border-style: dashed;
+  border-color: var(--line-2);
+  color: var(--ink-4);
+}
 .cv-rail-line {
   flex: 1;
-  max-width: 60px;
+  max-width: 44px;
   height: 1.5px;
-  margin: 0 12px;
+  margin: 10px 12px 0;
   background: var(--line-2);
+}
+/* Once every step is done the rail has no job left, so it collapses to a
+   quiet completed row instead of parking a finished progress bar on the
+   resting dashboard forever. */
+.cv-rail.complete .cv-rail-copy small,
+.cv-rail.complete .cv-rail-line {
+  display: none;
+}
+.cv-rail.complete .cv-rail-step {
+  gap: 6px;
+}
+.cv-rail.complete .cv-rail-step + .cv-rail-step {
+  margin-left: 16px;
+}
+.cv-rail.complete .cv-rail-dot {
+  width: 15px;
+  height: 15px;
+  font-size: 8.5px;
+}
+.cv-rail.complete .cv-rail-copy strong {
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+/* Signed-out: the shell is visible but obviously not yours yet. Opacity
+   rather than blur -- blur is unreadable and reads as motion. */
+.cv-shell.locked .cv-nav,
+.cv-shell.locked .cv-acct {
+  opacity: 0.55;
+}
+.cv-shell.booting {
+  pointer-events: none;
+}
+.cv-price {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 20px;
+}
+.cv-price strong {
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.cv-price span {
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.cv-brand-ns.pending {
+  color: var(--ink-4);
+}
+
+/* Four labelled steps cannot sit side by side on a phone -- flexed across,
+   the labels wrap one character per line. Stack them instead and drop the
+   connector, which has no meaning in a vertical list. */
+@media (max-width: 640px) {
+  .cv-rail {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .cv-rail-line {
+    display: none;
+  }
+  .cv-rail-copy small {
+    max-width: none;
+  }
+  .cv-rail.complete {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 10px 0;
+  }
 }
 
 /* status card (stage B/C) */
@@ -1731,12 +2095,6 @@ const ICON = {
   .cv-nav-label {
     flex: none;
   }
-  .cv-side-foot {
-    margin: 0;
-    padding: 0 0 0 8px;
-    border-top: 0;
-    border-left: 1px solid var(--line-2);
-  }
   .cv-preview,
   .cv-two {
     grid-template-columns: 1fr;
@@ -1763,11 +2121,6 @@ const ICON = {
   .cv-nav {
     flex: none;
     gap: 6px;
-  }
-  .cv-side-foot {
-    padding: 10px 0 0;
-    border-top: 1px solid var(--line-2);
-    border-left: 0;
   }
 }
 

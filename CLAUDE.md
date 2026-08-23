@@ -55,11 +55,20 @@ npm run dev:bootstrap                # apply all pending D1 migrations to local 
 ```
 
 `.dev.vars` is gitignored; `.dev.vars.example` documents every required key.
-Clerk keys can be pulled via `clerk env pull --file .dev.vars`. Stripe values
-come from `stripe config --list` and `stripe listen --print-secret`. The
-webhook secret is stable per Stripe account in test mode — don't re-roll it
-casually; just rerun `stripe listen --print-secret` if `.dev.vars` ever
-drifts.
+Clerk keys can be pulled via `clerk env pull --file .dev.vars`.
+
+**`STRIPE_SECRET_KEY` must come from the Stripe Dashboard** (Developers >
+API keys > Secret key, test mode) — *not* from `stripe config --list`.
+That CLI key is minted by `stripe login` and Stripe expires it 90 days
+later, at which point checkout starts failing with "Expired API Key
+provided: sk_test_***" and nothing points at the CLI as the cause. A
+dashboard key does not expire.
+
+`npm run dev:stripe` reads that same key and passes it to the Stripe CLI, so
+one credential covers both the app and webhook forwarding and `stripe login`
+is not required. It refuses to start on a live key. The webhook secret is
+stable per Stripe account in test mode — rerun `stripe listen --print-secret`
+if `.dev.vars` ever drifts.
 
 **Per-session — two terminals**
 
@@ -71,9 +80,24 @@ npm run dev:pages
 npm run dev:stripe
 ```
 
-For iteration on the funnel UI itself, use `npm run dev:pages:live` instead
-of `dev:pages` — it puts Wrangler in front of the live VitePress dev server,
-so component/CSS edits hot-reload without a rebuild.
+For iteration on the funnel UI itself, leave `dev:pages` running and rebuild
+in a third terminal — Wrangler picks the new bundle up without a restart, and
+`--live-reload` reloads the browser for you:
+
+```bash
+npm run docs:build      # ~2s, no restart needed
+```
+
+There used to be a `dev:pages:live` script promising true hot reload. It was
+removed because it silently lied: `wrangler pages dev --proxy 5173` is
+ignored whenever `wrangler.toml` sets `pages_build_output_dir`, so Wrangler
+served a stale `.vitepress/dist` while a VitePress dev server nobody proxied
+to ran alongside it. Verified against wrangler 4.125: edit a string, and
+:5173 shows it while :8788 still serves the previous build.
+
+**`npm run dev` (port 5173) cannot run this funnel at all.** It is VitePress
+only — no Pages Functions — so every `/api/*` call 404s and `/cloud` can
+never leave the signed-out state. The page detects port 5173 and says so.
 
 **Test-mode helpers**
 

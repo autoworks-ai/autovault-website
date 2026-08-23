@@ -156,6 +156,10 @@ describe("Clerk production deployment configuration", () => {
     expect(cloudPage).toContain("useClerkApiAuth");
     expect(funnel).not.toContain("window.Clerk");
     expect(cloudPage).not.toContain("window.Clerk");
+    // The account menu and its composable are where the new Clerk work
+    // lives; without these the ban stops covering the code it exists for.
+    expect(read(".vitepress/theme/components/CloudAccountMenu.vue")).not.toContain("window.Clerk");
+    expect(read(".vitepress/theme/utils/clerkAccount.ts")).not.toContain("window.Clerk");
     expect(funnel).toContain("@signed-in-action");
     expect(controls).toContain("signedInAction");
   });

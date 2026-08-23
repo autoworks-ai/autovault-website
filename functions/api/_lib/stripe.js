@@ -290,6 +290,32 @@ export async function retrieveCheckoutSession(env, sessionId, fetcher = fetch) {
   return payload;
 }
 
+// The configured plan's real price, read from Stripe rather than hardcoded.
+// The funnel showed no price at all before sending people to Checkout; a
+// literal in the UI would be worse, because it drifts silently the moment
+// the price changes in Stripe.
+export async function retrieveHostedPrice(env, fetcher = fetch) {
+  if (!env.STRIPE_SECRET_KEY) throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
+  if (!env.AUTOVAULT_HOSTED_PRICE_ID) throw new ApiError(503, "AUTOVAULT_HOSTED_PRICE_ID is not configured.");
+
+  const url = `https://api.stripe.com/v1/prices/${encodeURIComponent(env.AUTOVAULT_HOSTED_PRICE_ID)}`;
+  const response = await fetcher(url, {
+    method: "GET",
+    headers: {
+      authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+      "stripe-version": STRIPE_API_VERSION
+    }
+  });
+  const payload = await response.json();
+  if (!response.ok) throw new ApiError(502, payload.error?.message || "Stripe price lookup failed.");
+
+  return {
+    amount: payload.unit_amount ?? null,
+    currency: payload.currency ?? null,
+    interval: payload.recurring?.interval ?? null
+  };
+}
+
 export { asId, currentPeriodEndFor, priceIdForSubscription };
 
 function applyBranding(params, env) {
