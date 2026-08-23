@@ -261,9 +261,17 @@ describe("the early-access ask belongs to the stage, not to a panel", () => {
     expect(strip).toContain("@click=\"markProgress('early_access')\"");
     expect(strip).toContain("Get early access");
     // Same behaviour it had in the panel: it takes the shell's request lock
-    // and says so rather than going quiet.
+    // and says so rather than going quiet. The word changed with the move --
+    // `busy` is one lock shared with Manage billing, and the Billing panel
+    // now renders with this button beside it every time, so "Saving…" had the
+    // strip announcing work nobody asked for. "Working…" is what the device
+    // rows already say while someone else's request is in flight.
     expect(strip).toContain(':disabled="busy"');
-    expect(strip).toContain('busy ? "Saving…"');
+    // Anchored on the label expression, not the bare word: the comment above
+    // the button explains what it stopped saying, and a negative match on the
+    // quoted literal alone reads that comment instead of the code.
+    expect(strip).toContain('busy ? "Working…"');
+    expect(strip).not.toContain('busy ? "Saving…"');
     // And the strip really is stage chrome outside the chain -- the panel
     // test above pins that, this pins that the button came with it.
     const overviewAt = cloudPage.indexOf(`v-if="activeSection === 'overview'"`);

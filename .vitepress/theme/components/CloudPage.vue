@@ -313,6 +313,14 @@
                  which nav item hid it. Here it survives every panel switch.
                  Gone at `ready` because the ask has been made -- the strip's
                  own text says so, and the Skills panel confirms it. -->
+            <!-- "Working…", not "Saving…", which is what this button said
+                 inside the Skills panel. `busy` is the shell's single request
+                 lock, so it is also held by Manage billing — and the Billing
+                 panel now renders with this button beside it every time, so
+                 clicking Manage billing made the strip announce it was saving
+                 something nobody had asked it to save. Same word the device
+                 rows already use while a request they did not start is in
+                 flight. -->
             <button
               v-if="stage !== 'ready'"
               type="button"
@@ -320,7 +328,7 @@
               :disabled="busy"
               @click="markProgress('early_access')"
             >
-              {{ busy ? "Saving…" : "Get early access →" }}
+              {{ busy ? "Working…" : "Get early access →" }}
             </button>
           </div>
 
