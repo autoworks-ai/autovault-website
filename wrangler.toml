@@ -11,8 +11,11 @@ STRIPE_BRAND_BUTTON_COLOR = "#5ad6c0"
 STRIPE_BRAND_BORDER_STYLE = "rounded"
 STRIPE_BRAND_FONT_FAMILY = "inter"
 STRIPE_BRAND_ICON_URL = "https://autovault.dev/square-1200x1200.png"
+# Without this, Stripe falls back to the ACCOUNT logo — which belongs to
+# Very Good Plugins, not AutoVault. Verified on a live test session.
+STRIPE_BRAND_LOGO_URL = "https://autovault.dev/square-1200x1200.png"
 STRIPE_CHECKOUT_SUBMIT_TYPE = "subscribe"
-STRIPE_CHECKOUT_CUSTOM_TEXT_SUBMIT = "AutoVault reserves your hosted namespace after Stripe confirms this test subscription. Cloud sync remains disabled until the CLI handoff ships."
+STRIPE_CHECKOUT_CUSTOM_TEXT_SUBMIT = "AutoVault reserves your hosted namespace once Stripe confirms this subscription. Cloud sync remains disabled until the CLI handoff ships."
 
 [[d1_databases]]
 binding = "AUTOVAULT_DB"

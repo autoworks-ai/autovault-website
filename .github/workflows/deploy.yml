@@ -15,7 +15,7 @@ permissions:
 env:
   NODE_VERSION: "24"
   PAGES_PROJECT_NAME: autovault-website
-  WRANGLER_VERSION: "4.90.0"
+  WRANGLER_VERSION: "4.95.0"
 
 concurrency:
   group: pages-manual-${{ inputs.branch || github.ref_name }}
@@ -53,6 +53,25 @@ jobs:
         run: npm run docs:build
       - name: Scan Clerk production assets
         run: node scripts/scan-clerk-production-dist.mjs .vitepress/dist
+
+      # Migrations are not applied by any other step. Deploying Functions that
+      # depend on a new migration before the schema exists in production makes
+      # every request touching that path 500 until someone notices and runs
+      # this manually. Applying it here, before the Pages deploy, closes that
+      # window on every break-glass deploy too.
+      #
+      # This dispatcher accepts an arbitrary `branch` input and, unlike the
+      # PR-preview job in ci.yml, never swaps wrangler.toml to a preview D1
+      # binding — its D1 binding is ALWAYS the production database. Gate on
+      # DEPLOY_BRANCH so a manual deploy of a feature branch (which lands on a
+      # non-production Pages URL) cannot apply that branch's unreviewed
+      # migration to production data.
+      - name: Apply pending D1 migrations
+        if: env.DEPLOY_BRANCH == 'main'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npm run migrate:remote
 
       - name: Deploy to Cloudflare Pages
         id: pages_deploy

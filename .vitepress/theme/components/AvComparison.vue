@@ -2,6 +2,10 @@
 import { comparisonPlayers, comparisonSources, homepageComparisonRows, type ComparisonMark } from '../data/marketing'
 
 function glyph(k: ComparisonMark) { return k === 'yes' ? '●' : k === 'partial' ? '◐' : '○' }
+// Screen readers announced this 40-cell grid as forty repetitions of "●" with
+// the legend in a separate, purely visual div. The glyph stays decorative; the
+// word is what gets announced.
+function markLabel(k: ComparisonMark) { return k === 'yes' ? 'shipped' : k === 'partial' ? 'partial' : 'absent' }
 function rowMarks(row: (typeof homepageComparisonRows)[number]) { return row.slice(1) as ComparisonMark[] }
 </script>
 
@@ -20,10 +24,11 @@ function rowMarks(row: (typeof homepageComparisonRows)[number]) { return row.sli
       <table>
         <thead>
           <tr>
-            <th style="width: 34%">Capability</th>
+            <th scope="col" style="width: 34%">Capability</th>
             <th
               v-for="player in comparisonPlayers"
               :key="player.key"
+              scope="col"
               :class="{ us: player.us }"
             >
               <a v-if="player.href" :href="player.href">{{ player.name }}</a>
@@ -33,23 +38,24 @@ function rowMarks(row: (typeof homepageComparisonRows)[number]) { return row.sli
         </thead>
         <tbody>
           <tr v-for="r in homepageComparisonRows" :key="r[0]">
-            <td class="feat">{{ r[0] }}</td>
+            <th scope="row" class="feat">{{ r[0] }}</th>
             <td
               v-for="(mark, index) in rowMarks(r)"
               :key="comparisonPlayers[index]?.key ?? index"
               :class="{ us: comparisonPlayers[index]?.us }"
             >
-              <span :class="mark">{{ glyph(mark) }}</span>
+              <span :class="mark" aria-hidden="true">{{ glyph(mark) }}</span>
+              <span class="visually-hidden">{{ markLabel(mark) }}</span>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <div style="margin-top: 16px; font-family: var(--mono); font-size: 11px; color: var(--ink-3); display: flex; gap: 24px; justify-content: center">
-      <span><span class="yes" style="color: var(--accent)">●</span> shipped</span>
-      <span><span class="partial" style="color: var(--warn)">◐</span> partial</span>
-      <span><span class="no" style="color: var(--ink-4)">○</span> absent</span>
+    <div class="av-compare-legend" aria-hidden="true">
+      <span><span class="yes">●</span> shipped</span>
+      <span><span class="partial">◐</span> partial</span>
+      <span><span class="no">○</span> absent</span>
     </div>
     <nav class="av-compare-sources" aria-label="Comparison source checks">
       <span>Source checks</span>
