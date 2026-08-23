@@ -315,3 +315,39 @@ describe("one thing at a time", () => {
     expect(funnel).not.toContain("signedIn.value || paid.value");
   });
 });
+
+describe("local handoff terminal", () => {
+  const funnel = readFileSync(
+    new URL("../.vitepress/theme/components/HostedVaultFunnel.vue", import.meta.url),
+    "utf-8"
+  );
+
+  it("preserves the gating condition unchanged", () => {
+    // showLocalHandoff gating is pinned by tests above and must not change.
+    // This test verifies the gating is still there after the terminal restyle.
+    expect(funnel).toContain("v-if=\"showLocalHandoff\"");
+    expect(funnel).toContain("const showLocalHandoff = computed(() => atReserveStep.value);");
+  });
+
+  it("renders the three real commands, not the combined link command", () => {
+    // Ship the three separate commands, not curl … | sh -s -- link <slug>
+    // (that flag does not exist in the CLI yet). The installer flag is tracked
+    // as a separate issue in the CLI repo.
+    expect(funnel).toContain("AUTOVAULT_INSTALL_COMMAND");
+    expect(funnel).toContain('". \\"$HOME/.autovault/env\\""');
+    expect(funnel).toContain('"autovault skill list"');
+    // Confirm no combined command is present
+    expect(funnel).not.toContain("link ${");
+    expect(funnel).not.toContain("link <slug>");
+  });
+
+  it("wires all three copy handlers to buttons", () => {
+    // Keep the existing three copy handlers and their click bindings.
+    expect(funnel).toContain("@click=\"copyCommands\"");
+    expect(funnel).toContain("@click=\"copyAgentHandoff('claude-code')\"");
+    expect(funnel).toContain("@click=\"copyAgentHandoff('cursor')\"");
+    // Verify the handlers are still defined
+    expect(funnel).toContain("async function copyCommands()");
+    expect(funnel).toContain("async function copyAgentHandoff(agent: \"claude-code\" | \"cursor\")");
+  });
+});

@@ -47,7 +47,39 @@
 
     <div v-if="showLocalHandoff" class="hosted-command-card">
       <div class="panel-title">Local handoff</div>
-      <pre><code>{{ commandBlock }}</code></pre>
+      <div class="hcc-terminal">
+        <!-- Terminal chrome: header with dots and title -->
+        <div class="terminal-head">
+          <span class="dot" style="background:#d97171"></span>
+          <span class="dot" style="background:#e8a866"></span>
+          <span class="dot live"></span>
+          <span class="ttl">~ — autovault — bash</span>
+        </div>
+
+        <!-- Terminal body with typed replay and accessible transcript -->
+        <pre class="visually-hidden"><code>{{ commandBlock }}</code></pre>
+        <div class="hcc-terminal-body" ref="terminalBodyRef" aria-hidden="true">
+          <div
+            v-for="(line, index) in terminalReplay.visibleLines.value"
+            :key="index"
+            :class="[line.type !== 'cmd' && line.type !== 'blank' && line.type]"
+          >
+            <template v-if="line.type === 'cmd'">
+              <div class="line terminal-line">
+                <span class="pmt">$</span>
+                <span>{{ line.text }}</span>
+              </div>
+            </template>
+            <template v-else-if="line.type !== 'blank'">
+              {{ line.text }}
+            </template>
+          </div>
+          <!-- Blinking cursor while typing -->
+          <span v-if="!terminalReplay.complete.value" class="cur cursor"></span>
+        </div>
+      </div>
+
+      <!-- Copy buttons -->
       <div class="hosted-copy-row">
         <button type="button" @click="copyCommands">Copy local commands</button>
         <button type="button" @click="copyAgentHandoff('claude-code')">Copy Claude Code handoff</button>
@@ -64,6 +96,7 @@ import { skills } from "../data/skills";
 import type { GateEvaluation } from "../utils/skillGate";
 import { clerkAuthRecoveryMessage, isClerkApiAuthError, useClerkApiAuth } from "../utils/clerkApi";
 import { AUTOVAULT_INSTALL_COMMAND } from "../../shared/bootstrap";
+import { useTerminalReplay, type TerminalReplayLine } from "../composables/useTerminalReplay";
 
 const PENDING_DRAFT_KEY = "autovault.hostedVault.pendingDraft";
 
@@ -196,6 +229,19 @@ const atReserveStep = computed(() => actionKind.value === "reserve");
 const showSetupDetails = computed(() => atReserveStep.value);
 const showLocalHandoff = computed(() => atReserveStep.value);
 
+// Terminal setup for the local handoff command display
+const terminalBodyRef = ref<HTMLElement | null>(null);
+const terminalLines = computed<TerminalReplayLine[]>(() => [
+  { type: "cmd", text: AUTOVAULT_INSTALL_COMMAND },
+  { type: "out", text: ". \"$HOME/.autovault/env\"" },
+  { type: "cmd", text: "autovault skill list" },
+]);
+const terminalReplay = computed(() =>
+  useTerminalReplay(terminalLines.value, {
+    autoStart: true,
+    scrollTarget: () => terminalBodyRef.value,
+  })
+);
 
 onMounted(async () => {
   staticPreview.value = canUseBrowser() && window.location.port === "5173";
@@ -536,3 +582,115 @@ function canUseBrowser() {
   return typeof window !== "undefined";
 }
 </script>
+
+<style scoped>
+.hosted-command-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.hosted-command-card > .panel-title {
+  padding: 14px 14px 0 14px;
+  margin-bottom: 10px;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.hcc-terminal {
+  border-bottom: 1px solid var(--line);
+  border-radius: 8px 8px 0 0;
+  overflow: hidden;
+}
+
+.hcc-terminal-body {
+  min-height: 180px;
+  max-height: 180px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  padding: 18px 22px;
+  color: var(--ink);
+  line-height: 1.75;
+  background: var(--panel);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.hcc-terminal-body .line {
+  display: flex;
+  gap: 10px;
+}
+
+.hcc-terminal-body .out,
+.hcc-terminal-body .ok,
+.hcc-terminal-body .err {
+  padding-left: 22px;
+}
+
+.hcc-terminal-body .ok {
+  color: var(--accent);
+}
+
+.hcc-terminal-body .err {
+  color: var(--bad);
+}
+
+.hcc-terminal-body .out {
+  color: var(--ink-2);
+}
+
+/* Cursor animation */
+.cursor {
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  margin-left: 2px;
+  background: var(--accent);
+  vertical-align: middle;
+  animation: blink 1s steps(1) infinite;
+}
+
+@keyframes blink {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0;
+  }
+}
+
+.hosted-copy-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px;
+  margin-top: 0;
+}
+
+.hosted-copy-row button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 7px 10px;
+  text-decoration: none;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s;
+}
+
+.hosted-copy-row button:hover {
+  border-color: var(--accent);
+  background: var(--panel);
+  color: var(--accent);
+}
+</style>
