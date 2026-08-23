@@ -117,8 +117,10 @@ never leave the signed-out state. The page detects port 5173 and says so.
 | Build hooks | `.vitepress/build/agentArtifacts.ts` | Generates agent-readable artifacts at build time |
 | API | `functions/api/` | Pages Functions — Clerk auth, Stripe checkout, vault provisioning |
 | API lib | `functions/api/_lib/` | `auth.js`, `db.js`, `stripe.js`, `vault.js`, `crypto.js`, `http.js` |
+| Sync API | `functions/v/[slug]/` | Device-signed catalog sync. **Never redirect these paths** — see Active feature work |
+| Sync lib | `functions/api/_lib/sync.js` | Ed25519 device auth, fingerprints, KV keys |
 | Middleware | `functions/_middleware.js` | Handles `autovault.sh` installer host redirect |
-| Schema | `migrations/*.sql` | `0001` users, sessions, customers, subscriptions, vaults, pending_skills; `0002` vault progress columns; `0003` stripe_events dedupe + drops oauth_states |
+| Schema | `migrations/*.sql` | `0001` users, sessions, customers, subscriptions, vaults, pending_skills; `0002` vault progress columns; `0003` stripe_events dedupe + drops oauth_states; `0004` restores oauth_states; `0005` sync_devices |
 | Skill catalog content | `skill/` (rendered) + `public/skills/` (assets) | Static catalog pages |
 | Tests | `tests/*.test.ts` | Vitest, no browser yet |
 
@@ -186,9 +188,68 @@ Configured in Cloudflare Pages project settings (not `.env`):
 ## Active feature work
 
 The hosted-vault sync loop (signed catalog API + device enrollment) is the
-current build. Background on the client-side contract this server must match
-lives in `autoworks-ai/autovault` at `src/sync/contract.ts` and
-`src/sync/local.ts`.
+current build. The client half is already implemented in
+`autoworks-ai/autovault` on `feat/https-sync-upstream`. **That client is the
+spec.** Read `src/sync/contract.ts`, `src/sync/https.ts`, `src/sync/target.ts`
+and `src/cli/link.ts` before touching anything under `functions/v/` — do not
+design a parallel schema from this file.
+
+### Wire contract (implemented)
+
+`autovault link <slug>` expands to `https://autovault.dev/v/<slug>/catalog.json`.
+All four routes live under `functions/v/[slug]/` and every one of them is
+signed:
+
+| Route | Who may call it |
+|---|---|
+| `POST devices` | any key, signed by itself — this is first contact |
+| `GET devices/current` | any enrolled device, including revoked |
+| `GET catalog.json` | pending **or** active |
+| `GET bundles/<bundle_hash>.json` | active only |
+
+Load-bearing details, each of which breaks the CLI if changed:
+
+- **Signed message is `"<METHOD>\n<pathname>\n<unix-seconds>"`**, where
+  pathname is the full request path. Verify against
+  `new URL(request.url).pathname`, never a path rebuilt from route params.
+- Headers are `X-AutoVault-Device` (base64url public key),
+  `X-AutoVault-Timestamp`, `X-AutoVault-Signature`. Ed25519, verified with
+  `crypto.subtle` — available unflagged at this compatibility date.
+- **Never redirect anything under `/v/`.** The CLI fetches with
+  `redirect: "manual"` and throws on any 3xx. `_middleware.js` only redirects
+  the `autovault.sh` host, and a test pins that.
+- The catalog is readable while *pending* on purpose: `autovault link` enrols
+  and then immediately reads the catalog to pin `public_key`, before the owner
+  has admitted anything.
+- Catalog and bundles are served **byte-for-byte** from KV. Re-serialising
+  changes the bytes and every release signature stops verifying.
+- `bundle_path` lives inside the release signature and the client re-derives it
+  as `bundles/<bundle_hash>.json` relative to `catalog.json`. Do not rename,
+  move, or redirect bundles.
+- Release signature domain is exactly `autovault-sync-release-v1`.
+- Device responses are `no-store, private`. They are per-device authorized, so
+  an edge cache keyed on URL alone would hand one device another's content.
+- Beta limitation: `catalog.public_key` is pinned at enrollment, so rotating it
+  hard-fails every device. Document it, do not silently swap keys.
+
+### Getting a catalog into a vault
+
+The owner's machine holds the release signing secret; **Cloud never does**. The
+CLI has no publish path — it is purely a consumer — so signed objects are
+placed in KV out of band. There is deliberately no upload API, because
+inventing one would be a schema the client does not speak.
+
+```bash
+# vault id, which is the KV key prefix
+npx wrangler d1 execute autovault-hosted --remote \
+  --command "select id from vaults where slug = '<slug>'"
+
+npx wrangler kv key put --binding AUTOVAULT_VAULT_OBJECTS \
+  "sync:<vault_id>:catalog" --path ./catalog.json --remote
+
+npx wrangler kv key put --binding AUTOVAULT_VAULT_OBJECTS \
+  "sync:<vault_id>:bundle:<bundle_hash>" --path ./bundles/<bundle_hash>.json --remote
+```
 
 Migrations are NOT applied by CI. Run `npm run migrate:remote` before deploying
 any change that depends on a new migration, or the Functions will 500 against
