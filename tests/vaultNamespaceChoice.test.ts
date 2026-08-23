@@ -12,6 +12,7 @@ import {
 import { onRequestGet as namespaceAvailability } from "../functions/api/vaults/availability.js";
 import { onRequestPost as provisionHostedVault } from "../functions/api/vaults/provision.js";
 import { createTestEnv, seedUser } from "./support/d1.js";
+import { pageDocs } from "../.vitepress/shared/pageDocs.js";
 
 // Everything below runs against REAL SQLite with the repo's real migrations
 // applied (tests/support/d1.ts), not against a hand-rolled fake. That is
@@ -122,7 +123,7 @@ describe("namespace validation", () => {
     // the count is quoted in the task report and in the commit message, and a
     // floor lets those drift out of date silently. Adding an entry is meant to
     // be a deliberate act with prose attached.
-    expect(RESERVED_VAULT_SLUGS.size).toBe(53);
+    expect(RESERVED_VAULT_SLUGS.size).toBe(54);
     for (const reserved of RESERVED_VAULT_SLUGS) {
       const verdict = validateVaultSlug(reserved);
       expect(verdict.ok, reserved).toBe(false);
@@ -143,6 +144,21 @@ describe("namespace validation", () => {
     // But it must not swallow a legitimate name that merely starts with the
     // same letters.
     expect(validateVaultSlug("autovaulting")).toMatchObject({ ok: true });
+  });
+
+  it("reserves every route this site actually serves, derived not hand-listed", () => {
+    // The list's own comment claims it is "sourced from the repo's root pages,
+    // not guessed" -- but it was hand-maintained, and it drifted:
+    // /author-autoworks-ai was missing, which is both a served page and the
+    // first-party maintainer identity, so a customer could have claimed that
+    // exact name. Deriving the expectation from pageDocs is what stops the list
+    // silently falling behind the site again the next time a page is added.
+    const missing = pageDocs
+      .map((doc) => doc.route.replace(/^\//, "").split("/")[0])
+      .filter((segment) => segment && !RESERVED_VAULT_SLUGS.has(segment));
+    expect(missing).toEqual([]);
+    // The one that drifted, named so this cannot regress quietly.
+    expect(validateVaultSlug("author-autoworks-ai")).toMatchObject({ ok: false, code: "reserved" });
   });
 
   it("only accepts slugs the CLI can also resolve", () => {
@@ -466,6 +482,46 @@ describe("the namespace field in the funnel", () => {
   it("sends the chosen slug on the reserve click", () => {
     const fn = funnel.slice(funnel.indexOf("async function provisionVault"));
     expect(fn.slice(0, fn.indexOf("const payload"))).toContain("slug: namespaceSlug.value || undefined");
+  });
+
+  it("refuses to reserve with no namespace rather than deriving one", () => {
+    // Clearing the field left the button enabled, and the request then omits
+    // `slug` -- which provisionVault reads as a legacy caller and answers with a
+    // permanently derived `<local>-<six hex>`. The user would have reserved,
+    // irreversibly, a name the field never showed, under a label that says it
+    // cannot be changed later. That is the "arrived unbidden" defect this whole
+    // change set exists to remove, re-entered through the back door.
+    expect(funnel).toContain("const canReserve = computed(() => Boolean(namespaceSlug.value) && !localSlugProblem(namespaceSlug.value));");
+    expect(funnel).toContain(':disabled="busy || !canReserve"');
+    // The guard is on the call too, not only on the button.
+    const fn = funnel.slice(funnel.indexOf("async function provisionVault"));
+    const head = fn.slice(0, fn.indexOf("provisioning.value = true;"));
+    expect(head).toContain("if (!canReserve.value)");
+    expect(head).toContain("focusNamespaceField()");
+  });
+
+  it("forgets a namespace the user deleted instead of restoring it", () => {
+    // buildDraft returns null once the field is empty and no skill is pasted,
+    // and persistDraft simply returned -- leaving the previously typed slug in
+    // sessionStorage. After the Stripe redirect remounted the component,
+    // syncNamespaceFromDraft put that deleted name back and offered it for
+    // permanent reservation.
+    const fn = funnel.slice(funnel.indexOf("function persistDraft"), funnel.indexOf("function buildDraft"));
+    expect(fn).toContain("const stored = readDraft();");
+    expect(fn).toContain("delete cleared.desiredSlug;");
+    // The whole draft is NOT dropped: a skill pasted in the playground lives
+    // under the same key and is not this component's to delete.
+    expect(fn).not.toContain("removeItem");
+
+    // And persistDraft alone is not enough: it only runs from startFlow, and
+    // the reserve button is disabled while the field is empty -- so deleting a
+    // namespace at the reserve step would never reach that branch at all. The
+    // edit handler keeps storage in step directly.
+    const input = funnel.slice(funnel.indexOf("function onNamespaceInput"), funnel.indexOf("function scheduleNamespaceCheck"));
+    expect(input).toContain("syncStoredSlug();");
+    expect(input).toContain("function syncStoredSlug()");
+    expect(input).toContain("if (!stored) return;");
+    expect(input).toContain("delete next.desiredSlug;");
   });
 
   it("puts a refused name back on the field instead of reading as a crash", () => {

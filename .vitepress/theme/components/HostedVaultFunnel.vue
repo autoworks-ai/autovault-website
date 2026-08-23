@@ -76,7 +76,7 @@
       <button v-else-if="actionKind === 'checkout'" class="hosted-primary" type="button" :disabled="busy" @click="startFlow">
         {{ checkoutStarted ? "Opening Checkout..." : "Open checkout" }}
       </button>
-      <button v-else-if="actionKind === 'reserve'" class="hosted-primary" type="button" :disabled="busy" @click="startFlow">
+      <button v-else-if="actionKind === 'reserve'" class="hosted-primary" type="button" :disabled="busy || !canReserve" @click="startFlow">
         {{ provisioning ? "Reserving..." : "Reserve namespace" }}
       </button>
     </div>
@@ -439,6 +439,14 @@ const namespaceState = computed<{ tone: "ok" | "warn" | "fail" | "muted"; text: 
     : { tone: "fail", text: verdict.message };
 });
 
+// The reserve click is what makes the name permanent, so it may not fall
+// through to the server's derived slug. provision.js documents that fallback as
+// the right default for "a library call with no user in front of it" -- at this
+// step there IS one, looking at a field they just emptied, and handing them a
+// `<local>-<six hex>` they never saw and cannot rename is the exact "the name
+// arrived unbidden" defect this whole change set exists to remove.
+const canReserve = computed(() => Boolean(namespaceSlug.value) && !localSlugProblem(namespaceSlug.value));
+
 // Shape only, matching the server's rule. Anything this rejects never reaches
 // the network: an invalid string cannot become available, so a round trip per
 // keystroke would buy nothing.
@@ -461,7 +469,26 @@ function onNamespaceInput(event: Event) {
   // produced the same string as last render (typing a second "!" for instance)
   // it did not, so the rejected character would sit in the field. Write it back.
   if (input.value !== cleaned) input.value = cleaned;
+  syncStoredSlug();
   scheduleNamespaceCheck();
+}
+
+// Keep storage in step with the field. Without this the stored slug outlives the
+// value it came from: persistDraft() only runs from startFlow, and the reserve
+// button is disabled while the field is empty, so a paid user who deletes their
+// namespace and reloads gets it restored and can reserve the name they removed.
+// Only this one field is touched, and only on a draft that already exists --
+// creating one is startFlow's job, and `sourceText` belongs to the playground.
+function syncStoredSlug() {
+  if (!canUseBrowser()) return;
+  const stored = readDraft();
+  if (!stored) return;
+  const slug = namespaceSlug.value;
+  if ((stored.desiredSlug || "") === slug) return;
+  const next: PendingDraft = { ...stored };
+  if (slug) next.desiredSlug = slug;
+  else delete next.desiredSlug;
+  window.sessionStorage.setItem(PENDING_DRAFT_KEY, JSON.stringify(next));
 }
 
 function syncNamespaceFromDraft() {
@@ -584,8 +611,21 @@ async function startFlow() {
 function persistDraft() {
   if (!canUseBrowser()) return;
   const draft = buildDraft();
-  if (!draft) return;
-  window.sessionStorage.setItem(PENDING_DRAFT_KEY, JSON.stringify(draft));
+  if (draft) {
+    window.sessionStorage.setItem(PENDING_DRAFT_KEY, JSON.stringify(draft));
+    return;
+  }
+  // Nothing here is worth storing -- but a draft already in storage can still
+  // carry a namespace this page has since cleared, and syncNamespaceFromDraft
+  // would restore it after the Stripe redirect and offer it for permanent
+  // reservation, silently undoing the deletion. Drop that one field rather than
+  // the whole draft: a skill pasted in the playground shares this key and is not
+  // this component's to delete.
+  const stored = readDraft();
+  if (!stored?.desiredSlug) return;
+  const cleared: PendingDraft = { ...stored };
+  delete cleared.desiredSlug;
+  window.sessionStorage.setItem(PENDING_DRAFT_KEY, JSON.stringify(cleared));
 }
 
 function buildDraft(): PendingDraft | null {
@@ -707,6 +747,16 @@ async function startCheckout() {
 
 async function provisionVault() {
   if (provisioning.value) return;
+  // The button is disabled for this, but the refusal lives here too: this is the
+  // call that omits `slug` and lets the server derive a permanent one, and it
+  // must never be reachable with nothing in the field.
+  if (!canReserve.value) {
+    namespaceRefusal.value = "Choose a namespace before reserving it.";
+    notice.value = { kind: "warn", text: namespaceRefusal.value };
+    await nextTick();
+    focusNamespaceField();
+    return;
+  }
   provisioning.value = true;
   trackPirsch("Hosted Vault: Provision Requested", { entry: props.entry, skills: queuedSkillNames.value.length });
   try {

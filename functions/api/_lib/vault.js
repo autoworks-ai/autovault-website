@@ -85,6 +85,10 @@ export const RESERVED_VAULT_SLUGS = new Set([
   "about",
   "api",
   "assets",
+  // A served root page AND the first-party maintainer identity, so it lands in
+  // both categories at once: `/author-autoworks-ai` is a real route, and a
+  // customer holding that exact name answers as AutoWorks itself.
+  "author-autoworks-ai",
   "authoring",
   "changelog",
   "cloud",
