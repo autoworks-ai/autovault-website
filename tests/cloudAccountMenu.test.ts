@@ -132,11 +132,27 @@ describe("cloud account menu", () => {
     expect(body).toContain("activeIndex.value = moved");
   });
 
+  it("measures the popover unconstrained before it places it", () => {
+    // openMenu() renders first and measures on the next tick, and closeMenu()
+    // clears placement -- so the unplaced branch runs on every open. Falling
+    // back to a zero cap there meant reposition() measured an empty shell,
+    // `left` was clamped as though the menu were MENU_MIN_WIDTH wide, and the
+    // real cap then let it grow past the right edge with nothing re-measuring.
+    const at = menu.indexOf("const menuStyle = computed");
+    const body = menu.slice(at, menu.indexOf("function onProfile", at));
+    const unplaced = body.slice(body.indexOf("if (!placed)"), body.indexOf("return {", body.indexOf("if (!placed)") + 40));
+    expect(unplaced).not.toContain("maxWidth");
+    expect(unplaced).not.toContain("minWidth");
+    expect(body).not.toContain("?? 0}px");
+    // The stylesheet keeps that unconstrained pass from provoking a scrollbar.
+    expect(menu).toContain("max-width: 100vw");
+  });
+
   it("caps the teleported popover to the viewport", () => {
     // Its content is nowrap, so a long account email makes it intrinsically
     // wider than a phone screen; without a cap the right edge stays offscreen
     // and the email's ellipsis never engages.
-    expect(menu).toContain("maxWidth: `${placement.value?.maxWidth ?? 0}px`");
+    expect(menu).toContain("maxWidth: `${placed.maxWidth}px`");
     expect(menu).toContain("min-width: 0");
   });
 

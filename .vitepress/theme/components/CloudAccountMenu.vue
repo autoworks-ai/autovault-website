@@ -61,14 +61,41 @@ watch(
   }
 );
 
-const menuStyle = computed(() => ({
-  position: "fixed" as const,
-  top: `${placement.value?.top ?? 0}px`,
-  left: `${placement.value?.left ?? 0}px`,
-  minWidth: `${placement.value?.minWidth ?? 0}px`,
-  maxWidth: `${placement.value?.maxWidth ?? 0}px`,
-  visibility: placement.value ? ("visible" as const) : ("hidden" as const)
-}));
+const menuStyle = computed(() => {
+  const placed = placement.value;
+
+  // The measurement pass. openMenu() renders the menu and only measures it on
+  // the next tick, and closeMenu() clears placement, so this branch runs on
+  // EVERY open, not just the first.
+  //
+  // It must not constrain the box. Falling back to `0px` here pinned it to
+  // max-width 0, so reposition() measured an empty shell and computeMenuPosition
+  // clamped `left` as though the menu were only MENU_MIN_WIDTH wide -- then the
+  // real cap let it grow out to its intrinsic width with no second measurement,
+  // pushing it off the right edge wherever the trigger sits near one.
+  //
+  // Unconstrained here means the reported width is the intrinsic width, which
+  // is exactly what computeMenuPosition needs to clamp width and `left`
+  // together. The stylesheet's max-width: 100vw keeps this hidden pass from
+  // provoking a scrollbar, and never binds tighter than the real cap.
+  if (!placed) {
+    return {
+      position: "fixed" as const,
+      top: "0px",
+      left: "0px",
+      visibility: "hidden" as const
+    };
+  }
+
+  return {
+    position: "fixed" as const,
+    top: `${placed.top}px`,
+    left: `${placed.left}px`,
+    minWidth: `${placed.minWidth}px`,
+    maxWidth: `${placed.maxWidth}px`,
+    visibility: "visible" as const
+  };
+});
 
 // Profile and Sign out close with restoreFocus:false and only then run their
 // action. Returning focus to the trigger first would fight whatever the action
@@ -238,6 +265,10 @@ async function onSignOut() {
  * the topbar's Clerk menu read as one system.
  */
 .cv-acct-menu {
+  /* Only binds during the hidden measurement pass, when no inline cap is set
+     yet -- it stops a very wide intrinsic width provoking a scrollbar for a
+     frame. The real cap is narrower, so this never fights it. */
+  max-width: 100vw;
   z-index: 200;
   padding: 6px;
   border: 1px solid var(--line);
