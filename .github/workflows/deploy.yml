@@ -30,7 +30,7 @@ jobs:
       VITE_CLERK_PRODUCTION_PUBLISHABLE_KEY: ${{ vars.VITE_CLERK_PRODUCTION_PUBLISHABLE_KEY || secrets.VITE_CLERK_PRODUCTION_PUBLISHABLE_KEY }}
       VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.VITE_CLERK_PRODUCTION_PUBLISHABLE_KEY || secrets.VITE_CLERK_PRODUCTION_PUBLISHABLE_KEY }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ env.DEPLOY_BRANCH }}
 
@@ -38,7 +38,7 @@ jobs:
         id: deploy_ref
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
