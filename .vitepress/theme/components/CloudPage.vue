@@ -2123,9 +2123,39 @@ onMounted(() => {
   bootMountedAt = Date.now();
 });
 
-watch([isClerkLoaded, isClerkSignedIn], ([loaded]) => {
+watch([isClerkLoaded, isClerkSignedIn], ([loaded], [wasLoaded]) => {
   if (!loaded) return;
   void loadCloudState();
+  // And the device list, which is a SEPARATE wait with its own deadline.
+  //
+  // Without this line the boot veil held for the full twenty-second device
+  // backstop on every load where Clerk resolved after mount -- measured at
+  // 21.2s hermetically and 23.4s/24.5s on the live site. The chain: the mount
+  // /api/me is authenticated by the session COOKIE, so it returns a vault
+  // before clerk-js has resolved anything; the vault watcher fires
+  // loadDevices immediately; loadDevices needs a bearer token, so its
+  // `required: true` authHeaders throws `clerk-not-loaded` and the silent
+  // catch drops it. No request is sent, `devicesKnown` stays false, `stage`
+  // stays "loading" -- and the retry that would have fixed it is the poll,
+  // which at that moment is on the 30s IDLE cadence because `devicePollUrgent`
+  // reads `stage`, which is "loading". A 30s retry behind a 20s deadline is
+  // never reached, so the page waited out the backstop it should never have
+  // touched.
+  //
+  // Clerk resolving is precisely the missing precondition arriving, so this is
+  // where the attempt gets made again. `loadDevices` returns immediately when
+  // there is no vault, so the ordinary signed-out load is unaffected.
+  //
+  // Only on the unloaded -> loaded edge, never on a signed-in change. This
+  // watcher also fires when someone signs out and back in as a DIFFERENT
+  // account, and at that moment `vault` still holds the previous account's
+  // row until the /api/me above lands. /current/devices resolves the vault
+  // server-side from the new token, so firing here would write the new
+  // account's machines into a page still captioned with the old vault --
+  // the wrong list under the wrong name, with a live Admit button on it.
+  // The missing precondition is Clerk *loading*, so that is the only edge
+  // that should retry.
+  if (!wasLoaded) void loadDevices();
 });
 
 // Devices only exist once a vault does, and the list is what the connect step
@@ -2686,6 +2716,18 @@ onBeforeUnmount(cancelVaultArrival);
 
 const devicePollUrgent = computed(
   () =>
+    // No answer yet, and not yet given up. This one is about the PAGE, not the
+    // owner: while the list has never answered, `stage` is "loading" and the
+    // boot veil is up, so every other condition below reads false and the poll
+    // would arm at the 30s idle cadence -- longer than the 20s window that
+    // abandons the wait, which makes the retry unreachable and turns any single
+    // missed attempt into a 21-second opaque veil. That is exactly what
+    // happened: loadDevices' `required: true` authHeaders throws when Clerk has
+    // not resolved and the catch is silent, so the first attempt vanished and
+    // nothing tried again. The recovery path has to be faster than the deadline
+    // it is racing. Drops back to idle the moment the list answers or the wait
+    // is declared over, so a settled dashboard is not polling at 4s forever.
+    (!devicesKnown.value && !deviceWaitOver.value) ||
     stage.value === "connect" ||
     pendingDevices.value.length > 0 ||
     // A machine linking against an already-set-up vault reaches neither of the
