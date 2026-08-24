@@ -64,19 +64,41 @@
       </p>
     </div>
 
+    <!--
+      The marker is ANDed with the same predicate that enables the button, not
+      just with `markedAction`. Those two arrived from different branches:
+      `markedAction` is the shell's "this is the one thing to do", decided in
+      utils/nextAction.ts, which knows nothing about this component's namespace
+      field; `canCheckout`/`canReserve` gate the button on a name the server
+      has not refused. Marked-but-disabled is the one combination that must not
+      exist -- a halo saying "do this" on a control that cannot be clicked, at
+      the exact moment the field above says why. `busy` is deliberately NOT in
+      this condition: it is transient and the action is still the right one, so
+      dropping the halo for the length of a request would just make it flicker.
+    -->
     <div v-if="!vault" class="hosted-stage-action">
+      <!--
+        `markedAction` is the shell's answer to "is this component's button the
+        one thing to do right now", and it is passed straight through to
+        whichever of the three branches is live. The decision is not made here:
+        this component only ever sees the pre-vault steps, and the marker has
+        to be unique across the whole page — including the Machines card, which
+        this component knows nothing about. See cloudNextAction() in
+        utils/nextAction.ts.
+      -->
       <ClerkAuthControls
         v-if="actionKind === 'auth'"
         variant="funnel"
         cta-label="Create your account"
         signed-in-label="Continue onboarding"
+        :mark-primary="markedAction"
         @click.capture="persistDraft"
         @signed-in-action="startFlow"
       />
-      <button v-else-if="actionKind === 'checkout'" class="hosted-primary" type="button" :disabled="busy || !canCheckout" @click="startFlow">
+      <button v-else-if="actionKind === 'checkout'" class="hosted-primary" :class="{ 'av-nextaction': markedAction && canCheckout }" type="button" :disabled="busy || !canCheckout" @click="startFlow">
         {{ checkoutStarted ? "Opening Checkout..." : "Open checkout" }}
       </button>
-      <button v-else-if="actionKind === 'reserve'" class="hosted-primary" type="button" :disabled="busy || !canReserve" @click="startFlow">
+      <button v-else-if="actionKind === 'reserve'" class="hosted-primary" :class="{ 'av-nextaction': markedAction && canReserve }" type="button" :disabled="busy || !canReserve" @click="startFlow">
         {{ provisioning ? "Reserving..." : "Reserve namespace" }}
       </button>
     </div>
@@ -189,12 +211,18 @@ const props = withDefaults(defineProps<{
   evaluation?: GateEvaluation | null;
   // The shell's authoritative /api/me. See `current` below.
   state?: MeResponse | null;
+  // Whether this component's one primary button is the page's single required
+  // action, and therefore the one control allowed to carry `.av-nextaction`.
+  // Decided by the shell (cloudNextAction), never here — this component cannot
+  // see the Machines card, and the marker has to be unique across both.
+  markedAction?: boolean;
 }>(), {
   skillSource: "",
   skillName: "",
   sourceLabel: "",
   evaluation: null,
-  state: null
+  state: null,
+  markedAction: false
 });
 const emit = defineEmits<{
   stateChange: [state: MeResponse];

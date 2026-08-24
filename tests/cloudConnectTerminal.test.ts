@@ -68,6 +68,12 @@ function ruleBody(selector: string): string {
   return css.slice(at, css.indexOf("}", at));
 }
 
+/** The same rule with its explanatory comments stripped -- the comments now
+ *  quote the very declarations some of these assertions forbid. */
+function declarationsOf(selector: string): string {
+  return ruleBody(selector).replace(/\/\*[\s\S]*?\*\//g, " ");
+}
+
 function flatten(text: string): string {
   return text.replace(/\s+/g, " ");
 }
@@ -159,10 +165,89 @@ describe("scoped-style boundary into ConnectTerminal", () => {
   });
 
   it("beats the global .terminal-body height that was showing instead", () => {
+    // Unchanged intent: the global 400px must not win here. What changed is
+    // the answer -- `min-height: auto; max-height: none` beat the 400px by
+    // letting the box size to its content, which meant it GREW from one line
+    // to seven as the replay typed and carried the rest of the page down with
+    // it. The height is now reserved instead, so this asserts a real number
+    // that is not the global one rather than the absence of a number.
     expect(globalStyles.slice(globalStyles.indexOf(".terminal-body {"))).toContain("400px");
-    const body = ruleBody(".cv-connect-terminal :deep(.cv-terminal-body)");
-    expect(body).toContain("min-height: auto");
-    expect(body).toContain("max-height: none");
+    const body = declarationsOf(".cv-connect-terminal :deep(.cv-terminal-body)");
+    expect(body).toContain("min-height: 180px");
+    expect(body).toContain("max-height: 180px");
+    expect(body).not.toContain("400px");
+    expect(body).not.toContain("min-height: auto");
+    expect(body).not.toContain("max-height: none");
+  });
+});
+
+describe("the connect terminal reserves its space instead of growing into it", () => {
+  /**
+   * The complaint: "the layout is jumping down as the text types into the
+   * terminal isn't ideal because that's where the interaction button is for
+   * the next step."
+   *
+   * Measured at 1440px before the fix: the body went 49px -> 177px over the
+   * seven lines, and `.cv-nextstep` -- the sentence pointing at the Admit
+   * button -- went from y=765 to y=893. Node has no layout engine, so the
+   * measurement lives in the task report; these guard the mechanism it
+   * depends on.
+   */
+  it("pins the height in both directions, so it cannot grow or shrink", () => {
+    const body = declarationsOf(".cv-connect-terminal :deep(.cv-terminal-body)");
+    const min = /min-height:\s*(\d+)px/.exec(body);
+    const max = /max-height:\s*(\d+)px/.exec(body);
+    expect(min, "no min-height on the connect terminal body").not.toBeNull();
+    expect(max, "no max-height on the connect terminal body").not.toBeNull();
+    // A min without a max reserves a floor and still grows past it; a max
+    // without a min clips a box that started empty. Only both is "reserved".
+    expect(min![1]).toBe(max![1]);
+  });
+
+  it("reserves the same height the funnel's terminal already does", () => {
+    // `.cv-connect-terminal` is written as a mirror of `.hcc-terminal` on
+    // purpose -- "one terminal language on this site, not two" -- and the
+    // reserved height is the part of that language this page was missing.
+    const funnel = readFileSync(
+      new URL("../.vitepress/theme/components/HostedVaultFunnel.vue", import.meta.url),
+      "utf-8"
+    );
+    const at = funnel.indexOf(".hcc-terminal-body {");
+    expect(at, "no .hcc-terminal-body rule to mirror").toBeGreaterThan(-1);
+    const reference = funnel.slice(at, funnel.indexOf("}", at));
+    const referenceHeight = /min-height:\s*(\d+px)/.exec(reference)?.[1];
+    expect(referenceHeight).toBeTruthy();
+    const body = declarationsOf(".cv-connect-terminal :deep(.cv-terminal-body)");
+    expect(body).toContain(`min-height: ${referenceHeight}`);
+    expect(body).toContain(`max-height: ${referenceHeight}`);
+  });
+
+  it("lets anything taller scroll inside the box rather than move the page", () => {
+    // A pinned max-height with no way to scroll is just clipping. The replay
+    // already drives scrollTop through `scrollTarget`, and overflow-y comes
+    // from the global `.cd-page .terminal-body` rule; the scoped rule here
+    // sets overflow-x as a longhand precisely so it does not clobber it.
+    expect(connectTerminalSource()).toContain("scrollTarget: () => bodyRef.value");
+    const body = declarationsOf(".cv-connect-terminal :deep(.cv-terminal-body)");
+    expect(body).not.toContain("overflow:");
+    expect(body).toContain("overflow-x: auto");
+    const global = globalStyles.slice(globalStyles.indexOf(".cd-page .terminal-body {"));
+    expect(global.slice(0, global.indexOf("}"))).toContain("overflow-y: auto");
+  });
+
+  it("cannot wrap seven logical lines into more visual ones", () => {
+    // The reserved height is only safe because the transcript's line count is
+    // width-independent: commands scroll sideways instead of wrapping, and the
+    // scrollbar that allows is kept out of the layout.
+    const global = globalStyles.slice(globalStyles.lastIndexOf(".cd-page .terminal-body {"));
+    const rule = global.slice(0, global.indexOf("}"));
+    expect(rule).toContain("white-space: pre");
+    expect(rule).toContain("overflow-x: auto");
+    const lineRule = global.slice(global.indexOf(".cd-page .terminal-body .line {"));
+    expect(lineRule.slice(0, lineRule.indexOf("}"))).toContain("width: max-content");
+    // Hidden scrollbars, so a horizontally scrolling line never eats height.
+    const sized = globalStyles.slice(globalStyles.indexOf(".cd-page .terminal-body {"));
+    expect(sized.slice(0, sized.indexOf("}"))).toContain("scrollbar-width: none");
   });
 });
 

@@ -22,7 +22,7 @@
             :sign-in-force-redirect-url="authReturnPath"
             :sign-in-fallback-redirect-url="authReturnPath"
           >
-            <button class="clerk-auth-action primary" type="button">{{ ctaLabel }}</button>
+            <button class="clerk-auth-action primary" :class="{ 'av-nextaction': markPrimary }" type="button">{{ ctaLabel }}</button>
           </SignUpButton>
         </Show>
         <Show when="signed-in">
@@ -88,7 +88,7 @@
     </template>
 
     <template v-else-if="hydrated && variant === 'funnel'">
-      <a class="clerk-auth-action primary" :href="hostedPath">{{ ctaLabel }}</a>
+      <a class="clerk-auth-action primary" :class="{ 'av-nextaction': markPrimary }" :href="hostedPath">{{ ctaLabel }}</a>
     </template>
   </div>
 </template>
@@ -104,10 +104,17 @@ const props = withDefaults(defineProps<{
   ctaLabel?: string;
   signedInLabel?: string;
   variant?: "topbar" | "funnel";
+  // Wear the page's one "do this next" marker on the primary CTA. Owned by
+  // whoever renders this component, never decided here: the marker means "the
+  // single required action ON THIS PAGE", and an auth control has no way to
+  // know whether it is that. The topbar's copy is never marked, which is why
+  // this defaults false.
+  markPrimary?: boolean;
 }>(), {
   ctaLabel: "Create vault",
   signedInLabel: "Onboarding",
-  variant: "topbar"
+  variant: "topbar",
+  markPrimary: false
 });
 const emit = defineEmits<{
   signedInAction: [];

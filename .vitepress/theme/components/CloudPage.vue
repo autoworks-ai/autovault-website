@@ -321,6 +321,7 @@
             <HostedVaultFunnel
               entry="deploy"
               :state="cloudState"
+              :marked-action="nextAction === 'funnel'"
               @state-change="syncCloudState"
               @notice="setNotice"
             />
@@ -444,6 +445,7 @@
               v-if="stage !== 'ready'"
               type="button"
               class="cv-btn cv-status-cta"
+              :class="{ 'av-nextaction': nextAction === 'early-access' }"
               :disabled="busy"
               @click="markProgress('early_access')"
             >
@@ -764,6 +766,7 @@
                     v-if="device.status === 'pending'"
                     type="button"
                     class="cv-btn small"
+                    :class="{ 'av-nextaction': isNextAction(device) }"
                     :data-admit-target="isAdmitTarget(device) ? 'true' : undefined"
                     :disabled="deviceBusy === device.id"
                     @click="decideDevice(device.id, 'admit')"
@@ -808,6 +811,7 @@ import { prefersReducedMotion } from "../utils/motion";
 import { formatPriceLabel } from "../utils/money";
 import { consumeVaultArrival, isAuthenticatedCloudState } from "../utils/vaultArrival";
 import { cloudStateIsKnown, deviceListIsKnown } from "../utils/cloudLoadState";
+import { cloudNextAction, type CloudNextAction } from "../utils/nextAction";
 import {
   admitHandshakeState,
   findAdmitTarget,
@@ -1963,6 +1967,60 @@ const pageTitle = computed(() => {
 const showsMachines = computed(
   () => activeSection.value === "overview" || activeSection.value === "machines",
 );
+
+/* ---------------------------------------------------------------------------
+ * The one thing to do next, marked wherever it happens to be
+ *
+ * "there's one button on each page that completes that page and it moves
+ * around sometimes in the center, sometimes it's in the far right ... Maybe it
+ * would be enough just to highlight the button somehow with a sort of glow or
+ * indicator to show that that's what they have to do to continue."
+ *
+ * Moving the buttons to a common position was considered and rejected: Admit
+ * belongs to a specific device row, and a centred Admit with two machines
+ * pending is ambiguous about which one — the wrong-machine hazard the previous
+ * task removed. So the treatment travels instead of the control. The decision
+ * itself lives in cloudNextAction() rather than in the three template bindings
+ * that consume it, so "exactly one marker" is a property of a function with a
+ * truth table and not a coincidence between three `v-if`s in two components.
+ * ------------------------------------------------------------------------ */
+
+const nextAction = computed<CloudNextAction>(() =>
+  cloudNextAction({
+    stage: stage.value,
+    // The ?admit= target and nothing else. The CLI put that fingerprint in the
+    // URL, so pointing at that row is the page repeating a name rather than
+    // choosing one, and findAdmitTarget is pending-only and exact-match-only.
+    //
+    // "The only pending row there is" was also tried, on the reasoning that one
+    // Admit button cannot be ambiguous. Measured, it is worse than no marker.
+    // decideDevice writes `status: "active"` optimistically in the same tick as
+    // the click, so admitting the machine the CLI named empties admitTarget and
+    // leaves exactly one pending row -- and the marker moved to the OTHER
+    // machine, ~61px from where the pointer already was, while the list
+    // reordered underneath it. Traced at connect with two pending:
+    //
+    //   before   laptop-2 pending admit-target   marked Admit@laptop-2
+    //   +3s      laptop-2 active                 marked Admit@jacks-mbp
+    //
+    // The page would be advertising a grant of vault access to a machine
+    // nothing named, at the moment the owner's hand is on the button. That is
+    // the wrong-machine hazard, arrived at from a new direction. Task F drew
+    // this same line one notch weaker for the topbar badge: it scrolls to the
+    // card but deliberately does not focus Admit, "because nothing here named a
+    // machine". A marker is a weaker claim than focus, but it is the same claim.
+    namedPendingMachine: Boolean(admitTarget.value),
+    // Both halves of "the Admit button is actually rendered": the card is
+    // gated on `vault` existing, and on being one of the two panels that show
+    // it. Reading the panel alone would mark a button in a template Vue is not
+    // rendering.
+    machinesOnScreen: Boolean(vault.value) && showsMachines.value,
+  }),
+);
+
+function isNextAction(device: SyncDevice) {
+  return nextAction.value === "admit" && isAdmitTarget(device);
+}
 
 const navItems = computed<NavItem[]>(() => {
   const s = stage.value;
@@ -3423,10 +3481,30 @@ const ICON = {
   padding: 14px 16px;
   overflow-x: auto;
   background: #0a0f13;
-  /* Beats the global .terminal-body 400px min/max, which sized this for a
-     full-screen demo terminal and left two thirds of it empty here. */
-  min-height: auto;
-  max-height: none;
+  /* Reserved, not grown. Beats the global .terminal-body 400px min/max, which
+     sized this for a full-screen demo terminal and left two thirds of it empty
+     -- but `auto`/`none` traded that for the opposite defect: the box started
+     one line tall and typed its way to seven, pushing the whole page down by
+     128px (measured, 1440px wide: .cv-nextstep 765 -> 893) with the Machines
+     card and its Admit button riding along. That is the control this stage
+     exists to send people to, moving while they reach for it.
+
+     180px is the number .hcc-terminal-body already uses in
+     HostedVaultFunnel.vue -- same mechanism, same value, one terminal language
+     on this site rather than two. It also happens to fit this transcript with
+     room to spare: 7 lines at 21.25px plus 28px of padding is 176.75px, and
+     the tallest transient is the same 7 line boxes (6 lines + the cursor,
+     which occupies one of its own), so nothing is ever clipped.
+
+     Seven logical lines stay seven visual lines at every width, so this holds
+     on a phone: `.cd-page .terminal-body` pins `white-space: pre` and gives
+     each line `width: max-content`, so commands scroll sideways rather than
+     wrapping, and `scrollbar-width: none` keeps that scrollbar out of the
+     layout. Anything that did overflow scrolls inside the box -- overflow-y
+     resolves to `auto` here, and the replay's `scrollTarget` already drives
+     scrollTop. */
+  min-height: 180px;
+  max-height: 180px;
   font-family: var(--mono);
   font-size: 12.5px;
   line-height: 1.7;
