@@ -15,7 +15,13 @@ STRIPE_BRAND_ICON_URL = "https://autovault.dev/square-1200x1200.png"
 # Very Good Plugins, not AutoVault. Verified on a live test session.
 STRIPE_BRAND_LOGO_URL = "https://autovault.dev/square-1200x1200.png"
 STRIPE_CHECKOUT_SUBMIT_TYPE = "subscribe"
-STRIPE_CHECKOUT_CUSTOM_TEXT_SUBMIT = "AutoVault reserves your hosted namespace once Stripe confirms this subscription. Cloud sync remains disabled until the CLI handoff ships."
+# Rendered on the live Stripe Checkout page, so it is read at the moment money
+# changes hands. It used to say AutoVault reserves the namespace "once Stripe
+# confirms this subscription" -- true when provisioning happened on the Stripe
+# return, and false now that reserving is a deliberate click afterwards. The
+# check-then-claim race is accepted by design, so the name can even be gone by
+# the time they click: this may promise the step, never the outcome.
+STRIPE_CHECKOUT_CUSTOM_TEXT_SUBMIT = "You'll reserve your hosted namespace on the next screen, once Stripe confirms this subscription. Cloud sync remains disabled until the CLI handoff ships."
 
 [[d1_databases]]
 binding = "AUTOVAULT_DB"

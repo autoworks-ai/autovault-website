@@ -1,8 +1,15 @@
 export class ApiError extends Error {
-  constructor(status, message) {
+  // `code` is optional and machine-readable, for the cases where a client has
+  // to branch on WHICH refusal it got rather than just render the sentence.
+  // Namespace selection is the first: "that shape is not allowed" and "somebody
+  // already has it" are both refusals of the same field but need different UI,
+  // and matching on the human message would break the moment the wording
+  // changes.
+  constructor(status, message, code = null) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -13,8 +20,10 @@ export function json(data, init = {}) {
   return new Response(JSON.stringify(data), { ...init, headers });
 }
 
-export function apiError(status, message) {
-  return json({ error: message }, { status });
+export function apiError(status, message, code = null) {
+  // Only emit `code` when there is one, so every existing response body is
+  // byte-identical to what it was before codes existed.
+  return json(code ? { error: message, code } : { error: message }, { status });
 }
 
 export async function readJson(request, limit = 120_000) {
@@ -49,7 +58,7 @@ export async function handleApi(fn) {
   try {
     return await fn();
   } catch (error) {
-    if (error instanceof ApiError) return apiError(error.status, error.message);
+    if (error instanceof ApiError) return apiError(error.status, error.message, error.code);
     return apiError(500, "Unexpected hosted vault error.");
   }
 }

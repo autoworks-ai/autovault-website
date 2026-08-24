@@ -105,6 +105,32 @@ export function consumeVaultArrival(search: string, storage?: Storage | null): b
   return true;
 }
 
+/**
+ * Is this cloud state the *authenticated* answer, or still the anonymous one?
+ *
+ * The arrival has to wait for this, because the page's `signedIn` deliberately
+ * ORs in the live Clerk flag: it turns true a whole `/api/me` before the
+ * authenticated payload lands, so a returning owner would otherwise spend
+ * their one arrival watching a LOCKED mark swell while their open vault is
+ * still in flight -- and the occasion is one-shot, so the real one never
+ * plays.
+ *
+ * `user` alone is not the test. The funnel's provisioning path emits
+ * `{ ...(current ?? { user: null }), vault }` (HostedVaultFunnel.vue), so the
+ * checkout return -- the occasion the ask named first -- can carry a real
+ * vault with a null user. Either field is proof: `/api/me` answers an
+ * anonymous request with 200 and both null, and hands back a vault only for a
+ * session it authenticated.
+ */
+export function isAuthenticatedCloudState(
+  state:
+    | { user?: unknown; vault?: unknown; [key: string]: unknown }
+    | null
+    | undefined
+): boolean {
+  return Boolean(state?.user) || Boolean(state?.vault);
+}
+
 /** Test seam. Never called from the page. */
 export function resetVaultArrivalLedger(): void {
   consumedInMemory.clear();
