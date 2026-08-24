@@ -171,6 +171,16 @@ watch(
   { immediate: true }
 );
 
+// Any edit to the code field retires what is on screen. Without this the page
+// can show code A's fingerprint above code B's text, and a ticked checkbox that
+// refers to neither.
+watch(code, () => {
+  if (!pairing.value) return;
+  pairing.value = null;
+  fingerprintMatches.value = false;
+  error.value = null;
+});
+
 async function request(path: string, init?: RequestInit) {
   const headers = await authHeaders(
     { accept: "application/json", ...(init?.body ? { "content-type": "application/json" } : {}) },
@@ -210,7 +220,14 @@ async function decide(action: "confirm" | "deny") {
   busy.value = true;
   error.value = null;
   try {
-    const response = await request(`/api/devices/pairings/${encodeURIComponent(code.value.trim())}`, {
+    // Submit the code that was LOOKED UP, never the input's current value. The
+    // field stays editable while the fingerprint is on screen, so reading it
+    // here would let someone tick "this fingerprint matches", paste a different
+    // code, and confirm that one -- approving a machine whose fingerprint was
+    // never displayed, which is exactly the property the checkbox exists to
+    // provide. The watcher below is the other half: editing the field drops the
+    // pairing, so a stale fingerprint can never sit next to a changed code.
+    const response = await request(`/api/devices/pairings/${encodeURIComponent(pairing.value.user_code)}`, {
       method: "POST",
       body: JSON.stringify({ action })
     });

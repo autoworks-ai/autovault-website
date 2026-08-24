@@ -75,6 +75,15 @@ export async function onRequestPost(context) {
       return rfcError("expired_token");
     }
 
+    // Revoked between the browser confirming and this poll. Reporting it as
+    // `pending` (which the ternary below would) hands the CLI an authorized
+    // pairing whose every catalog request is then refused -- a linked machine
+    // that does not work. Revocation is the owner refusing, so say so with a
+    // terminal code instead.
+    if (device.status === "revoked") {
+      return rfcError("access_denied");
+    }
+
     const origin = new URL(request.url).origin;
     return deviceJson({
       slug: device.slug,

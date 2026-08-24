@@ -22,6 +22,12 @@ export const PAIRING_TTL_SECONDS = 900;
 // the next poll are at most five seconds apart.
 export const PAIRING_POLL_INTERVAL_SECONDS = 5;
 
+// How long a confirmed pairing stays redeemable past its own expiry. Generous
+// on purpose: the cost of keeping a spent row is one dead SQLite row, and the
+// cost of dropping it early is telling someone their machine failed to link
+// when it is sitting admitted in their console.
+export const PAIRING_REDEEM_GRACE_SECONDS = 86_400;
+
 // A slug-less, self-signed endpoint is a global mint surface: anybody with a
 // keypair can create rows. Cap live pairings per KEY rather than per vault,
 // because at mint time there is no vault yet. Confirming, denying or expiring
@@ -57,7 +63,17 @@ export function generateUserCode() {
 // and SQLite will not index one. Runs on the mint path, which is the only
 // place that needs a free code.
 export async function prunePairings(env, publicKey) {
-  await run(env, "delete from device_pairings where expires_at <= ?", nowIso());
+  // Unconfirmed codes die at expiry. Confirmed ones deliberately outlive it:
+  // the CLI can still be mid-poll when the TTL lapses, and deleting the row out
+  // from under it would report a machine that IS admitted as a failed link.
+  // They are retired on the owning key's next mint just below, with the
+  // retention window as the backstop for a key that never mints again.
+  await run(env, "delete from device_pairings where expires_at <= ? and confirmed_at is null", nowIso());
+  await run(
+    env,
+    "delete from device_pairings where confirmed_at is not null and expires_at <= ?",
+    isoAfter(-PAIRING_REDEEM_GRACE_SECONDS)
+  );
   if (publicKey) {
     await run(
       env,
@@ -155,7 +171,14 @@ export function pairingIsExpired(pairing) {
 export function pairingState(pairing) {
   if (!pairing) return "unknown";
   if (pairing.denied_at) return "denied";
-  if (pairingIsExpired(pairing)) return "expired";
+  // Confirmed outranks expired, and the order is the whole point. The TTL
+  // bounds how long an UNCONFIRMED code stays live; once the owner has
+  // admitted the machine the grant is real and the device row exists. Checking
+  // expiry first meant a confirm landing inside the last polling interval
+  // admitted an active device and then told the CLI `expired_token` -- the two
+  // ends disagreeing about whether the machine is linked, which is the one
+  // outcome this flow must never produce.
   if (pairing.confirmed_at) return "confirmed";
+  if (pairingIsExpired(pairing)) return "expired";
   return "pending";
 }

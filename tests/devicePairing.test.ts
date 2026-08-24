@@ -459,6 +459,70 @@ describe("the owner confirms in the browser", () => {
 // coverage: there is no DOM harness here, and these two properties are exactly
 // the ones that fail silently -- the page still renders, it just quietly loses
 // the code or quietly stops asking whether the fingerprint matched.
+describe("a grant that outlives its code", () => {
+  it("still redeems after expires_at, because the machine is already admitted", async () => {
+    const { db, env } = createTestEnv();
+    seedVault(db);
+    const device = await newDeviceKey();
+    const { payload: started } = await startFor(env, device);
+    const cookie = await createSession(new Request(ORIGIN), env, "clerk_1");
+
+    const confirmed = await decidePairing(
+      ownerContext(env, cookie, started.user_code, { action: "confirm" })
+    );
+    expect(confirmed.status).toBe(200);
+
+    // The owner confirmed inside the last polling interval and the TTL lapsed
+    // before the CLI's next poll. The device row is active either way, so
+    // answering `expired_token` would report a linked machine as a failure.
+    db.prepare("update device_pairings set expires_at = ? where device_code = ?")
+      .run(new Date(Date.now() - 60_000).toISOString(), started.device_code);
+
+    const { response, payload } = await poll(env, device, started.device_code);
+    expect(response.status).toBe(200);
+    expect(payload).toMatchObject({ slug: SLUG, status: "active" });
+  });
+
+  it("survives another device's prune sweep", async () => {
+    const { db, env } = createTestEnv();
+    seedVault(db);
+    const device = await newDeviceKey();
+    const { payload: started } = await startFor(env, device);
+    const cookie = await createSession(new Request(ORIGIN), env, "clerk_1");
+    await decidePairing(ownerContext(env, cookie, started.user_code, { action: "confirm" }));
+
+    db.prepare("update device_pairings set expires_at = ? where device_code = ?")
+      .run(new Date(Date.now() - 60_000).toISOString(), started.device_code);
+
+    // Minting for an unrelated key runs prunePairings, which used to delete
+    // every expired row -- including this confirmed one, out from under a CLI
+    // still polling it.
+    const other = await newDeviceKey();
+    await startFor(env, other);
+
+    const { response } = await poll(env, device, started.device_code);
+    expect(response.status).toBe(200);
+  });
+
+  it("tells the CLI a revoked machine is refused, not pending", async () => {
+    const { db, env } = createTestEnv();
+    seedVault(db);
+    const device = await newDeviceKey();
+    const { payload: started } = await startFor(env, device);
+    const cookie = await createSession(new Request(ORIGIN), env, "clerk_1");
+    await decidePairing(ownerContext(env, cookie, started.user_code, { action: "confirm" }));
+
+    // Revoked between confirming in the browser and the next poll. Reporting
+    // `pending` would hand the CLI an authorized pairing whose every catalog
+    // request is then refused.
+    db.prepare("update sync_devices set status = 'revoked' where public_key = ?").run(device.publicKey);
+
+    const { response, payload } = await poll(env, device, started.device_code);
+    expect(response.status).toBe(400);
+    expect(payload.error).toBe("access_denied");
+  });
+});
+
 describe("the confirm page", () => {
   const source = readFileSync(
     join(import.meta.dirname, "..", ".vitepress", "theme", "components", "CloudPairPage.vue"),
@@ -472,6 +536,16 @@ describe("the confirm page", () => {
     // main path, not an edge case.
     expect(source).toContain(':force-redirect-url="pairUrl"');
     expect(source).toContain("pairUrl.value = `${window.location.pathname}${window.location.search}`");
+  });
+
+  it("submits the code whose fingerprint was shown, not the input's value", () => {
+    // The field stays editable while the fingerprint is displayed. Reading it
+    // at submit time would let someone tick the box for code A, paste code B,
+    // and confirm a machine whose fingerprint was never on screen.
+    expect(source).toContain("encodeURIComponent(pairing.value.user_code)");
+    expect(source).not.toContain("encodeURIComponent(code.value.trim())");
+    // The other half: editing the field retires the displayed pairing.
+    expect(source).toMatch(/watch\(code, \(\) => \{[\s\S]*?fingerprintMatches\.value = false;/);
   });
 
   it("keeps confirm behind the fingerprint check", () => {
