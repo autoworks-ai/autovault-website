@@ -568,13 +568,19 @@ describe("polls do not trip over each other", () => {
     // pending machine never appears, and the backend carries all of it.
     const at = cloudPage.indexOf("devicePollTimer = setInterval");
     expect(at).toBeGreaterThan(-1);
-    expect(cloudPage.slice(at, at + 700)).toContain("if (deviceLoadInFlight) return;");
-    // The flag has to clear on the failure path too, or one error stops
-    // polling for the life of the page.
+    expect(cloudPage.slice(at, at + 700)).toContain("if (deviceLoadsInFlight > 0) return;");
+    // A count, not a flag: two requests can overlap when an auth change
+    // re-decides the gate mid-load, and a shared boolean would let the older
+    // one's finally report "idle" while the newer one is still running.
     const load = cloudPage.indexOf("async function loadDevices");
     const body = cloudPage.slice(load, cloudPage.indexOf("function stopDevicePolling", load));
+    expect(body).toContain("deviceLoadsInFlight += 1;");
+    // And it has to come back down on the failure path too, or one error
+    // stops polling for the life of the page.
     expect(body).toContain("finally {");
-    expect(body).toContain("deviceLoadInFlight = false;");
+    expect(body.indexOf("deviceLoadsInFlight -= 1;")).toBeGreaterThan(
+      body.indexOf("} finally {")
+    );
   });
 });
 
@@ -612,9 +618,34 @@ describe("one snapshot, and no claims about a vault that is not there", () => {
     // Signed out, mid-checkout, or after a failed load there is no vault whose
     // device state is known -- and "No machines linked yet" states a fact
     // about one that may not exist.
+    //
+    // This used to pin the literal `v-else-if="vault"`. The condition grew a
+    // second clause when the "waiting to be admitted" badge stopped being
+    // chained onto this one (it had to: as a v-else-if it went silent the
+    // moment any machine was linked, hiding the second machine still waiting).
+    // The guard this test exists for is unchanged and asserted below; what is
+    // new is that the badge which now runs ahead of it is held to the same
+    // standard, so the chain cannot be reordered into claiming device facts
+    // without a vault.
     const at = cloudPage.indexOf("No machines linked yet");
     expect(at).toBeGreaterThan(-1);
-    expect(cloudPage.slice(at - 200, at)).toContain('v-else-if="vault"');
+    const branch = cloudPage.slice(at - 260, at);
+    expect(branch).toMatch(/v-else-if="vault\b/);
+    expect(branch).toContain('v-else-if="vault && !activeDevices.length"');
+  });
+
+  it("empties the device list the moment a vault stops existing", () => {
+    // The badge ahead of "No machines linked yet" is gated on
+    // pendingDevices.length rather than on `vault`, so what keeps IT honest is
+    // that the list itself is cleared -- not a condition in the template.
+    const at = cloudPage.indexOf("() => vault.value?.id ?? null");
+    expect(at).toBeGreaterThan(-1);
+    const body = cloudPage.slice(at, cloudPage.indexOf("{ immediate: true }", at));
+    expect(body).toContain("if (!vaultId) {");
+    expect(body).toContain("devices.value = [];");
+    // Bumped, not just cleared: a request already in flight for the old vault
+    // would otherwise repopulate it.
+    expect(body).toContain("devicesRequestSeq += 1;");
   });
 });
 

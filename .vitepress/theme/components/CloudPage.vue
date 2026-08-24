@@ -8,15 +8,42 @@
     id="launch-path"
     class="cv-page"
     :class="`cv-stage-${stage}`"
-    :aria-busy="!hydrated"
+    :aria-busy="!revealed"
   >
-    <!-- Loading veil. An OVERLAY rather than a branch, so the shell below is
-         present in the prerendered HTML and there is no layout jump when
-         /api/me resolves. -->
-    <div v-if="!hydrated" class="cv-boot">
-      <span class="cv-boot-mark"
-        ><BrandMark :size="30" state="locked" show-depth
-      /></span>
+    <!-- The load screen IS the vault. An OVERLAY rather than a branch, so the
+         shell below is present in the prerendered HTML and there is no layout
+         jump when /api/me resolves.
+
+         That overlay is also what makes stage "loading" safe: the shell
+         underneath is still rendering the pre-vault card, funnel and all,
+         because keeping that component mounted across provisioning is
+         load-bearing (see the v-show below). This veil is opaque and covers
+         the whole shell, and `inert` takes the shell out of the focus and
+         accessibility trees, so a checkout button behind it is unreachable
+         rather than merely unpainted. Both properties are pinned by a test.
+
+         The mark is the SAME 72px vault the focal card uses, with the same
+         two documented props doing the work: `working` is BrandMark's own
+         loading graphic (the dial sweeps; it is deliberately not a spinner),
+         and `unlocking` is its one 700ms turn-and-retract. Its doc comment
+         says to apply that in the same tick the state flips, which is why all
+         three bindings read the same ref -- they cannot disagree. Nothing new
+         is animated on the mark itself. -->
+    <div v-if="!revealed" class="cv-boot" :class="{ opening: bootOpening }">
+      <div class="cv-boot-vault" aria-hidden="true">
+        <span class="cv-boot-halo" />
+        <span class="cv-boot-ring inner" />
+        <span class="cv-boot-ring mid" />
+        <span class="cv-boot-ring outer" />
+        <span class="cv-boot-mark"
+          ><BrandMark
+            :size="72"
+            :state="bootOpening ? 'unlocked' : 'locked'"
+            :working="!bootOpening"
+            :unlocking="bootOpening"
+            show-depth
+        /></span>
+      </div>
       <p>Opening your hosted vault…</p>
     </div>
 
@@ -26,8 +53,8 @@
          Only the main area changes now; the chrome never moves. -->
     <div
       class="cv-shell"
-      :class="{ locked: !signedIn, booting: !hydrated }"
-      :inert="!hydrated">
+      :class="{ locked: !signedIn, booting: !revealed }"
+      :inert="!revealed">
       <aside class="cv-side" aria-label="Vault navigation">
         <div class="cv-brand">
           <span class="cv-brand-mark"
@@ -149,15 +176,37 @@
               {{ activeDevices.length }}
               {{ activeDevices.length === 1 ? "machine" : "machines" }} linked</span
             >
-            <span v-else-if="pendingDevices.length" class="cv-pill warn"
-              ><span class="cv-dot" />
-              {{ pendingDevices.length }} waiting to be admitted</span
+            <!-- Deliberately NOT chained onto the pill above. As a v-else-if
+                 this said nothing whenever a machine was already linked -- and
+                 a second box running `autovault link` against a set-up vault is
+                 the exact case the device poll refuses to stop for (see
+                 devicePollUrgent). One active and one pending reported "1
+                 machine linked" and left the machine still waiting on a click
+                 unmentioned anywhere above the fold.
+
+                 A button, because this is the one badge here that names
+                 something only the owner can finish. The Machines card is
+                 ~960px down the connect stage on a 2560x1080 screen, which is
+                 the other half of "below the fold"; this is the handle back to
+                 it, and it reuses the scroll-and-flash the CLI handshake
+                 already uses rather than inventing a second one. -->
+            <button
+              v-if="pendingDevices.length"
+              type="button"
+              class="cv-pill warn cv-pill-jump"
+              title="Show the machines waiting to be admitted"
+              @click="jumpToMachines()"
             >
+              <span class="cv-dot" />
+              {{ pendingDevices.length }} waiting to be admitted
+              <span class="cv-pill-caret" aria-hidden="true">↓</span>
+            </button>
             <!-- v-else-if, not v-else: signed out, mid-checkout, or after a
                  failed load there is no vault whose device state we know, and
                  "no machines linked" states a fact about one that may not
-                 exist. -->
-            <span v-else-if="vault" class="cv-pill mut"
+                 exist. The added !activeDevices.length keeps this the last word
+                 of a chain that now starts one pill earlier. -->
+            <span v-else-if="vault && !activeDevices.length" class="cv-pill mut"
               ><span class="cv-dot" /> No machines linked yet</span
             >
           </div>
@@ -758,6 +807,7 @@ import { copyText as copyToClipboard } from "../utils/clipboard";
 import { prefersReducedMotion } from "../utils/motion";
 import { formatPriceLabel } from "../utils/money";
 import { consumeVaultArrival, isAuthenticatedCloudState } from "../utils/vaultArrival";
+import { cloudStateIsKnown, deviceListIsKnown } from "../utils/cloudLoadState";
 import {
   admitHandshakeState,
   findAdmitTarget,
@@ -897,7 +947,20 @@ type CloudStatePayload = {
   subscription?: CloudSubscription;
   vault?: CloudVault;
 };
-type Stage = "error" | "account" | "subscription" | "setup" | "connect" | "explore" | "ready";
+// "loading" is not a step in the funnel -- it is the honest answer while this
+// page still has none. Every other member below is a claim about the account,
+// and each one is read off state that starts empty, so without a member for
+// "not yet known" the empty state is indistinguishable from a real answer.
+// "error" stays first: cloudDashboardHonesty pins `type Stage = "error"`.
+type Stage =
+  | "error"
+  | "loading"
+  | "account"
+  | "subscription"
+  | "setup"
+  | "connect"
+  | "explore"
+  | "ready";
 // The main area renders exactly one of these at a time, chosen from the
 // sidebar. Adding one means four edits and nothing else: a member here, a row
 // in SECTION_REVEAL, an item() line in navItems, and a block in the template.
@@ -930,6 +993,104 @@ const cloudState = ref<CloudState>({
   vault: null,
 });
 const hydrated = ref(false);
+// The auth context the last completed /api/me was sent under, or null while no
+// response has landed at all.
+//
+// `hydrated` alone was never enough, and that is the whole of the flash. This
+// page fires /api/me on mount, before Clerk has resolved, so that request goes
+// out ANONYMOUS -- see the note on celebrateUnlock, which already documented
+// the double load. It comes back "no user, no subscription, no vault" quickly,
+// which is true of the request and says nothing about the person. Flipping
+// `hydrated` on it dropped the boot veil and let the page announce a stage it
+// had no evidence for: a paid, provisioned owner was shown a checkout button
+// for the length of a Clerk round trip.
+//
+// Compared against Clerk's own answer below. A response only speaks for the
+// visitor if it was sent under the auth context Clerk finally reports.
+const loadedSignedIn = ref<boolean | null>(null);
+// A bound on waits this page does not control. Clerk's script has no failure
+// signal -- a blocked bundle leaves `isLoaded` false forever -- and the device
+// list is deliberately silent on failure because it runs on a poll. Neither
+// can be waited on indefinitely: /cloud is also the public sign-up entry
+// point, and a veil that never lifts there is worse than the wrong-state flash
+// this whole change exists to remove.
+//
+// This is a FAILURE signal, not a slowness budget, and the number says so.
+// When it fires the page degrades to exactly its pre-fix behaviour -- which
+// for a signed-in owner IS the wrong-state flash. So it must never fire on a
+// page that is merely slow. Twenty seconds is far past any real Clerk load
+// (sub-second in practice) and past any /api/me that is going to arrive at
+// all; whoever reaches it has a Clerk bundle blocked outright, and could not
+// have signed in either way.
+//
+// Written as 8s first, and watching it load is how that got caught: with the
+// window widened the deadline landed while the authenticated /api/me was
+// still on its way, un-veiled the page using the anonymous response, and
+// reproduced the exact defect this task exists to remove. Both halves of the
+// repair are here -- the long deadline, and the in-flight guard.
+const LOAD_PATIENCE_MS = 20_000;
+const loadPatienceExpired = ref(false);
+let loadPatienceTimer: ReturnType<typeof setTimeout> | undefined;
+// How many /api/me calls are outstanding. A request still in flight is a wait
+// WITH an end -- it settles, or the browser ends it -- so giving up on it is
+// never right. The deadline exists for the wait that has no end at all.
+const cloudLoadsInFlight = ref(0);
+
+// Called from onMounted, never at setup scope: on the server there is nothing
+// to wait for and no timer to leak.
+function armLoadPatience() {
+  if (loadPatienceTimer) clearTimeout(loadPatienceTimer);
+  loadPatienceTimer = setTimeout(() => {
+    loadPatienceExpired.value = true;
+    loadPatienceTimer = undefined;
+  }, LOAD_PATIENCE_MS);
+}
+
+// The device list's own copy of that bound -- a copy rather than a share,
+// because the two waits do not start at the same moment. The deadline above
+// is armed on mount and bounds the wait for /api/me. The wait for the device
+// list cannot begin until an /api/me has come back carrying a vault, which is
+// the moment the gate below arms.
+//
+// Feeding the mount deadline to the device gate made that gate a no-op for
+// precisely the owner it exists to protect. A returning owner whose /api/me
+// lands after the mount deadline has already passed reads "expired" in the
+// same tick the vault appears, with `devices` still empty, so `cliLinked` is
+// false and the typed connect terminal replays at somebody who linked months
+// ago -- the exact replay this gate was added to stop. The deadline could
+// also fire mid-way through the first device request, which is the same
+// defect a few hundred milliseconds later.
+//
+// Same duration, for the same reason -- with one correction. "Twenty seconds
+// is five failed attempts" is only true if five attempts actually happened,
+// and startDevicePolling skips every tick while a request is in flight. A
+// first request that stalls therefore burns the whole window having completed
+// ZERO attempts, and giving up then is giving up on nothing: `stage` reads
+// the still-empty array and the connect terminal replays at the owner this
+// gate exists to protect. So the clock elapsing is not the same event as the
+// page giving up, and they need separate names.
+//
+// `deviceWaitOver` is the one `stage` reads. It is latched -- the wait ends
+// once and does not restart -- because a gate that re-closed on every poll
+// tick would toggle the whole page between the boot veil and the connect
+// stage every four seconds, which is worse than either answer alone.
+let devicePatienceElapsed = false;
+const deviceWaitOver = ref(false);
+let devicePatienceTimer: ReturnType<typeof setTimeout> | undefined;
+
+function armDevicePatience() {
+  if (devicePatienceTimer) clearTimeout(devicePatienceTimer);
+  devicePatienceElapsed = false;
+  deviceWaitOver.value = false;
+  devicePatienceTimer = setTimeout(() => {
+    devicePatienceTimer = undefined;
+    devicePatienceElapsed = true;
+    // Mid-attempt: hand the decision to loadDevices' finally, which runs when
+    // that attempt is over. The request is bounded (see loadDevices), so the
+    // worst case is this window plus one request bound rather than forever.
+    if (deviceLoadsInFlight === 0) deviceWaitOver.value = true;
+  }, LOAD_PATIENCE_MS);
+}
 // Set when /api/me could not be resolved because auth failed — as opposed to
 // resolving successfully and reporting no vault. Without this the two cases
 // are indistinguishable downstream, and a signed-in, paying, provisioned user
@@ -1043,9 +1204,327 @@ watch(
 
 onBeforeUnmount(clearAdmitWaitTimer);
 
+onBeforeUnmount(() => {
+  if (loadPatienceTimer) clearTimeout(loadPatienceTimer);
+  loadPatienceTimer = undefined;
+  if (devicePatienceTimer) clearTimeout(devicePatienceTimer);
+  devicePatienceTimer = undefined;
+});
+
 function isAdmitTarget(device: SyncDevice) {
   return admitTarget.value?.id === device.id;
 }
+
+// The CLI admit handoff -- selecting the waiting row, flashing it and focusing
+// its Admit button -- lives further down the file, below `revealed`. It has to
+// wait for the boot veil to lift, and it cannot name `revealed` before that
+// constant exists. See "the admit handoff waits for the veil".
+
+const earlyAccess = computed(() => Boolean(vault.value?.early_access_at));
+
+const subscription = computed(() => cloudState.value.subscription);
+
+// ORs in the live Clerk flag, not just the /api/me payload. Clerk resolves
+// after mount, so between those two moments `user` is still null -- without
+// this the shell would blink back to "create an account" for someone who is
+// demonstrably signed in.
+const signedIn = computed(
+  () => Boolean(user.value) || isClerkSignedIn.value,
+);
+const paid = computed(() => Boolean(subscription.value?.active));
+
+/* ---------------------------------------------------------------------------
+ * What this page actually knows
+ *
+ * Three separate questions, and the page used to answer all of them from
+ * whatever happened to be in the refs:
+ *
+ *   1. Has Clerk decided whether there is a session?      authSettled
+ *   2. Do we hold an /api/me sent under that decision?    cloudStateKnown
+ *   3. Has the device list answered for this vault?       devicesKnown
+ *
+ * Each starts out unknown and each has an empty value that looks exactly like
+ * a real negative answer. Keeping them as named facts is what lets `stage`
+ * say "loading" instead of guessing.
+ * ------------------------------------------------------------------------ */
+
+// Clerk is the authority on whether anyone is signed in; `user` from /api/me
+// only ever confirms it. `clerkAuthEnabled` is false during SSR and in the
+// legacy cookie mode, and isClerkLoaded is hardcoded true there, so this is
+// settled from the start in both.
+const authSettled = computed(() => !clerkAuthEnabled || isClerkLoaded.value);
+
+// The rule itself lives in utils/cloudLoadState.ts so it can be tested by
+// running it. This file's tests are source assertions -- they can see that a
+// branch exists and cannot see that it decides correctly, and deciding
+// correctly is the entire fix.
+const cloudStateKnown = computed(() =>
+  cloudStateIsKnown({
+    hydrated: hydrated.value,
+    loadedSignedIn: loadedSignedIn.value,
+    authSettled: authSettled.value,
+    clerkSignedIn: isClerkSignedIn.value,
+    patienceExpired: loadPatienceExpired.value && cloudLoadsInFlight.value === 0,
+  }),
+);
+
+// Whether the device list has answered for the vault currently in state. Reset
+// whenever that vault changes, set only by a response this page actually
+// parsed -- see loadDevices.
+const devicesKnown = ref(false);
+// Whether `cliLinked` is a question worth waiting for. Latched once, at the
+// moment the account's real state first lands.
+//
+// A vault that already existed then may already have a machine linked, and
+// `devices` starts empty, so reading cliLinked before the list answers is the
+// same unknown-vs-false conflation one level down: it renders the connect
+// terminal, with its typed replay, to someone who connected months ago.
+//
+// A vault provisioned later in this same session is seconds old and cannot
+// have one, so the checkout path is never held behind a list whose answer is
+// already known. Without the latch it would be: provisioning flips `vault`
+// from null to a row, which resets devicesKnown, which would veil the owner
+// who has just paid.
+const devicesGateArmed = ref(false);
+// Which auth answer the gate was decided under -- null until it has been.
+//
+// Latched per answer rather than per mount, and the difference is a whole
+// class of visitor. Clerk's modal finishes on the same document (see
+// ClerkAuthControls, which reconciles the session in place rather than
+// reloading), so signing in on /cloud never remounts this component. Someone
+// who arrived signed out has already decided the gate against an anonymous
+// payload -- no vault, so nothing armed -- and a "decided once, ever" latch
+// would never let the vault arriving with the authenticated /api/me re-arm
+// it. The connect terminal then replays at an owner who signed in on this
+// very page. Signing out is the same in reverse.
+//
+// Keyed to Clerk's own flag, not to `signedIn`: that ORs the live flag in, so
+// it turns true a whole request before the payload lands and would re-decide
+// the gate against state still in flight. And both signals are watched in ONE
+// watcher rather than two, because two would have an order between them --
+// on a session blip that flips both in the same flush, a separate reset
+// watcher running second would clear a decision the first had just made
+// correctly, with no further change left to re-decide on.
+let devicesGateDecidedFor: boolean | null = null;
+
+watch([cloudStateKnown, isClerkSignedIn], ([known, clerkSignedIn]) => {
+  if (!known || devicesGateDecidedFor === clerkSignedIn) return;
+  devicesGateDecidedFor = clerkSignedIn;
+  devicesGateArmed.value = Boolean(vault.value);
+  // Only an armed gate is waiting for anything, and this is the first moment
+  // the page knows it is one. A vault provisioned during this session never
+  // arms, so it never starts a window it would not use.
+  if (devicesGateArmed.value) armDevicePatience();
+});
+
+const stage = computed<Stage>(() => {
+  if (loadError.value && !vault.value) return "error";
+  // Before this branch existed the three tests below ran against empty refs on
+  // every load, and empty reads as "signed out, nothing bought, no vault" --
+  // a confident, wrong claim, made to the one visitor who has already done all
+  // three. Not knowing is a state of its own, and this is it.
+  if (!cloudStateKnown.value) return "loading";
+  // Vault first. A reserved vault is proof the first three steps completed,
+  // so checking `paid` ahead of it would bounce a past_due or canceled holder
+  // back to "Finish checkout" -- getSubscription derives `active` from
+  // isPaidStatus(status), so a lapse flips `paid` false while the vault row
+  // survives untouched. A lapse belongs on the Subscription card, not in the
+  // signup funnel.
+  if (vault.value) {
+    // Same rule as above, one level down: `devices` starts empty, so cliLinked
+    // is false before the list has said anything. See devicesGateArmed for why
+    // this only holds a vault that predates this page load.
+    if (
+      !deviceListIsKnown({
+        gateArmed: devicesGateArmed.value,
+        listAnswered: devicesKnown.value,
+        patienceExpired: deviceWaitOver.value,
+      })
+    ) {
+      return "loading";
+    }
+    if (!cliLinked.value) return "connect";
+    if (!earlyAccess.value) return "explore";
+    return "ready";
+  }
+  if (!signedIn.value) return "account";
+  if (!paid.value) return "subscription";
+  return "setup";
+});
+
+// "The page is showing something it knows." Everything that used to key off
+// `hydrated` keys off this instead, so the boot veil, the inert shell and the
+// ambient vault all follow the one derivation rather than a flag that meant
+// "a response landed" and was read as "the answer is in".
+//
+// Deliberately derived from `stage` rather than from cloudStateKnown: a load
+// that fails outright reaches "error", and the error card has a Try again
+// button on it. Veiling that would be the permanent spinner.
+const settled = computed(() => stage.value !== "loading");
+
+/* ---------------------------------------------------------------------------
+ * The load screen is the vault opening
+ *
+ * `settled` says the data is in. This says the page is on screen. Between the
+ * two sits one gesture: the boot vault, which has been sweeping its dial while
+ * the page had nothing to show, turns and retracts, and the settled dashboard
+ * is behind it.
+ *
+ * Three separate vault gestures now exist on this page and they must not be
+ * confused with each other. Each has its own ref and its own timer:
+ *
+ *   celebrateUnlock   the owner admits their first machine. One call site,
+ *                     inside decideDevice, with the pre-await `wasOpen`
+ *                     capture (PR #106). Not touched by any of this -- the
+ *                     shell is `inert` for the whole of the boot gesture, so
+ *                     there is no click that could reach it.
+ *   vaultArriving     this page arrived, in the background. Spent once per
+ *                     occasion (Task D). Gated on `revealed` below, so it can
+ *                     neither run under the veil nor overlap the boot unlock.
+ *   bootOpening       this. At most once per mount, and only when the wait was
+ *                     long enough to have registered as a wait.
+ *
+ * The precedence between the last two is structural rather than a rule anyone
+ * has to remember: `revealed` is false for the whole of the boot gesture, and
+ * `ambientVault` reads `revealed`, so the arrival cannot start until the boot
+ * unlock has finished. They are sequential by construction, never concurrent.
+ * ------------------------------------------------------------------------ */
+
+// Matches brand-mark-unlock's own 700ms in styles.css. Kept as its own
+// constant rather than reusing VAULT_UNLOCK_MS so the admit celebration's
+// timing cannot be changed from here by accident.
+const BOOT_UNLOCK_MS = 700;
+// Below this, skip the gesture entirely and reveal at once.
+//
+// A brand moment that makes a fast page feel slower is a regression, and this
+// is the line: under ~350ms the veil is a flicker rather than a state, so the
+// visitor never registered a wait and there is nothing to resolve. Completing
+// a beat nobody heard just adds 700ms to a page that was ready. Above it they
+// have seen the vault and it should open rather than vanish.
+const BOOT_MIN_VISIBLE_MS = 350;
+
+// Three phases, not two booleans. `settled` flipping true is not the same
+// moment as the veil lifting, and a plain `settled && !opening` would have
+// been true for the frame between them -- the veil would vanish, the gesture
+// would start, and it would come back. "waiting" holds that gap.
+type BootPhase = "waiting" | "opening" | "open";
+const bootPhase = ref<BootPhase>("waiting");
+let bootOpenTimer: ReturnType<typeof setTimeout> | undefined;
+let bootMountedAt = 0;
+
+const bootOpening = computed(() => bootPhase.value === "opening");
+
+// The veil is gone and the real page is on screen. Not a latch on `settled`:
+// if the session is lost later the page honestly veils again, and what stops
+// a second celebration is the arrival ledger, not this.
+const revealed = computed(() => settled.value && bootPhase.value === "open");
+
+// "Ready and settled", which is a stronger claim than "fetched". Vue has to
+// have flushed the render that `settled` triggers AND the browser has to have
+// painted a frame of it -- behind an opaque veil, where a reflow costs
+// nothing -- before the veil starts to lift. Revealing on promise resolution
+// and letting the layout settle in front of the visitor is the same defect
+// this task exists to fix, wearing better clothes.
+//
+// Two frames: the first is the style and layout pass Vue's flush schedules,
+// the second is evidence it was painted rather than merely scheduled.
+//
+// Raced against a deadline, and that is not defensive padding -- it is a bug
+// found by watching this load. requestAnimationFrame does not fire in a
+// background tab, and /cloud is opened in one routinely: people cmd-click, and
+// the Stripe return can land in a new tab. Waiting on a frame that will never
+// come held an opaque veil over the whole page until the tab was focused.
+// Two frames is ~33ms at 60fps and ~66ms at 30, so this ceiling is generous
+// where frames are being produced and instant where they are not.
+const PAINT_WAIT_MAX_MS = 120;
+
+function afterNextPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      resolve();
+    };
+    requestAnimationFrame(() => requestAnimationFrame(finish));
+    setTimeout(finish, PAINT_WAIT_MAX_MS);
+  });
+}
+
+async function openBoot() {
+  await nextTick();
+  await afterNextPaint();
+  // Lost the answer again while we waited; leave the phase alone so the next
+  // flip retries.
+  if (!settled.value || bootPhase.value !== "waiting") return;
+  if (
+    // A failed load did not open anything. Playing an unlock over "We couldn't
+    // load your vault" would be the page celebrating its own error.
+    stage.value === "error" ||
+    // Neither did a visit by someone who has no vault to open. Measured on a
+    // signed-out load: the gesture put 700ms between them and the sign-up
+    // button, on the page that IS the public sign-up entry point -- and the
+    // mark would have been claiming that something of theirs had just opened.
+    // The dial still sweeps behind the veil while the page loads; there is
+    // simply nothing to unlock at the end of it.
+    !signedIn.value ||
+    // Nor a signed-in visitor who has not reserved one yet. `signedIn` was
+    // the wrong question on its own: a brand-new account whose load crosses
+    // the 350ms threshold played the whole 700ms unlock and then revealed the
+    // checkout step, so the mark spent that beat claiming something of theirs
+    // had opened while `vault` was still null. Both conditions stay -- the
+    // signed-out case above is separately measured -- because this narrows
+    // the gate rather than swapping it.
+    !vault.value ||
+    // Read inside the callback, never at setup scope: the PR #88 hydration
+    // class, and the same placement the two existing gestures use.
+    prefersReducedMotion() ||
+    Date.now() - bootMountedAt < BOOT_MIN_VISIBLE_MS
+  ) {
+    bootPhase.value = "open";
+    return;
+  }
+  bootPhase.value = "opening";
+  if (bootOpenTimer) clearTimeout(bootOpenTimer);
+  bootOpenTimer = setTimeout(() => {
+    bootPhase.value = "open";
+    bootOpenTimer = undefined;
+  }, BOOT_UNLOCK_MS);
+}
+
+watch(settled, (isSettled) => {
+  if (!isSettled || bootPhase.value !== "waiting") return;
+  void openBoot();
+});
+
+onBeforeUnmount(() => {
+  if (bootOpenTimer) clearTimeout(bootOpenTimer);
+  bootOpenTimer = undefined;
+});
+
+/* ---------------------------------------------------------------------------
+ * The admit handoff waits for the veil
+ *
+ * Moved down here from beside admitTarget, because it now reads `revealed` and
+ * a watcher source is evaluated the moment the watcher is created -- naming a
+ * `const` declared further down would be a temporal-dead-zone throw at setup.
+ *
+ * Why it needs `revealed` at all: extending the loading state pushed `inert`
+ * out from "the first /api/me returned" to "the device list returned, plus a
+ * paint, plus up to 700ms of gesture" -- and the device list landing is the
+ * very event that produces the row this reaches for. Both flush together, so
+ * without the guard `button.focus()` ran while `.cv-shell` still carried
+ * `inert`. Inert elements are not focusable, so it was a silent no-op, the
+ * scroll and the flash were spent behind an opaque veil, and `admitFocusedId`
+ * had already latched -- so it never tried again. Measured, on the flow this
+ * branch is named after: the Admit button appeared at t=7452 with inert still
+ * set, and focus was still on <body> at t=20000.
+ *
+ * `revealed` is in the SOURCE rather than only read inside the callback, so
+ * the watcher re-fires when the veil lifts. Re-reading it inside would not
+ * help: the four-second poll does not change `admitTarget.value?.id`, so
+ * nothing else would ever wake this up.
+ * ------------------------------------------------------------------------ */
 
 // Focus the row once per machine, not once per poll tick. The device list
 // reloads every four seconds while this is open, and re-stealing focus (and
@@ -1054,9 +1533,12 @@ function isAdmitTarget(device: SyncDevice) {
 let admitFocusedId: string | null = null;
 
 watch(
-  () => admitTarget.value?.id ?? null,
-  async (deviceId) => {
+  () => [admitTarget.value?.id ?? null, revealed.value] as const,
+  async ([deviceId, isRevealed]) => {
     if (!deviceId || admitFocusedId === deviceId) return;
+    // Before the latch, never after: an attempt that could not have worked
+    // must not be counted as the one attempt this machine gets.
+    if (!isRevealed) return;
     admitFocusedId = deviceId;
     // Put the panel that holds the row on screen before reaching for it. At
     // connect the overview already shows the machines list, but a second
@@ -1074,36 +1556,79 @@ watch(
   },
   { immediate: true }
 );
-const earlyAccess = computed(() => Boolean(vault.value?.early_access_at));
 
-const subscription = computed(() => cloudState.value.subscription);
+/* ---------------------------------------------------------------------------
+ * A machine checking in, while the card it lands in is off the bottom
+ *
+ * .cv-nextstep promises, in so many words, that your machine will show up
+ * under Machines *below*. On a 2560x1080 screen "below" is 960px down -- the
+ * card is off the bottom of the window at the exact moment it becomes the only
+ * thing left to do, and the bridge is pointing at something you cannot see.
+ * That is the sequencing half of "below the fold": the connect focal, the
+ * terminal and the bridge all sit above the card, and none of them shrink.
+ *
+ * So when a pending row actually lands at connect, bring the card to the
+ * viewport. Same scroll-and-flash the CLI handshake uses -- not a second
+ * mechanism -- and deliberately nothing more: no focus, because nothing here
+ * named a machine, and focus on a button that grants vault access is something
+ * the ?admit= handshake earns by carrying a fingerprint.
+ *
+ * Connect only. From `explore` on, the owner may be reading Billing, and a
+ * page that scrolls itself out from under them is worse than a badge they can
+ * click -- which is exactly what the topbar's "N waiting to be admitted" is.
+ * ------------------------------------------------------------------------ */
 
-// ORs in the live Clerk flag, not just the /api/me payload. Clerk resolves
-// after mount, so between those two moments `user` is still null -- without
-// this the shell would blink back to "create an account" for someone who is
-// demonstrably signed in.
-const signedIn = computed(
-  () => Boolean(user.value) || isClerkSignedIn.value,
-);
-const paid = computed(() => Boolean(subscription.value?.active));
+// Once per machine, like the admit handshake's latch and for the same reason:
+// the list reloads every four seconds, and re-scrolling on every response
+// would pin the page to this card and make it impossible to read anything else.
+const arrivalShownIds = new Set<string>();
 
-const stage = computed<Stage>(() => {
-  if (loadError.value && !vault.value) return "error";
-  // Vault first. A reserved vault is proof the first three steps completed,
-  // so checking `paid` ahead of it would bounce a past_due or canceled holder
-  // back to "Finish checkout" -- getSubscription derives `active` from
-  // isPaidStatus(status), so a lapse flips `paid` false while the vault row
-  // survives untouched. A lapse belongs on the Subscription card, not in the
-  // signup funnel.
-  if (vault.value) {
-    if (!cliLinked.value) return "connect";
-    if (!earlyAccess.value) return "explore";
-    return "ready";
+// No `{ immediate: true }`: there is nothing to do before a device list exists,
+// and `revealed` is in the source, so the case this really has to catch -- a
+// row that arrived while the boot veil was still up -- wakes it anyway. That
+// ordering is the regression Task E found one watcher above.
+watch(
+  () =>
+    [
+      pendingDevices.value.map((device) => device.id).join(" "),
+      revealed.value,
+      stage.value,
+    ] as const,
+  async ([, isRevealed, currentStage]) => {
+    const unseen = pendingDevices.value.filter((device) => !arrivalShownIds.has(device.id));
+    if (!unseen.length) return;
+    // Every guard that could mean "this could not have worked" sits before the
+    // latch, so a failed attempt does not spend the one each machine gets.
+    if (!isRevealed) return;
+    if (currentStage !== "connect") return;
+    // The handshake owns the moment when it has a row of its own to reach: it
+    // scrolls, flashes AND focuses, and half of that again on top would restart
+    // the flash mid-flash and scroll a card that is already arriving.
+    if (admitTarget.value) return;
+    for (const device of unseen) arrivalShownIds.add(device.id);
+    // Measured after the flush, and this is not a detail. A watcher callback
+    // runs BEFORE Vue renders, so the card here still holds "Nothing enrolled
+    // yet" -- short enough to sit inside the window, while the rows about to
+    // replace it push it off the bottom. Measured early, the check below said
+    // "already on screen" every time and this never scrolled at all; seen at
+    // 2560x1080, card bottom 1030 before the flush and 1181 after.
+    await nextTick();
+    // No "is it already on screen?" check, and that is a decision rather than
+    // an omission. The connect stage is GROWING while this runs: ConnectTerminal
+    // types its replay out a line at a time, and each line pushes this card
+    // further down. Traced at 2560x1080, the card's bottom went 1053 -> 1074 ->
+    // 1181 over the first seven seconds, crossing the fold partway through. A
+    // measurement taken when the row lands is provisional, so the guard read
+    // "already visible" and skipped the scroll for a card that was about to
+    // drop off the bottom -- flaky in exactly the way that is worst, because it
+    // worked whenever the page happened to be watched.
+    //
+    // Scrolling a card that was already visible costs a centring nudge and a
+    // flash; not scrolling one that has just left the viewport costs the whole
+    // point. On a window tall enough to hold the page this is a no-op anyway.
+    await focusDevicesCard();
   }
-  if (!signedIn.value) return "account";
-  if (!paid.value) return "subscription";
-  return "setup";
-});
+);
 
 // The card used to render a hardcoded "Active" pill and a hardcoded monthly
 // price as static markup, while the real
@@ -1269,9 +1794,12 @@ const onboardingSteps = computed<OnboardingStep[]>(() =>
     detail: stepDetail.value[key],
     // A failed /api/me leaves every downstream fact unknowable. Ticking step
     // one off isClerkSignedIn while greying the rest as "pending" would claim
-    // knowledge we do not have.
+    // knowledge we do not have. "loading" is the same situation before the
+    // fact rather than after it -- the rail is behind the boot veil there, but
+    // "unknown" is what it actually is, and RAIL_STATE_LABEL already speaks
+    // it to assistive tech.
     state:
-      stage.value === "error"
+      stage.value === "error" || stage.value === "loading"
         ? "unknown"
         : stepDone.value[key]
           ? "done"
@@ -1387,8 +1915,11 @@ const SECTION_TITLE: Record<Section, string> = {
   catalog: "Vault catalog",
 };
 
-// -1 for "error", which is deliberate: at that stage nothing but overview is
-// reachable, and overview passes on the null branch.
+// "error" and "loading" are deliberately absent, so indexOf returns -1 for
+// both: at either one nothing but overview is reachable, and overview passes
+// on the null branch. Adding "loading" to the front of this array would make
+// every gated panel compare against it as if it were a step in the funnel,
+// which is exactly what it is not.
 function stageReached(at: Stage | null, current: Stage) {
   return at === null || STAGE_ORDER.indexOf(current) >= STAGE_ORDER.indexOf(at);
 }
@@ -1414,6 +1945,11 @@ const activeSection = computed<Section>(() =>
 // things about where the reader is. Lives here, below activeSection, because
 // that is what the last branch reads.
 const pageTitle = computed(() => {
+  // Ahead of the pre-vault branch below, which reads `!vault.value` -- true
+  // while loading for the same reason it is true for a new visitor. The
+  // heading is behind the boot veil either way, but it is also the accessible
+  // name every panel region points at, so it must not name a step.
+  if (stage.value === "loading") return "Opening your hosted vault…";
   if (stage.value === "error") return "We couldn't load your vault";
   if (!vault.value) return "Reserve a hosted AutoVault namespace";
   if (stage.value === "connect") return "Connect your CLI";
@@ -1525,6 +2061,8 @@ onMounted(() => {
   // replaceState once provisioning settles, and the arrival fires after
   // /api/me -- later than that. See arrivalSearch.
   arrivalSearch.value = window.location.search;
+  armLoadPatience();
+  bootMountedAt = Date.now();
 });
 
 watch([isClerkLoaded, isClerkSignedIn], ([loaded]) => {
@@ -1537,6 +2075,8 @@ watch([isClerkLoaded, isClerkSignedIn], ([loaded]) => {
 watch(
   () => vault.value?.id ?? null,
   (vaultId) => {
+    // Whatever the list said was about a different vault, or about no vault.
+    devicesKnown.value = false;
     if (!vaultId) {
       // Bump the sequence, do not just clear. A list request already in flight
       // for the OLD vault would otherwise pass both staleness checks and
@@ -1553,22 +2093,95 @@ watch(
   { immediate: true }
 );
 
+// A deadline that only reaches `fetch` bounds only the last step of the
+// request. `authHeaders` goes through Clerk's getToken, which is its own
+// network call with its own way to stall, and an await that never settles
+// never reaches the finally below -- which is where cloudLoadsInFlight is
+// decremented, so the deadline it masks would still never fire and the veil
+// would still be permanent. Racing the signal against the token step is what
+// makes the bound cover the sequence rather than its tail.
+//
+// Rejects and never resolves, so it can only ever lose the race or end it.
+function abortRejection(signal: AbortSignal): Promise<never> {
+  return new Promise((_resolve, reject) => {
+    const fail = () => {
+      // Named rather than typed: DOMException is not constructible everywhere
+      // this file is parsed, and the name is what isAbortError reads.
+      const error = new Error("The request was aborted.");
+      error.name = "AbortError";
+      reject(error);
+    };
+    if (signal.aborted) {
+      fail();
+      return;
+    }
+    signal.addEventListener("abort", fail, { once: true });
+  });
+}
+
+// The one error shape that has to be told apart from a network failure, and
+// `instanceof DOMException` is not it: an abort surfaces as a plain object in
+// some runtimes and the test environment has no DOMException at all.
+function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { name?: unknown }).name === "AbortError"
+  );
+}
+
 async function loadCloudState(initial = false) {
   const requestSeq = ++cloudStateRequestSeq;
+  // Captured here, not in the finally. This is the context the request is
+  // actually sent under -- authHeaders reads isClerkSignedIn synchronously on
+  // the line below -- and Clerk can resolve while the fetch is in flight.
+  // Reading it back at completion time would relabel an anonymous request as
+  // an authenticated one, which is the flash wearing a different hat.
+  const requestSignedIn = isClerkSignedIn.value;
+  cloudLoadsInFlight.value += 1;
+  // What makes cloudLoadsInFlight's own claim true. That counter suspends the
+  // patience deadline for as long as a request is outstanding, on the
+  // reasoning that a request in flight is a wait WITH an end -- and `fetch`
+  // has no default timeout, so that was an assumption rather than a fact. A
+  // stalled connection (a captive portal, a dead proxy, a socket the network
+  // dropped without an RST) never settles: the counter never returns to zero,
+  // the deadline it masks can never fire, and the opaque, inert boot veil
+  // stays up for the life of the tab. Bounded by the same number, because it
+  // is the same bound.
+  const abort = new AbortController();
+  const abortTimer = setTimeout(() => abort.abort(), LOAD_PATIENCE_MS);
   try {
-    const headers = await authHeaders({ accept: "application/json" }, {
-      required: clerkAuthEnabled && isClerkSignedIn.value,
-      fresh: isClerkSignedIn.value,
-    });
+    const headers = await Promise.race([
+      authHeaders({ accept: "application/json" }, {
+        required: clerkAuthEnabled && isClerkSignedIn.value,
+        fresh: isClerkSignedIn.value,
+      }),
+      abortRejection(abort.signal),
+    ]);
     const response = await fetch("/api/me", {
       credentials: "include",
       headers,
+      signal: abort.signal,
     });
     if (requestSeq !== cloudStateRequestSeq) return;
     cloudState.value = response.ok
       ? normalizeCloudState((await response.json()) as CloudStatePayload)
       : { user: null, subscription: null, vault: null };
-    loadError.value = null;
+    // A 5xx is the server saying it could not answer, and the empty state
+    // above is a placeholder, not a report. Reading it as "no subscription,
+    // no vault" is the same conflation the loading stage exists to end -- and
+    // it lands in the same place: watched live, an /api/me returning 500
+    // showed a paying, provisioned owner "Finish checkout". The error stage
+    // and its Try again button are for exactly this, and they were reachable
+    // only from an auth failure.
+    //
+    // Deliberately 5xx only. A 4xx here is auth-shaped, and the signed-out
+    // path is not one: /api/me answers an anonymous request with 200 and a
+    // null user, so no ordinary visitor can reach this branch.
+    loadError.value =
+      response.status >= 500
+        ? "We couldn't reach your vault just now. Nothing has changed on your account."
+        : null;
   } catch (error) {
     if (requestSeq !== cloudStateRequestSeq) return;
     if (isClerkApiAuthError(error)) {
@@ -1580,11 +2193,32 @@ async function loadCloudState(initial = false) {
       return;
     }
     cloudState.value = { user: null, subscription: null, vault: null };
-    loadError.value = null;
+    // An aborted request answered nothing, which is the 5xx case wearing a
+    // different hat, and it has to say so. Left on the silent branch below it
+    // would be worse than the veil it replaces: the finally records this
+    // request's auth context, that context matches Clerk, cloudStateKnown
+    // goes true, and the empty placeholder renders as "Finish checkout" to a
+    // paying owner -- the original complaint, twenty seconds late. The error
+    // card and its Try again button are the honest answer.
+    loadError.value = isAbortError(error)
+      ? "We couldn't reach your vault just now. Nothing has changed on your account."
+      : null;
   } finally {
+    clearTimeout(abortTimer);
+    cloudLoadsInFlight.value -= 1;
     // `initial` used to set hydrated outside the staleness guard, so a slow
     // first request could un-veil the page using a superseded response.
     if (requestSeq === cloudStateRequestSeq || initial) hydrated.value = true;
+    // NOT under `|| initial`, and that difference is load-bearing. The mount
+    // request is the anonymous one; if it lands after the authenticated
+    // follow-up has already resolved, recording its context here would flip
+    // cloudStateKnown back to false and pull the veil down over a page that
+    // was already correct. It is stale, so it says nothing.
+    //
+    // Set in the finally rather than on success so a network failure still
+    // resolves the wait: /api/me failing leaves loadError null and the state
+    // empty, and that has to reach a rendered stage rather than spin.
+    if (requestSeq === cloudStateRequestSeq) loadedSignedIn.value = requestSignedIn;
   }
 }
 
@@ -1617,6 +2251,10 @@ function syncCloudState(payload: CloudStatePayload) {
   cloudState.value = normalizeCloudState(payload);
   loadError.value = null;
   hydrated.value = true;
+  // The funnel only emits what it knows to be true, and it is signed in to
+  // have learned it, so this payload speaks for the current context. Without
+  // this line the page would stay veiled behind an /api/me it no longer needs.
+  loadedSignedIn.value = isClerkSignedIn.value;
 }
 
 function normalizeCloudState(payload: CloudStatePayload): CloudState {
@@ -1713,31 +2351,66 @@ function formatWhen(iso: string): string {
   return new Date(when).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-let deviceLoadInFlight = false;
+// A count rather than a flag, and for the same reason cloudLoadsInFlight is
+// one. Two requests can overlap -- an auth change re-decides the gate and
+// starts a fresh list load while the previous vault's request is still out --
+// and a shared boolean lets the OLD one's finally report "idle" while the new
+// one is still running. The window would then end mid-request on a still-empty
+// array, which is the replay this gate exists to stop.
+let deviceLoadsInFlight = 0;
 
 async function loadDevices() {
   if (!vault.value) return;
-  deviceLoadInFlight = true;
+  deviceLoadsInFlight += 1;
   const requestSeq = ++devicesRequestSeq;
+  // The same bound as /api/me, and needed here for a sharper reason. The poll
+  // skips every tick while the count above is non-zero, and the device window
+  // can only end on a finished attempt, so a request that never settles
+  // stops the retries AND stops the page ever giving up: the veil stays for
+  // the life of the tab. Covers the token step as well as the fetch, because
+  // Clerk's getToken is its own network call with its own way to stall.
+  const abort = new AbortController();
+  const abortTimer = setTimeout(() => abort.abort(), LOAD_PATIENCE_MS);
   try {
-    const headers = await authHeaders({ accept: "application/json" }, {
-      required: true,
-      fresh: false,
-    });
+    const headers = await Promise.race([
+      authHeaders({ accept: "application/json" }, {
+        required: true,
+        fresh: false,
+      }),
+      abortRejection(abort.signal),
+    ]);
     const response = await fetch("/api/vaults/current/devices", {
       credentials: "include",
       headers,
+      signal: abort.signal,
     });
     if (requestSeq !== devicesRequestSeq) return;
     if (!response.ok) return;
     const payload = (await response.json()) as { devices?: SyncDevice[] };
     if (requestSeq !== devicesRequestSeq) return;
     devices.value = payload.devices ?? [];
+    // Only here: inside the staleness guard, and only for a response this
+    // page actually parsed. The two early returns above -- a superseded
+    // request and a non-2xx -- have not answered the question, and a transient
+    // 401 marked "known" would drop a linked owner onto the connect terminal,
+    // which is the exact symptom this flag exists to prevent. The poll retries
+    // every four seconds, and loadPatienceExpired is the backstop if it never
+    // succeeds.
+    devicesKnown.value = true;
   } catch {
     // Silent on purpose. This runs on a timer; a transient failure must not
     // stack up notices on a page the owner is reading.
   } finally {
-    deviceLoadInFlight = false;
+    clearTimeout(abortTimer);
+    deviceLoadsInFlight -= 1;
+    // The other half of armDevicePatience's decision. If the window ran out
+    // while this attempt was running, the page gives up here -- on a finished
+    // attempt -- rather than in the timer, which would have given up in the
+    // middle of one. Only once nothing is outstanding: an overlapping request
+    // is still an attempt in progress.
+    if (devicePatienceElapsed && deviceLoadsInFlight === 0) {
+      deviceWaitOver.value = true;
+    }
   }
 }
 
@@ -1782,7 +2455,7 @@ const vaultOpen = computed(() => stage.value === "explore" || stage.value === "r
 // a dial that turns forever reads as a component somebody forgot to stop.
 const vaultWorking = computed(
   () =>
-    !hydrated.value ||
+    !settled.value ||
     // Same predicate the poll uses. A stale, malformed, or wrong-account
     // `?admit=` never matches a row, so `waiting` is permanent — and without
     // this the dial advertised active work forever, long after the budget had
@@ -1861,22 +2534,48 @@ const VAULT_ARRIVAL_MS = 1800;
 // window.location.search then would miss the one arrival the ask named first.
 const arrivalSearch = ref("");
 
-// Signed up, and past the boot veil. `hydrated` is false in the prerendered
-// HTML and in the client's first render, so this element is absent from both
-// and cannot contribute a hydration mismatch.
-const ambientVault = computed(() => hydrated.value && signedIn.value);
+// Signed up, and past the boot veil. `revealed` is false in the prerendered
+// HTML and in the client's first render -- `hydrated` starts false on both
+// sides, which makes stage "loading", which makes `settled` false -- so this
+// element is absent from both and cannot contribute a hydration mismatch.
+//
+// It gates on `revealed` rather than on `hydrated`, and the distance between
+// those two grew twice in one change, so it is worth stating what each one
+// would have cost. The arrival is spent once per occasion
+// (consumeVaultArrival) and the watcher below fires the instant this flips:
+//
+//   `hydrated`  flips on the anonymous mount response, while the veil is
+//               still up. The whole 1800ms swell would run behind an opaque
+//               overlay and the occasion would be spent on a frame nobody
+//               saw -- once per session, so it would not come back.
+//   `settled`   flips when the data lands, which is when the boot vault
+//               STARTS its unlock. The background arrival would then swell
+//               underneath the foreground gesture: two vaults moving at once,
+//               which is the defect `v-show="!vaultUnlocking"` on the status
+//               mark exists to prevent one layer forward.
+//   `revealed`  flips in the tick the veil is removed, which is the first
+//               frame of the real page and the only honest place for it.
+const ambientVault = computed(() => revealed.value && signedIn.value);
 
 // Presence is ambient-always; the arrival is not, and the difference is the
 // whole of this gate.
 //
-// `signedIn` ORs in the live Clerk flag on purpose (see its own comment), so
-// it turns true the moment Clerk resolves -- which is one whole /api/me before
-// the authenticated payload lands. `hydrated` is already true by then, because
-// the anonymous load on mount passes `initial` and sets it even when its
-// response is discarded as stale. So `ambientVault` alone flips true while
-// `vault` is still null, and the one-shot arrival gets spent on the empty
-// state: the returning owner watches a LOCKED mark swell, and the real unlock
-// arrival they were owed is gone.
+// This gate was written (PR #113) against an `ambientVault` that was still
+// `hydrated && signedIn`, and the `revealed` it now reads is a strictly
+// stronger claim -- which makes it tempting to conclude this gate has been
+// absorbed and can go. It has not been. The gap is exactly one short-circuit
+// wide, and it is in utils/cloudLoadState.ts: `cloudStateIsKnown` returns
+// true on `hydrated && patienceExpired` WITHOUT auth ever settling. On that
+// path stage leaves "loading", `settled` and then `revealed` follow, and
+// `signedIn` ORs in the live Clerk flag (see its own comment) -- so the whole
+// chain above can be true while the only /api/me in hand is the anonymous
+// mount response, with `user` and `vault` still null.
+//
+// What that costs is not a frame. The occasion is spent once
+// (consumeVaultArrival), so the returning owner watches a LOCKED mark swell
+// and the real unlock arrival they were owed never plays. And the bounded
+// wait is not an exotic path: it exists precisely for a slow Clerk, which is
+// the same slowness that leaves the authenticated payload in flight.
 //
 // `cloudState` is only ever written from an applied /api/me or from the
 // funnel's own syncCloudState, so asking it -- rather than the Clerk flag --
@@ -1960,7 +2659,7 @@ function startDevicePolling() {
     // superseded before it lands and the list never updates at all, while the
     // backend takes the load of all of them. Explicit refreshes after an
     // action still go through: those are newer on purpose.
-    if (deviceLoadInFlight) return;
+    if (deviceLoadsInFlight > 0) return;
     void loadDevices();
   }, wanted);
 }
@@ -2113,6 +2812,17 @@ function onNavClick(item: NavItem) {
   if (item.section === "machines") void focusDevicesCard();
 }
 
+// The topbar's "N waiting to be admitted" badge. Same two moves the nav item
+// makes -- render the panel, then scroll to it -- so there is one way this page
+// gets you to the machines list, not three. It deliberately does NOT focus the
+// Admit button: focus is the CLI handshake's move, where a fingerprint in the
+// URL says which machine you came for. Nothing here says that, and stealing
+// focus onto a button that grants vault access is not a thing to do on a hunch.
+function jumpToMachines() {
+  selectedSection.value = "machines";
+  void focusDevicesCard();
+}
+
 let devicesFlashTimer: ReturnType<typeof setTimeout> | undefined;
 
 // Scroll the machines list into view and flash it. The admit handshake is the
@@ -2122,7 +2832,26 @@ async function focusDevicesCard() {
   // Read after the tick rather than taken as an argument. The caller may have
   // just switched to the panel that renders this, in which case the ref was
   // still null at call time.
-  devicesCard.value?.scrollIntoView({ behavior: "smooth", block: "center" });
+  // Two reasons to jump instead of glide, both read here in the callback and
+  // never at setup scope -- the PR #88 hydration class.
+  //
+  // The preference, because `behavior: "smooth"` is only *advisory* under
+  // prefers-reduced-motion, and everywhere else on this page motion is spelled
+  // out rather than hoped for (styles.css, startVaultArrival, the media block
+  // at the bottom of this file).
+  //
+  // And a hidden document, because a smooth scroll is animated and a
+  // background tab does not animate: measured here, `scrollIntoView` with
+  // "smooth" left scrollY at 0 in a hidden tab while "auto" moved it to 531 in
+  // the same frame. /cloud lands in a background tab routinely -- `autovault
+  // link` opens the browser, the Stripe return can arrive in a new tab, people
+  // cmd-click -- and the whole point of scrolling is that the card is in the
+  // right place when they look. Nobody is watching the animation anyway.
+  const jump = prefersReducedMotion() || document.visibilityState === "hidden";
+  devicesCard.value?.scrollIntoView({
+    behavior: jump ? "auto" : "smooth",
+    block: "center",
+  });
   devicesFlash.value = true;
   if (devicesFlashTimer) clearTimeout(devicesFlashTimer);
   devicesFlashTimer = setTimeout(() => {
@@ -2175,7 +2904,9 @@ const ICON = {
 
 /* ---------------- boot veil ---------------- */
 /* Overlays the shell rather than replacing it, so the prerendered HTML
-   already contains the real layout and nothing jumps when /api/me lands. */
+   already contains the real layout and nothing jumps when /api/me lands.
+   The background is an opaque token, not an alpha: this has to hide the
+   pre-vault card underneath, not tint it. */
 .cv-boot {
   position: absolute;
   inset: 24px 0 0;
@@ -2183,15 +2914,67 @@ const ICON = {
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 14px;
+  gap: 26px;
   border-radius: var(--cv-radius);
   background: var(--bg);
   color: var(--ink-3);
   font-size: 14px;
 }
+/* The reveal, and the reason it is 700ms with a hold: opacity stays at 1
+   through the dial's 140deg turn and clears only as the dial retracts. 55% is
+   the exact frame brand-mark-unlock changes direction on, so the dashboard
+   appears from behind a vault that is opening rather than after one that has
+   already opened. Perceived cost is the tail, not the whole gesture. */
+.cv-boot.opening {
+  animation: cv-boot-open 700ms var(--ease) forwards;
+  pointer-events: none;
+}
+
+.cv-boot-vault {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 232px;
+  height: 232px;
+}
+/* Concentric rings, in the mark's own vocabulary rather than a new one: the
+   middle ring is dashed because the vault's interior is (brand-mark-depth),
+   and the outer breathes on brand-mark-breathe's 2.2s so the whole
+   composition pulses as one object instead of two. */
+.cv-boot-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  pointer-events: none;
+}
+.cv-boot-ring.inner {
+  width: 124px;
+  height: 124px;
+  border-color: var(--line-2);
+}
+.cv-boot-ring.mid {
+  width: 176px;
+  height: 176px;
+  border-style: dashed;
+  border-color: rgba(90, 214, 192, 0.22);
+  animation: cv-boot-turn 16s linear infinite;
+}
+.cv-boot-ring.outer {
+  width: 232px;
+  height: 232px;
+  animation: cv-boot-breathe 2.2s ease-in-out infinite;
+}
+.cv-boot-halo {
+  position: absolute;
+  width: 232px;
+  height: 232px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(90, 214, 192, 0.1), transparent 68%);
+  pointer-events: none;
+}
 .cv-boot-mark {
-  opacity: 0.7;
-  animation: cv-pulse 1.8s var(--ease) infinite;
+  position: relative;
+  color: var(--accent);
 }
 
 /* Eyebrow + spark moved from the deleted pre-vault header into the topbar,
@@ -2482,6 +3265,35 @@ const ICON = {
 }
 .cv-pill.mut {
   color: var(--ink-3);
+}
+/* The one pill that is a control. A <button> arrives with a UA font, a grey
+   background and a border of its own, all of which have to be handed back to
+   .cv-pill before it reads as a sibling of the badges beside it. Restrained on
+   purpose: the caret and the hover are the whole affordance, because this sits
+   next to two pills that are only ever statements. */
+.cv-pill-jump {
+  font-family: inherit;
+  line-height: inherit;
+  cursor: pointer;
+  appearance: none;
+  transition:
+    border-color var(--dur-base) var(--ease),
+    background var(--dur-base) var(--ease);
+}
+.cv-pill-jump:hover {
+  border-color: var(--warn);
+  background: rgba(232, 168, 102, 0.16);
+}
+.cv-pill-jump:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* Same glyph and the same job as .cv-nextstep-caret: the thing you want is
+   further down the page. */
+.cv-pill-caret {
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.75;
 }
 
 .cv-sub-warn {
@@ -2811,12 +3623,35 @@ const ICON = {
     opacity: 1;
   }
 }
+/* The measure, and the whole horizontal half of "the actual permission grant
+   button is off to the right".
+
+   This was `flex: 1 1 auto`, so the identity column absorbed every pixel of
+   slack in the row. .cv-shell has no max-width -- /cloud is deliberately
+   full-bleed (.cd-full-content) -- so on a 2560px monitor the row is 2236px
+   wide and the machine's name sat 2260px from the Admit button that acts on
+   it. Reading a fingerprint and then travelling that far to click is a
+   cross-reference, not a glance, and with two machines pending it is a
+   cross-reference you can lose your place in -- which is how the wrong box
+   gets admitted.
+   A fixed basis instead of a growing one keeps every row's controls on the
+   same x, so the buttons stack in a column rather than landing wherever each
+   hostname happens to end. It still shrinks (0 1, not 0 0) for the narrow
+   viewports above the wrap breakpoint. */
 .cv-device-id {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-  flex: 1 1 auto;
+  flex: 0 1 300px;
+}
+/* Two pending machines differ by exactly this string -- it is what the CLI
+   printed on each box, and the only thing that tells them apart. At --ink-3 it
+   was the dimmest thing in the row it most needed to be read from. Lifted a
+   step on the rows that are actually asking to be told apart; the settled ones
+   keep the quiet treatment. */
+.cv-device.pending .cv-device-id code {
+  color: var(--ink-2);
 }
 .cv-device-id strong {
   font-size: 12.5px;
@@ -2831,12 +3666,22 @@ const ICON = {
   font-size: 11px;
   color: var(--ink-3);
 }
+/* Travels with the identity now rather than being flung to the far end of the
+   row. Left-aligned at every width -- the @media block below used to switch
+   this to flex-start under 640px and that rule is gone, because there is no
+   longer a width at which this column is right-aligned.
+
+   `min-width` rather than a fixed basis: the width is the content's
+   ("first seen just now", "first seen Aug 23"), floored so that the Admit
+   buttons still line up across rows instead of stepping in and out by however
+   many characters the last timestamp happened to need. */
 .cv-device-seen {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  align-items: flex-end;
-  flex: 0 0 auto;
+  align-items: flex-start;
+  flex: 0 1 auto;
+  min-width: 132px;
 }
 .cv-device-seen small {
   font-size: 11px;
@@ -2858,8 +3703,11 @@ const ICON = {
   .cv-device {
     flex-wrap: wrap;
   }
+  /* Nothing to re-align here any more: .cv-device-seen is left-aligned at
+     every width now, and its floor has to go so the identity is not squeezed
+     out by a timestamp on a phone. */
   .cv-device-seen {
-    align-items: flex-start;
+    min-width: 0;
   }
   .cv-device-actions {
     width: 100%;
@@ -2988,6 +3836,7 @@ const ICON = {
 }
 .cv-vaultfocal :deep(.brand-mark-svg),
 .cv-status-mark :deep(.brand-mark-svg),
+.cv-boot-mark :deep(.brand-mark-svg),
 .cv-ambient-mark :deep(.brand-mark-svg) {
   color: inherit;
 }
@@ -3481,13 +4330,41 @@ const ICON = {
     transform: none;
   }
 }
-@keyframes cv-pulse {
+/* cv-pulse used to live here, driving the old 30px boot mark. The mark's own
+   `working` prop is the loading graphic now, so the wrapper animation went
+   with it -- and an unused @keyframes is the same dead weight as the unused
+   rules Task A found by compiling the stylesheet. */
+
+/* The reveal. See .cv-boot.opening for why the hold runs to 55%. */
+@keyframes cv-boot-open {
+  0%,
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes cv-boot-turn {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* Restates its resting values at 0/100% rather than only travelling from
+   them, so `animation: none` under reduced motion lands on a ring that is
+   present and still -- the hazard styles.css documents for the mark itself. */
+@keyframes cv-boot-breathe {
   0%,
   100% {
-    opacity: 0.5;
+    opacity: 1;
+    transform: scale(1);
   }
   50% {
-    opacity: 1;
+    opacity: 0.55;
+    transform: scale(1.035);
   }
 }
 @keyframes cv-shimmer {
@@ -3568,7 +4445,12 @@ const ICON = {
   .cv-reveal,
   .cv-nav-item.revealed,
   .cv-nav-new,
-  .cv-boot-mark,
+  /* The load screen's rings. The mark inside them needs nothing here: its own
+     `is-working` and `is-unlocking` rules are already handled in styles.css,
+     which lands them on their resting states rather than freezing them
+     mid-travel. */
+  .cv-boot-ring.mid,
+  .cv-boot-ring.outer,
   .cv-status-card,
   .cv-appsync,
   .cv-focal-glow,
@@ -3586,10 +4468,19 @@ const ICON = {
   .cv-appskel {
     background: rgba(255, 255, 255, 0.08);
   }
+  /* Belt and braces, exactly as brand-mark's own reduced-motion rule does it:
+     openBoot never sets the phase that applies this class under the
+     preference, but if it somehow did, land on the destination rather than
+     freezing an opaque veil over the page forever. */
+  .cv-boot.opening {
+    animation: none;
+    opacity: 0;
+  }
   /* Neutralize decorative hover motion too — keep state changes, drop the travel */
   .cv-btn,
   .cv-nav-item,
   .cv-card,
+  .cv-pill-jump,
   .cv-preview {
     transition: none;
   }
@@ -3609,6 +4500,16 @@ const ICON = {
 @media (max-width: 960px) {
   .cv-shell {
     grid-template-columns: 1fr;
+  }
+  /* The veil covers the whole shell, and once the sidebar stacks, the shell is
+     far taller than the screen -- so centring in it put the vault most of a
+     viewport below the fold, leaving the load screen looking like an empty
+     page. Seen at 375px. Anchored near the top instead, where the composition
+     is the first thing on screen; desktop keeps the centring, which is right
+     there because the shell and the viewport are about the same height. */
+  .cv-boot {
+    align-content: start;
+    padding-top: 88px;
   }
   .cv-side {
     flex-direction: row;

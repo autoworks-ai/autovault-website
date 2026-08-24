@@ -257,18 +257,41 @@ describe("the arrival cannot disturb the first-machine celebration", () => {
     // page loads /api/me twice, and any "previous was non-null" watcher on the
     // stage celebrates on every reload for every returning customer.
     // `vaultArrivalReady` is monotonic per mount — it goes false -> true once,
-    // when the authenticated payload lands behind the boot veil — and the
-    // one-shot ledger covers the remount case.
+    // in the tick whichever of its two conditions lands last: the boot veil
+    // lifting, or the authenticated payload arriving. Usually that is the
+    // veil, because the payload is what settles the stage; on the bounded-wait
+    // path it is the payload, which is the case the auth gate is there for.
+    // The one-shot ledger covers the remount case.
     expect(cloudPage).toContain("watch(vaultArrivalReady, (ready) => {");
     expect(cloudPage).not.toContain("watch(vaultOpen");
     expect(cloudPage).not.toContain("watch(() => vaultOpen");
     // Presence is still the plain gate; only the trigger waits for more.
+    //
+    // The gate is the moment the veil ACTUALLY lifts, and that moved twice.
+    // `hydrated` now means only that some /api/me response arrived, and the
+    // first one is anonymous and lands while the veil is still up. `settled`
+    // means the data is in, which is when the boot vault STARTS its unlock.
+    // Keyed to either, consumeVaultArrival would spend the once-per-session
+    // occasion behind the veil or underneath the foreground gesture.
     expect(cloudPage).toContain(
-      "const ambientVault = computed(() => hydrated.value && signedIn.value);"
+      "const ambientVault = computed(() => revealed.value && signedIn.value);"
     );
+    expect(cloudPage).toContain('const settled = computed(() => stage.value !== "loading");');
+    expect(cloudPage).toContain(
+      'const revealed = computed(() => settled.value && bootPhase.value === "open");'
+    );
+    expect(cloudPage).toContain('<div v-if="!revealed" class="cv-boot"');
     // And the trigger is NOT that gate on its own. This is the assertion that
     // fails if someone reverts the arrival to the Clerk flag plus `hydrated`:
     // the predicate above proves the rule, this proves the page still asks it.
+    //
+    // Both gates survive the merge of #113 and #114 on purpose, and this pair
+    // is what stops the plausible-sounding collapse. `revealed` is a stronger
+    // claim than the `hydrated` #113 was written against, but not a strictly
+    // sufficient one: cloudStateIsKnown short-circuits true on `hydrated &&
+    // patienceExpired` without auth settling (cloudLoadState.test.ts runs that
+    // rule), so `revealed` can be reached against an anonymous payload and
+    // only cloudStateAuthenticated still says no.
     expect(cloudPage).not.toContain("watch(ambientVault");
     expect(cloudPage).toContain(
       "const cloudStateAuthenticated = computed(() =>\n  isAuthenticatedCloudState(cloudState.value)\n);"
@@ -392,10 +415,15 @@ describe("reduced motion gets a vault, just not a moving one", () => {
 
   it("adds nothing to the prerendered HTML, so there is nothing to mismatch", () => {
     // `hydrated` is false at setup on the server AND on the client's first
-    // render, so this element is in neither. No media query is read at setup
+    // render, which makes stage "loading" and therefore `settled` false on
+    // both, so this element is in neither. No media query is read at setup
     // scope, which is the PR #88 hydration class.
     expect(cloudPage).toContain('v-if="ambientVault"');
     expect(cloudPage).toContain("const hydrated = ref(false);");
+    // The chain that carries that from `hydrated` to `settled`: nothing in
+    // cloudStateKnown can be true before a response lands. The rule itself is
+    // executed in cloudLoadState.test.ts.
+    expect(cloudPage).toContain("hydrated: hydrated.value,");
   });
 });
 
