@@ -118,15 +118,17 @@ export async function getDeviceByKey(env, vaultId, publicKey) {
 }
 
 /**
- * Verify the signature on a device request and resolve which vault and device
- * it belongs to. Does NOT decide whether that device may proceed -- each route
- * applies its own status rule, because they differ: enrollment accepts an
- * unknown key, the catalog accepts pending or active, a bundle accepts only
- * active.
+ * Verify the signature on a device request and return the key that signed it.
  *
- * @returns {Promise<{ vault: any, device: any | null, publicKey: string }>}
+ * Slug-less on purpose. Pairing's whole point is a first contact that names no
+ * vault -- the browser session decides that later -- so it cannot use the
+ * slug-scoped wrapper below. Both paths share this one implementation because
+ * a second signature verifier is a second place for the message format to
+ * drift, and the format is the trust boundary.
+ *
+ * @returns {Promise<string>} the base64url ed25519 public key
  */
-export async function authenticateDeviceRequest(request, env, slug) {
+export async function verifySignedDeviceRequest(request) {
   const publicKey = request.headers.get(DEVICE_HEADERS.device);
   const timestamp = request.headers.get(DEVICE_HEADERS.timestamp);
   const signature = request.headers.get(DEVICE_HEADERS.signature);
@@ -151,6 +153,21 @@ export async function authenticateDeviceRequest(request, env, slug) {
   if (!(await verifyDeviceSignature(publicKey, message, signature))) {
     throw new ApiError(401, "Device signature is not valid for this request.");
   }
+
+  return publicKey;
+}
+
+/**
+ * Verify the signature on a device request and resolve which vault and device
+ * it belongs to. Does NOT decide whether that device may proceed -- each route
+ * applies its own status rule, because they differ: enrollment accepts an
+ * unknown key, the catalog accepts pending or active, a bundle accepts only
+ * active.
+ *
+ * @returns {Promise<{ vault: any, device: any | null, publicKey: string }>}
+ */
+export async function authenticateDeviceRequest(request, env, slug) {
+  const publicKey = await verifySignedDeviceRequest(request);
 
   const vault = await getVaultBySlug(env, slug);
   if (!vault) throw new ApiError(404, "No such vault.");
