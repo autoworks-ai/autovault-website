@@ -81,7 +81,34 @@ describe("which control is the one thing to do next", () => {
     // A marker with no step behind it is worse than none: it is the page
     // insisting there is another one.
     expect(site("ready")).toBeNull();
-    expect(site("ready", true, true)).toBeNull();
+  });
+
+  it("still marks a named machine at ready, where the stage outlives the claim", () => {
+    // `stage` is `ready` whenever ANY machine is active and early access has
+    // been asked for -- cliLinked reads activeDevices, not pendingDevices. So
+    // an owner who has done both and then runs `autovault link` on a second
+    // machine gets a pending row, an ?admit= fingerprint, and a stage that
+    // never leaves `ready`. "Nothing is left to do" is false in exactly that
+    // state: a CLI on the other end of that row is blocked on the click.
+    //
+    // The rest of the page already agreed. CloudPage's admit-handshake watcher
+    // carries no stage gate, so at `ready` it still forces
+    // selectedSection = "machines", scrolls the card, flashes it, and focuses
+    // that same Admit button. This was the one code path that disagreed.
+    //
+    // Named still means named: `namedPendingMachine` is the ?admit= target and
+    // nothing else, so this does not reopen the hazard the wiring block below
+    // pins -- admitting the named machine empties admitTarget, and the answer
+    // falls back to null rather than to the other row.
+    expect(site("ready", true, true)).toBe("admit");
+    // Card not on screen (the owner is reading Billing): no marker, rather
+    // than one on an element Vue is not rendering. `explore` falls back to the
+    // early-access CTA here; at `ready` that ask is already done, so there is
+    // nothing to fall back to.
+    expect(site("ready", true, false)).toBeNull();
+    // Pending machines with nothing naming one: unmarked at ready for exactly
+    // the same reason as at connect.
+    expect(site("ready", false, true)).toBeNull();
   });
 
   it("marks nothing while the page does not know what state this account is in", () => {

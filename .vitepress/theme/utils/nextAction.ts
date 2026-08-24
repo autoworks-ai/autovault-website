@@ -61,9 +61,11 @@ export function cloudNextAction({
   // the loading stage was introduced to stop making. It is also behind the
   // boot veil, so the marker would be spent where nobody could see it.
   // `error`: the only control is Try again, which is a recovery, not a step.
-  // `ready`: nothing is left to do, and a marker pointing at nothing is worse
-  // than none — it is the page insisting there is another step.
-  if (stage === "loading" || stage === "error" || stage === "ready") return null;
+  //
+  // `ready` used to be on this line and is not any more; it is handled below
+  // the admit branch instead. "Nothing is left to do" is true of the stage and
+  // false of one reachable state inside it — see there.
+  if (stage === "loading" || stage === "error") return null;
 
   // A machine sitting in a spinner outranks anything else on screen: a CLI on
   // the other end of it is blocked until this click happens. This is also what
@@ -77,6 +79,30 @@ export function cloudNextAction({
   // in the DOM is no marker at all. In that case the fall-through below marks
   // the action that IS on screen.
   if (namedPendingMachine && machinesOnScreen) return "admit";
+
+  // `ready` — the vault is open, a machine is linked, and early access has
+  // been asked for. Nothing is left to do, and a marker pointing at nothing is
+  // worse than none: it is the page insisting there is another step.
+  //
+  // Below the admit branch rather than above it, because the stage outlives
+  // the claim. `stage` is `ready` while ANY machine is active and
+  // `early_access_at` is set, so linking a second machine from an account that
+  // has already done both leaves it at `ready` with a pending row on screen —
+  // `cliLinked` reads activeDevices, not pendingDevices. Returning null there
+  // withheld the marker from the one control that was genuinely blocking a
+  // CLI, and did it while the rest of the page was pointing straight at that
+  // control: the admit-handshake watcher in CloudPage carries no stage gate,
+  // so at `ready` it still forces `selectedSection = "machines"`, scrolls the
+  // card, flashes it, and calls `button.focus()` on that exact Admit. One code
+  // path disagreeing with the other three is a defect, not restraint.
+  //
+  // The reordering cannot resurrect the wrong-machine hazard, because it does
+  // not touch what "named" means: `namedPendingMachine` is still
+  // `Boolean(admitTarget.value)`, and findAdmitTarget is pending-only and
+  // exact-match-only against the `?admit=` fingerprint. Admitting the named
+  // machine empties admitTarget, and this branch is then what the fall-through
+  // lands on — null, not the other row.
+  if (stage === "ready") return null;
 
   // The vault is open and the one thing left is asking for early access.
   if (stage === "explore") return "early-access";
