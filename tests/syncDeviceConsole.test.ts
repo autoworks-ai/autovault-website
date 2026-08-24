@@ -832,6 +832,50 @@ describe("selecting a machine is not admitting it", () => {
     expect(mount).not.toContain("decideDevice");
   });
 
+  it("retries the device list before the page gives up waiting for it", () => {
+    // The invariant behind a measured 21-second boot veil. loadDevices can
+    // miss -- its `required: true` authHeaders throws when Clerk has not
+    // resolved, and the catch is silent -- so the poll IS the recovery path.
+    // If a miss happens while `stage` is still "loading", devicePollUrgent is
+    // false and the poll arms at the IDLE cadence; if that cadence is longer
+    // than the device-patience window, the retry is scheduled after the
+    // deadline that abandons the wait and can never run. It was 30s against
+    // 20s, and the page sat behind an opaque veil for the difference.
+    const active = Number(/const DEVICE_POLL_ACTIVE_MS = ([\d_]+)/.exec(cloudPage)![1].replace(/_/g, ""));
+    const patience = Number(/const LOAD_PATIENCE_MS = ([\d_]+)/.exec(cloudPage)![1].replace(/_/g, ""));
+
+    // An unanswered list must be one of the things that makes the poll urgent,
+    // or "loading" arms the idle cadence and the two numbers below are not the
+    // ones being raced.
+    expect(cloudPage).toContain("(!devicesKnown.value && !deviceWaitOver.value) ||");
+    expect(active).toBeGreaterThan(0);
+    expect(patience).toBeGreaterThan(0);
+    expect(
+      active,
+      `the retry cadence for an unanswered list (${active}ms) must fire before the wait is abandoned (${patience}ms)`
+    ).toBeLessThan(patience);
+  });
+
+  it("re-runs the device load when Clerk resolves", () => {
+    // The other half of the same defect: the mount /api/me is authenticated by
+    // the session cookie, so a vault -- and therefore the first loadDevices --
+    // can land before clerk-js has resolved, and that attempt throws
+    // clerk-not-loaded into a silent catch. Clerk resolving is the missing
+    // precondition arriving, so the attempt has to be made again there.
+    const at = cloudPage.indexOf("watch([isClerkLoaded, isClerkSignedIn]");
+    expect(at).toBeGreaterThan(-1);
+    const watcher = cloudPage.slice(at, cloudPage.indexOf("});", at));
+
+    expect(watcher).toContain("void loadCloudState();");
+    // Guarded to the unloaded -> loaded edge. Ungated, the same watcher fires
+    // when someone signs out and back in as a different account, while `vault`
+    // still holds the previous account's row -- and /current/devices resolves
+    // server-side from the new token, so the new account's machines would land
+    // under the old vault's name with a live Admit button.
+    expect(watcher).toContain("if (!wasLoaded) void loadDevices();");
+    expect(watcher).toContain("([loaded], [wasLoaded])");
+  });
+
   it("focuses the target row once per machine, not once per poll", () => {
     // The list reloads every four seconds while this page is open; re-stealing
     // focus on each response would trap the keyboard on the Admit button.
