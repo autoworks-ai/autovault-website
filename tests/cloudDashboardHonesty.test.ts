@@ -261,8 +261,13 @@ describe("funnel/shell handoff", () => {
     // And the provisioning hand-off must merge onto the authoritative state,
     // or a failed local load turns "namespace reserved" into "signed out".
     expect(funnel).toContain("{ ...(current.value ?? { user: null }), vault: payload.vault }");
-    // provisionVault has to settle too: resumeCheckoutReturn reads vault.value
-    // straight after awaiting it, to decide whether to clear ?hosted=success.
+    // provisionVault has to settle too. The original reason was that
+    // resumeCheckoutReturn read vault.value straight after awaiting it; that
+    // caller is gone (reserving is a click now), but the assertion still holds
+    // for a live reason: startFlow's finally re-enables the button the moment
+    // this resolves, and without the flush it renders clickable for one frame
+    // at a step the shell has already left. Comment corrected, assertion
+    // unchanged.
     const prov = funnel.slice(funnel.indexOf("async function provisionVault"));
     const handoff = prov.indexOf('emit("stateChange"');
     expect(prov.slice(handoff, handoff + 400)).toContain("await nextTick();");
