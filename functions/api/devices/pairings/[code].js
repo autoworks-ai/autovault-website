@@ -44,6 +44,11 @@ export async function onRequestGet(context) {
       expires_at: pairing.expires_at,
       state,
       previously_revoked: existing?.status === "revoked",
+      // Deny marks the pairing; it does NOT revoke a device that is already
+      // enrolled. When this key is already active the outcome copy has to say
+      // so, or the page tells an owner a machine "never had access" while it is
+      // still holding their catalog.
+      already_active: existing?.status === "active",
       vault: vault ? { slug: vault.slug } : null
     });
   });
@@ -148,13 +153,30 @@ export async function onRequestPost(context) {
 async function admitDevice(env, vault, pairing) {
   const existing = await getDeviceByKey(env, vault.id, pairing.public_key);
   if (existing) {
-    await run(
+    // Conditional on the status that was READ. Re-admitting a revoked key is
+    // allowed here -- it is the owner doing it, and the page warns them first
+    // -- but only when revoked is the state they were shown. Without the
+    // predicate, a revocation landing between that read and this write is
+    // silently undone: the owner revokes a stolen laptop in one tab while
+    // confirming an unrelated-looking code in another, and the confirm
+    // resurrects it with no warning ever displayed.
+    const readmitted = await run(
       env,
-      "update sync_devices set status = 'active', admitted_at = ?, revoked_at = null, hostname = coalesce(?, hostname) where id = ?",
+      `update sync_devices set status = 'active', admitted_at = ?, revoked_at = null,
+              hostname = coalesce(?, hostname)
+         where id = ? and status = ?`,
       nowIso(),
       pairing.hostname,
-      existing.id
+      existing.id,
+      existing.status
     );
+    if (!readmitted?.meta?.changes) {
+      throw new ApiError(
+        409,
+        "That machine's status changed while you were confirming. Check it in your console and try again.",
+        "device-changed"
+      );
+    }
     return { id: existing.id, status: "active" };
   }
 

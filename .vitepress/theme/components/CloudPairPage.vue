@@ -36,10 +36,23 @@
 
     <div v-else-if="outcome === 'denied'" class="cp-card cp-card--quiet">
       <div class="cp-outcome">Refused</div>
-      <p class="cp-msg">
+      <!-- Two different truths, and saying the wrong one is a security problem
+           rather than a wording problem. Refusing a pairing does not revoke a
+           key that is ALREADY enrolled, so telling that owner "it never had
+           access" would leave a machine holding their catalog while the page
+           says it is handled. -->
+      <p v-if="deniedWasActive" class="cp-msg">
+        This code was refused, but that key is <strong>already a linked machine</strong>
+        on your namespace — refusing a code does not remove access it already has.
+        If it is not yours, revoke it in your console now.
+      </p>
+      <p v-else class="cp-msg">
         That machine was not linked. If it was not yours, nothing else is needed —
         it never had access.
       </p>
+      <a v-if="deniedWasActive" class="cp-btn cp-btn--primary" :href="cloudPath">
+        Revoke it in your console
+      </a>
     </div>
 
     <div v-else class="cp-card">
@@ -124,6 +137,7 @@ type Pairing = {
   expires_at: string;
   state: string;
   previously_revoked: boolean;
+  already_active?: boolean;
   vault: { slug: string } | null;
 };
 
@@ -146,6 +160,7 @@ const urlCode = ref("");
 // Where Clerk must return after sign-in: this page, with the code still on it.
 // Filled on mount rather than computed, so it never runs during SSR.
 const pairUrl = ref("/cloud/pair");
+const deniedWasActive = ref(false);
 let autoLookupDone = false;
 
 onMounted(() => {
@@ -245,6 +260,9 @@ async function decide(action: "confirm" | "deny") {
       error.value = payload.error ?? "That did not go through.";
       return;
     }
+    // Captured before the outcome renders: the copy has to reflect what was
+    // true for the key that was just refused.
+    deniedWasActive.value = action === "deny" && pairing.value?.already_active === true;
     confirmedSlug.value = payload.slug ?? "";
     outcome.value = action === "confirm" ? "confirmed" : "denied";
   } catch {

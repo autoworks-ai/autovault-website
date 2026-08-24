@@ -8,6 +8,11 @@ import { getPairingByDeviceCode, pairingState } from "../_lib/pairing.js";
 // protocol.
 const DEVICE_CODE_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code";
 
+// How long after confirmation a pairing with no device row is still treated as
+// in progress rather than dead. Far longer than any admission request, far
+// shorter than the code's own lifetime.
+const ADMISSION_SETTLE_SECONDS = 60;
+
 // POST /api/devices/token  ->  { slug, catalog_url, device_id, status }
 //                          or  400 { error: "<rfc 8628 code>" }
 //
@@ -67,12 +72,19 @@ export async function onRequestPost(context) {
         `, pairing.device_id)
       : null;
 
-    // Confirmed but the grant is gone -- the vault was deleted, or the owner
-    // revoked and removed the device between confirming and this poll. Not
-    // pending (nothing is coming) and not denied (nobody refused), so the
-    // honest RFC answer is that this code no longer buys anything.
+    // Confirmed, but no device row yet. TWO situations look identical here and
+    // they need opposite answers: the browser is between claiming the pairing
+    // and writing device_id (ordinary, milliseconds wide, and a poll lands in
+    // it whenever the timing aligns), or admission genuinely failed and nothing
+    // is coming. Answering `expired_token` for the first told the CLI the link
+    // failed while the browser was busy succeeding.
+    //
+    // So a freshly confirmed pairing stays NON-terminal: keep polling, the next
+    // one resolves it. Past the window no in-flight request can still be
+    // running, so the honest answer is that this code no longer buys anything.
     if (!device || !device.slug) {
-      return rfcError("expired_token");
+      const settling = Date.now() - Date.parse(pairing.confirmed_at) < ADMISSION_SETTLE_SECONDS * 1000;
+      return rfcError(settling ? "authorization_pending" : "expired_token");
     }
 
     // Revoked between the browser confirming and this poll. Reporting it as

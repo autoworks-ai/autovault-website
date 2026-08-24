@@ -459,6 +459,99 @@ describe("the owner confirms in the browser", () => {
 // coverage: there is no DOM harness here, and these two properties are exactly
 // the ones that fail silently -- the page still renders, it just quietly loses
 // the code or quietly stops asking whether the fingerprint matched.
+describe("races against the browser half", () => {
+  it("keeps the CLI polling while admission is still settling", async () => {
+    const { db, env } = createTestEnv();
+    seedVault(db);
+    const device = await newDeviceKey();
+    const { payload: started } = await startFor(env, device);
+    const cookie = await createSession(new Request(ORIGIN), env, "clerk_1");
+    await decidePairing(ownerContext(env, cookie, started.user_code, { action: "confirm" }));
+
+    // Exactly the window between claiming the pairing and writing device_id.
+    // A poll landing here used to get the terminal `expired_token` -- telling
+    // the CLI the link failed while the browser was busy succeeding.
+    db.prepare("update device_pairings set device_id = null where device_code = ?")
+      .run(started.device_code);
+
+    const { payload } = await poll(env, device, started.device_code);
+    expect(payload.error).toBe("authorization_pending");
+  });
+
+  it("calls it dead once no admission could still be in flight", async () => {
+    const { db, env } = createTestEnv();
+    seedVault(db);
+    const device = await newDeviceKey();
+    const { payload: started } = await startFor(env, device);
+    const cookie = await createSession(new Request(ORIGIN), env, "clerk_1");
+    await decidePairing(ownerContext(env, cookie, started.user_code, { action: "confirm" }));
+
+    db.prepare("update device_pairings set device_id = null, confirmed_at = ? where device_code = ?")
+      .run(new Date(Date.now() - 10 * 60_000).toISOString(), started.device_code);
+
+    const { payload } = await poll(env, device, started.device_code);
+    expect(payload.error).toBe("expired_token");
+  });
+
+  it("does not undo a revocation that landed mid-confirm", async () => {
+    const { db, env } = createTestEnv();
+    const vaultId = seedVault(db);
+    const device = await newDeviceKey();
+    const { payload: started } = await startFor(env, device);
+    const cookie = await createSession(new Request(ORIGIN), env, "clerk_1");
+
+    db.prepare(
+      `insert into sync_devices (id, vault_id, public_key, status, hostname, first_seen_at, admitted_at)
+       values ('device-old', ?, ?, 'active', 'workbench', ?, ?)`
+    ).run(vaultId, device.publicKey, new Date().toISOString(), new Date().toISOString());
+
+    // The owner revokes this key in another tab after the confirm handler has
+    // read it as active. The unconditional update used to write 'active' back
+    // over the newer 'revoked', silently restoring bundle access with no
+    // warning ever shown.
+    let raced = false;
+    const racingEnv = {
+      ...env,
+      AUTOVAULT_DB: {
+        prepare(sql: string) {
+          if (!raced && sql.includes("update sync_devices set status = 'active'")) {
+            raced = true;
+            db.prepare("update sync_devices set status = 'revoked', revoked_at = ? where id = 'device-old'")
+              .run(new Date().toISOString());
+          }
+          return (env.AUTOVAULT_DB as any).prepare(sql);
+        }
+      }
+    };
+
+    const lost = await decidePairing(
+      ownerContext(racingEnv, cookie, started.user_code, { action: "confirm" })
+    );
+    expect(lost.status).toBe(409);
+    expect((await lost.json()).code).toBe("device-changed");
+    expect((db.prepare("select status from sync_devices where id = 'device-old'").get() as any).status)
+      .toBe("revoked");
+    expect(raced).toBe(true);
+  });
+
+  it("tells the owner when the key they refused is already linked", async () => {
+    const { db, env } = createTestEnv();
+    const vaultId = seedVault(db);
+    const device = await newDeviceKey();
+    const { payload: started } = await startFor(env, device);
+    const cookie = await createSession(new Request(ORIGIN), env, "clerk_1");
+    db.prepare(
+      `insert into sync_devices (id, vault_id, public_key, status, hostname, first_seen_at, admitted_at)
+       values ('device-live', ?, ?, 'active', 'workbench', ?, ?)`
+    ).run(vaultId, device.publicKey, new Date().toISOString(), new Date().toISOString());
+
+    // Deny marks the pairing and leaves the enrolled device alone, so the page
+    // must not tell this owner the machine "never had access".
+    const view = await readPairing(ownerContext(env, cookie, started.user_code));
+    expect((await view.json()).already_active).toBe(true);
+  });
+});
+
 describe("the TTL and the mint cap", () => {
   it("refuses a claim that lands after the code expired", async () => {
     const { db, env } = createTestEnv();
@@ -605,6 +698,11 @@ describe("the confirm page", () => {
     expect(source).toContain("if (code.value.trim() !== value) return;");
     // Both the success path and the failure path, or a stale error survives.
     expect(source.split("if (code.value.trim() !== value) return;").length - 1).toBe(2);
+  });
+
+  it("does not claim a refusal removed access it never touched", () => {
+    expect(source).toContain("deniedWasActive");
+    expect(source).toMatch(/v-if="deniedWasActive"[\s\S]*?already a linked machine/);
   });
 
   it("keeps confirm behind the fingerprint check", () => {
