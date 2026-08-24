@@ -75,7 +75,7 @@ function isHiddenSitemapItem(item: { url: string }) {
     : item.url.startsWith("/")
       ? item.url
       : `/${item.url}`;
-  return path === "/cloud" || path === "/cloud/";
+  return path === "/cloud" || path === "/cloud/" || path.startsWith("/cloud/");
 }
 
 export default defineConfig({

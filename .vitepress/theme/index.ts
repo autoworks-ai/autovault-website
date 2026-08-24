@@ -20,6 +20,7 @@ import SkillDetailPage from "./components/SkillDetailPage.vue";
 import AuthorProfilePage from "./components/AuthorProfilePage.vue";
 import AboutPage from "./components/AboutPage.vue";
 import CloudPage from "./components/CloudPage.vue";
+import CloudPairPage from "./components/CloudPairPage.vue";
 
 const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
@@ -48,5 +49,6 @@ export default {
     app.component("AuthorProfilePage", AuthorProfilePage);
     app.component("AboutPage", AboutPage);
     app.component("CloudPage", CloudPage);
+    app.component("CloudPairPage", CloudPairPage);
   }
 } satisfies Theme;

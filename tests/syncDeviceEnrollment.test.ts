@@ -367,7 +367,12 @@ describe("sync routes are never redirected", () => {
     `/v/${SLUG}/catalog.json`,
     `/v/${SLUG}/devices`,
     `/v/${SLUG}/devices/current`,
-    `/v/${SLUG}/bundles/${"a".repeat(64)}.json`
+    `/v/${SLUG}/bundles/${"a".repeat(64)}.json`,
+    // Pairing is signed and manual-redirect too, and it is the FIRST call a
+    // machine makes -- `autovault link` with no slug. A 3xx here fails before
+    // the user has anything to fall back to.
+    "/api/devices/pair",
+    "/api/devices/token"
   ];
 
   it("passes every sync path straight through on the canonical host", async () => {
