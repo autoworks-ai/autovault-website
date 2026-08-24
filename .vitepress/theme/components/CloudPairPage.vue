@@ -199,6 +199,14 @@ async function lookup() {
   try {
     const response = await request(`/api/devices/pairings/${encodeURIComponent(value)}`);
     const payload = (await response.json()) as Pairing & { error?: string };
+    // The field can change while this is in flight -- a slow automatic lookup
+    // of the linked code, and the owner pastes a different one meanwhile. The
+    // watcher below cannot catch that, because `pairing` is still null for the
+    // whole request and it has nothing to retire yet. Without this guard the
+    // late response installs code A's fingerprint beside code B's text, and
+    // confirming would then act on A. Answers for a code that is no longer in
+    // the box are discarded, errors included.
+    if (code.value.trim() !== value) return;
     if (!response.ok) {
       error.value = payload.error ?? "That code could not be checked.";
       return;
@@ -209,6 +217,7 @@ async function lookup() {
     }
     pairing.value = payload;
   } catch {
+    if (code.value.trim() !== value) return;
     error.value = "Could not reach AutoVault Cloud. Check your connection and try again.";
   } finally {
     busy.value = false;

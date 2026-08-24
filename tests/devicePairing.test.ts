@@ -598,6 +598,15 @@ describe("the confirm page", () => {
     expect(source).toMatch(/watch\(code, \(\) => \{[\s\S]*?fingerprintMatches\.value = false;/);
   });
 
+  it("discards a lookup answer for a code that is no longer in the box", () => {
+    // The watcher cannot cover this: during an in-flight lookup `pairing` is
+    // already null, so it has nothing to retire, and the late response would
+    // install code A's fingerprint next to code B's text.
+    expect(source).toContain("if (code.value.trim() !== value) return;");
+    // Both the success path and the failure path, or a stale error survives.
+    expect(source.split("if (code.value.trim() !== value) return;").length - 1).toBe(2);
+  });
+
   it("keeps confirm behind the fingerprint check", () => {
     // The server cannot verify a human compared anything, so this checkbox is
     // the entire both-ends-match property (RFC 8628 s5.4). If the disabled
