@@ -3493,10 +3493,15 @@ const ICON = {
     color-mix(in srgb, var(--accent) 55%, transparent)
   );
 }
+/* A plain block, deliberately. As a flex container this paragraph turned its
+   own sentence into columns: the caret, the run of text before <strong>, the
+   <strong> itself, and the run after it are four flex items laid side by
+   side, and flex items do not wrap mid-item. At 375px that rendered as three
+   stacked columns rather than one sentence. It fit on one line at desktop,
+   which is why it read as fine there -- though even there the 8px `gap` was
+   showing up as a second helping of space either side of "Machines". */
 .cv-nextstep-copy {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
+  display: block;
   margin: 0;
   color: var(--ink-2);
   font-size: 13px;
@@ -3507,6 +3512,15 @@ const ICON = {
   font-weight: 600;
 }
 .cv-nextstep-caret {
+  /* inline-block, so the caret stays inside the sentence's own inline flow
+     and the words wrap past it normally. It also gets baseline alignment for
+     free -- an inline-block's baseline is its own text baseline -- which is
+     what `align-items: baseline` used to buy. 4px rather than the 8px that
+     `gap` used to give it: the newline between this span and "Next:"
+     collapses to a space that carries the remaining ~4px, which lands the
+     sentence within half a pixel of where it has always sat. */
+  display: inline-block;
+  margin-right: 4px;
   color: var(--accent);
   font-size: 12px;
   line-height: 1;
