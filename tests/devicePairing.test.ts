@@ -459,6 +459,56 @@ describe("the owner confirms in the browser", () => {
 // coverage: there is no DOM harness here, and these two properties are exactly
 // the ones that fail silently -- the page still renders, it just quietly loses
 // the code or quietly stops asking whether the fingerprint matched.
+describe("the TTL and the mint cap", () => {
+  it("refuses a claim that lands after the code expired", async () => {
+    const { db, env } = createTestEnv();
+    seedVault(db);
+    const device = await newDeviceKey();
+    const { payload: started } = await startFor(env, device);
+    const cookie = await createSession(new Request(ORIGIN), env, "clerk_1");
+
+    // The confirm read the pairing while it was still live, then spent time
+    // loading the vault and subscription. Because a confirmed pairing outranks
+    // an expired one by design, a late write here would resurrect a dead code
+    // for the whole grace window -- so the claim re-checks expiry itself.
+    let raced = false;
+    const racingEnv = {
+      ...env,
+      AUTOVAULT_DB: {
+        prepare(sql: string) {
+          if (!raced && sql.includes("set confirmed_at")) {
+            raced = true;
+            db.prepare("update device_pairings set expires_at = ? where device_code = ?")
+              .run(new Date(Date.now() - 1_000).toISOString(), started.device_code);
+          }
+          return (env.AUTOVAULT_DB as any).prepare(sql);
+        }
+      }
+    };
+
+    const lost = await decidePairing(
+      ownerContext(racingEnv, cookie, started.user_code, { action: "confirm" })
+    );
+    expect(lost.status).toBe(409);
+    expect((await lost.json()).code).toBe("expired");
+    expect((db.prepare("select count(*) as n from sync_devices").get() as any).n).toBe(0);
+    expect(raced).toBe(true);
+  });
+
+  it("caps live pairings per key in the insert itself", async () => {
+    const { env } = createTestEnv();
+    const device = await newDeviceKey();
+    for (let i = 0; i < 5; i += 1) {
+      const { response } = await startFor(env, device);
+      expect(response.status).toBe(200);
+    }
+    // A separate count-then-insert could not cap parallel mints at all; the
+    // predicate lives in the statement so the sixth is refused by the write.
+    const { response } = await startFor(env, device);
+    expect(response.status).toBe(429);
+  });
+});
+
 describe("a grant that outlives its code", () => {
   it("still redeems after expires_at, because the machine is already admitted", async () => {
     const { db, env } = createTestEnv();

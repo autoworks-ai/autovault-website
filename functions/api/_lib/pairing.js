@@ -83,21 +83,8 @@ export async function prunePairings(env, publicKey) {
   }
 }
 
-export async function countLivePairings(env, publicKey) {
-  const row = await first(
-    env,
-    "select count(*) as live from device_pairings where public_key = ? and expires_at > ?",
-    publicKey,
-    nowIso()
-  );
-  return Number(row?.live ?? 0);
-}
-
 export async function createPairing(env, { publicKey, hostname }) {
   await prunePairings(env, publicKey);
-  if ((await countLivePairings(env, publicKey)) >= MAX_LIVE_PAIRINGS_PER_KEY) {
-    throw new ApiError(429, "Too many pairing attempts for this device. Wait for the current code to expire.");
-  }
 
   const deviceCode = randomToken(32);
   const expiresAt = isoAfter(PAIRING_TTL_SECONDS);
@@ -106,18 +93,31 @@ export async function createPairing(env, { publicKey, hostname }) {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const userCode = generateUserCode();
     try {
-      await run(
+      // The cap is a predicate ON the insert, not a count before it. Parallel
+      // mints for one key can all read "four live rows" before any of them
+      // commits, and then all succeed -- so a separate SELECT does not cap
+      // anything. Selecting through a WHERE makes the check and the write one
+      // statement, and `changes === 0` is how the cap reports itself.
+      const inserted = await run(
         env,
         `insert into device_pairings
            (device_code, user_code, public_key, hostname, created_at, expires_at)
-         values (?, ?, ?, ?, ?, ?)`,
+         select ?, ?, ?, ?, ?, ?
+          where (select count(*) from device_pairings
+                  where public_key = ? and expires_at > ?) < ?`,
         deviceCode,
         userCode,
         publicKey,
         hostname ?? null,
         nowIso(),
-        expiresAt
+        expiresAt,
+        publicKey,
+        nowIso(),
+        MAX_LIVE_PAIRINGS_PER_KEY
       );
+      if (!inserted?.meta?.changes) {
+        throw new ApiError(429, "Too many pairing attempts for this device. Wait for the current code to expire.");
+      }
       return { deviceCode, userCode, expiresAt };
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;

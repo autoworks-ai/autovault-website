@@ -111,13 +111,21 @@ export async function onRequestPost(context) {
     // active device row in BOTH vaults and letting whichever write lands last
     // decide the slug the CLI is told. Making confirm and deny compete for one
     // conditional update means exactly one of them ever has side effects.
+    // `expires_at > ?` is load-bearing, not belt-and-braces. The state check
+    // above is a read, and loading the vault and subscription takes time, so a
+    // confirm that arrived just before the TTL can land just after it. Because
+    // a confirmed pairing outranks an expired one by design, that late write
+    // would resurrect a dead code and keep it redeemable for the whole grace
+    // window. Re-checking expiry here is what keeps the TTL authoritative.
     const claimed = await run(
       env,
       `update device_pairings set confirmed_at = ?, vault_id = ?
-         where device_code = ? and confirmed_at is null and denied_at is null`,
+         where device_code = ? and confirmed_at is null and denied_at is null
+           and expires_at > ?`,
       nowIso(),
       vault.id,
-      pairing.device_code
+      pairing.device_code,
+      nowIso()
     );
     if (!claimed?.meta?.changes) await throwLostRace(env, params.code);
 
