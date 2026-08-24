@@ -330,3 +330,27 @@ describe("the marker rule is live, steady, and reduced-motion safe", () => {
     expect(body).toContain("transform: none");
   });
 });
+
+describe("the marker never lands on a control that cannot be clicked", () => {
+  it("ANDs the marker with the same predicate that enables each button", () => {
+    // `markedAction` and `canCheckout`/`canReserve` arrived from different
+    // branches and neither knows about the other: the shell decides which
+    // control is the next action (utils/nextAction.ts) without seeing this
+    // component's namespace field, and the field gates the button without
+    // seeing the marker. Marked-but-disabled is the one combination that must
+    // not exist -- a halo saying "do this" on a control that cannot be
+    // clicked, while the field above explains why.
+    expect(funnel).toContain(
+      `:class="{ 'av-nextaction': markedAction && canCheckout }" type="button" :disabled="busy || !canCheckout"`
+    );
+    expect(funnel).toContain(
+      `:class="{ 'av-nextaction': markedAction && canReserve }" type="button" :disabled="busy || !canReserve"`
+    );
+  });
+
+  it("still marks while a request is in flight", () => {
+    // `busy` is transient and the action is still the correct one, so the halo
+    // stays; dropping it per-request would make it flicker.
+    expect(funnel).not.toContain("markedAction && !busy");
+  });
+});

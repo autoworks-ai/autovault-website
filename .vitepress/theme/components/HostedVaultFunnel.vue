@@ -64,6 +64,18 @@
       </p>
     </div>
 
+    <!--
+      The marker is ANDed with the same predicate that enables the button, not
+      just with `markedAction`. Those two arrived from different branches:
+      `markedAction` is the shell's "this is the one thing to do", decided in
+      utils/nextAction.ts, which knows nothing about this component's namespace
+      field; `canCheckout`/`canReserve` gate the button on a name the server
+      has not refused. Marked-but-disabled is the one combination that must not
+      exist -- a halo saying "do this" on a control that cannot be clicked, at
+      the exact moment the field above says why. `busy` is deliberately NOT in
+      this condition: it is transient and the action is still the right one, so
+      dropping the halo for the length of a request would just make it flicker.
+    -->
     <div v-if="!vault" class="hosted-stage-action">
       <!--
         `markedAction` is the shell's answer to "is this component's button the
@@ -83,10 +95,10 @@
         @click.capture="persistDraft"
         @signed-in-action="startFlow"
       />
-      <button v-else-if="actionKind === 'checkout'" class="hosted-primary" :class="{ 'av-nextaction': markedAction }" type="button" :disabled="busy || !canCheckout" @click="startFlow">
+      <button v-else-if="actionKind === 'checkout'" class="hosted-primary" :class="{ 'av-nextaction': markedAction && canCheckout }" type="button" :disabled="busy || !canCheckout" @click="startFlow">
         {{ checkoutStarted ? "Opening Checkout..." : "Open checkout" }}
       </button>
-      <button v-else-if="actionKind === 'reserve'" class="hosted-primary" :class="{ 'av-nextaction': markedAction }" type="button" :disabled="busy || !canReserve" @click="startFlow">
+      <button v-else-if="actionKind === 'reserve'" class="hosted-primary" :class="{ 'av-nextaction': markedAction && canReserve }" type="button" :disabled="busy || !canReserve" @click="startFlow">
         {{ provisioning ? "Reserving..." : "Reserve namespace" }}
       </button>
     </div>
