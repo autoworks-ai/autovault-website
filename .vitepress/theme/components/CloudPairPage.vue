@@ -47,7 +47,7 @@
            access" would leave a machine holding their catalog while the page
            says it is handled. -->
       <p v-if="deniedWasActive" class="cp-msg">
-        This code was refused, but that key is <strong>already a linked machine</strong>
+        This code was refused, but that key is <strong>already an enrolled machine</strong>
         on your namespace — refusing a code does not remove access it already has.
         If it is not yours, revoke it in your console now.
       </p>
@@ -142,7 +142,7 @@ type Pairing = {
   expires_at: string;
   state: string;
   previously_revoked: boolean;
-  already_active?: boolean;
+  already_enrolled?: boolean;
   vault: { slug: string } | null;
 };
 
@@ -267,7 +267,7 @@ async function decide(action: "confirm" | "deny") {
     }
     // Captured before the outcome renders: the copy has to reflect what was
     // true for the key that was just refused.
-    deniedWasActive.value = action === "deny" && pairing.value?.already_active === true;
+    deniedWasActive.value = action === "deny" && pairing.value?.already_enrolled === true;
     confirmedSlug.value = payload.slug ?? "";
     outcome.value = action === "confirm" ? "confirmed" : "denied";
   } catch {

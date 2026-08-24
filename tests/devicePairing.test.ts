@@ -572,6 +572,23 @@ describe("races against the browser half", () => {
     expect(raced).toBe(true);
   });
 
+  it("counts a still-pending enrollment as retaining access", async () => {
+    const { db, env } = createTestEnv();
+    const vaultId = seedVault(db);
+    const device = await newDeviceKey();
+    const { payload: started } = await startFor(env, device);
+    const cookie = await createSession(new Request(ORIGIN), env, "clerk_1");
+    db.prepare(
+      `insert into sync_devices (id, vault_id, public_key, status, hostname, first_seen_at)
+       values ('device-pending', ?, ?, 'pending', 'workbench', ?)`
+    ).run(vaultId, device.publicKey, new Date().toISOString());
+
+    // v/<slug>/catalog.json refuses only revoked devices, so this key is
+    // reading the catalog right now even though it was never admitted.
+    const view = await readPairing(ownerContext(env, cookie, started.user_code));
+    expect((await view.json()).already_enrolled).toBe(true);
+  });
+
   it("tells the owner when the key they refused is already linked", async () => {
     const { db, env } = createTestEnv();
     const vaultId = seedVault(db);
@@ -586,7 +603,7 @@ describe("races against the browser half", () => {
     // Deny marks the pairing and leaves the enrolled device alone, so the page
     // must not tell this owner the machine "never had access".
     const view = await readPairing(ownerContext(env, cookie, started.user_code));
-    expect((await view.json()).already_active).toBe(true);
+    expect((await view.json()).already_enrolled).toBe(true);
   });
 });
 
@@ -740,7 +757,7 @@ describe("the confirm page", () => {
 
   it("does not claim a refusal removed access it never touched", () => {
     expect(source).toContain("deniedWasActive");
-    expect(source).toMatch(/v-if="deniedWasActive"[\s\S]*?already a linked machine/);
+    expect(source).toMatch(/v-if="deniedWasActive"[\s\S]*?already an enrolled machine/);
   });
 
   it("carries the pairing URL through sign-up, not just sign-in", () => {

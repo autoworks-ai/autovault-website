@@ -45,10 +45,12 @@ export async function onRequestGet(context) {
       state,
       previously_revoked: existing?.status === "revoked",
       // Deny marks the pairing; it does NOT revoke a device that is already
-      // enrolled. When this key is already active the outcome copy has to say
-      // so, or the page tells an owner a machine "never had access" while it is
-      // still holding their catalog.
-      already_active: existing?.status === "active",
+      // enrolled. Any non-revoked row counts, not just an active one: v/<slug>/
+      // catalog.json refuses ONLY revoked devices, so a key still sitting
+      // pending from `autovault link <slug>` is reading the catalog too. Saying
+      // "it never had access" to that owner is false in the direction that
+      // matters.
+      already_enrolled: Boolean(existing) && existing.status !== "revoked",
       vault: vault ? { slug: vault.slug } : null
     });
   });
