@@ -181,11 +181,17 @@ async function admitDevice(env, vault, pairing) {
   }
 
   const id = `device-${crypto.randomUUID()}`;
+  // The WHERE on DO UPDATE is the same guard as the branch above, for the case
+  // where getDeviceByKey found nothing: another enrollment can insert this key
+  // and the owner revoke it, both between that read and this write. Without the
+  // clause the conflict path reactivates a revoked row -- the identical silent
+  // resurrection, reached down the other side of the branch.
   await run(env, `
     insert into sync_devices (id, vault_id, public_key, status, hostname, first_seen_at, last_seen_at, admitted_at)
     values (?, ?, ?, 'active', ?, ?, ?, ?)
     on conflict(vault_id, public_key) do update set
       status = 'active', admitted_at = excluded.admitted_at, revoked_at = null
+    where sync_devices.status != 'revoked'
   `, id, vault.id, pairing.public_key, pairing.hostname, nowIso(), nowIso(), nowIso());
 
   // Read back rather than assuming the insert won -- two confirms racing on
@@ -193,6 +199,16 @@ async function admitDevice(env, vault, pairing) {
   // console will never show.
   const stored = await getDeviceByKey(env, vault.id, pairing.public_key);
   if (!stored) throw new ApiError(500, "Device pairing did not persist.");
+  // A revoked row here means the guard above declined to reactivate it, which
+  // is a lost race and not an admission. Reporting it as one would tell the
+  // owner a machine is linked while every catalog request it makes is refused.
+  if (stored.status !== "active") {
+    throw new ApiError(
+      409,
+      "That machine's status changed while you were confirming. Check it in your console and try again.",
+      "device-changed"
+    );
+  }
   return { id: stored.id, status: stored.status };
 }
 

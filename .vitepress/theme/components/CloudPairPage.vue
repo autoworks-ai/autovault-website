@@ -19,7 +19,12 @@
            successful sign-in lands the owner on the dashboard with the code
            thrown away -- stranding precisely the signed-out visitor this flow is
            for, since `autovault link` sends them straight here. -->
-      <SignInButton v-if="clerkAuthEnabled" mode="modal" :force-redirect-url="pairUrl">
+      <SignInButton
+        v-if="clerkAuthEnabled"
+        mode="modal"
+        :force-redirect-url="pairUrl"
+        :sign-up-force-redirect-url="pairUrl"
+      >
         <button class="cp-btn cp-btn--primary">Sign in</button>
       </SignInButton>
       <a v-else class="cp-btn cp-btn--primary" :href="cloudPath">Sign in</a>

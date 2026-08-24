@@ -534,6 +534,44 @@ describe("races against the browser half", () => {
     expect(raced).toBe(true);
   });
 
+  it("does not reactivate a revoked key down the insert-conflict path", async () => {
+    const { db, env } = createTestEnv();
+    const vaultId = seedVault(db);
+    const device = await newDeviceKey();
+    const { payload: started } = await startFor(env, device);
+    const cookie = await createSession(new Request(ORIGIN), env, "clerk_1");
+
+    // getDeviceByKey finds nothing, so confirm takes the insert branch -- and
+    // another enrollment inserts this key and the owner revokes it in between.
+    // The conflict path used to reactivate it, the same silent resurrection as
+    // the existing-row branch, just reached down the other side.
+    let raced = false;
+    const racingEnv = {
+      ...env,
+      AUTOVAULT_DB: {
+        prepare(sql: string) {
+          if (!raced && sql.includes("insert into sync_devices")) {
+            raced = true;
+            db.prepare(
+              `insert into sync_devices (id, vault_id, public_key, status, hostname, first_seen_at, revoked_at)
+               values ('device-gone', ?, ?, 'revoked', 'workbench', ?, ?)`
+            ).run(vaultId, device.publicKey, new Date().toISOString(), new Date().toISOString());
+          }
+          return (env.AUTOVAULT_DB as any).prepare(sql);
+        }
+      }
+    };
+
+    const lost = await decidePairing(
+      ownerContext(racingEnv, cookie, started.user_code, { action: "confirm" })
+    );
+    expect(lost.status).toBe(409);
+    expect((await lost.json()).code).toBe("device-changed");
+    expect((db.prepare("select status from sync_devices where id = 'device-gone'").get() as any).status)
+      .toBe("revoked");
+    expect(raced).toBe(true);
+  });
+
   it("tells the owner when the key they refused is already linked", async () => {
     const { db, env } = createTestEnv();
     const vaultId = seedVault(db);
@@ -703,6 +741,12 @@ describe("the confirm page", () => {
   it("does not claim a refusal removed access it never touched", () => {
     expect(source).toContain("deniedWasActive");
     expect(source).toMatch(/v-if="deniedWasActive"[\s\S]*?already a linked machine/);
+  });
+
+  it("carries the pairing URL through sign-up, not just sign-in", () => {
+    // A new visitor switching to the nested sign-up flow otherwise falls back
+    // to clerk.ts's global signUpFallbackRedirectUrl and loses the ?code=.
+    expect(source).toContain(':sign-up-force-redirect-url="pairUrl"');
   });
 
   it("keeps confirm behind the fingerprint check", () => {
