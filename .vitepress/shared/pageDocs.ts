@@ -297,7 +297,7 @@ The examples page is a compatibility route for curated SKILL.md references. It i
 
 - autovault-bootstrap: audit, install, verify, and sync AutoVault for an agent profile.
 - skill-author: author a well-formed SKILL.md with valid frontmatter and capability declarations.
-- autovault-skill: understand AutoVault-managed filesystem-synced skills.
+- autovault-skill: understand AutoVault-managed filesystem-synced skills, and never hand-edit the signed vault.
 
 First-party AutoVault examples use MIT metadata. Other example sources keep their submitted license metadata and still run through the same gate before admission.
 

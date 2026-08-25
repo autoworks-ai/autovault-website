@@ -298,11 +298,11 @@ export const skills: Skill[] = [
     icon: "AV",
     category: "meta",
     agents: ["cc", "cx", "aj"],
-    desc: "Understand AutoVault-managed skills and when synced filesystem skills can be used without an MCP server.",
-    v: "1.0.0",
+    desc: "Understand AutoVault-managed skills, when synced filesystem skills can be used without MCP, and that vault writes must go through add-local or propose_skill/update_skill.",
+    v: "1.2.0",
     references: 4,
     license: "MIT",
-    size: "6,709 B",
+    size: "7,877 B",
     ...githubSkillSource("autoworks-ai/autovault", AUTOVAULT_SOURCE_SKILL_REF, "skills/autovault-skill/SKILL.md"),
     detailPath: "/skill/autovault-skill",
     rawPath: "/skills/autovault-skill/SKILL.md",
@@ -314,25 +314,26 @@ export const skills: Skill[] = [
     provenanceNote: "Published from the AutoVault source tree and mirrored here as a hosted SKILL.md example.",
     frontmatter: [
       "name: autovault-skill",
-      "version: 1.0.0",
-      "description: Understand AutoVault-managed skills.",
+      "version: 1.2.0",
+      "description: Understand AutoVault-managed skills and how to install or update them.",
       "category: meta",
       "capabilities.filesystem: readonly",
-      "tools: none"
+      "tools: Bash"
     ],
     overview: [
       "Explains that AutoVault syncs skills into normal agent skill directories as filesystem links.",
-      "Documents the optional MCP compatibility tools and when agents should use synced skills directly."
+      "Treats ~/.autovault/skills as a signed store: author outside the vault, then add-local or MCP propose_skill/update_skill.",
+      "Documents optional MCP tools and when missing MCP means use the CLI, not a hand edit."
     ],
     useCases: [
       "A user asks why an AutoVault-managed skill is visible.",
-      "An agent needs to decide whether MCP tools are required.",
-      "You are debugging stale profile sync or skill links."
+      "An agent is about to edit SKILL.md and needs the signed-store write path.",
+      "You are debugging stale profile sync, tampered integrity, or skill links."
     ],
     permissions: [
       { kind: "no", label: "network", scope: "none" },
       { kind: "ok", label: "filesystem", scope: "readonly profile inspection" },
-      { kind: "no", label: "tools", scope: "none" }
+      { kind: "ok", label: "tools", scope: "Bash for doctor / add-local" }
     ],
     related: ["skill-author", "autovault-bootstrap"],
     featured: true
