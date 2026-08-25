@@ -1,0 +1,11 @@
+{
+  "assets": [
+    {
+      "source": "clerk-logo.html",
+      "output": "clerk-logo.png",
+      "selector": ".canvas",
+      "transparent": true,
+      "maxBytes": 80000
+    }
+  ]
+}
