@@ -147,6 +147,7 @@ describe("v1 content guardrails", () => {
       ".vitepress/shared/pageDocs.ts",
       "changelog.md",
       "public/skills/trusted-skill-import/SKILL.md",
+      "public/skills/autovault-skill/SKILL.md",
       ...readdirSync(resolve(repoRoot, "skill"))
         .filter((file) => file.endsWith(".md"))
         .map((file) => `skill/${file}`)

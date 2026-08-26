@@ -159,6 +159,25 @@ describe("skills catalog integrity", () => {
     expect(detail).not.toContain("/api/vaults/current/pending-skills");
   });
 
+  it("points autovault-skill installs at the hosted 1.2.0 copy and the public CLI write path", () => {
+    const skill = skills.find((entry) => entry.name === "autovault-skill");
+    expect(skill?.v).toBe("1.2.0");
+    expect(skill?.install).toContain("https://autovault.dev/skills/autovault-skill/SKILL.md");
+    expect(skill?.install).toContain('source: "url"');
+    expect(skill?.cliInstall).toBe(
+      "autovault add https://autovault.dev/skills/autovault-skill/SKILL.md --source url --sync-profiles",
+    );
+    expect(skill?.agents).toEqual(["cc", "cx", "aj", "cu"]);
+
+    const source = readFileSync(resolve(repoRoot, "public", "skills", "autovault-skill", "SKILL.md"), "utf8");
+    expect(source).not.toContain("add-local");
+    expect(source).toMatch(/do not\n`--repair`/);
+    expect(source).not.toMatch(/--repair` re-signs an already-tampered/);
+    expect(source).toContain("autovault add /path/to/bundle --source local --sync-profiles --yes");
+    expect(source).toContain("--provenance '<existing-identifier>'");
+    expect(source).toContain("cursor");
+  });
+
   it("keeps static skill detail pages aligned with curated catalog entries", () => {
     const staticPages = readdirSync(resolve(repoRoot, "skill"))
       .filter((file) => file.endsWith(".md"))

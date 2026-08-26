@@ -5,7 +5,7 @@ description: >-
   Understand AutoVault-managed skills and how to install or update them. Use
   when a skill is visible via symlink, when authoring or editing SKILL.md, or
   before touching ~/.autovault/skills. Vault writes must go through
-  `autovault add-local` or MCP propose_skill/update_skill so AutoVault
+  `autovault add --source local` or MCP propose_skill/update_skill so AutoVault
   re-signs; never hand-edit vaulted files and run sync-profiles.
 license: MIT
 tags:
@@ -52,10 +52,10 @@ then install through the same gate humans and MCP use:
 
 ```bash
 # New skill, or replace an existing one by frontmatter name
-autovault add-local /path/to/bundle --sync-profiles
+autovault add /path/to/bundle --source local --sync-profiles --yes
 
-# Preserve recorded provenance when replacing a local skill
-autovault add-local /path/to/bundle --source '<existing-identifier>' --sync-profiles
+# Preserve recorded provenance when replacing a staged local skill
+autovault add /path/to/bundle --source local --provenance '<existing-identifier>' --sync-profiles --yes
 ```
 
 Confirm the vault accepted the write:
@@ -67,8 +67,10 @@ autovault doctor <name> --json   # integrity.kind must be "ok"
 If MCP tools are connected, `propose_skill` (new) and `update_skill` (existing)
 are the same gate. Use them when present. When they are absent **the CLI is required**, not optional.
 
-`autovault doctor <name> --repair` re-signs an already-tampered vault copy.
-That is a recovery hatch, not the authoring path.
+If `autovault doctor <name>` reports `tampered` / `signature_invalid`, do not
+`--repair`. That flag only re-signs unsigned local skills; it refuses tampered
+metadata and remote sources. Restore a trusted copy outside the vault, then
+`autovault add /path/to/bundle --source local --sync-profiles --yes`.
 
 ## When to use
 
@@ -112,9 +114,9 @@ autovault doctor
 
 | Intent | CLI | MCP |
 |---|---|---|
-| Install a local bundle | `autovault add-local <path> --sync-profiles` | `add_skill({source:"local", skill_dir})` |
-| Author a new skill | `add-local` after writing the bundle | `propose_skill` |
-| Replace an installed skill | `add-local` with the same frontmatter `name` | `update_skill` |
+| Install a local bundle | `autovault add <path> --source local --sync-profiles` | `add_skill({source:"local", skill_dir})` |
+| Author a new skill | `autovault add <path> --source local` after writing the bundle | `propose_skill` |
+| Replace an installed skill | `autovault add <path> --source local` with the same frontmatter `name` | `update_skill` |
 | Refresh profile links only | `autovault sync-profiles` | n/a — not a content write |
 | Remove | `autovault remove <name>` | `delete_skill` |
 
@@ -156,8 +158,8 @@ Only use these if `mcp__autovault__*` tools are actually present:
   source; other inline skills are reported as unchecked.
 
 Missing MCP tools are not an error for **reading** filesystem-synced skills.
-Missing MCP tools **are** a reason to use `autovault add-local`, not a reason
-to write `$AUTOVAULT_STORAGE_PATH/skills` directly.
+Missing MCP tools **are** a reason to use `autovault add --source local`, not a
+reason to write `$AUTOVAULT_STORAGE_PATH/skills` directly.
 
 ## SKILL.md schema (minimum)
 

@@ -1,4 +1,4 @@
-export type AgentId = "cc" | "cx" | "aj";
+export type AgentId = "cc" | "cx" | "aj" | "cu";
 export type SkillCategory = "setup" | "authoring" | "brand" | "meta" | "provenance" | "transforms" | "security";
 export type SkillSourceKind = "first-party" | "trusted-provider";
 export type SkillAdmissionStatus = "hosted-example" | "provenance-example";
@@ -46,7 +46,8 @@ export interface Skill {
 export const agents = [
   { id: "cc" as const, label: "Claude Code", color: "#d6a85a" },
   { id: "cx" as const, label: "Codex", color: "#5a9dd6" },
-  { id: "aj" as const, label: "AutoJack", color: "#5ad6c0" }
+  { id: "aj" as const, label: "AutoJack", color: "#5ad6c0" },
+  { id: "cu" as const, label: "Cursor", color: "#9aa5b1" }
 ];
 
 export const categories = [
@@ -297,21 +298,21 @@ export const skills: Skill[] = [
     org: "autoworks-ai",
     icon: "AV",
     category: "meta",
-    agents: ["cc", "cx", "aj"],
-    desc: "Understand AutoVault-managed skills, when synced filesystem skills can be used without MCP, and that vault writes must go through add-local or propose_skill/update_skill.",
+    agents: ["cc", "cx", "aj", "cu"],
+    desc: "Understand AutoVault-managed skills, when synced filesystem skills can be used without MCP, and that vault writes must go through autovault add --source local or propose_skill/update_skill.",
     v: "1.2.0",
     references: 4,
     license: "MIT",
-    size: "7,877 B",
-    ...githubSkillSource("autoworks-ai/autovault", AUTOVAULT_SOURCE_SKILL_REF, "skills/autovault-skill/SKILL.md"),
+    size: "8,174 B",
+    ...hostedUrlSkillSource("https://autovault.dev/skills/autovault-skill/SKILL.md"),
     detailPath: "/skill/autovault-skill",
     rawPath: "/skills/autovault-skill/SKILL.md",
-    sourceLabel: "autoworks-ai/autovault/skills/autovault-skill/SKILL.md",
+    sourceLabel: "public/skills/autovault-skill/SKILL.md",
     sourceKind: "first-party",
     providerName: "autoworks-ai",
-    trustLabel: "First-party source skill",
+    trustLabel: "First-party hosted example",
     admissionStatus: "hosted-example",
-    provenanceNote: "Published from the AutoVault source tree and mirrored here as a hosted SKILL.md example.",
+    provenanceNote: "Hosted by autovault.dev and parsed by the website catalog test before being shown.",
     frontmatter: [
       "name: autovault-skill",
       "version: 1.2.0",
@@ -322,7 +323,7 @@ export const skills: Skill[] = [
     ],
     overview: [
       "Explains that AutoVault syncs skills into normal agent skill directories as filesystem links.",
-      "Treats ~/.autovault/skills as a signed store: author outside the vault, then add-local or MCP propose_skill/update_skill.",
+      "Treats ~/.autovault/skills as a signed store: author outside the vault, then autovault add --source local or MCP propose_skill/update_skill.",
       "Documents optional MCP tools and when missing MCP means use the CLI, not a hand edit."
     ],
     useCases: [
@@ -333,7 +334,7 @@ export const skills: Skill[] = [
     permissions: [
       { kind: "no", label: "network", scope: "none" },
       { kind: "ok", label: "filesystem", scope: "readonly profile inspection" },
-      { kind: "ok", label: "tools", scope: "Bash for doctor / add-local" }
+      { kind: "ok", label: "tools", scope: "Bash for doctor / autovault add" }
     ],
     related: ["skill-author", "autovault-bootstrap"],
     featured: true
