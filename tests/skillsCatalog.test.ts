@@ -174,6 +174,8 @@ describe("skills catalog integrity", () => {
     expect(source).toMatch(/do not\n`--repair`/);
     expect(source).not.toMatch(/--repair` re-signs an already-tampered/);
     expect(source).toContain("autovault add /path/to/bundle --source local --sync-profiles --yes");
+    expect(source).toContain("autovault add <path> --source local --sync-profiles --yes");
+    expect(source).not.toMatch(/autovault add <path> --source local`/);
     expect(source).not.toContain("--provenance");
     expect(source).toContain('add_skill({source:"local", identifier:"/path/to/bundle", skill_dir:"/path/to/bundle"})');
     expect(source).toContain("cursor");

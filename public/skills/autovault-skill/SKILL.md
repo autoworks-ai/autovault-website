@@ -111,9 +111,9 @@ autovault doctor
 
 | Intent | CLI | MCP |
 |---|---|---|
-| Install a local bundle | `autovault add <path> --source local --sync-profiles` | `add_skill({source:"local", identifier:"/path/to/bundle", skill_dir:"/path/to/bundle"})` |
-| Author a new skill | `autovault add <path> --source local` after writing the bundle | `propose_skill` |
-| Replace an installed skill | `autovault add <path> --source local` with the same frontmatter `name` | `update_skill` |
+| Install a local bundle | `autovault add <path> --source local --sync-profiles --yes` | `add_skill({source:"local", identifier:"/path/to/bundle", skill_dir:"/path/to/bundle"})` |
+| Author a new skill | `autovault add <path> --source local --sync-profiles --yes` after writing the bundle | `propose_skill` |
+| Replace an installed skill | `autovault add <path> --source local --sync-profiles --yes` with the same frontmatter `name` | `update_skill` |
 | Refresh profile links only | `autovault sync-profiles` | n/a — not a content write |
 | Remove | `autovault remove <name>` | `delete_skill` |
 

@@ -303,7 +303,7 @@ export const skills: Skill[] = [
     v: "1.2.0",
     references: 4,
     license: "MIT",
-    size: "8,127 B",
+    size: "8,177 B",
     ...hostedUrlSkillSource("https://autovault.dev/skills/autovault-skill/SKILL.md"),
     detailPath: "/skill/autovault-skill",
     rawPath: "/skills/autovault-skill/SKILL.md",
