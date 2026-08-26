@@ -106,10 +106,13 @@ describe("v1 content guardrails", () => {
     expect(styles).toContain(".api-sig .pmt {");
     expect(styles).toContain("margin-right: 0.35em");
     expect(api).toContain("autovault add <source-or-path>");
+    expect(api).toContain("[--provenance <value>]");
     expect(api).toContain("autovault add ./skills/skill-author --sync-profiles --yes");
+    expect(api).toContain("autovault add ./staging/skill-author --source local --provenance '<existing-identifier>' --sync-profiles --yes");
     expect(api).toContain("autovault add skill-slug --source agentskills --sync-profiles --agent codex --yes");
     expect(api).not.toContain("autovault add-local");
     expect(apiMarkdown).toContain("autovault add ./skills/skill-author --sync-profiles --yes");
+    expect(apiMarkdown).toContain("autovault add ./staging/skill-author --source local --provenance '<existing-identifier>' --sync-profiles --yes");
     expect(apiMarkdown).toContain("autovault add skill-slug --source agentskills --sync-profiles --agent codex --yes");
     expect(apiMarkdown).not.toMatch(/add-local|cli-import-autohub|import-autohub/);
 

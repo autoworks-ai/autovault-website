@@ -53,6 +53,9 @@ then install through the same gate humans and MCP use:
 ```bash
 # New skill, or replace an existing one by frontmatter name
 autovault add /path/to/bundle --source local --sync-profiles --yes
+
+# Preserve recorded provenance when replacing a staged local skill
+autovault add /path/to/bundle --source local --provenance '<existing-identifier>' --sync-profiles --yes
 ```
 
 Confirm the vault accepted the write:
