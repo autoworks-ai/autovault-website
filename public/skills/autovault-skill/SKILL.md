@@ -53,9 +53,6 @@ then install through the same gate humans and MCP use:
 ```bash
 # New skill, or replace an existing one by frontmatter name
 autovault add /path/to/bundle --source local --sync-profiles --yes
-
-# Preserve recorded provenance when replacing a staged local skill
-autovault add /path/to/bundle --source local --provenance '<existing-identifier>' --sync-profiles --yes
 ```
 
 Confirm the vault accepted the write:
@@ -114,7 +111,7 @@ autovault doctor
 
 | Intent | CLI | MCP |
 |---|---|---|
-| Install a local bundle | `autovault add <path> --source local --sync-profiles` | `add_skill({source:"local", skill_dir})` |
+| Install a local bundle | `autovault add <path> --source local --sync-profiles` | `add_skill({source:"local", identifier:"/path/to/bundle", skill_dir:"/path/to/bundle"})` |
 | Author a new skill | `autovault add <path> --source local` after writing the bundle | `propose_skill` |
 | Replace an installed skill | `autovault add <path> --source local` with the same frontmatter `name` | `update_skill` |
 | Refresh profile links only | `autovault sync-profiles` | n/a — not a content write |
@@ -135,7 +132,8 @@ Only use these if `mcp__autovault__*` tools are actually present:
   search and load the best match.
 - `add_skill({source, identifier, version?, skill_dir?, sync_profiles?,
   profile_roots?, discover_profile_roots?, verbose?})` - installs from
-  `github`, `agentskills`, `url`, or a local bundle. Local bundles sync
+  `github`, `agentskills`, `url`, or a local bundle. Local bundles must pass
+  both `skill_dir` and `identifier` (the CLI provenance value) and sync
   configured profile roots by default.
 - `update_skill({name, source?, identifier?, skill_dir?, skill_md?, resources?,
   reuse_existing_resources?, verbose?})` - refreshes or replaces an installed
