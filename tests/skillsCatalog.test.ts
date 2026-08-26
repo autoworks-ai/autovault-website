@@ -178,6 +178,8 @@ describe("skills catalog integrity", () => {
     expect(source).not.toMatch(/autovault add <path> --source local`/);
     expect(source).not.toContain("--provenance");
     expect(source).toContain('add_skill({source:"local", identifier:"/path/to/bundle", skill_dir:"/path/to/bundle"})');
+    expect(source).toContain("tools_required: [shell.run]");
+    expect(source).toMatch(/capabilities:[\s\S]*tools: \[shell\.run\]/);
     expect(source).toContain("cursor");
   });
 

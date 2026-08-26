@@ -303,7 +303,7 @@ export const skills: Skill[] = [
     v: "1.2.0",
     references: 4,
     license: "MIT",
-    size: "8,177 B",
+    size: "8,182 B",
     ...hostedUrlSkillSource("https://autovault.dev/skills/autovault-skill/SKILL.md"),
     detailPath: "/skill/autovault-skill",
     rawPath: "/skills/autovault-skill/SKILL.md",
@@ -319,7 +319,7 @@ export const skills: Skill[] = [
       "description: Understand AutoVault-managed skills and how to install or update them.",
       "category: meta",
       "capabilities.filesystem: readonly",
-      "tools: Bash"
+      "tools: shell.run"
     ],
     overview: [
       "Explains that AutoVault syncs skills into normal agent skill directories as filesystem links.",
@@ -334,7 +334,7 @@ export const skills: Skill[] = [
     permissions: [
       { kind: "no", label: "network", scope: "none" },
       { kind: "ok", label: "filesystem", scope: "readonly profile inspection" },
-      { kind: "ok", label: "tools", scope: "Bash for doctor / autovault add" }
+      { kind: "ok", label: "tools", scope: "shell.run for doctor / autovault add" }
     ],
     related: ["skill-author", "autovault-bootstrap"],
     featured: true

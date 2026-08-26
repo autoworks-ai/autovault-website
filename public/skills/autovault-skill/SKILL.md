@@ -24,7 +24,7 @@ metadata:
 capabilities:
   network: false
   filesystem: readonly
-  tools: [Bash]
+  tools: [shell.run]
 ---
 
 # AutoVault Meta-Skill
