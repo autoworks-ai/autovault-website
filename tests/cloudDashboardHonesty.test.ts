@@ -453,3 +453,18 @@ describe("local handoff terminal", () => {
     expect(funnel).not.toContain("async function copyText(text: string) {");
   });
 });
+
+describe("the sync engine card", () => {
+  it("claims sync is enabled, not that anything is being served", () => {
+    // The page never queries KV, so it cannot know whether this vault has a
+    // catalog, and a new one answers 404 until a release is published out of
+    // band. A green "Serving signed skills" at `ready` contradicted the Catalog
+    // panel on the same screen.
+    expect(cloudPage).not.toContain("Serving signed skills");
+    expect(cloudPage).toContain("Sync enabled");
+    const at = cloudPage.indexOf('<div class="cv-card-label">Sync engine</div>');
+    expect(at, "no sync engine card").toBeGreaterThan(-1);
+    const card = cloudPage.slice(at, cloudPage.indexOf("</article>", at));
+    expect(card.replace(/\s+/g, " ")).toContain("answers <code>404</code>");
+  });
+});

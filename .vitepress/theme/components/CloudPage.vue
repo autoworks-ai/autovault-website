@@ -473,14 +473,25 @@
             >
               <article class="cv-card soft">
                 <div class="cv-card-label">Sync engine</div>
+                <!-- A capability, not a claim about what this vault is doing
+                     right now. The page never queries KV, so it cannot know
+                     whether a catalog exists here, and a new vault answers 404
+                     until a release is published out of band. The pill used to
+                     assert delivery unconditionally at `ready`, which
+                     contradicted the Catalog panel on the same screen: the
+                     exact overclaim this rewrite exists to remove. Worded so a
+                     test can forbid the old string without matching this
+                     comment. -->
                 <span class="cv-pill ok"
-                  ><span class="cv-dot" /> Serving signed skills</span
+                  ><span class="cv-dot" /> Sync enabled</span
                 >
                 <p class="cv-muted">
                   Admitted machines fetch this namespace over HTTPS and verify
-                  every release before installing it. Nothing is gated behind
-                  the cloud: your local CLI stays fully usable offline, and it
-                  is still where skills get signed.
+                  every release before installing it. Until a catalog is
+                  published here the fetch answers <code>404</code>, which is
+                  the normal state of a new vault. Nothing is gated behind the
+                  cloud: your local CLI stays fully usable offline, and it is
+                  still where skills get signed.
                 </p>
               </article>
             </div>
