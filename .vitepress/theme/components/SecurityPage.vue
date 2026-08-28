@@ -145,7 +145,10 @@
       <div class="disc-grid">
         <article class="disc-card">
           <h3>What Cloud holds</h3>
-          <p>Signed catalog and bundle objects, byte for byte. Enrolled device public keys and their status. Your subscription record. That is the list.</p>
+          <p><strong>Sync artifacts:</strong> signed catalog and bundle objects byte for byte, enrolled device public keys with their status and hostname, and live pairing codes until they expire.</p>
+          <p><strong>Account records:</strong> the email, name and avatar your identity provider returns, your Stripe customer and subscription ids, and the reserved namespace.</p>
+          <p><strong>Skill drafts you submit:</strong> a draft posted from the dashboard is stored whole, body text included, and nothing reads it back yet.</p>
+          <p class="muted">No signing key, in any of them. That is the one thing Cloud is built never to hold.</p>
           <div class="kv">
             <span class="k">Serves</span><span class="v">/v/&lt;slug&gt;/</span>
           </div>

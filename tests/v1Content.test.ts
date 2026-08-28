@@ -281,6 +281,49 @@ describe("v1 content guardrails", () => {
     expect(pageDocsSource).toContain("SkillClone");
   });
 
+  it("does not sell the CLI version as a container tag", () => {
+    const api = read(".vitepress/theme/components/ApiReferencePage.vue");
+    const deploy = read(".vitepress/shared/deploy.ts");
+
+    // npm and GHCR do not ship together. One version printed over three
+    // channels claimed a GHCR image that stopped resolving the moment npm
+    // moved ahead, so the container gets its own row keyed to its own tag.
+    expect(api).not.toContain("npm · brew · GHCR");
+    expect(api).toContain("MANUAL_GHCR_TAG");
+    expect(deploy).toContain("export const MANUAL_GHCR_TAG");
+  });
+
+  it("does not describe hosted sync as read-only or admission-gated at the catalog", () => {
+    const api = read(".vitepress/theme/components/ApiReferencePage.vue");
+    const apiMarkdown = pageDocs.find((doc) => doc.key === "api")?.markdown ?? "";
+
+    // Two claims that were both wrong, in the one paragraph a reader uses to
+    // size up the surface. POST /v/<slug>/devices is a write any keypair may
+    // call, and the catalog is readable while pending: admission gates bundles.
+    for (const text of [api, apiMarkdown]) {
+      expect(text).not.toMatch(/hosted sync is a read-only surface/i);
+      expect(text).toMatch(/exactly one write/i);
+    }
+  });
+
+  it("does not present a partial inventory of hosted data as the whole of it", () => {
+    const security = read(".vitepress/theme/components/SecurityPage.vue");
+    const securityMarkdown = pageDocs.find((doc) => doc.key === "security")?.markdown ?? "";
+
+    // The card listed catalog objects, device keys and the subscription, then
+    // said "That is the list". D1 also holds the identity provider's email,
+    // name and avatar, Stripe ids, pairing codes and hostnames, and the full
+    // body of any skill draft submitted from the dashboard. A privacy claim
+    // that stops early is worse than none.
+    expect(security).not.toContain("That is the list");
+    for (const text of [security, securityMarkdown]) {
+      expect(text).toMatch(/email, name and avatar/i);
+      expect(text).toMatch(/stored whole, body text included/i);
+      expect(text).toMatch(/pairing codes/i);
+      expect(text).toMatch(/No signing key/i);
+    }
+  });
+
   it("never tells a paired machine to go and get admitted afterwards", () => {
     // Two enrollment paths, and they end differently. `autovault link <slug>`
     // POSTs /v/<slug>/devices and lands `pending`, so the dashboard Admit is

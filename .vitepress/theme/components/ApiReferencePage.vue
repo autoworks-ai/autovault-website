@@ -18,9 +18,14 @@
       <section class="api-hero reveal-item">
         <div class="eyebrow"><span class="dash" /> Reference · {{ PRODUCT_RELEASE_LABEL }}</div>
         <h1>Current surfaces. <span class="ital">Clear boundaries.</span></h1>
-        <p class="lede">Current {{ PRODUCT_VERSION }} surfaces are the local CLI, source ESM library exports, local stdio MCP, remote Streamable HTTP MCP at <code>/mcp</code>, and the hosted sync routes under <code>/v/&lt;slug&gt;/</code>. There is no public REST API or separately published SDK package yet; MCP tools are the agent-facing API, and hosted sync is a read-only surface for the machines you have admitted.</p>
+        <p class="lede">Current {{ PRODUCT_VERSION }} surfaces are the local CLI, source ESM library exports, local stdio MCP, remote Streamable HTTP MCP at <code>/mcp</code>, and the hosted sync routes under <code>/v/&lt;slug&gt;/</code>. There is no public REST API or separately published SDK package yet; MCP tools are the agent-facing API. Hosted sync has exactly one write, <code>POST /v/&lt;slug&gt;/devices</code>, which any keypair may call to enrol itself as <code>pending</code>; the rest is reads, and admission is what gates bundles rather than what gates the catalog.</p>
         <div class="api-versions">
-          <div class="v"><div class="lbl">CLI</div><div class="val">autovault@{{ PRODUCT_VERSION_SHORT }} <span class="meta">npm · brew · GHCR</span></div></div>
+          <div class="v"><div class="lbl">CLI</div><div class="val">autovault@{{ PRODUCT_VERSION_SHORT }} <span class="meta">npm · brew</span></div></div>
+          <!-- Its own row, not a third word after the CLI version. The npm
+               package and the container do not ship together, and printing one
+               version over three channels claimed a GHCR image that does not
+               resolve the moment npm moved ahead. -->
+          <div class="v"><div class="lbl">Container</div><div class="val">autovault:{{ MANUAL_GHCR_TAG }} <span class="meta">GHCR</span></div></div>
           <div class="v"><div class="lbl">Library</div><div class="val">source ESM exports <span class="meta">Node/TypeScript</span></div></div>
           <div class="v"><div class="lbl">Remote</div><div class="val">/mcp <span class="meta">Streamable HTTP MCP</span></div></div>
           <div class="v"><div class="lbl">Hosted</div><div class="val">/v/&lt;slug&gt;/ <span class="meta">Ed25519 device-signed</span></div></div>
@@ -73,6 +78,7 @@
 <script setup lang="ts">
 import { defineComponent, h, ref } from "vue";
 import { PRODUCT_RELEASE_LABEL, PRODUCT_VERSION, PRODUCT_VERSION_SHORT } from "../data/product";
+import { MANUAL_GHCR_TAG } from "../../shared/deploy";
 
 type ExampleTab = { label: string; body: string };
 type ApiArg = { name: string; type: string; description: string; required?: boolean };

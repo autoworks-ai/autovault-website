@@ -464,7 +464,7 @@ Agents should use get_skill for vault inventory lookup, fetch full content only 
 
 const apiMarkdown = `# AutoVault API Reference
 
-Current ${PRODUCT_VERSION} surfaces are the local CLI, source ESM library exports, local stdio MCP, remote Streamable HTTP MCP at /mcp, and the hosted sync routes under /v/<slug>/. There is no public REST API or separately published SDK package yet. MCP tools are the agent-facing API, and hosted sync is a read-only surface for the machines an owner has admitted.
+Current ${PRODUCT_VERSION} surfaces are the local CLI, source ESM library exports, local stdio MCP, remote Streamable HTTP MCP at /mcp, and the hosted sync routes under /v/<slug>/. There is no public REST API or separately published SDK package yet. MCP tools are the agent-facing API. Hosted sync has exactly one write, POST /v/<slug>/devices, which any keypair may call to enrol itself as pending; the rest is reads, and admission gates bundles rather than the catalog.
 
 ## Current ${PRODUCT_VERSION} surfaces
 
@@ -645,7 +645,10 @@ Remote AutoVault serves Streamable HTTP MCP at /mcp. It uses OAuth for client re
 
 AutoVault Cloud moves a signed catalog from the owner's machine to the machines the owner admits. The trust boundary does not move when a vault becomes hosted.
 
-- Cloud holds signed catalog and bundle objects byte for byte, enrolled device public keys and their status, and the subscription record.
+- Cloud holds sync artifacts: signed catalog and bundle objects byte for byte, enrolled device public keys with their status and hostname, and live pairing codes until they expire.
+- It also holds account records: the email, name and avatar the identity provider returns, Stripe customer and subscription ids, and the reserved namespace.
+- A skill draft posted from the dashboard is stored whole, body text included, and nothing reads it back yet.
+- No signing key, in any of them. That is the one thing Cloud is built never to hold.
 - Cloud never holds a release signing key. There is no upload API and no publish button, because either would require Cloud to hold the thing that makes a release trustworthy. Signed objects are placed by hand from the machine that signed them.
 - A device proves identity with an Ed25519 keypair generated on that machine. The private half never leaves it and there is no API key in its place.
 - Every request under /v/ carries a detached signature over \`<METHOD>\\n<pathname>\\n<unix-seconds>\`. A timestamp more than 300 seconds out is refused, so a captured request stops working in five minutes.
