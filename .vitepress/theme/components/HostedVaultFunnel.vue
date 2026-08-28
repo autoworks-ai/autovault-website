@@ -952,14 +952,28 @@ async function resumeCheckoutReturn() {
     return;
   }
   if (hosted !== "success") return;
-  if (vault.value) {
-    clearCheckoutReturnParams();
-    return;
-  }
 
+  // Reconcile BEFORE the vault check, not after it. This used to return early
+  // whenever a vault existed, which is exactly the resubscribe case: a lapsed
+  // customer already has a namespace, so the branch that throws the session_id
+  // away was the only branch they could take. If their webhook had not landed,
+  // D1 stayed inactive, the one identifier that could have fixed that was
+  // dropped from the URL, and the page went on offering them Checkout for a
+  // subscription they had just paid for.
   if (!paid.value && sessionId && signedIn.value && !reconcileAttempted && !reconciling.value) {
     reconcileAttempted = true;
     await reconcileCheckout(sessionId);
+  }
+
+  if (vault.value) {
+    if (paid.value) {
+      notice.value = { kind: "ok", text: "Payment confirmed. Your hosted namespace is active again." };
+      clearCheckoutReturnParams();
+      return;
+    }
+    // Same rule as the no-vault path below: keep session_id so a reload can
+    // retry reconciliation against a webhook that has not arrived yet.
+    return;
   }
 
   // Reserving the namespace is a step the user takes, not something that

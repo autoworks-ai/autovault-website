@@ -25,12 +25,21 @@ export async function onRequestPost({ request, env }) {
       );
     }
 
+    // A row in `subscriptions` means this account has subscribed before, so it
+    // has already had whatever trial was on offer then. The table is keyed on
+    // user_id and upserted, so the row survives cancellation: that is the only
+    // durable record of prior eligibility, and it is why the check is a status
+    // presence test rather than an `active` test. Without it, a trial that ends
+    // in "cancel" can simply be started again, forever, for free.
+    const firstSubscription = !subscription?.status;
+
     const body = await readJson(request, 8_000);
     const params = buildHostedVaultCheckoutParams({
       request,
       env,
       user,
-      source: body.source === "playground" ? "playground" : "deploy"
+      source: body.source === "playground" ? "playground" : "deploy",
+      allowTrial: firstSubscription
     });
     const session = await createCheckoutSession(env, params);
     return json({ url: session.url, id: session.id });

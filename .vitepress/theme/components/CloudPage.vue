@@ -1741,7 +1741,15 @@ const subscriptionNeedsAttention = computed(
 // Statuses that already have a Stripe subscription in a payment-problem
 // state. Checkout would mint a second one; the portal is how they update the
 // card. Canceled / expired / never-subscribed go to Checkout instead.
-const PORTAL_ONLY_STATUSES = new Set(["past_due", "unpaid", "incomplete"]);
+// `paused` belongs here for the same reason the other three do: the
+// subscription still exists in Stripe, so Checkout mints a second one rather
+// than resuming this one. Resuming is a portal action.
+const PORTAL_ONLY_STATUSES = new Set([
+  "past_due",
+  "unpaid",
+  "incomplete",
+  "paused",
+]);
 
 const canStartCheckout = computed(() => {
   if (paid.value) return false;
@@ -1927,6 +1935,13 @@ const hostedPriceLabel = computed(() => {
 // /api/pricing is unreachable. Both cases render the plan without a trial line
 // rather than guessing, because the wrong guess here is a promise.
 const trialDays = computed(() => {
+  // /api/pricing is public and edge-cached, so it answers for everybody and
+  // cannot know who is asking. The checkout route grants the trial only on a
+  // first subscription, so anyone with a subscription row -- cancelled, lapsed,
+  // paused, whatever -- would be shown an offer the Checkout page then does not
+  // make. Advertising it here is the same defect this whole page exists to
+  // remove, one step earlier.
+  if (subscription.value?.status) return null;
   const days = hostedPrice.value?.trial_days ?? 0;
   return typeof days === "number" && days > 0 ? days : null;
 });

@@ -161,6 +161,44 @@ describe("trial copy never outlives the trial", () => {
     expect(params.get("payment_method_collection")).toBe("if_required");
   });
 
+  it("offers the trial once per account, in the params and in the sentence", () => {
+    const env = { AUTOVAULT_HOSTED_PRICE_ID: "price_x", AUTOVAULT_HOSTED_TRIAL_DAYS: "14" };
+    const build = (allowTrial: boolean) =>
+      buildHostedVaultCheckoutParams({
+        request: new Request("https://autovault.dev/cloud"),
+        env,
+        user: { id: "u_1" },
+        allowTrial,
+      });
+
+    const first = build(true);
+    expect(first.get("subscription_data[trial_period_days]")).toBe("14");
+    expect(first.get("custom_text[submit][message]")).toContain("14 days are free");
+
+    // A trial that ends in "cancel" leaves the customer free to check out
+    // again. Without this gate that is a subscription which renews forever and
+    // never bills, so the second session must carry no trial AND must not say
+    // it does: an ineligible buyer reading "your first 14 days are free" above
+    // a $15 total is the worse half of the bug.
+    const repeat = build(false);
+    expect(repeat.get("subscription_data[trial_period_days]")).toBeNull();
+    expect(
+      repeat.get("subscription_data[trial_settings][end_behavior][missing_payment_method]"),
+    ).toBeNull();
+    expect(repeat.get("custom_text[submit][message]") ?? "").not.toMatch(/days are free/);
+  });
+
+  it("does not advertise a trial to an account that already had one", () => {
+    const cloudPage = read(".vitepress/theme/components/CloudPage.vue");
+    const at = cloudPage.indexOf("const trialDays = computed");
+    expect(at, "no trialDays computed").toBeGreaterThan(-1);
+    const body = cloudPage.slice(at, cloudPage.indexOf("const trialLabel", at));
+
+    // /api/pricing is edge-cached and answers for everybody, so the page has to
+    // apply the same eligibility the checkout route does.
+    expect(body).toContain("subscription.value?.status");
+  });
+
   it("sets no trial-end behaviour when there is no trial to end", () => {
     const params = buildHostedVaultCheckoutParams({
       request: new Request("https://autovault.dev/cloud"),

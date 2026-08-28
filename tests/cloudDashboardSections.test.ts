@@ -400,9 +400,21 @@ describe("the Billing panel", () => {
   });
 
   it("sends never-subscribed owners to Checkout, not a second subscription for past_due", () => {
-    expect(cloudPage).toContain(
-      'const PORTAL_ONLY_STATUSES = new Set(["past_due", "unpaid", "incomplete"])',
-    );
+    // Membership, not the literal source line. The rule is "a status that still
+    // has a live Stripe subscription behind it goes to the portal, because
+    // Checkout would mint a second one"; `paused` joined the set for exactly
+    // that reason and the old string match failed on the formatting rather than
+    // on the rule.
+    const at0 = cloudPage.indexOf("const PORTAL_ONLY_STATUSES");
+    expect(at0, "no PORTAL_ONLY_STATUSES").toBeGreaterThan(-1);
+    const declared = cloudPage.slice(at0, cloudPage.indexOf("]);", at0));
+    for (const live of ["past_due", "unpaid", "incomplete", "paused"]) {
+      expect(declared, `${live} must not reach Checkout`).toContain(`"${live}"`);
+    }
+    // Canceled and never-subscribed are the ones Checkout is for.
+    for (const gone of ["canceled", "incomplete_expired"]) {
+      expect(declared).not.toContain(`"${gone}"`);
+    }
     const at = cloudPage.indexOf("const canStartCheckout = computed");
     expect(at, "no canStartCheckout").toBeGreaterThan(-1);
     const body = cloudPage.slice(

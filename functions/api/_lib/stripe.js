@@ -42,6 +42,12 @@ export function buildHostedVaultCheckoutParams({
   env,
   user,
   source = "hosted-vault",
+  // One trial per account. Stripe does not remember that a customer already
+  // had one, and "cancel" at trial end leaves them free to check out again, so
+  // without this a 14-day trial is a renewable subscription that never bills.
+  // The caller owns the eligibility question because it is the half with a
+  // database; this function only refuses to offer what it was told not to.
+  allowTrial = true,
 }) {
   if (!env.AUTOVAULT_HOSTED_PRICE_ID)
     throw new ApiError(503, "AUTOVAULT_HOSTED_PRICE_ID is not configured.");
@@ -77,7 +83,7 @@ export function buildHostedVaultCheckoutParams({
   // the subscription ending, not an unpaid bill and a sequence of Stripe emails
   // about it. Writing it down also stops a money decision from resting on a
   // default that Stripe is free to change.
-  const trialDays = hostedTrialDays(env);
+  const trialDays = allowTrial ? hostedTrialDays(env) : 0;
   if (trialDays > 0) {
     params.set("subscription_data[trial_period_days]", String(trialDays));
     params.set(
@@ -95,7 +101,7 @@ export function buildHostedVaultCheckoutParams({
   if (user.email) params.set("customer_email", user.email);
 
   applyBranding(params, env);
-  applyCustomText(params, env);
+  applyCustomText(params, env, allowTrial);
   return params;
 }
 
@@ -517,13 +523,13 @@ function applyBranding(params, env) {
   }
 }
 
-function applyCustomText(params, env) {
+function applyCustomText(params, env, allowTrial = true) {
   // The trial sentence is generated here rather than written into
   // STRIPE_CHECKOUT_CUSTOM_TEXT_SUBMIT, because a configured "14 days free"
   // would be a second copy of AUTOVAULT_HOSTED_TRIAL_DAYS, and this copy is the
   // one a buyer reads while deciding to pay. Retire the trial and the sentence
   // leaves with it.
-  const trialDays = hostedTrialDays(env);
+  const trialDays = allowTrial ? hostedTrialDays(env) : 0;
   const submitMessage = [
     trialDays > 0
       ? `Your first ${trialDays} days are free and no card is collected today. Cancel before the trial ends and you are not charged.`
