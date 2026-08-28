@@ -105,7 +105,47 @@ describe("pricing endpoint", () => {
     await pricing({ request: new Request("https://autovault.dev/api/pricing?bust=2"), env: ENV });
 
     expect(stripe).toHaveBeenCalledTimes(1);
-    expect([...store.keys()]).toEqual(["https://autovault.dev/api/pricing"]);
+    // One key, and it is the server's, not the caller's: the `config` suffix is
+    // built from env rather than from anything in the request.
+    expect([...store.keys()]).toEqual([
+      "https://autovault.dev/api/pricing?config=price_hosted%3A0"
+    ]);
+  });
+
+  it("stops serving the old trial the moment the trial changes", async () => {
+    // The body carries trial_days now, so a key that ignores the config leaves
+    // a 300 second window where the cached page promises a trial that a session
+    // created in the same second no longer grants. Shortening or switching the
+    // trial off has to invalidate, not wait out the TTL.
+    const store = new Map<string, Response>();
+    vi.stubGlobal("caches", {
+      default: {
+        match: async (key: Request) => store.get(key.url)?.clone(),
+        put: async (key: Request, value: Response) => void store.set(key.url, value)
+      }
+    });
+    const stripe = stubPrice({ unit_amount: 1500, currency: "usd", recurring: { interval: "month" } });
+    const request = new Request("https://autovault.dev/api/pricing");
+
+    const withTrial = await pricing({
+      request,
+      env: { ...ENV, AUTOVAULT_HOSTED_TRIAL_DAYS: "14" }
+    });
+    expect((await withTrial.json()).trial_days).toBe(14);
+
+    const retired = await pricing({
+      request,
+      env: { ...ENV, AUTOVAULT_HOSTED_TRIAL_DAYS: "0" }
+    });
+    expect((await retired.json()).trial_days).toBe(0);
+
+    // A second Stripe call, because the second request could not hit the first
+    // entry. Both keys survive; the stale one is simply unreachable.
+    expect(stripe).toHaveBeenCalledTimes(2);
+    expect([...store.keys()].sort()).toEqual([
+      "https://autovault.dev/api/pricing?config=price_hosted%3A0",
+      "https://autovault.dev/api/pricing?config=price_hosted%3A14"
+    ]);
   });
 
   it("never hardcodes a price in the funnel UI", () => {

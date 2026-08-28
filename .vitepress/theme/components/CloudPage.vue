@@ -711,6 +711,44 @@
             </div>
           </template>
         </template>
+        <!-- ---------- BILLING RECOVERY ----------
+             Outside the `ready` template on purpose, for the same reason the
+             Machines card is: the Billing panel reveals at `ready`, and `ready`
+             now requires an admitted machine. An owner whose subscription
+             lapsed before admitting one is therefore parked at `connect` with
+             no Billing panel, and admitting a machine answers 402 while the
+             subscription is inactive. Both exits are shut, and the trial made
+             that a normal way to end rather than an edge case: every trial
+             nobody converts arrives here. This is the way out. -->
+        <div v-if="vault && !paid" class="cv-recover" role="region" aria-labelledby="cv-recover-title">
+          <h3 id="cv-recover-title" class="cv-recover-title">Subscription inactive</h3>
+          <p class="cv-muted sm">
+            {{ vaultSlug }} is still reserved and nothing has been deleted.
+            Machines cannot be admitted and bundles answer 402 until a
+            subscription is active again.
+          </p>
+          <div class="cv-recover-actions">
+            <button
+              v-if="canStartCheckout"
+              type="button"
+              class="cv-btn"
+              :disabled="busy"
+              @click="startHostedCheckout"
+            >
+              {{ busy ? "Working…" : "Start subscription" }}
+            </button>
+            <button
+              v-if="canManageBilling"
+              type="button"
+              class="cv-btn ghost"
+              :disabled="busy"
+              @click="openBillingPortal"
+            >
+              {{ busy ? "Working…" : "Manage billing" }}
+            </button>
+          </div>
+        </div>
+
         <!-- ---------- SECTION: MACHINES ----------
              Enrolled machines. This list IS the link step: there is no
              button to say a CLI is connected, because saying so was never
@@ -3856,6 +3894,27 @@ const ICON = {
 }
 /* Inside the focal card it borrowed that card's frame. On its own it needs
    one, and it is now the only route to revoking a machine. */
+.cv-recover {
+  margin: 0 0 18px;
+  padding: 18px 20px;
+  border: 1px solid rgba(217, 113, 113, 0.32);
+  border-radius: 12px;
+  background: rgba(217, 113, 113, 0.05);
+}
+
+.cv-recover-title {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cv-recover-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
 .cv-devices.standalone {
   margin-top: 20px;
   padding: 16px 18px 18px;

@@ -1,5 +1,5 @@
 import { handleApi } from "./_lib/http.js";
-import { retrieveHostedPrice } from "./_lib/stripe.js";
+import { hostedTrialDays, retrieveHostedPrice } from "./_lib/stripe.js";
 
 const CACHE_SECONDS = 300;
 
@@ -19,7 +19,16 @@ const CACHE_SECONDS = 300;
 // result goes in the edge cache explicitly.
 //
 // The key is rebuilt from the pathname alone, so a query string cannot be
-// used to walk around the cache.
+// used to walk around the cache. It then carries a fingerprint of the config
+// this response is derived from, computed server-side from env and never from
+// anything the caller sends, so a visitor still cannot pick their own key.
+//
+// Without that fingerprint the 300 second window is a window where the page
+// and Checkout disagree about money: shorten or switch off
+// AUTOVAULT_HOSTED_TRIAL_DAYS and a cached body keeps promising the old trial
+// while a session created in the same second already uses the new one. Making
+// the key move with the config means a change invalidates instead of waiting
+// out the TTL.
 // request/waitUntil default so a caller can supply just { env } -- the
 // endpoint then simply skips the edge cache instead of throwing.
 /**
@@ -32,7 +41,14 @@ const CACHE_SECONDS = 300;
 export async function onRequestGet({ request = null, env, waitUntil = null }) {
   return handleApi(async () => {
     const cache = typeof caches !== "undefined" ? caches.default : null;
-    const cacheKey = request ? new Request(new URL(request.url).origin + "/api/pricing") : null;
+    const fingerprint = encodeURIComponent(
+      `${env.AUTOVAULT_HOSTED_PRICE_ID || ""}:${hostedTrialDays(env)}`,
+    );
+    const cacheKey = request
+      ? new Request(
+          `${new URL(request.url).origin}/api/pricing?config=${fingerprint}`,
+        )
+      : null;
 
     if (cache && cacheKey) {
       const hit = await cache.match(cacheKey);

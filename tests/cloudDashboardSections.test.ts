@@ -518,9 +518,51 @@ describe("the Billing panel", () => {
   });
 });
 
+describe("the billing recovery block", () => {
+  const at = cloudPage.indexOf("BILLING RECOVERY");
+  const block = cloudPage.slice(at, cloudPage.indexOf("SECTION: MACHINES", at));
+
+  it("gives a lapsed owner a way out before any machine is admitted", () => {
+    // The Billing panel reveals at `ready`, and `ready` requires an admitted
+    // machine. Admitting one answers 402 while the subscription is inactive.
+    // An owner who reserved a namespace and then lapsed was parked at
+    // `connect` with both exits shut, and that is every unconverted trial. So
+    // this block has to live OUTSIDE the `ready` template, next to Machines.
+    expect(at, "no billing recovery block").toBeGreaterThan(-1);
+    expect(SECTION_REVEAL_BILLING).toBe('billing: "ready"');
+    expect(block).toContain('v-if="vault && !paid"');
+    expect(block).toContain("startHostedCheckout");
+    expect(block).toContain("openBillingPortal");
+    // Same predicates the Billing panel uses, so a paused or past_due owner is
+    // still routed to the portal rather than to a second subscription.
+    expect(block).toContain('v-if="canStartCheckout"');
+    expect(block).toContain('v-if="canManageBilling"');
+  });
+
+  it("says the namespace survived rather than implying it was taken away", () => {
+    expect(flatten(block)).toContain("still reserved and nothing has been deleted");
+  });
+});
+
+const SECTION_REVEAL_BILLING = (() => {
+  const at = cloudPage.indexOf("const SECTION_REVEAL");
+  const body = cloudPage.slice(at, cloudPage.indexOf("};", at));
+  return body.split("\n").map((line) => line.trim().replace(/,$/, ""))
+    .find((line) => line.startsWith("billing:")) ?? "";
+})();
+
 describe("the Catalog panel", () => {
   const at = cloudPage.indexOf(`v-else-if="activeSection === 'catalog'"`);
-  const panel = cloudPage.slice(at, cloudPage.indexOf("SECTION: MACHINES", at));
+  // Ends at whichever block comes next, not at one named marker. This slice
+  // used to run to SECTION: MACHINES and swallowed everything inserted between
+  // the two, so a <button> in a later, unrelated block failed a case about the
+  // catalog panel. The nearest following marker is the panel's real end.
+  const panelEnd = Math.min(
+    ...["BILLING RECOVERY", "SECTION: MACHINES"]
+      .map((marker) => cloudPage.indexOf(marker, at))
+      .filter((index) => index > -1)
+  );
+  const panel = cloudPage.slice(at, panelEnd);
 
   it("exists as a panel, not a card to scroll to", () => {
     expect(at, "no catalog panel").toBeGreaterThan(-1);
