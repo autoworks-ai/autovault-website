@@ -5,7 +5,7 @@
         <div class="eyebrow">
           <span class="dash" />
           Deploy a remote vault
-          <span class="pr">{{ PRODUCT_VERSION_SHORT }} · current</span>
+          <span class="pr">image {{ MANUAL_GHCR_TAG }}</span>
         </div>
         <h1>From a local CLI to <span class="ital">a network service</span> in two minutes.</h1>
         <p class="lede">In remote mode, the same vault binary speaks Streamable HTTP MCP with OAuth auth-code + PKCE. Stand it up on a real host so agents can resolve, read, propose, and update signed skills through MCP; local filesystem-native host folders still require local profile sync or a future mirror helper.</p>
@@ -168,8 +168,7 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, h, ref } from "vue";
-import { MANUAL_GHCR_IMAGE, RAILWAY_TEMPLATE_URL } from "../../shared/deploy";
-import { PRODUCT_VERSION_SHORT } from "../data/product";
+import { MANUAL_GHCR_IMAGE, MANUAL_GHCR_TAG, RAILWAY_TEMPLATE_URL } from "../../shared/deploy";
 import UiIcon from "./UiIcon.vue";
 
 type Provider = {

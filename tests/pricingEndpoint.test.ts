@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { onRequestGet as pricing } from "../functions/api/pricing.js";
 import { formatPriceLabel } from "../.vitepress/theme/utils/money";
+import { buildHostedVaultCheckoutParams } from "../functions/api/_lib/stripe.js";
 
 const ENV = { STRIPE_SECRET_KEY: "sk_test_x", AUTOVAULT_HOSTED_PRICE_ID: "price_hosted" };
 
@@ -19,7 +20,12 @@ describe("pricing endpoint", () => {
   it("returns the configured plan's real price from Stripe", async () => {
     stubPrice({ unit_amount: 1500, currency: "usd", recurring: { interval: "month" } });
     const response = await pricing({ env: ENV });
-    expect(await response.json()).toEqual({ amount: 1500, currency: "usd", interval: "month" });
+    expect(await response.json()).toEqual({ amount: 1500, currency: "usd", interval: "month", trial_days: 0 });
+
+    // 0, not absent. The page renders every trial line off this number, so an
+    // endpoint that simply omitted the field when no trial is configured would
+    // be indistinguishable from an older deploy that did not know about
+    // trials, and "no trial" is the answer that has to be unambiguous.
   });
 
   it("is cacheable — the price is identical for every visitor", async () => {
@@ -72,11 +78,11 @@ describe("pricing endpoint", () => {
     return (async () => {
       const request = new Request("https://autovault.dev/api/pricing");
       const first = await pricing({ request, env: ENV });
-      expect(await first.json()).toEqual({ amount: 1500, currency: "usd", interval: "month" });
+      expect(await first.json()).toEqual({ amount: 1500, currency: "usd", interval: "month", trial_days: 0 });
       expect(stripe).toHaveBeenCalledTimes(1);
 
       const second = await pricing({ request, env: ENV });
-      expect(await second.json()).toEqual({ amount: 1500, currency: "usd", interval: "month" });
+      expect(await second.json()).toEqual({ amount: 1500, currency: "usd", interval: "month", trial_days: 0 });
       // The point of the whole exercise: no second Stripe call.
       expect(stripe).toHaveBeenCalledTimes(1);
     })();
@@ -156,5 +162,37 @@ describe("price label", () => {
     expect(label(null, "usd")).toBeNull();
     expect(label(1500, null)).toBeNull();
     expect(formatPriceLabel(1500, "usd", null, "en-US")).toBe("$15");
+  });
+
+  it("reports the same trial Checkout would send", async () => {
+    // The one guarantee that keeps "14 days free" on the page honest. This
+    // endpoint is where the funnel learns the trial length, and
+    // buildHostedVaultCheckoutParams is what Stripe is actually asked for.
+    // Both read hostedTrialDays, so this asserts they cannot disagree.
+    stubPrice({ unit_amount: 1500, currency: "usd", recurring: { interval: "month" } });
+    const env = { ...ENV, AUTOVAULT_HOSTED_TRIAL_DAYS: "14" };
+    const body = await (await pricing({ env })).json() as { trial_days: number };
+
+    const params = buildHostedVaultCheckoutParams({
+      request: new Request("https://autovault.dev/cloud"),
+      env,
+      user: { id: "user_1", email: "jack@example.com" }
+    });
+
+    expect(body.trial_days).toBe(14);
+    expect(params.get("subscription_data[trial_period_days]")).toBe(String(body.trial_days));
+  });
+
+  it("advertises no trial when Checkout would send none", async () => {
+    stubPrice({ unit_amount: 1500, currency: "usd", recurring: { interval: "month" } });
+    const body = await (await pricing({ env: ENV })).json() as { trial_days: number };
+    const params = buildHostedVaultCheckoutParams({
+      request: new Request("https://autovault.dev/cloud"),
+      env: ENV,
+      user: { id: "user_1", email: "jack@example.com" }
+    });
+
+    expect(body.trial_days).toBe(0);
+    expect(params.get("subscription_data[trial_period_days]")).toBeNull();
   });
 });

@@ -214,8 +214,10 @@ describe("the honour-system checkbox is gone", () => {
     expect(cloudPage).not.toContain("I've linked my CLI");
     expect(cloudPage).not.toContain('markProgress("cli_linked")');
     expect(cloudPage).not.toContain("markProgress('cli_linked')");
-    // markProgress survives for early access only.
-    expect(cloudPage).toContain('async function markProgress(step: "early_access")');
+    // markProgress is gone entirely now. It survived this cleanup once, for
+    // the early-access waitlist; that ask was removed when hosted sync
+    // shipped, taking its only remaining call site with it.
+    expect(cloudPage).not.toContain("markProgress");
   });
 
   it("derives 'linked' from an admitted device, not from a timestamp column", () => {
@@ -261,12 +263,12 @@ describe("Skills and Sync log are real destinations now", () => {
     expect(cloudPage).toContain("selectedSection.value = item.section;");
 
     // Skills -> the panel holding the app preview. The early-access ask used
-    // to live here too; it moved to the vault strip, which stays on screen
-    // whichever panel is selected -- see cloudDashboardSections.test.ts.
+    // to live here, then moved to the vault strip, and was finally removed
+    // with the waitlist -- see cloudDashboardSections.test.ts.
     expect(sectionOf("skills")).toBe("skills");
     const skillsPanel = cloudPage.indexOf(`v-else-if="activeSection === 'skills'"`);
     expect(skillsPanel, "no skills panel").toBeGreaterThan(-1);
-    expect(cloudPage.slice(skillsPanel)).toContain("Manage your vault from the web");
+    expect(cloudPage.slice(skillsPanel)).toContain("Managing your vault from the web");
 
     // Sync log -> the machines list, which the overview also shows.
     expect(sectionOf("sync")).toBe("machines");
@@ -378,11 +380,11 @@ describe("nav items only enable once their destination exists", () => {
     const at = cloudPage.indexOf("const SECTION_REVEAL");
     expect(at, "no SECTION_REVEAL table").toBeGreaterThan(-1);
     const table = cloudPage.slice(at, cloudPage.indexOf("};", at));
-    expect(table).toContain('skills: "explore"');
+    expect(table).toContain('skills: "ready"');
     expect(table).toContain('machines: "connect"');
     // And the item factory has to actually read it, or the table is decoration.
     expect(cloudPage).toContain(
-      "const revealAt = opts.revealAt ?? (opts.section ? SECTION_REVEAL[opts.section] : null);"
+      "const revealAt =\n      opts.revealAt ?? (opts.section ? SECTION_REVEAL[opts.section] : null);"
     );
   });
 
@@ -525,7 +527,9 @@ describe("the console does not cost more than it is worth", () => {
     // The idle branch must still schedule a timer, not clear one.
     const at = cloudPage.indexOf("function startDevicePolling");
     const body = cloudPage.slice(at, at + 600);
-    expect(body).toContain("devicePollUrgent.value ? DEVICE_POLL_ACTIVE_MS : DEVICE_POLL_IDLE_MS");
+    expect(body).toContain(
+      "const wanted = devicePollUrgent.value\n    ? DEVICE_POLL_ACTIVE_MS\n    : DEVICE_POLL_IDLE_MS;"
+    );
     expect(body).toContain("setInterval");
   });
 });

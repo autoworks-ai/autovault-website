@@ -14,14 +14,44 @@ const scannedRoots = [
   ...pageDocs.map((doc) => doc.file)
 ];
 
-const allowedCloudLinkFiles = new Set([
-  "public/_redirects"
-]);
+const read = (path: string) => readFileSync(resolve(repoRoot, path), "utf8");
 
-const cloudHrefPattern = /\bhref\s*[:=]\s*["']\/cloud(?:["'#?\/])/g;
-
+/**
+ * This file used to enforce the opposite rule: /cloud was unlisted while the
+ * hosted vault was a name you reserved, and nothing public was allowed to link
+ * it. Sync shipped, so the rule inverted. What did NOT change is that the
+ * hosted route has an anchor -- clerkBrand.cloudPath is "/cloud#launch-path",
+ * and Clerk's signInFallbackRedirectUrl is the same constant -- so a second
+ * copy written as a bare literal sends half the visitors to a different scroll
+ * position than the sign-in bounce does.
+ *
+ * A note for whoever inverts this next. The old scan ran a regex that required
+ * a quote straight after `href:`, so `href: clerkBrand.cloudPath` never matched
+ * it. Flipping the posture without rewriting these cases would have left the
+ * file green and guarding nothing at all.
+ */
 describe("public hosted route links", () => {
-  it("does not publicly link to the unlisted hosted cloud route", () => {
+  it("links Cloud from the public nav, signed in or not", () => {
+    const topbar = read(".vitepress/theme/components/AvTopbar.vue");
+
+    expect(topbar).toContain('{ label: "Cloud", href: clerkBrand.cloudPath }');
+    // In the array itself, not pushed on behind an auth check. /cloud is where
+    // sign-up happens, so gating it on being signed in hid it from precisely
+    // the people it is for.
+    expect(topbar).not.toContain("isClerkSignedIn.value");
+    expect(topbar).not.toContain("useClerkApiAuth");
+  });
+
+  it("links Cloud from the docs sidebar", () => {
+    const docsShell = read(".vitepress/theme/components/DocsShell.vue");
+
+    expect(docsShell).toContain('{ label: "Cloud", href: clerkBrand.cloudPath }');
+    expect(docsShell).toContain('import { clerkBrand } from "../clerk";');
+  });
+
+  it("writes the hosted route through clerkBrand, never as a bare literal", () => {
+    // The inverse of the rule this file used to hold, and the reason the scan
+    // survived the flip: exactly one file gets to spell the path out.
     const offenders = scanFiles(scannedRoots)
       .flatMap((file) => matchesForFile(file))
       .filter((match) => !allowedCloudLinkFiles.has(match.file));
@@ -29,13 +59,28 @@ describe("public hosted route links", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("does not expose the hosted route through local search copy", () => {
-    const docsShell = readFileSync(resolve(repoRoot, ".vitepress/theme/components/DocsShell.vue"), "utf8");
+  it("still does not publicly link the pairing endpoint", () => {
+    // /cloud/pair is addressed by a one-time code the CLI prints. It is out of
+    // the sitemap and out of local search, and nothing in the nav should walk a
+    // visitor to a form they have no code for.
+    const offenders = scanFiles(scannedRoots)
+      .flatMap((file) => matchesForFile(file, pairHrefPattern))
+      .filter((match) => !allowedCloudLinkFiles.has(match.file));
 
-    expect(docsShell).not.toContain("Cloud launch");
-    expect(docsShell).not.toContain('href: "/cloud"');
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps the retired launch copy out of local search", () => {
+    expect(read(".vitepress/theme/components/DocsShell.vue")).not.toContain("Cloud launch");
   });
 });
+
+const allowedCloudLinkFiles = new Set([
+  "public/_redirects"
+]);
+
+const cloudHrefPattern = /\bhref\s*[:=]\s*["']\/cloud(?:["'#?])/g;
+const pairHrefPattern = /\bhref\s*[:=]\s*["']\/cloud\/pair/g;
 
 function scanFiles(paths: string[]): string[] {
   return paths.flatMap((path) => {
@@ -55,10 +100,10 @@ function walk(dir: string): string[] {
   }).filter((file) => [".md", ".ts", ".vue"].includes(extname(file)));
 }
 
-function matchesForFile(file: string) {
+function matchesForFile(file: string, pattern = cloudHrefPattern) {
   const rel = relative(repoRoot, file);
   const text = readFileSync(file, "utf8");
-  return [...text.matchAll(cloudHrefPattern)].map((match) => ({
+  return [...text.matchAll(pattern)].map((match) => ({
     file: rel,
     match: match[0],
     line: lineForOffset(text, match.index ?? 0)

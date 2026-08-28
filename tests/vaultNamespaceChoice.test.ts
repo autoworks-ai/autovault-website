@@ -123,7 +123,11 @@ describe("namespace validation", () => {
     // the count is quoted in the task report and in the commit message, and a
     // floor lets those drift out of date silently. Adding an entry is meant to
     // be a deliberate act with prose attached.
-    expect(RESERVED_VAULT_SLUGS.size).toBe(54);
+    //
+    // 54 -> 55: "hosted-sync", added with the /hosted-sync docs page. The
+    // derived-routes case below is what caught it. A customer holding that
+    // slug would shadow a real route on this site.
+    expect(RESERVED_VAULT_SLUGS.size).toBe(55);
     for (const reserved of RESERVED_VAULT_SLUGS) {
       const verdict = validateVaultSlug(reserved);
       expect(verdict.ok, reserved).toBe(false);
@@ -532,11 +536,17 @@ describe("the namespace field in the funnel", () => {
     const submit = wrangler.match(/^STRIPE_CHECKOUT_CUSTOM_TEXT_SUBMIT = "(.*)"$/m)?.[1];
     expect(submit).toBeTruthy();
     expect(submit).not.toMatch(/reserves your hosted namespace once/i);
-    // The sync limitation still has to be stated, and still may not overclaim --
-    // same three rules the rest of the hidden hosted copy is held to.
-    expect(submit).toContain("Cloud sync remains disabled until the CLI handoff ships.");
+    // A limitation still has to be stated here, but it is no longer the sync
+    // one: hosted sync and the CLI handoff both shipped, so saying sync is
+    // disabled is now the overclaim, in the other direction. What is still
+    // true at the moment money changes hands is that publishing is manual.
+    expect(submit).toMatch(/publishing/i);
+    expect(submit).toMatch(/private beta/i);
+    expect(submit).not.toMatch(/sync (remains|is) disabled|sync is not enabled/i);
+    // ...and stating it may not tip into promising a publish path that does
+    // not exist. There is no upload API and the CLI is a consumer only.
+    expect(submit).not.toMatch(/publish your|upload your|push your/i);
     expect(submit).not.toMatch(/live vault|provisioned runtime/i);
-    expect(submit).not.toMatch(/cloud sync is enabled|enabled cloud sync|sync now/i);
     expect(submit).not.toMatch(/prototype mode/i);
   });
 

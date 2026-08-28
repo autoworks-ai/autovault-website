@@ -294,10 +294,10 @@ describe("the arrival cannot disturb the first-machine celebration", () => {
     // only cloudStateAuthenticated still says no.
     expect(cloudPage).not.toContain("watch(ambientVault");
     expect(cloudPage).toContain(
-      "const cloudStateAuthenticated = computed(() =>\n  isAuthenticatedCloudState(cloudState.value)\n);"
+      "const cloudStateAuthenticated = computed(() =>\n  isAuthenticatedCloudState(cloudState.value),\n);"
     );
     expect(cloudPage).toContain(
-      "const vaultArrivalReady = computed(\n  () => ambientVault.value && cloudStateAuthenticated.value\n);"
+      "const vaultArrivalReady = computed(\n  () => ambientVault.value && cloudStateAuthenticated.value,\n);"
     );
   });
 
@@ -360,9 +360,9 @@ describe("what makes the load-triggered arrival safe: opening needs an admitted 
 
   it("cannot open the vault without an admitted machine", () => {
     expect(cloudPage).toContain(
-      'const vaultOpen = computed(() => stage.value === "explore" || stage.value === "ready");'
+      'const vaultOpen = computed(() => stage.value === "ready");'
     );
-    // A vault on its own is `connect`. `explore` is on the far side of an
+    // A vault on its own is `connect`. `ready` is on the far side of an
     // admit, so a fresh checkout return cannot reach it.
     expect(stageBody).toContain('if (!cliLinked.value) return "connect";');
     expect(cloudPage).toContain(

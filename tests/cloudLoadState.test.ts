@@ -275,7 +275,7 @@ describe("the auth context is recorded honestly", () => {
     // would flip cloudStateKnown false again over a page already correct.
     const body = fnBody("loadCloudState");
     expect(body).toContain(
-      "if (requestSeq === cloudStateRequestSeq) loadedSignedIn.value = requestSignedIn;"
+      "if (requestSeq === cloudStateRequestSeq)\n      loadedSignedIn.value = requestSignedIn;"
     );
     expect(body).not.toContain(
       "if (requestSeq === cloudStateRequestSeq || initial) loadedSignedIn.value"
@@ -382,7 +382,7 @@ describe("the wait is bounded", () => {
     expect(body).not.toContain("patienceExpired: loadPatienceExpired.value,");
     const known = cloudPage.indexOf("const cloudStateKnown = computed(");
     const block = cloudPage.slice(known, cloudPage.indexOf("\n);", known));
-    expect(block).toContain("patienceExpired: loadPatienceExpired.value");
+    expect(block).toContain("patienceExpired:\n      loadPatienceExpired.value");
   });
 
   it("does not start the device window before there is a list to wait for", () => {
@@ -516,7 +516,7 @@ describe("the wait is bounded", () => {
     const known = cloudPage.indexOf("const cloudStateKnown = computed(");
     const block = cloudPage.slice(known, cloudPage.indexOf("\n);", known));
     expect(block).toContain(
-      "patienceExpired: loadPatienceExpired.value && cloudLoadsInFlight.value === 0,"
+      "patienceExpired:\n      loadPatienceExpired.value && cloudLoadsInFlight.value === 0,"
     );
     const load = fnBody("loadCloudState");
     expect(load).toContain("cloudLoadsInFlight.value += 1;");

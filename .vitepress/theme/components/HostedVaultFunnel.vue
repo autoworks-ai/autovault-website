@@ -33,7 +33,7 @@
     <div v-if="!vault" class="hosted-namespace">
       <label class="hosted-namespace-label" for="hosted-namespace">Your namespace</label>
       <div class="hosted-namespace-field" :class="namespaceState.tone">
-        <span class="hosted-namespace-prefix" aria-hidden="true">vault.autovault.dev/</span>
+        <span class="hosted-namespace-prefix" aria-hidden="true">autovault.dev/v/</span>
         <input
           id="hosted-namespace"
           ref="namespaceInputRef"
@@ -89,14 +89,14 @@
       <ClerkAuthControls
         v-if="actionKind === 'auth'"
         variant="funnel"
-        cta-label="Create your account"
+        :cta-label="accountCtaLabel"
         signed-in-label="Continue onboarding"
         :mark-primary="markedAction"
         @click.capture="persistDraft"
         @signed-in-action="startFlow"
       />
       <button v-else-if="actionKind === 'checkout'" class="hosted-primary" :class="{ 'av-nextaction': markedAction && canCheckout }" type="button" :disabled="busy || !canCheckout" @click="startFlow">
-        {{ checkoutStarted ? "Opening Checkout..." : "Open checkout" }}
+        {{ checkoutStarted ? "Opening Checkout..." : checkoutCtaLabel }}
       </button>
       <button v-else-if="actionKind === 'reserve'" class="hosted-primary" :class="{ 'av-nextaction': markedAction && canReserve }" type="button" :disabled="busy || !canReserve" @click="startFlow">
         {{ provisioning ? "Reserving..." : "Reserve namespace" }}
@@ -216,14 +216,33 @@ const props = withDefaults(defineProps<{
   // Decided by the shell (cloudNextAction), never here — this component cannot
   // see the Machines card, and the marker has to be unique across both.
   markedAction?: boolean;
+  // Trial length in days, or null for no trial. Comes down from the shell,
+  // which read it from /api/pricing, which reads the same hostedTrialDays()
+  // the Checkout builder reads. Threaded rather than fetched again so there is
+  // one request and, more to the point, one answer: a button that says "start
+  // free trial" while Checkout charges immediately is the failure this whole
+  // chain exists to make impossible.
+  trialDays?: number | null;
 }>(), {
   skillSource: "",
   skillName: "",
   sourceLabel: "",
   evaluation: null,
   state: null,
-  markedAction: false
+  markedAction: false,
+  trialDays: null
 });
+
+// Every label below falls back to the paid wording when trialDays is null,
+// which is also what happens when /api/pricing cannot be reached. Silence is
+// the safe default; a trial is a promise.
+const trialing = computed(() => (props.trialDays ?? 0) > 0);
+const accountCtaLabel = computed(() =>
+  trialing.value ? `Start your ${props.trialDays} day trial` : "Create your account"
+);
+const checkoutCtaLabel = computed(() =>
+  trialing.value ? "Start free trial" : "Open checkout"
+);
 const emit = defineEmits<{
   stateChange: [state: MeResponse];
   notice: [notice: Notice | null];
@@ -312,7 +331,10 @@ const namespaceCheckReady = computed(() => clerkAuthEnabled ? isClerkSignedIn.va
 // Follows the field before a vault exists, so the endpoint quoted in the local
 // handoff card is the one they are about to reserve.
 const teamSlug = computed(() => vault.value?.slug || namespaceSlug.value || namespaceSuggestion.value);
-const hostedEndpoint = computed(() => vault.value?.public_url ?? `https://vault.autovault.dev/${teamSlug.value}`);
+// Derived from the slug, not from the stored public_url: nothing routes
+// vault.autovault.dev, and this string is pasted into the copyable command
+// block below, so it has to be an address that actually answers.
+const hostedEndpoint = computed(() => `https://autovault.dev/v/${teamSlug.value}/`);
 const namespaceStatusLabel = computed(() => vault.value ? "Hosted namespace reserved:" : "Planned namespace:");
 const commandBlock = computed(() => [
   AUTOVAULT_INSTALL_COMMAND,
@@ -328,12 +350,15 @@ const commandBlock = computed(() => [
   // which was survivable while the auto-provision made that state last one
   // frame; now that reserving waits for a click, it is the durable
   // post-checkout screen -- and the screen-reader transcript.
-  vault.value ? "# Cloud sync is not enabled yet." : "# Checkout is complete. Reserve the namespace above to claim it.",
+  vault.value ? "# Pair this machine with: autovault link" : "# Checkout is complete. Reserve the namespace above to claim it.",
   // The copied text has to carry the caveat too. Somebody who pastes this into
   // a terminal is not looking at the page any more, and the block deliberately
   // has no `autovault link` in it -- there is no namespace to link to yet.
   // Without this line the paste just ends, and the reasonable conclusion is
   // that the link command is missing rather than not-yet-applicable.
+  //
+  // Only in the no-vault case: once reserved, the connect step owns the real
+  // link command, and repeating it here would be a second copy to drift.
   ...(vault.value ? [] : ["# `autovault link` appears here once you reserve it."])
 ].join("\n"));
 
@@ -860,7 +885,7 @@ async function provisionVault() {
     // Success notice FIRST. This also clears any stale warn from an earlier
     // attempt ("waiting for the webhook") that would otherwise still be on
     // screen when the shell advances to the connect step.
-    notice.value = { kind: "ok", text: "Hosted namespace reserved. Keep signing and serving skills locally — hosted sync ships next." };
+    notice.value = { kind: "ok", text: "Hosted namespace reserved. Run autovault link on a machine to pair it, then admit it below." };
     // Merge onto `current`, not onto the local copy. If this component's own
     // /api/me failed earlier the local copy is still null, and handing the
     // shell { user: null, vault } would install an anonymous state over the
@@ -1032,7 +1057,7 @@ async function copyCommands() {
 
 async function copyAgentHandoff(agent: "claude-code" | "cursor") {
   const label = agent === "claude-code" ? "Claude Code" : "Cursor";
-  await copyText(`# ${label} paid hosted AutoVault handoff\n${commandBlock.value}\n\nHosted sync is not enabled yet. Keep using the local AutoVault CLI; this namespace and any skills carry over when it ships.\n`);
+  await copyText(`# ${label} paid hosted AutoVault handoff\n${commandBlock.value}\n\nRun 'autovault link' with no argument to pair this machine, then admit it from the cloud dashboard. Skills are signed locally; the hosted namespace only serves them.\n`);
   notice.value = { kind: "ok", text: `${label} handoff copied.` };
 }
 
@@ -1050,7 +1075,7 @@ function slugify(value: string) {
 // vaultSlugForUser does server-side. An empty suggestion is worse than a generic
 // one three ways over: syncNamespaceFromDraft treats it as nothing to fill so
 // the field never prefills at all, the default path stops being one click, and
-// teamSlug collapses hostedEndpoint to a bare "https://vault.autovault.dev/" --
+// teamSlug collapses hostedEndpoint to a bare "https://autovault.dev/v//",
 // which is the string the screen-reader transcript in the local handoff card
 // reads out. "your-team" is also exactly what this surface showed before there
 // was a field.

@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { clerkBrand } from "../clerk";
-import { clerkAuthRecoveryMessage, isClerkApiAuthError, useClerkApiAuth } from "../utils/clerkApi";
+import {
+  clerkAuthRecoveryMessage,
+  isClerkApiAuthError,
+  useClerkApiAuth,
+} from "../utils/clerkApi";
 
 // Mirrors CloudPage.vue's CloudVault/CloudSubscription shapes (not exported
 // from there, so duplicated here rather than imported) -- see
@@ -26,7 +30,10 @@ const { authHeaders } = useClerkApiAuth();
 // that file). This repo has no shared composable for the vocabulary yet, so
 // the small map is duplicated rather than invented -- keep these two in sync
 // if either changes.
-const SUBSCRIPTION_LABELS: Record<string, { text: string; tone: "ok" | "warn" | "bad" }> = {
+const SUBSCRIPTION_LABELS: Record<
+  string,
+  { text: string; tone: "ok" | "warn" | "bad" }
+> = {
   active: { text: "Active", tone: "ok" },
   trialing: { text: "Trialing", tone: "ok" },
   past_due: { text: "Past due", tone: "warn" },
@@ -53,15 +60,34 @@ const subscriptionState = computed(() => {
       ? { text: "Active", tone: "ok" as const }
       : { text: "No subscription", tone: "warn" as const };
   }
-  return SUBSCRIPTION_LABELS[status] ?? { text: status.replace(/_/g, " "), tone: "warn" as const };
+  return (
+    SUBSCRIPTION_LABELS[status] ?? {
+      text: status.replace(/_/g, " "),
+      tone: "warn" as const,
+    }
+  );
 });
 
+const PORTAL_ONLY_STATUSES = new Set(["past_due", "unpaid", "incomplete"]);
+
+const canStartCheckout = computed(() => {
+  if (subscription.value?.active) return false;
+  const status = subscription.value?.status ?? null;
+  return !status || !PORTAL_ONLY_STATUSES.has(status);
+});
+
+const canManageBilling = computed(
+  () =>
+    Boolean(subscription.value?.active) || Boolean(subscription.value?.status),
+);
+
+// Derived from the slug rather than the stored public_url. That column holds a
+// vault.autovault.dev string and nothing routes that host; the address this
+// namespace answers on is the /v/<slug>/ path.
 const namespaceHost = computed(() => {
   const current = vault.value;
   if (!current) return null;
-  return current.public_url
-    ? current.public_url.replace(/^https?:\/\//, "")
-    : `vault.autovault.dev/${current.slug}`;
+  return `autovault.dev/v/${current.slug}/`;
 });
 
 // Guards against writing to these refs after this tab's content unmounts.
@@ -89,8 +115,14 @@ onMounted(load);
 async function load() {
   loadState.value = "loading";
   try {
-    const headers = await authHeaders({ accept: "application/json" }, { required: true, fresh: true });
-    const response = await fetch("/api/me", { credentials: "include", headers });
+    const headers = await authHeaders(
+      { accept: "application/json" },
+      { required: true, fresh: true },
+    );
+    const response = await fetch("/api/me", {
+      credentials: "include",
+      headers,
+    });
     if (!componentActive) return;
     // A non-OK /api/me means "could not find out", not "no vault" -- see
     // commit 2a81d91 (this repo already paid for the demoted-subscriber
@@ -125,11 +157,19 @@ async function load() {
 // on top of an otherwise-successful /api/me load, not load-bearing for it.
 async function loadActiveDeviceCount(): Promise<number | null> {
   try {
-    const headers = await authHeaders({ accept: "application/json" }, { required: true, fresh: false });
-    const response = await fetch("/api/vaults/current/devices", { credentials: "include", headers });
+    const headers = await authHeaders(
+      { accept: "application/json" },
+      { required: true, fresh: false },
+    );
+    const response = await fetch("/api/vaults/current/devices", {
+      credentials: "include",
+      headers,
+    });
     if (!componentActive || !response.ok) return null;
     const payload = (await response.json()) as { devices?: SyncDevice[] };
-    return (payload.devices ?? []).filter((device) => device.status === "active").length;
+    return (payload.devices ?? []).filter(
+      (device) => device.status === "active",
+    ).length;
   } catch {
     return null;
   }
@@ -146,19 +186,27 @@ async function openBillingPortal() {
   billingBusy.value = true;
   billingNotice.value = null;
   try {
-    const headers = await authHeaders({
-      "content-type": "application/json",
-      accept: "application/json",
-    }, { required: true, fresh: true });
+    const headers = await authHeaders(
+      {
+        "content-type": "application/json",
+        accept: "application/json",
+      },
+      { required: true, fresh: true },
+    );
     const response = await fetch("/api/billing/portal", {
       method: "POST",
       credentials: "include",
       headers,
       body: JSON.stringify({ return_to: "/cloud#launch-path" }),
     });
-    const payload = await response.json().catch(() => ({})) as { url?: string; error?: string };
+    const payload = (await response.json().catch(() => ({}))) as {
+      url?: string;
+      error?: string;
+    };
     if (!response.ok || !payload.url) {
-      billingNotice.value = payload.error || "Couldn't open billing just now. Try again in a moment.";
+      billingNotice.value =
+        payload.error ||
+        "Couldn't open billing just now. Try again in a moment.";
       return;
     }
     window.location.assign(payload.url);
@@ -180,17 +228,27 @@ async function openBillingPortal() {
     <p v-if="loadState === 'loading'">Loading your cloud status…</p>
 
     <template v-else-if="loadState === 'error'">
-      <p>Couldn't load your cloud status right now. Account identity and security stay in Clerk regardless.</p>
+      <p>
+        Couldn't load your cloud status right now. Account identity and security
+        stay in Clerk regardless.
+      </p>
       <div class="clerk-profile-actions">
-        <a class="clerk-profile-action" :href="clerkBrand.cloudPath">Open dashboard</a>
+        <a class="clerk-profile-action" :href="clerkBrand.cloudPath"
+          >Open dashboard</a
+        >
         <a class="clerk-profile-action" :href="clerkBrand.docsPath">Docs</a>
       </div>
     </template>
 
     <template v-else-if="!vault">
-      <p>Manage your reserved namespace from the cloud dashboard. Account identity and security stay in Clerk.</p>
+      <p>
+        Manage your reserved namespace from the cloud dashboard. Account
+        identity and security stay in Clerk.
+      </p>
       <div class="clerk-profile-actions">
-        <a class="clerk-profile-action" :href="clerkBrand.cloudPath">Open cloud dashboard</a>
+        <a class="clerk-profile-action" :href="clerkBrand.cloudPath"
+          >Open cloud dashboard</a
+        >
       </div>
     </template>
 
@@ -198,18 +256,39 @@ async function openBillingPortal() {
       <p class="clerk-profile-slug">{{ namespaceHost }}</p>
       <ul class="clerk-profile-meta">
         <li>
-          <span class="clerk-profile-pill" :class="`is-${subscriptionState.tone}`">
-            <span class="clerk-profile-dot" aria-hidden="true" /> {{ subscriptionState.text }}
+          <span
+            class="clerk-profile-pill"
+            :class="`is-${subscriptionState.tone}`"
+          >
+            <span class="clerk-profile-dot" aria-hidden="true" />
+            {{ subscriptionState.text }}
           </span>
         </li>
         <li v-if="activeDeviceCount !== null">
-          {{ activeDeviceCount }} {{ activeDeviceCount === 1 ? "machine" : "machines" }} linked
+          {{ activeDeviceCount }}
+          {{ activeDeviceCount === 1 ? "machine" : "machines" }} linked
         </li>
       </ul>
-      <p v-if="billingNotice" class="clerk-profile-notice">{{ billingNotice }}</p>
+      <p v-if="billingNotice" class="clerk-profile-notice">
+        {{ billingNotice }}
+      </p>
       <div class="clerk-profile-actions">
-        <a class="clerk-profile-action" :href="clerkBrand.cloudPath">Open dashboard</a>
-        <button type="button" class="clerk-profile-action" :disabled="billingBusy" @click="openBillingPortal">
+        <a class="clerk-profile-action" :href="clerkBrand.cloudPath"
+          >Open dashboard</a
+        >
+        <a
+          v-if="canStartCheckout"
+          class="clerk-profile-action"
+          :href="clerkBrand.cloudPath"
+          >Start subscription</a
+        >
+        <button
+          v-if="canManageBilling"
+          type="button"
+          class="clerk-profile-action"
+          :disabled="billingBusy"
+          @click="openBillingPortal"
+        >
           Manage billing
         </button>
         <a class="clerk-profile-action" :href="clerkBrand.docsPath">Docs</a>

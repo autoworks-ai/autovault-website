@@ -1,4 +1,4 @@
-import { PRODUCT_VERSION } from "../theme/data/product";
+import { HOSTED_TRIAL_DAYS, PRODUCT_VERSION } from "../theme/data/product";
 import { AUTOVAULT_AGENT_SETUP_PROMPT, AUTOVAULT_BOOTSTRAP_INSTALL_PATH, AUTOVAULT_BOOTSTRAP_SKILL_URL, AUTOVAULT_INSTALL_COMMAND, AUTOVAULT_NPM_INSTALL_COMMAND, AUTOVAULT_NPM_PACKAGE } from "./bootstrap";
 import { MANUAL_GHCR_IMAGE, RAILWAY_TEMPLATE_URL } from "./deploy";
 
@@ -7,6 +7,7 @@ export const SITE_URL = "https://autovault.dev";
 export type PageDocKey =
   | "overview"
   | "cloud"
+  | "hosted-sync"
   | "quick-start"
   | "authoring"
   | "permissions"
@@ -165,21 +166,177 @@ autovault remove skill-author --json
 
 Use \`autovault remove <name>\` to delete a vaulted skill, delete its vault-local transforms, and prune AutoVault-managed profile symlinks; native host root discovery is on by default, \`--no-discover\` skips discovered roots, and \`--link agent=/path\` targets a custom root.`;
 
-const cloudMarkdown = `# AutoVault Cloud Launch
+const cloudMarkdown = `# AutoVault Cloud
 
-AutoVault Cloud is currently paid hosted onboarding: users create an account, subscribe through Stripe Checkout, and reserve a hosted namespace. Cloud sync is not enabled yet; local AutoVault remains the signing and profile-sync source of truth.
+AutoVault Cloud serves a signed skill catalog to the machines you admit. You create an account, subscribe, reserve a namespace, and pair each machine with a code. From then on that machine pulls signed skills over HTTPS and verifies every release against a key pinned at enrollment.
 
-## Promise
+Cloud never holds a release signing key. Signing stays on your machine.
 
-- Create a Clerk-backed account and internal user row.
-- Subscribe through Stripe Checkout before namespace reservation.
-- Reserve a stable hosted URL such as https://vault.autovault.dev/your-team.
-- Keep local AutoVault as the signing and profile-sync source of truth.
-- Preserve portability: the public source remains MIT licensed and local-first.
+## What it costs
+
+One hosted namespace, unlimited machines, billed monthly. The live figure is served from Stripe at /api/pricing rather than written into this page, so treat that endpoint as authoritative.
+
+${HOSTED_TRIAL_DAYS > 0 ? `A ${HOSTED_TRIAL_DAYS} day free trial is currently configured, and no card is collected while it runs. Stripe Checkout reads the same setting this sentence does, so the trial offered is the trial granted.` : "No free trial is configured right now."}
+
+Cancel any time from the Stripe billing portal. Revoking a machine keeps working after a subscription lapses, so a closed account can still remove a machine it no longer controls.
+
+## What works today
+
+- Create an account and subscribe through Stripe Checkout.
+- Reserve a namespace, then reach it at \`https://autovault.dev/v/<slug>/\`.
+- Pair a machine by running \`autovault link\` with no argument. The CLI prints an \`XXXX-XXXX\` code and waits.
+- Confirm that code in the browser, then admit or revoke the machine from the dashboard.
+- Admitted machines fetch \`catalog.json\` and each signed bundle, verifying the release signature, the bundle hash, and every file hash.
+
+## How content lands in your vault
+
+Publishing is hands-on in private beta. There is no upload API and the CLI has no publish path, because the release signing key lives on the owner machine and never reaches Cloud. Signed catalog and bundle objects are placed in storage out of band.
+
+**A newly reserved vault therefore serves nothing.** Its catalog returns 404 until the first release is published for it. That is expected, not a fault in your setup.
+
+## Limits worth knowing before you subscribe
+
+- \`catalog.public_key\` is pinned when a machine enrols, so rotating it breaks every enrolled machine.
+- Scope is devices, not people. There are no seats, roles, or invitations.
+- One vault per account. Namespaces cannot be renamed or deleted.
+- Skill drafts can be submitted from the dashboard, but there is no review queue that reads them back yet.
 
 ## When to use it
 
-Use hosted AutoVault when a team wants to reserve its cloud namespace and join the paid onboarding path. Use the local quick start when a single developer wants the working CLI surface today.`;
+Use Cloud when you want several machines pulling the same signed skills without running a server. Use the local quick start when one developer wants the full CLI surface today. Nothing is gated behind Cloud: the source stays MIT licensed and local-first.`;
+
+const hostedSyncMarkdown = `# Hosted Sync
+
+A hosted vault serves a signed catalog over HTTPS. You pair each machine with a short code, admit it from the browser, and from then on it pulls skills and verifies every release against a key it pinned when it enrolled. Signing stays on your machine; Cloud never holds a signing key.
+
+## Pair a machine
+
+Run this on the machine you want to sync. No argument: the slug is something the machine learns, not something you type.
+
+\`\`\`bash
+autovault link
+\`\`\`
+
+The CLI generates an Ed25519 keypair, asks Cloud for a pairing code, and prints it. Codes look like \`BKDF-QMTW\`: eight characters from a 20-letter alphabet with no vowels, so a code can never spell a word. The CLI opens your browser and polls every 5 seconds.
+
+Confirm the code at \`/cloud/pair\`. Check the fingerprint on screen against the one in your terminal before confirming. Codes expire after 15 minutes; run \`autovault link\` again to mint another.
+
+## Admit and revoke
+
+Machines are listed under Machines on the cloud dashboard, identified by a fingerprint: the first four and last four characters of the public key. The console never renders a full key.
+
+- **Admit** moves a machine from pending to active.
+- **Revoke** moves it to revoked, effective on that machine's next request. This needs no active subscription, so a lapsed account can still remove a machine it no longer controls.
+- **Deny** refuses a waiting pairing code. It writes a tombstone rather than deleting the record, so the CLI is told it was refused instead of timing out against a 404.
+
+Re-admitting a revoked key from the console is deliberately not possible; pair that machine again from the machine itself.
+
+## What a machine may read
+
+| Status | May read | May not read |
+| --- | --- | --- |
+| pending | catalog.json, its own device record | bundles |
+| active | catalog.json, bundles, its own device record | nothing withheld while the subscription is live |
+| revoked | its own device record, so the CLI can report it and exit | catalog.json, bundles |
+
+The catalog being readable at pending is deliberate rather than an oversight: \`autovault link\` reads it the moment it enrols, to pin \`catalog.public_key\` before you have admitted anything. Bundles are where skill content lives, so they need active status and a live subscription.
+
+## How a request is signed
+
+Every request under \`/v/<slug>/\` is signed. No bearer tokens, no cookies.
+
+\`\`\`text
+X-AutoVault-Device      base64url Ed25519 public key
+X-AutoVault-Timestamp   whole seconds since epoch
+X-AutoVault-Signature   base64url Ed25519 detached signature
+\`\`\`
+
+The signed message is the HTTP method, the request path, and the timestamp, newline separated. Timestamps outside a 300 second window either side are rejected, which bounds replay rather than preventing it.
+
+Enrollment is self-attested: the request that enrols a key is signed by that key and the body repeats it. Admitting is what grants access, not enrolling.
+
+## How content lands in your vault
+
+There is no publish API, and the CLI has no publish command. AutoVault consumes the catalog rather than producing it. The key that signs a release lives on the owner machine and never reaches Cloud, which is what makes the signature worth checking. Signed catalog and bundle objects are placed in your namespace out of band while this is in private beta.
+
+**A newly reserved vault serves nothing.** Its catalog returns 404 until the first release is published to it. Your machine will pair and be admitted normally, then report an empty catalog. That is expected.
+
+## Limits worth knowing
+
+- Key rotation breaks enrolled machines. Each pins \`catalog.public_key\` at enrollment, so changing it hard-fails all of them.
+- Scope is machines, not people. No seats, roles, or invitations.
+- One vault per account. Namespaces cannot be renamed, transferred, or deleted.
+- Skill drafts submitted from the dashboard are stored and never read back. There is no review queue yet.
+
+## The protocol underneath
+
+Hosted sync is one transport for a smaller thing: a signed catalog of releases, plus a bundle per release. Cloud is a convenient place to put those files, not where their trustworthiness comes from.
+
+A catalog is one JSON document. Every release inside it carries its own detached signature, so the catalog is a manifest rather than an authority, and verification happens on the consuming machine against a key it pinned.
+
+\`\`\`text
+catalog.json
+  schema_version  1
+  id              vault identifier
+  name            display name
+  public_key      base64url Ed25519, pinned by each machine
+  releases[]      one entry per publishable thing
+
+releases[]
+  kind            skill | agent | mcp_server | collection
+  name            stable identifier
+  version         semver, compared on every check
+  channel         stable, beta, or your own
+  publisher       who signed it
+  policy          auto_apply | user_approve | admin_hold
+  capabilities    network, filesystem, tools[]
+  breaking        refuse a silent upgrade
+  file_hashes[]   path plus sha256, per file
+  bundle_hash     sha256 of the bundle
+  bundle_path     bundles/<bundle_hash>.json
+  signature       ed25519 over the release, domain-separated
+\`\`\`
+
+Two fields carry most of the weight. \`policy\` decides what may happen without a human: auto_apply updates silently, user_approve waits for a person, admin_hold refuses until somebody releases it. \`capabilities\` travels inside the signature, so what a skill may reach is part of the signed payload rather than a claim made after installation.
+
+The release signature uses the domain-separation prefix \`autovault-sync-release-v1\`. That prefix is the trust boundary: a signature minted for another purpose cannot be replayed as a release, and changing the string invalidates every signature ever issued.
+
+\`bundle_path\` is inside the signature, and the client re-derives it as bundles/<bundle_hash>.json relative to the catalog. Bundles cannot be renamed, moved, or redirected. A downloaded bundle is checked against bundle_hash and against every entry in file_hashes before any byte reaches the vault.
+
+## Upstreams
+
+A vault holds a list of upstreams. Each records where a catalog lives, the public key pinned for it, and this machine's own enrollment. \`autovault link\` adds one. There are two kinds, and the difference is transport only.
+
+- \`https\` points at a catalog URL. Requests are device-signed, which is what enrollment and admission are for. AutoVault Cloud is one of these, and so is any HTTPS host you run.
+- \`file\` points at a catalog path: a directory, a network mount, a checkout on disk. No server, no enrollment handshake, no account.
+
+Both run the same verification. A file upstream is not the trusting option; the release signature is checked exactly as it is over HTTPS, because a shared drive is not a trust boundary either.
+
+\`\`\`bash
+autovault link acme-skills                              # a Cloud slug
+autovault link https://skills.acme.dev/catalog.json     # your own host
+autovault link ./team-catalog                           # a directory
+\`\`\`
+
+The argument decides the kind. Anything that parses as a URL is https. Anything containing a path separator, starting with . or ~ or /, or ending in .json is file. A bare lowercase word is treated as a Cloud slug and expanded against autovault.dev. Slugs are lowercase, and a capitalised one is rejected with the lowercase spelling rather than silently downcased.
+
+## Self-hosting a catalog
+
+A catalog is a static file tree, so anything that serves JSON over HTTPS can host one.
+
+\`\`\`text
+your-catalog/
+  catalog.json
+  bundles/
+    3f1a...c92e.json
+    a704...11bd.json
+\`\`\`
+
+Point a machine at it with \`autovault link https://your-host/catalog.json\`. Self-hosted catalogs carry no device enrollment, so there is no admit step and no console. Access control is whatever the host already does, and the signature is what makes the content trustworthy in either case.
+
+**Self-hosting does not solve the publishing gap. It relocates it.** The CLI consumes catalogs and has no command that produces one: link, add, and sync-profiles all read, and nothing signs a release. The signing primitives exist in the source and are reachable from the test helpers, not from a terminal. Hosting your own catalog today means generating and signing it yourself against the shape above.
+
+So the choice is narrower than it looks. Cloud gives enrollment, per-machine admission, and revocation, with hands-on publishing. Self-hosting gives the same verification with no account and no per-machine gate, with hands-on publishing. Neither has a publish command yet.`;
 
 const authoringMarkdown = `# Authoring AutoVault Skills
 
@@ -307,7 +464,7 @@ Agents should use get_skill for vault inventory lookup, fetch full content only 
 
 const apiMarkdown = `# AutoVault API Reference
 
-Current ${PRODUCT_VERSION} surfaces are the local CLI, source ESM library exports, local stdio MCP, and remote Streamable HTTP MCP at /mcp. There is no public REST API or separately published SDK package yet. MCP tools are the agent-facing API.
+Current ${PRODUCT_VERSION} surfaces are the local CLI, source ESM library exports, local stdio MCP, remote Streamable HTTP MCP at /mcp, and the hosted sync routes under /v/<slug>/. There is no public REST API or separately published SDK package yet. MCP tools are the agent-facing API, and hosted sync is a read-only surface for the machines an owner has admitted.
 
 ## Current ${PRODUCT_VERSION} surfaces
 
@@ -315,6 +472,36 @@ Current ${PRODUCT_VERSION} surfaces are the local CLI, source ESM library export
 - Source ESM library exports for resolveCapabilities, syncProfiles, addSkill, updateSkill, deleteSkill, proposeSkill, transforms, auditRepo, and profile discovery.
 - MCP tools for discovery/full reads through get_skill, trusted adds, updates, deletes, proposals, and drift checks.
 - Remote Streamable HTTP MCP with OAuth and role-aware filtering at /mcp.
+- AutoVault Cloud hosted sync at /v/<slug>/, four device-signed read routes.
+
+## Hosted sync routes
+
+Served by AutoVault Cloud under /v/<slug>/. Every route is signed. There are no anonymous reads and no API keys: a device holds an Ed25519 keypair, signs the string \`<METHOD>\\n<pathname>\\n<unix-seconds>\`, and sends three headers.
+
+\`\`\`http
+X-AutoVault-Device      base64url Ed25519 public key
+X-AutoVault-Timestamp   whole seconds since epoch
+X-AutoVault-Signature   base64url detached signature
+\`\`\`
+
+Timestamps more than 300 seconds off are rejected. Pathname is the full request path as sent, not a path rebuilt from route parameters.
+
+| Route | Who may call it |
+|---|---|
+| POST /v/<slug>/devices | any keypair, signed by itself. This is first contact. |
+| GET /v/<slug>/devices/current | any enrolled device, including a revoked one |
+| GET /v/<slug>/catalog.json | a pending or active device |
+| GET /v/<slug>/bundles/<bundle_hash>.json | an active device, on an active subscription |
+
+- Enrollment is idempotent per key, so running \`autovault link\` twice returns the same device_id. A vault holds at most 20 pending devices at once.
+- The catalog is readable while a device is still pending, because \`autovault link\` enrols and then immediately reads the catalog to pin the publishing public key.
+- Catalog and bundles are served byte-for-byte from KV. Re-serialising the JSON changes the bytes and every release signature stops verifying.
+- A vault with nothing published answers 404 for its catalog. That is the normal state of a new vault, not an error.
+- Bundles additionally check the hosted subscription and answer 402 when it lapses, while the catalog keeps answering.
+- Nothing under /v/ returns a 3xx. The client fetches with redirect: "manual" and throws on any redirect.
+- Device responses are no-store, private, because they are authorized per device rather than per URL.
+
+There is no route that writes a catalog. Publishing is owner-side and out of band: the release signing key stays on the owner's machine and Cloud never holds one.
 
 ## Agent guidance
 
@@ -405,6 +592,12 @@ Admission-time dedup matters because agent-authored skill corpora already show c
 
 Source: https://arxiv.org/abs/2603.22447
 
+## Hosted delivery
+
+AutoVault Cloud pulls skills to a second machine without hand-copying files. A machine pairs with a code, the owner admits it from the browser, and it fetches a signed catalog and signed bundles over HTTPS from /v/<slug>/. Every request is Ed25519 device-signed and the client verifies each release against a key pinned at enrollment, so delivery is authenticated in both directions rather than just encrypted in transit.
+
+Where it is behind: getting a signed catalog into a hosted vault is hands-on in private beta. There is no publish button and no upload API, because publishing would require Cloud to hold a release signing key and it deliberately does not. Tessl is the stronger fit when hosted distribution itself is the job.
+
 ## Tradeoff
 
 AutoVault is stricter than a sync manager or external discovery surface. That is useful when provenance, permission signals, transforms, drift checks, and scoped delivery matter more than the broadest discovery surface.`;
@@ -447,6 +640,22 @@ Use requires-secrets to document required variable or credential names. Use sign
 ## Remote mode
 
 Remote AutoVault serves Streamable HTTP MCP at /mcp. It uses OAuth for client registration, login, token issuance, and protected-resource metadata, then filters skill visibility for non-owner roles.
+
+## Hosted sync
+
+AutoVault Cloud moves a signed catalog from the owner's machine to the machines the owner admits. The trust boundary does not move when a vault becomes hosted.
+
+- Cloud holds signed catalog and bundle objects byte for byte, enrolled device public keys and their status, and the subscription record.
+- Cloud never holds a release signing key. There is no upload API and no publish button, because either would require Cloud to hold the thing that makes a release trustworthy. Signed objects are placed by hand from the machine that signed them.
+- A device proves identity with an Ed25519 keypair generated on that machine. The private half never leaves it and there is no API key in its place.
+- Every request under /v/ carries a detached signature over \`<METHOD>\\n<pathname>\\n<unix-seconds>\`. A timestamp more than 300 seconds out is refused, so a captured request stops working in five minutes.
+- Admission is a person clicking Admit in the browser, not a token exchange. An enrolled key nobody admits reads nothing but its own status.
+- Device responses are no-store and private, because they are authorized per device rather than per URL.
+
+Two costs worth knowing before adopting hosted sync:
+
+- A device pins catalog.public_key the first time it reads the catalog, which is what stops a compromised Cloud substituting releases of its own. There is no rotation path in beta, so changing that key means re-enrolling every machine.
+- Revoking a device is immediate for catalog and bundle reads. It does not reach back onto that machine. Skills it already pulled are files on a disk the owner no longer controls.
 
 ## Provenance and drift
 
@@ -526,7 +735,7 @@ AutoVault is brought to you by Jack Arturo, Jason Coleman, Flint, Zack Katz, and
 
 const changelogMarkdown = `# AutoVault Changelog
 
-AutoVault is currently pre-1.0. The public source package is MIT licensed and the current source README identifies ${PRODUCT_VERSION} as the release status, including setup review UX, public output standardization, local import fixes, community skills, bundled skills, signing, and profile cleanup.
+AutoVault is currently pre-1.0. The public source package is MIT licensed and the current release is ${PRODUCT_VERSION}, which adds hosted sync: autovault link enrolls a machine against a signed HTTPS catalog, by Cloud slug or by pairing with a code.
 
 ## Current source sync
 
@@ -539,6 +748,10 @@ AutoVault is currently pre-1.0. The public source package is MIT licensed and th
 - scripts/bootstrap-skills.mjs to seed bundled skills through the real validation path and refresh discovered host profiles.
 - get_skill agent rendering and include_resources for transformed variants and packaged resources.
 - check_updates for upstream drift and transform review state.
+
+## v0.5.0
+
+Released August 26, 2026. Adds autovault link, which enrolls a machine against a signed HTTPS catalog and expands a bare Cloud slug to its catalog URL. With no argument it starts Cloud pairing and prints a code to confirm in the browser. Also adds a local management dashboard, Codex render checks in doctor, a unified add UX, and interactive frontmatter repair in add-local. An unpublished Cloud catalog now reads as a waiting state rather than an error.
 
 ## v0.4.0
 
@@ -569,12 +782,20 @@ export const pageDocs: PageDoc[] = [
   {
     key: "cloud",
     file: "cloud.md",
-    title: "AutoVault Cloud Launch",
-    description: "Create a Clerk account, subscribe through Stripe Checkout, and reserve a hosted AutoVault namespace. Cloud sync is not enabled yet.",
+    title: "AutoVault Cloud",
+    description: "Serve a signed skill catalog to the machines you admit. Pair a machine with a code, admit it, and it pulls verified skills over HTTPS. Publishing is hands-on in private beta.",
     route: "/cloud",
     agentPath: "/agents/cloud",
-    markdown: cloudMarkdown,
-    listed: false
+    markdown: cloudMarkdown
+  },
+  {
+    key: "hosted-sync",
+    file: "hosted-sync.md",
+    title: "AutoVault Hosted Sync",
+    description: "Pair a machine with a code, admit it, and it pulls signed skills from your hosted vault over HTTPS. Covers enrollment, the signed request format, and how content is published.",
+    route: "/hosted-sync",
+    agentPath: "/agents/hosted-sync",
+    markdown: hostedSyncMarkdown
   },
   {
     key: "quick-start",
@@ -742,7 +963,7 @@ export function buildLlmsTxt(): string {
   const lines = [
     "# AutoVault",
     "",
-    "> AutoVault is an MIT-licensed local-first vault for AI agent skills. It validates, signs, scopes, transforms, and serves SKILL.md files over local stdio MCP and remote Streamable HTTP MCP.",
+    "> AutoVault is an MIT-licensed local-first vault for AI agent skills. It validates, signs, scopes, transforms, and serves SKILL.md files over local stdio MCP, remote Streamable HTTP MCP, and device-signed hosted sync.",
     "",
     "## Canonical Docs",
     ...listedPageDocs.map((doc) => `- [${doc.title}](${agentUrl(doc)}): ${doc.description}`),

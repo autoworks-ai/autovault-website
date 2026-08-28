@@ -5,7 +5,6 @@ import UiIcon from "./UiIcon.vue";
 import ClerkAuthControls from "./ClerkAuthControls.vue";
 import { PRODUCT_VERSION } from "../data/product";
 import { searchResults } from "../data/searchResults";
-import { useClerkApiAuth } from "../utils/clerkApi";
 import { clerkBrand } from "../clerk";
 
 const props = withDefaults(defineProps<{
@@ -16,23 +15,26 @@ const props = withDefaults(defineProps<{
   showSearch: false
 });
 
-const baseNavItems = [
+// Five, not seven. Adding Hosted sync pushed this to seven links plus search,
+// auth and a GitHub icon, which is more than a topbar reads as at 1100px.
+// Authoring and Compare came out: Authoring is linked five times from the
+// landing body and heads its own sidebar group, Compare moved to the footer,
+// and both stay in the docs sidebar and local search. What is left is the
+// question order a visitor actually asks. How do I start, what does one look
+// like, what does it do across machines, can I trust it, what does it cost.
+const navItems = [
   { label: "Quick start", href: "/quick-start" },
-  { label: "Authoring", href: "/authoring" },
   { label: "Examples", href: "/skills-directory" },
-  { label: "Compare", href: "/compare" },
-  { label: "Security", href: "/security" }
+  { label: "Hosted sync", href: "/hosted-sync" },
+  { label: "Security", href: "/security" },
+  // Signed out too. Cloud used to be pushed on only for a signed-in
+  // visitor, back when the hosted vault was a reservation and the page had
+  // nothing to show a stranger. It sells a shipped product now, and it is
+  // also where sign-up happens, so hiding it from the people who have not
+  // signed up yet had it backwards. Still clerkBrand.cloudPath, so the
+  // `#launch-path` anchor is written down once.
+  { label: "Cloud", href: clerkBrand.cloudPath }
 ];
-
-const { isClerkSignedIn } = useClerkApiAuth();
-
-const navItems = computed(() => {
-  const items = [...baseNavItems];
-  if (isClerkSignedIn.value) {
-    items.push({ label: "Cloud", href: clerkBrand.cloudPath });
-  }
-  return items;
-});
 
 const query = ref("");
 const searchOpen = ref(false);

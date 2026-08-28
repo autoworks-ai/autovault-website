@@ -28,15 +28,54 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: "0.5.0",
+    date: "August 26, 2026",
+    type: "minor",
+    tag: "minor",
+    codename: "Link",
+    featured: true,
+    title: "Hosted sync, pairing, and a local dashboard",
+    summary:
+      "autovault link enrolls a machine against a signed HTTPS catalog, either by Cloud slug or by pairing with a code, and a local dashboard manages what the vault holds.",
+    sections: [
+      {
+        kind: "added",
+        items: [
+          "autovault link enrolls a device against a signed HTTPS catalog and expands a bare Cloud slug to its catalog URL",
+          "autovault link with no argument starts Cloud pairing and prints a code to confirm in the browser",
+          "A local dashboard manages vaulted skills, and signed delivery renders through the same template on every surface",
+          "autovault doctor verifies Codex render fidelity, and bundle imports record hardened provenance",
+        ],
+      },
+      {
+        kind: "changed",
+        items: [
+          "autovault add unifies the skill add UX across sources, and add-local repairs frontmatter interactively",
+          "autovault update is harder to misuse, and version output surfaces an available update",
+        ],
+      },
+      {
+        kind: "fixed",
+        items: [
+          "An unpublished Cloud catalog reads as a waiting state instead of an error",
+          "Orphaned stdio MCP servers exit when the parent process dies",
+          "Omitted pairing intervals default correctly and the OS pairing lock holds",
+        ],
+      },
+    ],
+    commit: "5c88ac3",
+    author: "jack",
+    contributors: 2,
+  },
+  {
     version: "0.4.0",
     date: "May 22, 2026",
     type: "minor",
     tag: "minor",
     codename: "Review",
-    featured: true,
     title: "Setup review, public output, and community skills",
     summary:
-      "The current source release improves install and setup review UX, adds community skill examples, smooths local imports, standardizes public CLI output, and retries Dependabot automerge after CI.",
+      "Improves install and setup review UX, adds community skill examples, smooths local imports, standardizes public CLI output, and retries Dependabot automerge after CI.",
     sections: [
       {
         kind: "added",

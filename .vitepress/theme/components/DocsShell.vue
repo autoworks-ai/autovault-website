@@ -42,8 +42,9 @@ import AvFooter from "./AvFooter.vue";
 import MarkdownActions from "./MarkdownActions.vue";
 import { PRODUCT_VERSION } from "../data/product";
 import type { PageDocKey } from "../../shared/pageDocs";
+import { clerkBrand } from "../clerk";
 
-type PageKey = "quick-start" | "authoring" | "permissions" | "skills" | "api" | "deploy" | "compare" | "skill-detail" | "author-profile" | "security" | "troubleshooting" | "about" | "cloud" | "changelog";
+type PageKey = "quick-start" | "authoring" | "permissions" | "skills" | "api" | "deploy" | "compare" | "skill-detail" | "author-profile" | "security" | "troubleshooting" | "about" | "cloud" | "hosted-sync" | "changelog";
 type ShellVariant = "docs" | "full";
 type TocItem = { label: string; id: string };
 
@@ -81,6 +82,11 @@ const sidebarGroups = [
     title: "Reference",
     items: [
       { label: "Examples", href: "/skills-directory" },
+      { label: "Hosted sync", href: "/hosted-sync" },
+      // The product page for the hosted vault, next to the doc that explains
+      // it. clerkBrand.cloudPath rather than a literal, so the #launch-path
+      // anchor Clerk redirects to is written down in exactly one file.
+      { label: "Cloud", href: clerkBrand.cloudPath },
       { label: "API", href: "/api" },
       { label: "Deploy", href: "/deploy" },
       { label: "Compare", href: "/compare" },
@@ -146,6 +152,23 @@ const configs: Record<PageKey, { active: string; sidebarActive: string; variant:
   troubleshooting: { active: "Troubleshooting", sidebarActive: "Troubleshooting", variant: "full", toc: [] },
   about: { active: "About", sidebarActive: "About", variant: "full", toc: [] },
   cloud: { active: "Cloud", sidebarActive: "Cloud", variant: "full", toc: [] },
+  "hosted-sync": {
+    active: "Hosted sync",
+    sidebarActive: "Hosted sync",
+    variant: "docs",
+    toc: [
+      { label: "Pair a machine", id: "pair" },
+      { label: "Admit and revoke", id: "admit" },
+      { label: "What a machine may read", id: "what-a-device-reads" },
+      { label: "How a request is signed", id: "wire" },
+      { label: "How content lands", id: "publishing" },
+      { label: "Limits worth knowing", id: "limits" },
+      { label: "The protocol underneath", id: "protocol" },
+      { label: "Upstreams", id: "upstreams" },
+      { label: "Self-hosting a catalog", id: "self-hosting" },
+      { label: "Where next", id: "next" }
+    ]
+  },
   changelog: { active: "Changelog", sidebarActive: "Changelog", variant: "full", toc: [] }
 };
 

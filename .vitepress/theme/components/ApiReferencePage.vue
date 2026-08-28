@@ -18,11 +18,12 @@
       <section class="api-hero reveal-item">
         <div class="eyebrow"><span class="dash" /> Reference · {{ PRODUCT_RELEASE_LABEL }}</div>
         <h1>Current surfaces. <span class="ital">Clear boundaries.</span></h1>
-        <p class="lede">Current {{ PRODUCT_VERSION }} surfaces are the local CLI, source ESM library exports, local stdio MCP, and remote Streamable HTTP MCP at <code>/mcp</code>. There is no public REST API or separately published SDK package yet; MCP tools are the agent-facing API.</p>
+        <p class="lede">Current {{ PRODUCT_VERSION }} surfaces are the local CLI, source ESM library exports, local stdio MCP, remote Streamable HTTP MCP at <code>/mcp</code>, and the hosted sync routes under <code>/v/&lt;slug&gt;/</code>. There is no public REST API or separately published SDK package yet; MCP tools are the agent-facing API, and hosted sync is a read-only surface for the machines you have admitted.</p>
         <div class="api-versions">
           <div class="v"><div class="lbl">CLI</div><div class="val">autovault@{{ PRODUCT_VERSION_SHORT }} <span class="meta">npm · brew · GHCR</span></div></div>
           <div class="v"><div class="lbl">Library</div><div class="val">source ESM exports <span class="meta">Node/TypeScript</span></div></div>
           <div class="v"><div class="lbl">Remote</div><div class="val">/mcp <span class="meta">Streamable HTTP MCP</span></div></div>
+          <div class="v"><div class="lbl">Hosted</div><div class="val">/v/&lt;slug&gt;/ <span class="meta">Ed25519 device-signed</span></div></div>
         </div>
       </section>
 
@@ -120,7 +121,12 @@ const nav: NavItem[] = [
   { kind: "item", id: "mcp-get-skill", method: "fn", label: "get_skill" },
   { kind: "item", id: "mcp-add-skill", method: "fn", label: "add_skill" },
   { kind: "item", id: "mcp-propose-skill", method: "fn", label: "propose_skill" },
-  { kind: "item", id: "mcp-check-updates", method: "fn", label: "check_updates" }
+  { kind: "item", id: "mcp-check-updates", method: "fn", label: "check_updates" },
+  { kind: "section", label: "Hosted sync", color: "#d67a7a" },
+  { kind: "item", id: "sync-enroll", method: "post", label: "devices" },
+  { kind: "item", id: "sync-current", method: "get", label: "devices/current" },
+  { kind: "item", id: "sync-catalog", method: "get", label: "catalog.json" },
+  { kind: "item", id: "sync-bundle", method: "get", label: "bundles/<hash>" }
 ];
 
 const sections: ApiSection[] = [
@@ -214,6 +220,33 @@ const sections: ApiSection[] = [
       endpoint("mcp-add-skill", "add_skill", "add_skill", "Install a known skill from GitHub, agentskills, HTTPS URL, or local bundle source. Caller-authored bytes should use <code>propose_skill</code> instead. For local bundles, pass <code>skill_dir</code> and an explicit <code>identifier</code> matching the CLI provenance value.", "{ source: \"github\" | \"agentskills\" | \"url\" | \"local\", identifier: string, ... }", "add_skill({ source: \"github\", identifier: \"owner/repo:skills/example/SKILL.md\" })"),
       endpoint("mcp-propose-skill", "propose_skill", "propose_skill", "Submit newly authored SKILL.md content for validation, security scan, capability cross-check, deduplication, signing, and storage.", "{ skill_md: string, resources?: Array<{ path: string, content: string }> }", "propose_skill({ skill_md })"),
       endpoint("mcp-check-updates", "check_updates", "check_updates", "Compare installed skills against recorded upstream source state and report drift, unchecked inline skills, warnings, and errors.", "{ skill?: string }", "check_updates({ skill: \"skill-author\" })")
+    ]
+  },
+  {
+    id: "sync",
+    title: "Hosted sync",
+    meta: "AutoVault Cloud · device-signed HTTPS",
+    lede: "Four routes under /v/<slug>/, served by AutoVault Cloud. Every one of them is signed: there are no anonymous reads and no API keys. A device holds an Ed25519 keypair, signs the string METHOD, newline, pathname, newline, unix seconds, and Cloud verifies the detached signature against the public key it enrolled. Timestamps more than 300 seconds off are rejected. There is no route here that writes a catalog. Publishing is owner-side and out of band, so this section is a read surface and the CLI that uses it is purely a consumer.",
+    items: [
+      {
+        id: "sync-enroll",
+        short: "enroll a device",
+        title: "POST /v/<slug>/devices",
+        status: "beta",
+        since: "0.5.0",
+        description: "First contact. Any keypair may call this, signed by itself, which is what makes <code>autovault link</code> work on a machine the owner has never seen: the request enrols the key as <code>pending</code> and returns its <code>device_id</code>. The owner admits it from the Machines card on <a href=\"/cloud\">Cloud</a>. Enrolling the same key twice returns the existing device rather than a second row, so a repeated <code>link</code> is safe. A vault holds at most 20 pending devices at once; admitting or denying any of them frees a slot, and a machine that is already enrolled is never locked out by a full queue.",
+        signature: signatureLines("POST /v/<slug>/devices\nX-AutoVault-Device: <base64url public key>\nX-AutoVault-Timestamp: <unix seconds>\nX-AutoVault-Signature: <base64url detached signature>\n\n{ \"hostname\": \"<machine name>\" }"),
+        copy: "autovault link",
+        argsLabel: "Header",
+        args: [
+          { name: "X-AutoVault-Device", type: "base64url", description: "The device\u2019s Ed25519 public key. Also the identity: there is no separate account credential on this surface.", required: true },
+          { name: "X-AutoVault-Timestamp", type: "integer", description: "Whole seconds since the epoch. Rejected beyond a 300 second skew in either direction.", required: true },
+          { name: "X-AutoVault-Signature", type: "base64url", description: "Detached Ed25519 signature over <code>&lt;METHOD&gt;\\n&lt;pathname&gt;\\n&lt;unix-seconds&gt;</code>, where pathname is the full request path.", required: true }
+        ]
+      },
+      endpoint("sync-current", "device status", "GET /v/<slug>/devices/current", "What the CLI polls while it waits for an owner to click Admit. Readable by any enrolled device, <strong>including a revoked one</strong>, which is deliberate: a machine that has lost access should be able to find that out rather than retry into a wall. Returns <code>device_id</code> and <code>status</code>, one of <code>pending</code>, <code>active</code>, or <code>revoked</code>. Responses are <code>no-store, private</code> because they are authorized per device.", "GET /v/<slug>/devices/current\nX-AutoVault-Device / -Timestamp / -Signature", "curl -sS https://autovault.dev/v/<slug>/devices/current", "0.5.0", "beta"),
+      endpoint("sync-catalog", "catalog.json", "GET /v/<slug>/catalog.json", "The signed index of what the vault serves. Readable while a device is still <code>pending</code>, on purpose: <code>autovault link</code> enrols and then immediately reads the catalog to pin <code>public_key</code>, before the owner has admitted anything. Served byte-for-byte from KV, because re-serialising the JSON changes the bytes and every release signature stops verifying. A vault with nothing published yet answers <code>404 This vault has no published catalog yet</code>, which is the normal state of a new vault rather than an error.", "GET /v/<slug>/catalog.json\nX-AutoVault-Device / -Timestamp / -Signature", "curl -sS https://autovault.dev/v/<slug>/catalog.json", "0.5.0", "beta"),
+      endpoint("sync-bundle", "bundles/<hash>", "GET /v/<slug>/bundles/<bundle_hash>.json", "The skill content itself, addressed by the hash the catalog names. Active devices only, and unlike the catalog it also checks the hosted subscription: a lapsed subscriber gets <code>402</code> here while the catalog keeps answering, so billing failure reads as billing rather than as a broken vault. The client re-derives this path as <code>bundles/&lt;bundle_hash&gt;.json</code> relative to <code>catalog.json</code> and the path is covered by the release signature, so bundles cannot be renamed, moved, or redirected. Nothing under <code>/v/</code> may return a 3xx at all: the CLI fetches with <code>redirect: \"manual\"</code> and throws on any redirect it sees.", "GET /v/<slug>/bundles/<bundle_hash>.json\nX-AutoVault-Device / -Timestamp / -Signature", "curl -sS https://autovault.dev/v/<slug>/bundles/<bundle_hash>.json", "0.5.0", "beta")
     ]
   }
 ];

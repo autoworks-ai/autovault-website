@@ -6,19 +6,30 @@ import { MANUAL_GHCR_IMAGE, RAILWAY_TEMPLATE_URL } from "../.vitepress/shared/de
 import { pageDocs } from "../.vitepress/shared/pageDocs";
 import { comparisonPlayers, comparisonSources, homepageComparisonRows, homepageGateMetrics } from "../.vitepress/theme/data/marketing";
 import { PRODUCT_STATUS, PRODUCT_VERSION, PRODUCT_VERSION_BADGE, PRODUCT_VERSION_SHORT } from "../.vitepress/theme/data/product";
+import { releases } from "../.vitepress/theme/data/releases";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("v1 content guardrails", () => {
   it("keeps primary product version copy centralized", () => {
     expect(PRODUCT_VERSION).toBe(`v${PRODUCT_VERSION_SHORT}`);
-    expect(PRODUCT_VERSION).toBe("v0.4.0");
+    expect(PRODUCT_VERSION).toBe("v0.5.0");
     expect(PRODUCT_STATUS).toBe("pre-1.0");
     expect(PRODUCT_VERSION_BADGE).toContain(PRODUCT_VERSION);
     expect(PRODUCT_VERSION_BADGE).not.toContain("Unreleased May 2026");
     const changelogMarkdown = pageDocs.find((doc) => doc.key === "changelog")?.markdown ?? "";
+    expect(changelogMarkdown).toContain("## v0.5.0");
     expect(changelogMarkdown).toContain("## v0.4.0");
     expect(changelogMarkdown).not.toContain("## Unreleased");
+
+    // The topbar badge and the newest changelog entry are edited in different
+    // files, so bumping one and forgetting the other is the drift that put
+    // v0.4.0 in the nav while npm shipped 0.5.0. Exactly one entry is featured,
+    // and it is the one the rest of the site claims to be running.
+    expect(`v${releases[0].version}`).toBe(PRODUCT_VERSION);
+    expect(releases.filter((release) => release.featured)).toHaveLength(1);
+    expect(releases[0].featured).toBe(true);
+    expect(changelogMarkdown).toContain(`## v${releases[0].version}`);
 
     const primarySurfaces = [
       ".vitepress/theme/components/AvTopbar.vue",
@@ -134,7 +145,7 @@ describe("v1 content guardrails", () => {
     expect(deploy).not.toContain("statusLines");
     expect(compare).toContain("autovault add ./skills/toolsmith --source local --sync-profiles --yes");
     expect(compare).not.toContain("--source github:");
-    expect(apiMarkdown).toContain("Current v0.4.0 surfaces");
+    expect(apiMarkdown).toContain("Current v0.5.0 surfaces");
   });
 
   it("keeps internal imports and compatibility aliases out of public docs", () => {
@@ -160,7 +171,7 @@ describe("v1 content guardrails", () => {
     expect(publicSurfaces).not.toMatch(/cli-import-autohub|import-autohub|autovault add-local|agentgonewild-publisher/);
   });
 
-  it("keeps hidden hosted copy reservation-only", () => {
+  it("keeps hosted copy accurate: sync shipped, publishing did not", () => {
     const hostedCopy = [
       ".vitepress/theme/components/CloudPage.vue",
       ".vitepress/theme/components/CloudAccountMenu.vue",
@@ -168,17 +179,37 @@ describe("v1 content guardrails", () => {
       ".vitepress/shared/pageDocs.ts"
     ].map(read).join("\n");
 
-    expect(hostedCopy).toContain("Cloud sync is not enabled yet");
-    expect(hostedCopy).toContain("Reserve a hosted AutoVault namespace");
+    // This case used to require the opposite and is the reason true copy could
+    // not be written without editing this file: it asserted the copy contained
+    // "Cloud sync is not enabled yet" and forbade /cloud sync is enabled/. That
+    // was correct while sync was vapor. Enrollment (#98), admit/revoke (#99),
+    // pairing (#117) and CLI v0.5.0 have all shipped since, so the line it
+    // guards has moved rather than disappeared.
+    //
+    // The line now: sync is real, publishing is not. Both halves are
+    // load-bearing. Drop the first and the site understates a shipped product;
+    // drop the second and it promises an upload path that does not exist.
+
+    // Half one. Sync is real, and the copy is allowed to say so.
     expect(hostedCopy).toContain("Hosted vault");
-    expect(hostedCopy).toContain("Reserve a stable hosted URL");
-    expect(hostedCopy).toContain("hosted sync ships");
-    expect(hostedCopy).toContain("coming soon");
-    expect(hostedCopy).toContain("reserved");
+    expect(hostedCopy).toMatch(/autovault link/i);
+    expect(hostedCopy).toMatch(/signed skills/i);
+    expect(hostedCopy).not.toMatch(/cloud sync is not enabled|sync is not enabled yet/i);
+    expect(hostedCopy).not.toMatch(/hosted sync ships next|turns on automatically when it ships/i);
+    expect(hostedCopy).not.toMatch(/Get early access|early-access list|Coming soon · preview/i);
+
+    // Half two. Publishing is not, and nothing may imply otherwise.
+    // AUTOVAULT_VAULT_OBJECTS.put() appears once in functions/, writing a
+    // pending-skill draft; the catalog and bundle keys are only ever read.
+    expect(hostedCopy).not.toMatch(/publish your|upload your|push your/i);
+    expect(hostedCopy).toMatch(/no publish (path|button)|hands-on in private beta/i);
+
+    // Unchanged guards: never claim a runtime that does not exist, and never
+    // print an address that does not resolve. Nothing routes vault.autovault.dev.
     expect(hostedCopy).not.toMatch(/prototype mode|Internal cloud prototype/i);
     expect(hostedCopy).not.toMatch(/Simulate MCP ping|Simulate pending import/i);
-    expect(hostedCopy).not.toMatch(/cloud sync is enabled|enabled cloud sync|sync now/i);
     expect(hostedCopy).not.toMatch(/live vault|provisioned runtime/i);
+    expect(hostedCopy).not.toMatch(/>vault\.autovault\.dev/);
   });
 
   it("keeps homepage comparison credible and linked", () => {
@@ -227,13 +258,20 @@ describe("v1 content guardrails", () => {
     expect(compare).toMatch(/41%/);
   });
 
-  it("keeps compare discoverable in top navigation, search, and markdown export", () => {
-    const topbar = read(".vitepress/theme/components/AvTopbar.vue");
+  it("keeps compare discoverable in the footer, sidebar, search, and markdown export", () => {
+    const footer = read(".vitepress/theme/components/AvFooter.vue");
+    const docsShell = read(".vitepress/theme/components/DocsShell.vue");
     const searchResultsSource = read(".vitepress/theme/data/searchResults.ts");
     const pageDocsSource = read(".vitepress/shared/pageDocs.ts");
     const compareMarkdown = pageDocs.find((doc) => doc.key === "compare")?.markdown ?? "";
 
-    expect(topbar).toContain('{ label: "Compare", href: "/compare" }');
+    // This used to require Compare in the topbar. The topbar is capped at five
+    // links now, so the invariant had to move rather than be deleted: Compare
+    // is still reachable from every page, just from the footer instead. The
+    // footer is the only one of these three that renders on the landing page,
+    // so it is the load-bearing assertion, not a formality.
+    expect(footer).toContain('<a href="/compare">Compare</a>');
+    expect(docsShell).toContain('{ label: "Compare", href: "/compare" }');
     expect(searchResultsSource).toContain("transforms instead of forks");
     expect(searchResultsSource).toContain("skillclone");
     expect(compareMarkdown).toContain("transforms instead of forks");
@@ -243,26 +281,55 @@ describe("v1 content guardrails", () => {
     expect(pageDocsSource).toContain("SkillClone");
   });
 
-  it("gates the cloud nav entry to signed-in users and uses clerkBrand.cloudPath", () => {
+  it("caps the top nav at five links and keeps every demoted page reachable", () => {
+    const topbar = read(".vitepress/theme/components/AvTopbar.vue");
+    const footer = read(".vitepress/theme/components/AvFooter.vue");
+    const docsShell = read(".vitepress/theme/components/DocsShell.vue");
+
+    const nav = topbar.slice(topbar.indexOf("const navItems = ["));
+    const items = nav.slice(0, nav.indexOf("\n];"));
+    const labels = [...items.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]);
+
+    // Six is where a topbar with a search box, an auth control and a GitHub
+    // icon stops reading as a row and starts reading as a list. The cap is the
+    // point of this case; which five is a product call and can change.
+    expect(labels).toHaveLength(5);
+    expect(labels).toContain("Cloud");
+    expect(labels).toContain("Quick start");
+
+    // Nothing gets demoted into nowhere. Every page that left the topbar is
+    // still one click away from the landing page, which has a footer and no
+    // sidebar.
+    for (const href of ["/authoring", "/compare"]) {
+      expect(labels).not.toContain(href);
+      expect(footer).toContain(`href="${href}"`);
+      expect(docsShell).toContain(`href: "${href}"`);
+    }
+  });
+
+  it("shows the cloud nav entry to everyone and uses clerkBrand.cloudPath", () => {
     const topbar = read(".vitepress/theme/components/AvTopbar.vue");
     const clerk = read(".vitepress/theme/clerk.ts");
 
-    // Verify the cloud entry uses clerkBrand.cloudPath, not a string literal
-    expect(topbar).toContain("useClerkApiAuth");
-    expect(topbar).toContain("clerkBrand");
+    // This case used to assert the opposite, and the reason it did is worth
+    // keeping written down: Cloud was pushed onto the nav only for a signed-in
+    // visitor, because the hosted vault was a namespace you reserved while
+    // waiting for sync, and there was nothing on that page for a stranger.
+    // Sync shipped. /cloud is now the sign-up entry point, so gating it on
+    // being signed in hid the page from everyone it was built to reach.
     expect(topbar).toContain('{ label: "Cloud", href: clerkBrand.cloudPath }');
     expect(topbar).not.toContain('{ label: "Cloud", href: "/cloud');
 
-    // Verify the gating condition: isClerkSignedIn computed property
-    expect(topbar).toContain("const { isClerkSignedIn } = useClerkApiAuth()");
-    expect(topbar).toContain("const navItems = computed");
-    expect(topbar).toContain("if (isClerkSignedIn.value)");
-
-    // Verify the isActive special case for /cloud paths
-    expect(topbar).toContain('item.href === clerkBrand.cloudPath && currentPath.value.startsWith("/cloud")');
-
-    // Verify clerkBrand.cloudPath is defined in clerk.ts
+    // No auth gate left, and no leftover machinery for one. clerkBrand.cloudPath
+    // carries the `#launch-path` anchor Clerk also redirects to, so the topbar
+    // and the sign-in bounce land on the same scroll position.
+    expect(topbar).not.toContain("useClerkApiAuth");
+    expect(topbar).not.toContain("isClerkSignedIn");
     expect(clerk).toContain("cloudPath");
+
+    // The isActive special case survives the flip: cloudPath carries a hash, so
+    // a plain equality against location.pathname would never match on /cloud.
+    expect(topbar).toContain('item.href === clerkBrand.cloudPath && currentPath.value.startsWith("/cloud")');
   });
 
   it("keeps homepage gate metrics labeled as fixtures", () => {

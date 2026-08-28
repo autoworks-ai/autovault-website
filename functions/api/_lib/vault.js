@@ -95,6 +95,7 @@ export const RESERVED_VAULT_SLUGS = new Set([
   "compare",
   "deploy",
   "docs",
+  "hosted-sync",
   "index",
   "permissions",
   "public",

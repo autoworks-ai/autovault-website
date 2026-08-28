@@ -2,14 +2,97 @@ import { describe, expect, it } from "vitest";
 import { parseCookies, SESSION_COOKIE } from "../functions/api/_lib/auth.js";
 import { hmacSha256Hex } from "../functions/api/_lib/crypto.js";
 import { safeReturnTo } from "../functions/api/_lib/http.js";
-import { buildHostedVaultCheckoutParams, STRIPE_API_VERSION, verifyStripeSignature } from "../functions/api/_lib/stripe.js";
-import { markVaultProgress, provisionVault, savePendingSkill } from "../functions/api/_lib/vault.js";
+import {
+  buildHostedVaultCheckoutParams,
+  hostedTrialDays,
+  isPaidStatus,
+  STRIPE_API_VERSION,
+  verifyStripeSignature,
+} from "../functions/api/_lib/stripe.js";
+import {
+  markVaultProgress,
+  provisionVault,
+  savePendingSkill,
+} from "../functions/api/_lib/vault.js";
 
 describe("hosted vault auth helpers", () => {
   it("parses session cookies and constrains return paths", () => {
-    expect((parseCookies(`${SESSION_COOKIE}=abc123; theme=dark`) as Record<string, string>)[SESSION_COOKIE]).toBe("abc123");
-    expect(safeReturnTo("/authoring.html#playground")).toBe("/authoring.html#playground");
-    expect(safeReturnTo("https://evil.example/callback")).toBe("/cloud#launch-path");
+    expect(
+      (
+        parseCookies(`${SESSION_COOKIE}=abc123; theme=dark`) as Record<
+          string,
+          string
+        >
+      )[SESSION_COOKIE],
+    ).toBe("abc123");
+    expect(safeReturnTo("/authoring.html#playground")).toBe(
+      "/authoring.html#playground",
+    );
+    expect(safeReturnTo("https://evil.example/callback")).toBe(
+      "/cloud#launch-path",
+    );
+  });
+});
+
+describe("the hosted trial", () => {
+  const checkout = (env: Record<string, string>) =>
+    buildHostedVaultCheckoutParams({
+      request: new Request("https://autovault.dev/cloud"),
+      env: { AUTOVAULT_HOSTED_PRICE_ID: "price_hosted_vault", ...env },
+      user: { id: "user_1", email: "jack@example.com" },
+    });
+
+  it("sends the configured trial to Stripe", () => {
+    expect(
+      checkout({ AUTOVAULT_HOSTED_TRIAL_DAYS: "14" }).get(
+        "subscription_data[trial_period_days]",
+      ),
+    ).toBe("14");
+  });
+
+  it("collects no card while a trial is running", () => {
+    // The half of "14 days free, no card" that is not the trial itself.
+    // Stripe reads a trial as nothing due now, and only skips the card when
+    // collection is if_required -- set to support 100% coupons, and load
+    // bearing for the trial too, which is why it is asserted from here as
+    // well.
+    expect(
+      checkout({ AUTOVAULT_HOSTED_TRIAL_DAYS: "14" }).get(
+        "payment_method_collection",
+      ),
+    ).toBe("if_required");
+  });
+
+  it("sends nothing at all when no trial is configured", () => {
+    // Absent, not "0". Stripe treats trial_period_days=0 as an error rather
+    // than as no trial.
+    expect(checkout({}).get("subscription_data[trial_period_days]")).toBeNull();
+    expect(
+      checkout({ AUTOVAULT_HOSTED_TRIAL_DAYS: "0" }).get(
+        "subscription_data[trial_period_days]",
+      ),
+    ).toBeNull();
+  });
+
+  it("fails closed on a value it cannot read", () => {
+    // Charging normally is the safe failure. Granting an unbounded free run
+    // because someone typed a word into an env var is not.
+    for (const raw of ["", "  ", "yes", "-30", "NaN", "1e9999"]) {
+      expect(hostedTrialDays({ AUTOVAULT_HOSTED_TRIAL_DAYS: raw })).toBe(0);
+    }
+    expect(hostedTrialDays({})).toBe(0);
+  });
+
+  it("clamps to the ceiling Stripe accepts", () => {
+    // Past 730 Stripe rejects the session, which would take down the whole
+    // funnel rather than just the trial.
+    expect(hostedTrialDays({ AUTOVAULT_HOSTED_TRIAL_DAYS: "9000" })).toBe(730);
+  });
+
+  it("treats a trialing subscription as paid", () => {
+    // Nothing downstream needed changing for the trial because of this: a
+    // trialing customer reserves a namespace and pulls bundles like any other.
+    expect(isPaidStatus("trialing")).toBe(true);
   });
 });
 
@@ -21,10 +104,11 @@ describe("hosted vault Stripe checkout", () => {
         AUTOVAULT_HOSTED_PRICE_ID: "price_hosted_vault",
         STRIPE_BRAND_DISPLAY_NAME: "AutoVault Test",
         STRIPE_BRAND_ICON_URL: "https://autovault.dev/brand-mark.svg",
-        STRIPE_CHECKOUT_CUSTOM_TEXT_SUBMIT: "Your hosted vault namespace is reserved after the Stripe webhook confirms the subscription."
+        STRIPE_CHECKOUT_CUSTOM_TEXT_SUBMIT:
+          "Your hosted vault namespace is reserved after the Stripe webhook confirms the subscription.",
       },
       user: { id: "github_1", email: "jack@example.com" },
-      source: "playground"
+      source: "playground",
     });
 
     expect(STRIPE_API_VERSION).toBe("2026-02-25.clover");
@@ -32,31 +116,57 @@ describe("hosted vault Stripe checkout", () => {
     expect(params.get("line_items[0][price]")).toBe("price_hosted_vault");
     expect(params.get("amount")).toBeNull();
     expect(params.get("metadata[user_id]")).toBe("github_1");
-    expect(params.get("branding_settings[display_name]")).toBe("AutoVault Test");
-    expect(params.get("branding_settings[icon][url]")).toBe("https://autovault.dev/brand-mark.svg");
+    expect(params.get("branding_settings[display_name]")).toBe(
+      "AutoVault Test",
+    );
+    expect(params.get("branding_settings[icon][url]")).toBe(
+      "https://autovault.dev/brand-mark.svg",
+    );
     expect(params.get("submit_type")).toBe("subscribe");
-    expect(params.get("custom_text[submit][message]")).toContain("hosted vault namespace");
-    expect(params.get("success_url")).toBe("https://autovault.dev/cloud?hosted=success&session_id={CHECKOUT_SESSION_ID}#launch-path");
-    expect(params.get("cancel_url")).toBe("https://autovault.dev/cloud?hosted=cancelled#launch-path");
+    expect(params.get("allow_promotion_codes")).toBe("true");
+    expect(params.get("payment_method_collection")).toBe("if_required");
+    expect(params.get("custom_text[submit][message]")).toContain(
+      "hosted vault namespace",
+    );
+    expect(params.get("success_url")).toBe(
+      "https://autovault.dev/cloud?hosted=success&session_id={CHECKOUT_SESSION_ID}#launch-path",
+    );
+    expect(params.get("cancel_url")).toBe(
+      "https://autovault.dev/cloud?hosted=cancelled#launch-path",
+    );
   });
 
   it("rejects checkout creation when the hosted price is not configured", () => {
-    expect(() => buildHostedVaultCheckoutParams({
-      request: new Request("https://autovault.dev/deploy.html"),
-      env: {},
-      user: { id: "github_1" }
-    })).toThrow("AUTOVAULT_HOSTED_PRICE_ID");
+    expect(() =>
+      buildHostedVaultCheckoutParams({
+        request: new Request("https://autovault.dev/deploy.html"),
+        env: {},
+        user: { id: "github_1" },
+      }),
+    ).toThrow("AUTOVAULT_HOSTED_PRICE_ID");
   });
 
   it("verifies Stripe webhook signatures with the expected HMAC payload", async () => {
-    const payload = JSON.stringify({ id: "evt_1", type: "checkout.session.completed" });
+    const payload = JSON.stringify({
+      id: "evt_1",
+      type: "checkout.session.completed",
+    });
     const timestamp = 1_800_000_000;
     const secret = "whsec_test";
     const signature = await hmacSha256Hex(secret, `${timestamp}.${payload}`);
     const header = `t=${timestamp},v1=${signature}`;
 
-    await expect(verifyStripeSignature(payload, header, secret, timestamp)).resolves.toBe(true);
-    await expect(verifyStripeSignature(payload, header.replace(signature, "00"), secret, timestamp)).resolves.toBe(false);
+    await expect(
+      verifyStripeSignature(payload, header, secret, timestamp),
+    ).resolves.toBe(true);
+    await expect(
+      verifyStripeSignature(
+        payload,
+        header.replace(signature, "00"),
+        secret,
+        timestamp,
+      ),
+    ).resolves.toBe(false);
   });
 });
 
@@ -64,7 +174,9 @@ describe("hosted vault provisioning", () => {
   it("requires an active subscription before provisioning a namespace", async () => {
     const env = createFakeEnv({ subscriptionStatus: "past_due" });
 
-    await expect(provisionVault(env, { id: "github_1", email: "jack@example.com" })).rejects.toMatchObject({ status: 402 });
+    await expect(
+      provisionVault(env, { id: "github_1", email: "jack@example.com" }),
+    ).rejects.toMatchObject({ status: 402 });
   });
 
   it("provisions a shared static namespace and stores pending imports", async () => {
@@ -76,7 +188,7 @@ describe("hosted vault provisioning", () => {
       version: "0.1.0",
       source_label: "browser playground",
       source_text: "---\nname: weather\n---\n# Weather",
-      queued_skills: ["extract-pdf"]
+      queued_skills: ["extract-pdf"],
     });
 
     expect(vault.slug).toMatch(/^jack-[a-f0-9]{6}$/);
@@ -91,7 +203,9 @@ describe("hosted vault provisioning", () => {
     const env = createFakeEnv({ subscriptionStatus: "active" });
     const user = { id: "github_1", email: "jack@example.com" };
 
-    await expect(markVaultProgress(env, user, "cli_linked")).rejects.toMatchObject({ status: 409 });
+    await expect(
+      markVaultProgress(env, user, "cli_linked"),
+    ).rejects.toMatchObject({ status: 409 });
 
     await provisionVault(env, user);
 
@@ -113,19 +227,27 @@ describe("hosted vault provisioning", () => {
     const user = { id: "github_1", email: "jack@example.com" };
     await provisionVault(env, user);
 
-    await expect(markVaultProgress(env, user, "delete_everything")).rejects.toMatchObject({ status: 400 });
+    await expect(
+      markVaultProgress(env, user, "delete_everything"),
+    ).rejects.toMatchObject({ status: 400 });
   });
 
   it("returns a clear configuration error when pending source storage lacks KV", async () => {
     const env = createFakeEnv({ subscriptionStatus: "active" });
-    delete (env as { AUTOVAULT_VAULT_OBJECTS?: unknown }).AUTOVAULT_VAULT_OBJECTS;
+    delete (env as { AUTOVAULT_VAULT_OBJECTS?: unknown })
+      .AUTOVAULT_VAULT_OBJECTS;
     const user = { id: "github_1", email: "jack@example.com" };
     const vault = await provisionVault(env, user);
 
-    await expect(savePendingSkill(env, user, vault, {
-      skill_name: "weather",
-      source_text: "---\nname: weather\n---\n# Weather"
-    })).rejects.toMatchObject({ status: 503, message: "AUTOVAULT_VAULT_OBJECTS binding is not configured." });
+    await expect(
+      savePendingSkill(env, user, vault, {
+        skill_name: "weather",
+        source_text: "---\nname: weather\n---\n# Weather",
+      }),
+    ).rejects.toMatchObject({
+      status: 503,
+      message: "AUTOVAULT_VAULT_OBJECTS binding is not configured.",
+    });
   });
 });
 
@@ -133,7 +255,7 @@ function createFakeEnv({ subscriptionStatus }: { subscriptionStatus: string }) {
   const state = {
     vaults: [] as Array<Record<string, unknown>>,
     pendingSkills: [] as Array<Record<string, unknown>>,
-    kvWrites: [] as Array<{ key: string; value: string }>
+    kvWrites: [] as Array<{ key: string; value: string }>,
   };
 
   return {
@@ -141,7 +263,7 @@ function createFakeEnv({ subscriptionStatus }: { subscriptionStatus: string }) {
     AUTOVAULT_VAULT_OBJECTS: {
       async put(key: string, value: string) {
         state.kvWrites.push({ key, value });
-      }
+      },
     },
     AUTOVAULT_DB: {
       prepare(sql: string) {
@@ -150,10 +272,19 @@ function createFakeEnv({ subscriptionStatus }: { subscriptionStatus: string }) {
             return {
               async first() {
                 if (sql.includes("from subscriptions")) {
-                  return subscriptionStatus ? { status: subscriptionStatus, stripe_subscription_id: "sub_1", price_id: "price_1" } : null;
+                  return subscriptionStatus
+                    ? {
+                        status: subscriptionStatus,
+                        stripe_subscription_id: "sub_1",
+                        price_id: "price_1",
+                      }
+                    : null;
                 }
                 if (sql.includes("from vaults")) {
-                  return state.vaults.find((vault) => vault.user_id === binds[0]) ?? null;
+                  return (
+                    state.vaults.find((vault) => vault.user_id === binds[0]) ??
+                    null
+                  );
                 }
                 return null;
               },
@@ -168,13 +299,17 @@ function createFakeEnv({ subscriptionStatus }: { subscriptionStatus: string }) {
                     created_at: binds[5],
                     provisioned_at: binds[6],
                     cli_linked_at: null,
-                    early_access_at: null
+                    early_access_at: null,
                   });
                 }
                 if (sql.includes("update vaults")) {
-                  const vault = state.vaults.find((row) => row.user_id === binds[1]);
+                  const vault = state.vaults.find(
+                    (row) => row.user_id === binds[1],
+                  );
                   if (vault) {
-                    const column = sql.includes("cli_linked_at") ? "cli_linked_at" : "early_access_at";
+                    const column = sql.includes("cli_linked_at")
+                      ? "cli_linked_at"
+                      : "early_access_at";
                     // mirror the SQL `and <column> is null` guard
                     if (vault[column] == null) vault[column] = binds[0];
                   }
@@ -187,15 +322,15 @@ function createFakeEnv({ subscriptionStatus }: { subscriptionStatus: string }) {
                     name: binds[3],
                     source_hash: binds[6],
                     source_text: binds[7],
-                    queued_skills_json: binds[9]
+                    queued_skills_json: binds[9],
                   });
                 }
                 return { success: true };
-              }
+              },
             };
-          }
+          },
         };
-      }
-    }
+      },
+    },
   };
 }

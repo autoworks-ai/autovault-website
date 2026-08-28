@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import UiIcon from './UiIcon.vue'
+import { clerkBrand } from '../clerk'
+import { HOSTED_TRIAL_DAYS } from '../data/product'
 </script>
 
 <template>
@@ -24,14 +26,26 @@ import UiIcon from './UiIcon.vue'
             <div class="route-num">A</div>
             <div class="route-body">
               <div class="route-title">Self-host</div>
-              <div class="route-desc">Drop the binary on your own server. Point your team's <code>~/.autovault</code> at it. MIT licensed, no phoning home.</div>
+              <div class="route-desc">Drop the binary on your own server. Point your team's <code>~/.autovault</code> at it. MIT licensed, no phoning home. A catalog is a signed static file tree, so any host that serves JSON will do, and <code>autovault link</code> takes a plain directory too.</div>
             </div>
           </div>
           <div class="route">
             <div class="route-num">B</div>
             <div class="route-body">
               <div class="route-title">Hosted at autovault.dev <span class="route-tag">private beta</span></div>
-              <div class="route-desc">For teams who'd rather not run a server. Reserved namespace today; device enrollment and signed skill sync are not enabled yet. Same engine, same gate once they ship.</div>
+              <div class="route-desc">For teams who'd rather not run a server. Pair a machine with a code, admit it from the browser, and it pulls signed skills over HTTPS. Same engine, same gate. Publishing a catalog is still hands-on in private beta.</div>
+              <!-- The number is interpolated, never typed: HOSTED_TRIAL_DAYS
+                   is pinned to the Cloudflare var that Checkout reads, so this
+                   line cannot outlive the trial it advertises. See
+                   tests/hostedTrial.test.ts. -->
+              <div v-if="HOSTED_TRIAL_DAYS > 0" class="route-cta">
+                <a class="route-btn" :href="clerkBrand.cloudPath">Try it free for {{ HOSTED_TRIAL_DAYS }} days</a>
+                <span class="route-fine">No card up front. <a href="/hosted-sync">How hosted sync works</a></span>
+              </div>
+              <div v-else class="route-cta">
+                <a class="route-btn" :href="clerkBrand.cloudPath">See pricing</a>
+                <span class="route-fine"><a href="/hosted-sync">How hosted sync works</a></span>
+              </div>
             </div>
           </div>
         </div>
@@ -80,6 +94,34 @@ import UiIcon from './UiIcon.vue'
   font-size: 10.5px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.route-cta {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.route-btn {
+  display: inline-block;
+  padding: 8px 15px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #062821;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.route-btn:hover {
+  filter: brightness(1.08);
+}
+.route-fine {
+  font-size: 12px;
+  color: var(--ink-4);
+}
+.route-fine a {
+  color: var(--ink-3);
 }
 
 .route-tag {

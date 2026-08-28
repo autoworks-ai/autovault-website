@@ -44,6 +44,10 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 STRIPE_SECRET_KEY=sk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 AUTOVAULT_HOSTED_PRICE_ID=price_xxxxxxxxxxxxxxxxxxxxxxxx
+#   AUTOVAULT_HOSTED_TRIAL_DAYS: free-trial length in days. Optional; unset
+#   or 0 means no trial. Production sets this in wrangler.toml [vars]; set it
+#   here to exercise the trial locally. No card is collected while it runs.
+AUTOVAULT_HOSTED_TRIAL_DAYS=14
 
 # Optional. /api/billing/portal works without this as long as the Stripe
 # account has a DEFAULT customer-portal configuration — without one, Stripe
