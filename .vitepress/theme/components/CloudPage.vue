@@ -455,11 +455,27 @@
                   : `${activeDevices.length} machines linked`
               }}</span
             >
+            <!-- Two claims this page cannot support, both removed. It never
+                 queries KV, so asserting an empty vault was as much an
+                 invention as asserting a serving one, just pointed the other
+                 way. And
+                 `ready` means a machine is admitted, not that billing is live:
+                 bundles answer 402 the moment a subscription lapses, while the
+                 recovery card three sections down says exactly that. State the
+                 rule, and gate the part that depends on billing. -->
             <span class="cv-status-text">
-              Admitted machines pull signed skills from
-              <code>{{ vaultSlug }}</code> and verify every release before
-              installing it. Publishing the first catalog is still hands-on in
-              private beta, so this vault serves nothing until we publish to it.
+              <template v-if="paid">
+                Admitted machines pull signed skills from
+                <code>{{ vaultSlug }}</code> and verify every release before
+                installing it.
+              </template>
+              <template v-else>
+                Bundle downloads answer <code>402</code> while the subscription
+                is inactive. Admitted machines stay admitted.
+              </template>
+              Publishing the first catalog is still hands-on in private beta,
+              and a namespace with nothing published answers <code>404</code>
+              for its catalog.
             </span>
           </div>
 
@@ -487,11 +503,11 @@
                 >
                 <p class="cv-muted">
                   Admitted machines fetch this namespace over HTTPS and verify
-                  every release before installing it. Until a catalog is
-                  published here the fetch answers <code>404</code>, which is
-                  the normal state of a new vault. Nothing is gated behind the
-                  cloud: your local CLI stays fully usable offline, and it is
-                  still where skills get signed.
+                  every release before installing it. A namespace with
+                  nothing published answers <code>404</code> for its catalog,
+                  which is the normal state of a new vault rather than a fault.
+                  Nothing is gated behind the cloud: your local CLI stays fully
+                  usable offline, and it is still where skills get signed.
                 </p>
               </article>
             </div>
@@ -708,9 +724,9 @@
                   There is no publish button here, and no upload API behind one.
                   The signing key that makes a release trustworthy lives on your
                   machine and never reaches us, so releases are placed in your
-                  namespace out of band while this is in private beta. Until the
-                  first one lands, this vault serves nothing and its catalog
-                  returns a 404. That is expected.
+                  namespace out of band while this is in private beta. A
+                  namespace with nothing published answers 404 for its catalog,
+                  which is the expected state of a new one rather than a fault.
                 </p>
                 <p class="cv-muted sm">
                   Not to be confused with

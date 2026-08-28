@@ -612,8 +612,13 @@ describe("the Catalog panel", () => {
     expect(flatten(panel)).toContain("no upload API");
     expect(flatten(panel)).toContain("never reaches us");
     // And it says what a customer sees before the first release lands, so a
-    // 404 from their own catalog does not read as a fault they caused.
-    expect(flatten(panel)).toContain("catalog returns a 404");
+    // 404 from their own catalog does not read as a fault they caused. Phrased
+    // as the rule rather than as a claim about this vault: the panel never
+    // queries KV, so "this vault serves nothing" was an assertion it could not
+    // support, in the same way "serving signed skills" was.
+    expect(flatten(panel)).toContain("answers 404 for its catalog");
+    expect(flatten(panel)).toContain("rather than a fault");
+    expect(panel).not.toContain("this vault serves nothing");
   });
 
   it("gives an honest empty state instead of a fake control", () => {

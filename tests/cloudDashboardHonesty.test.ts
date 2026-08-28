@@ -468,3 +468,29 @@ describe("the sync engine card", () => {
     expect(card.replace(/\s+/g, " ")).toContain("answers <code>404</code>");
   });
 });
+
+describe("per-vault claims the dashboard cannot support", () => {
+  it("never asserts what this specific vault is or is not serving", () => {
+    // The page never queries KV. "Serving signed skills" and "this vault serves
+    // nothing" are the same defect pointed in opposite directions, and this
+    // branch shipped one, replaced it with the other, and had to be told twice.
+    // Every claim about catalog contents has to be a rule, not a state.
+    expect(cloudPage).not.toContain("serves nothing");
+    expect(cloudPage).not.toContain("Serving signed skills");
+    expect(cloudPage).not.toContain("published here");
+    expect(cloudPage.replace(/\s+/g, " ")).toContain(
+      "a namespace with nothing published answers"
+    );
+  });
+
+  it("does not promise bundle downloads while billing is lapsed", () => {
+    // `ready` proves a machine is admitted, not that the subscription is live.
+    // Bundles answer 402 the moment it lapses, and the recovery card further
+    // down already says so, so the status strip must not contradict it.
+    const at = cloudPage.indexOf('<span class="cv-status-text">');
+    expect(at, "no status strip").toBeGreaterThan(-1);
+    const strip = cloudPage.slice(at, cloudPage.indexOf("</span>", at));
+    expect(strip).toContain('v-if="paid"');
+    expect(strip.replace(/\s+/g, " ")).toContain("402");
+  });
+});
