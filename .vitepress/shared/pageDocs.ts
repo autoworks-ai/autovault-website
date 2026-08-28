@@ -142,7 +142,7 @@ autovault add autoworks-ai/autovault:skills/skill-author/SKILL.md --sync-profile
 autovault add https://example.com/SKILL.md --source url --no-sync-profiles --yes
 \`\`\`
 
-\`autovault add\` hands local paths, GitHub identifiers or URLs, agentskills slugs, and direct \`SKILL.md\` URLs to the same gate used by MCP install paths: frontmatter repair, schema validation, denylist scan, capability/behavior check, deduplication, and Ed25519 signing. Pass \`--source local\` when a path needs explicit local-source provenance and \`--agent\` when a remote skill does not declare target agents.
+\`autovault add\` hands local paths, GitHub identifiers or URLs, agentskills slugs, and direct \`SKILL.md\` URLs to the same gate used by MCP install paths: frontmatter repair, schema validation, denylist scan, capability/behavior check, deduplication, and Ed25519 signing. Pass \`--source local\` when a path needs explicit local-source provenance, \`--provenance\` to keep the recorded identifier when replacing from a staging directory, and \`--agent\` when a remote skill does not declare target agents.
 
 ## Vault anatomy
 
@@ -297,7 +297,7 @@ The examples page is a compatibility route for curated SKILL.md references. It i
 
 - autovault-bootstrap: audit, install, verify, and sync AutoVault for an agent profile.
 - skill-author: author a well-formed SKILL.md with valid frontmatter and capability declarations.
-- autovault-skill: understand AutoVault-managed filesystem-synced skills.
+- autovault-skill: understand AutoVault-managed filesystem-synced skills, and never hand-edit the signed vault.
 
 First-party AutoVault examples use MIT metadata. Other example sources keep their submitted license metadata and still run through the same gate before admission.
 
@@ -324,12 +324,13 @@ Prefer inventory lookup first, full reads second, and get_skill with include_res
 
 \`\`\`bash
 autovault add ./skills/skill-author --sync-profiles --yes
+autovault add ./staging/skill-author --source local --provenance '<existing-identifier>' --sync-profiles --yes
 autovault add autoworks-ai/autovault:skills/skill-author/SKILL.md --sync-profiles --yes
 autovault add skill-slug --source agentskills --sync-profiles --agent codex --yes
 autovault add https://example.com/SKILL.md --source url --no-sync-profiles --yes
 \`\`\`
 
-\`autovault add\` infers the source for common local paths and GitHub inputs. Use \`--source\` when the input is ambiguous, \`--agent\` when a remote skill does not declare target agents, and \`--sync-profiles\` when visible agent roots should be refreshed.`;
+\`autovault add\` infers the source for common local paths and GitHub inputs. Use \`--source\` when the input is ambiguous, \`--agent\` when a remote skill does not declare target agents, \`--sync-profiles\` when visible agent roots should be refreshed, and \`--provenance\` to keep the recorded source identifier when replacing a staged local bundle.`;
 
 const deployMarkdown = `# Deploy A Remote AutoVault
 

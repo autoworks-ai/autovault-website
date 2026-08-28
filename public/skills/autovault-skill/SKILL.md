@@ -1,7 +1,12 @@
 ---
 name: autovault-skill
-version: 1.0.0
-description: Understand AutoVault-managed skills. AutoVault syncs skills into the agent's normal skill directory, so loaded skills can be used directly without an AutoVault MCP server.
+version: 1.2.0
+description: >-
+  Understand AutoVault-managed skills and how to install or update them. Use
+  when a skill is visible via symlink, when authoring or editing SKILL.md, or
+  before touching ~/.autovault/skills. Vault writes must go through
+  `autovault add --source local` or MCP propose_skill/update_skill so AutoVault
+  re-signs; never hand-edit vaulted files and run sync-profiles.
 license: MIT
 tags:
   - meta
@@ -11,12 +16,15 @@ agents:
   - claude-code
   - codex
   - autojack
+  - cursor
 category: meta
 tools_required: [shell.run]
+metadata:
+  version: "1.2.0"
 capabilities:
   network: false
   filesystem: readonly
-  tools: []
+  tools: [shell.run]
 ---
 
 # AutoVault Meta-Skill
@@ -24,25 +32,59 @@ capabilities:
 AutoVault is the local capability and skill profile layer. It stores and
 validates skills, then syncs them into the agent's normal skill directory as
 filesystem symlinks. If this skill is loaded, AutoVault profile sync is already
-working for this agent; do not require an AutoVault MCP server before using
+working for this agent; do not require an AutoVault MCP server before *using*
 other visible skills.
 
 AutoVault does not execute skills. The agent that loads a skill is responsible
 for sandboxing and user confirmation before running anything the skill
 describes.
 
+## Hard rule: never write the vault by hand
+
+`~/.autovault/skills/<name>/` is a **signed store**, not a working copy.
+Hand-editing `SKILL.md` there invalidates the Ed25519 manifest
+(`autovault doctor <name>` reports `tampered` / `signature_invalid`).
+`autovault sync-profiles` only refreshes symlinks. It does **not** validate,
+hash, or re-sign.
+
+Author or edit a bundle **outside** the vault (a temp directory is fine),
+then install through the same gate humans and MCP use:
+
+```bash
+# New skill, or replace an existing one by frontmatter name
+autovault add /path/to/bundle --source local --sync-profiles --yes
+
+# Preserve recorded provenance when replacing a staged local skill
+autovault add /path/to/bundle --source local --provenance '<existing-identifier>' --sync-profiles --yes
+```
+
+Confirm the vault accepted the write:
+
+```bash
+autovault doctor <name> --json   # integrity.kind must be "ok"
+```
+
+If MCP tools are connected, `propose_skill` (new) and `update_skill` (existing)
+are the same gate. Use them when present. When they are absent **the CLI is required**, not optional.
+
+If `autovault doctor <name>` reports `tampered` / `signature_invalid`, do not
+`--repair`. That flag only re-signs unsigned local skills; it refuses tampered
+metadata and remote sources. Restore a trusted copy outside the vault, then
+`autovault add /path/to/bundle --source local --sync-profiles --yes`.
+
 ## When to use
 
 - When the user asks why an AutoVault-managed skill is visible.
 - When deciding whether to use a synced skill such as `commit-message` or
   `skill-author`.
-- Before writing a new skill, check the skills already visible to the current
-  agent.
+- Before writing or updating a skill. Check installed skills first
+  (`autovault skill search <query>` or the host's skill list).
+- When `autovault doctor` reports tampered integrity.
 - When debugging profile sync or stale skill links.
 
-## Primary workflow: synced skills
+## Read path: synced skills
 
-AutoVault's primary interface is filesystem-native profile sync:
+Using a skill is filesystem-native. Do not require MCP for that:
 
 ```text
 $AUTOVAULT_STORAGE_PATH/
@@ -57,76 +99,68 @@ $AUTOVAULT_STORAGE_PATH/
 
 Use synced skills directly through the host's normal skill mechanism. If a
 skill is visible in the current agent session, it is already available; no
-`mcp__autovault__*` tools are required.
+`mcp__autovault__*` tools are required to *follow* it.
 
-For local troubleshooting, inspect the profile directory:
+For local troubleshooting:
 
 ```bash
 ls -l ~/.autovault/profiles/claude-code
 ls -l ~/.claude/skills
 ls -l ~/.codex/skills
+autovault doctor
 ```
 
-## Optional compatibility: MCP tools
+## Write path: CLI or MCP (same gate)
 
-Some hosts may still connect the AutoVault MCP compatibility server. Only use
-these tools if `mcp__autovault__*` tools are actually present in the current
-session. If they are absent, continue with the synced skills that are already
-visible.
+| Intent | CLI | MCP |
+|---|---|---|
+| Install a local bundle | `autovault add <path> --source local --sync-profiles --yes` | `add_skill({source:"local", identifier:"/path/to/bundle", skill_dir:"/path/to/bundle"})` |
+| Author a new skill | `autovault add <path> --source local --sync-profiles --yes` after writing the bundle | `propose_skill` |
+| Replace an installed skill | `autovault add <path> --source local --sync-profiles --yes` with the same frontmatter `name` | `update_skill` |
+| Refresh profile links only | `autovault sync-profiles` | n/a — not a content write |
+| Remove | `autovault remove <name>` | `delete_skill` |
 
-The compatibility server exposes these MCP tools:
+`autovault skill <action> <name>` runs a declared **bin** action (setup,
+doctor, apply). It is not how you publish SKILL.md changes.
 
-- `list_skills` - returns metadata for every installed skill.
-- `search_skills(query, top_k?)` - metadata text search across name, title,
-  description, tags, category, and `when_to_use`. Returns ranked matches with
-  scores and structured match reasons.
-- `get_skill(name, agent?)` - returns the full SKILL.md plus parsed metadata,
-  capabilities, required secrets, and source provenance. Pass `agent` to see
-  the generated variant with matching transforms applied.
-- `read_skill_resource(skill_name, resource_path)` - reads a file packaged
-  alongside a skill. Path traversal is blocked.
-- `install_skill({source, identifier, version?, skill_md?})` - installs
-  from `github`, `agentskills` (`slug[@version]`), or `url` (https only).
-  GitHub identifiers may be `owner/repo[@ref][:path/to/SKILL.md]`, a blob
-  URL, or a repo-root/tree URL. Repo-root/tree URLs discover `SKILL.md`
-  candidates; if there is more than one, the tool returns
-  `outcome: "multiple_candidates"` with exact candidate identifiers. If
-  `skill_md` is provided, it is treated as inline content; otherwise the
-  source adapter fetches it.
-- `propose_skill({skill_md, resources?, source_session?})` - validates and
-  installs a new skill. Outcome is one of `accepted`, `duplicate`,
-  `invalid`, or `security_blocked`.
-- `propose_skill_transform({transform_md, replace?})` - validates and stores a
-  vault-local transform overlay for an installed base skill. The base skill is
-  not modified.
-- `list_skill_transforms({base?})` - lists transform overlays and integrity
-  status.
-- `remove_skill_transform({base, name})` - deletes a transform overlay and
-  refreshes generated profiles.
+Copy the current vaulted files into the staging bundle if you are iterating,
+then edit the copy. Do not edit `$AUTOVAULT_STORAGE_PATH/skills/` in place.
+
+## Optional MCP tools
+
+Only use these if `mcp__autovault__*` tools are actually present:
+
+- `get_skill({name?, query?, agent?, top_k?, include_resources?})` - finds and
+  loads an installed skill. Pass `name` for an exact skill, or `query` to
+  search and load the best match.
+- `add_skill({source, identifier, version?, skill_dir?, sync_profiles?,
+  profile_roots?, discover_profile_roots?, verbose?})` - installs from
+  `github`, `agentskills`, `url`, or a local bundle. Local bundles must pass
+  both `skill_dir` and `identifier` (the CLI provenance value) and sync
+  configured profile roots by default.
+- `update_skill({name, source?, identifier?, skill_dir?, skill_md?, resources?,
+  reuse_existing_resources?, verbose?})` - refreshes or replaces an installed
+  skill. Use `source: "inline"` plus `reuse_existing_resources: true` for
+  SKILL.md-only frontmatter edits.
+- `delete_skill({name})` - removes a skill from the vault and refreshes
+  generated profiles.
+- `propose_skill({skill_md, resources?, source_session?,
+  allow_synthesized_frontmatter?, check?, verbose?})` - validates, dedups, and
+  installs a new skill. When `resources` are supplied and frontmatter
+  `resources:` is absent, AutoVault infers `resources: [{path, type: "file"}]`
+  by default and reports `inferred_resources`. Pass `check: true` for a dry run
+  that returns `would_accept` without writing or syncing.
+- `bulk_import({source_dir, agents?, allow_synthesized_frontmatter?,
+  sync_profiles?, profile_roots?, discover_profile_roots?, verbose?})` -
+  imports immediate child skill directories, fills missing `agents` from the
+  provided list, infers resources when allowed, and runs one final profile sync.
 - `check_updates(skill?)` - compares installed content hash against the
   recorded source. Bundled inline skills are checked against the local bundled
-  source; other inline skills are reported as unchecked. Changed transform
-  bases appear in `transform_reviews` with the pinned old base content.
+  source; other inline skills are reported as unchecked.
 
-## Optional MCP workflow
-
-1. If `mcp__autovault__search_skills` is available, call `search_skills` with a
-   concise query.
-2. If a result has high confidence, call `get_skill` and follow it.
-3. If nothing fits, author a new `SKILL.md` and call `propose_skill`.
-   Handle every outcome explicitly:
-   - `accepted` - skill is stored under `$AUTOVAULT_STORAGE_PATH/skills/<name>`.
-   - `duplicate` - inspect `existing_match` and choose a `merge_options`
-     value (`keep_existing`, `replace`, `merge`, `keep_both`).
-   - `invalid` - fix the listed schema errors and resubmit.
-   - `security_blocked` - rewrite the content to remove flagged patterns.
-4. Use `propose_skill_transform` instead of forking a skill when the user wants
-   an agent/workspace-specific variant such as different research tools or
-   output channels.
-5. Periodically call `check_updates` to detect drift for skills installed from a remote source, bundled inline skills, or transforms pinned to an older base.
-
-Skip this workflow entirely when the MCP tools are not connected. Missing MCP
-tools are not an error for filesystem-synced skills.
+Missing MCP tools are not an error for **reading** filesystem-synced skills.
+Missing MCP tools **are** a reason to use `autovault add --source local`, not a
+reason to write `$AUTOVAULT_STORAGE_PATH/skills` directly.
 
 ## SKILL.md schema (minimum)
 
@@ -134,6 +168,7 @@ tools are not an error for filesystem-synced skills.
 ---
 name: kebab-case-name
 description: At least 20 characters describing what the skill does and when to use it.
+agents: [claude-code, codex]
 metadata:
   version: "1.0.0"
 ---
@@ -141,7 +176,9 @@ metadata:
 
 Optional but recommended fields: `tags`, `category`, `license`,
 `capabilities` (`network`, `filesystem`, `tools`), and
-`requires-secrets`.
+`requires-secrets`. If the bundle ships files beyond `SKILL.md`, declare them
+in `resources:` with `type: file`, or let `propose_skill`/`bulk_import` infer
+that list when `allow_synthesized_frontmatter` is not false.
 
 ## Security expectations
 
