@@ -19,7 +19,7 @@ import BrandMark from './BrandMark.vue'
       </div>
       <div class="av-footer-col">
         <h5>Vault</h5>
-        <a href="/authoring">What's a skill</a><a href="/#vault">The folder</a><a href="/#gate">Validation gate</a><a href="/#render">Transformation</a><a href="/authoring#perms">Scoping</a>
+        <a href="/authoring">What’s a skill</a><a href="/#vault">The folder</a><a href="/#gate">Validation gate</a><a href="/#render">Transformation</a><a href="/authoring#perms">Scoping</a>
       </div>
       <div class="av-footer-col">
         <h5>Develop</h5>

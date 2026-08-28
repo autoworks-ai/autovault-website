@@ -116,7 +116,7 @@ const chips = chipLabels.map((label) => {
         </h2>
       </div>
       <p class="av-lede" style="max-width: 380px">
-        Every agent reads from its own folder. Edits in one don't propagate. Versions drift. Signatures don't exist.
+        Every agent reads from its own folder. Edits in one don’t propagate. Versions drift. Signatures don’t exist.
         The same <code>extract-pdf</code> skill ends up looking like this.
       </p>
     </div>

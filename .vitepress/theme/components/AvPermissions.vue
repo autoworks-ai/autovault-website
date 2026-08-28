@@ -52,7 +52,7 @@ const activeCard = computed(() => cards[active.value])
       <span class="ital">Whether you can see it</span> is a separate question.
     </h2>
     <p class="av-lede" style="margin-top: 16px">
-      Every request carries a context. Same folder, filtered four ways — agent, device, project, tool. Dev-machine skills don't surface on a CI runner. Client A skills don't leak into Client B's project.
+      Every request carries a context. Same folder, filtered four ways — agent, device, project, tool. Dev-machine skills don’t surface on a CI runner. Client A skills don’t leak into Client B’s project.
     </p>
     <p class="av-perm-note">
       The agent axis is enforced at sync time by <code>autovault sync-profiles</code>.

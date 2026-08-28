@@ -111,15 +111,15 @@ function resumeCycle() {
       </div>
 
       <h2 class="av-folder-title">
-        It's a folder.<br />
-        <span class="ital">That's the whole pitch.</span>
+        It’s a folder.<br />
+        <span class="ital">That’s the whole pitch.</span>
       </h2>
 
       <p class="av-folder-lede">
         AutoVault lives at <code>~/.autovault</code>. Your skills go in there.
         Every agent on your machine — Claude Code, Codex, Cursor, AutoHub —
         reads from the same folder. Sync it with Git. Sync it with Dropbox.
-        Don't sync it. Your call.
+        Don’t sync it. Your call.
       </p>
 
       <div class="av-folder-explorer">
