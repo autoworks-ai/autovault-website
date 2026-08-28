@@ -227,7 +227,7 @@ function dstY(i: number) { return 90 + i * (VBOX_H - 180) / (ADOPTERS.length - 1
           <span class="meta-lbl">{{ homepageGateMetrics.render.label }}</span>
         </div>
         <div class="bridge">
-          <span>The format works. The bits around it don't.</span>
+          <span>The format works. The bits around it don’t.</span>
           <span class="arrow">↓</span>
         </div>
       </div>
