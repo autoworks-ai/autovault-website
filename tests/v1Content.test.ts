@@ -281,6 +281,25 @@ describe("v1 content guardrails", () => {
     expect(pageDocsSource).toContain("SkillClone");
   });
 
+  it("keeps both account surfaces agreeing on which statuses go to the portal", () => {
+    // CloudPage and ClerkCloudTab each carry their own copy of this set. Two
+    // account surfaces offering different recovery paths for one Stripe status
+    // is worse than either being wrong alone, and `paused` was fixed in one and
+    // missed in the other. Compare the sets rather than one literal.
+    const setIn = (file: string) => {
+      const text = read(file);
+      const at = text.indexOf("const PORTAL_ONLY_STATUSES");
+      expect(at, `no PORTAL_ONLY_STATUSES in ${file}`).toBeGreaterThan(-1);
+      const body = text.slice(at, text.indexOf("]);", at));
+      return [...body.matchAll(/"([a-z_]+)"/g)].map((m) => m[1]).sort();
+    };
+
+    const dashboard = setIn(".vitepress/theme/components/CloudPage.vue");
+    const profile = setIn(".vitepress/theme/components/ClerkCloudTab.vue");
+    expect(profile).toEqual(dashboard);
+    expect(dashboard).toContain("paused");
+  });
+
   it("documents an enrollment body the handler will actually accept", () => {
     const api = read(".vitepress/theme/components/ApiReferencePage.vue");
     const route = readFileSync(resolve(repoRoot, "functions/v/[slug]/devices.js"), "utf-8");

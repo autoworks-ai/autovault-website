@@ -472,7 +472,7 @@ Current ${PRODUCT_VERSION} surfaces are the local CLI, source ESM library export
 - Source ESM library exports for resolveCapabilities, syncProfiles, addSkill, updateSkill, deleteSkill, proposeSkill, transforms, auditRepo, and profile discovery.
 - MCP tools for discovery/full reads through get_skill, trusted adds, updates, deletes, proposals, and drift checks.
 - Remote Streamable HTTP MCP with OAuth and role-aware filtering at /mcp.
-- AutoVault Cloud hosted sync at /v/<slug>/, four device-signed read routes.
+- AutoVault Cloud hosted sync at /v/<slug>/: four device-signed routes, one write (POST devices, which enrols a key as pending) and three reads.
 
 ## Hosted sync routes
 

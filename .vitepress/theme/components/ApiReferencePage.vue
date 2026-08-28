@@ -242,7 +242,11 @@ const sections: ApiSection[] = [
         since: "0.5.0",
         description: "First contact. Any keypair may call this, signed by itself, which is what makes <code>autovault link</code> work on a machine the owner has never seen: the request enrols the key as <code>pending</code> and returns its <code>device_id</code>. The owner admits it from the Machines card on <a href=\"/cloud\">Cloud</a>. Enrolling the same key twice returns the existing device rather than a second row, so a repeated <code>link</code> is safe. A vault holds at most 20 pending devices at once; admitting or denying any of them frees a slot, and a machine that is already enrolled is never locked out by a full queue.",
         signature: signatureLines("POST /v/<slug>/devices\nX-AutoVault-Device: <base64url public key>\nX-AutoVault-Timestamp: <unix seconds>\nX-AutoVault-Signature: <base64url detached signature>\n\n{ \"public_key\": \"<base64url public key>\", \"hostname\": \"<machine name>\" }"),
-        copy: "autovault link",
+        // `autovault link` with no argument goes to /api/devices/pair and
+        // starts the browser pairing flow, which is a different route entirely.
+        // Only the slug form POSTs here, and it is the form a headless machine
+        // needs.
+        copy: "autovault link <slug>",
         // Not just "Header" any more: the body field below is required too,
         // and the column heading is the only thing that says where each one
         // goes.

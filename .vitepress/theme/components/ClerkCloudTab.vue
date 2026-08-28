@@ -68,7 +68,17 @@ const subscriptionState = computed(() => {
   );
 });
 
-const PORTAL_ONLY_STATUSES = new Set(["past_due", "unpaid", "incomplete"]);
+// Kept in step with the copy in CloudPage.vue deliberately: two account
+// surfaces offering different recovery paths for the same Stripe status is
+// worse than either being wrong on its own. `paused` belongs here because the
+// subscription still exists, so Checkout mints a second one instead of
+// resuming it.
+const PORTAL_ONLY_STATUSES = new Set([
+  "past_due",
+  "unpaid",
+  "incomplete",
+  "paused",
+]);
 
 const canStartCheckout = computed(() => {
   if (subscription.value?.active) return false;
