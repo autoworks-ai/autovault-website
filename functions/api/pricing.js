@@ -59,7 +59,13 @@ export async function onRequestGet({ request = null, env, waitUntil = null }) {
     const response = new Response(JSON.stringify(price), {
       headers: {
         "content-type": "application/json; charset=utf-8",
-        "cache-control": `public, max-age=${CACHE_SECONDS}`
+        // s-maxage for the edge, max-age=0 for the browser. The fingerprint
+        // above only moves the key this Worker reads; a browser holding the
+        // body under max-age=300 never asks again, so a retired trial kept
+        // being advertised for five minutes to exactly the people already on
+        // the page. Revalidating costs a Worker invocation, not a Stripe call,
+        // because the edge entry is what this endpoint was cached to protect.
+        "cache-control": `public, max-age=0, s-maxage=${CACHE_SECONDS}`
       }
     });
 

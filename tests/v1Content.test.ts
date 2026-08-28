@@ -281,6 +281,22 @@ describe("v1 content guardrails", () => {
     expect(pageDocsSource).toContain("SkillClone");
   });
 
+  it("documents an enrollment body the handler will actually accept", () => {
+    const api = read(".vitepress/theme/components/ApiReferencePage.vue");
+    const route = readFileSync(resolve(repoRoot, "functions/v/[slug]/devices.js"), "utf-8");
+
+    // The handler refuses with 400 unless body.public_key equals the
+    // X-AutoVault-Device header. The reference showed a body of hostname
+    // alone, so anyone implementing from it got a 400 on first contact and
+    // nothing on the page said why.
+    expect(route).toContain("body.public_key !== publicKey");
+    const at = api.indexOf('id: "sync-enroll"');
+    expect(at, "no sync-enroll endpoint").toBeGreaterThan(-1);
+    const block = api.slice(at, api.indexOf('endpoint("sync-current"', at));
+    expect(block).toContain('public_key');
+    expect(block).toContain('hostname');
+  });
+
   it("does not sell the CLI version as a container tag", () => {
     const api = read(".vitepress/theme/components/ApiReferencePage.vue");
     const deploy = read(".vitepress/shared/deploy.ts");

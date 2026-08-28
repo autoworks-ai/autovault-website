@@ -241,11 +241,15 @@ const sections: ApiSection[] = [
         status: "beta",
         since: "0.5.0",
         description: "First contact. Any keypair may call this, signed by itself, which is what makes <code>autovault link</code> work on a machine the owner has never seen: the request enrols the key as <code>pending</code> and returns its <code>device_id</code>. The owner admits it from the Machines card on <a href=\"/cloud\">Cloud</a>. Enrolling the same key twice returns the existing device rather than a second row, so a repeated <code>link</code> is safe. A vault holds at most 20 pending devices at once; admitting or denying any of them frees a slot, and a machine that is already enrolled is never locked out by a full queue.",
-        signature: signatureLines("POST /v/<slug>/devices\nX-AutoVault-Device: <base64url public key>\nX-AutoVault-Timestamp: <unix seconds>\nX-AutoVault-Signature: <base64url detached signature>\n\n{ \"hostname\": \"<machine name>\" }"),
+        signature: signatureLines("POST /v/<slug>/devices\nX-AutoVault-Device: <base64url public key>\nX-AutoVault-Timestamp: <unix seconds>\nX-AutoVault-Signature: <base64url detached signature>\n\n{ \"public_key\": \"<base64url public key>\", \"hostname\": \"<machine name>\" }"),
         copy: "autovault link",
-        argsLabel: "Header",
+        // Not just "Header" any more: the body field below is required too,
+        // and the column heading is the only thing that says where each one
+        // goes.
+        argsLabel: "Header or body",
         args: [
           { name: "X-AutoVault-Device", type: "base64url", description: "The device\u2019s Ed25519 public key. Also the identity: there is no separate account credential on this surface.", required: true },
+          { name: "public_key (body)", type: "base64url", description: "The same key again, in the JSON body, and it must match the header byte for byte or the request is refused with <code>400</code>. Enrollment is self-attested, so this is the request stating which key it is asking to enrol rather than leaving that to a header a proxy might rewrite.", required: true },
           { name: "X-AutoVault-Timestamp", type: "integer", description: "Whole seconds since the epoch. Rejected beyond a 300 second skew in either direction.", required: true },
           { name: "X-AutoVault-Signature", type: "base64url", description: "Detached Ed25519 signature over <code>&lt;METHOD&gt;\\n&lt;pathname&gt;\\n&lt;unix-seconds&gt;</code>, where pathname is the full request path.", required: true }
         ]

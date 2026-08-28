@@ -37,7 +37,15 @@ describe("pricing endpoint", () => {
     // Assert the header the endpoint actually sends, not the text of the
     // source -- the value is built from a constant now, so a source match
     // would have gone vacuous without anything failing.
-    expect(response.headers.get("cache-control")).toMatch(/^public, max-age=\d+$/);
+    const cacheControl = response.headers.get("cache-control") ?? "";
+    // The edge holds it; the browser does not. A shared cache is what spares
+    // Stripe the call, and it is invalidated by the config fingerprint on the
+    // key. A browser copy cannot be invalidated at all, so a retired trial
+    // would have gone on being advertised for the rest of its max-age to
+    // precisely the people already looking at the page.
+    expect(cacheControl).toMatch(/\bs-maxage=\d+/);
+    expect(cacheControl).toMatch(/\bmax-age=0\b/);
+    expect(cacheControl).toContain("public");
 
     const source = readFileSync(new URL("../functions/api/pricing.js", import.meta.url), "utf-8");
     // Anchor on the import, not the word: the comment explaining why json()
