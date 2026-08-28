@@ -143,6 +143,36 @@ describe("trial copy never outlives the trial", () => {
     expect(message.length).toBeLessThanOrEqual(1200);
   });
 
+  it("ends a cardless trial rather than leaving it to a Stripe default", () => {
+    const params = buildHostedVaultCheckoutParams({
+      request: new Request("https://autovault.dev/cloud"),
+      env: { AUTOVAULT_HOSTED_PRICE_ID: "price_x", AUTOVAULT_HOSTED_TRIAL_DAYS: "14" },
+      user: { id: "u_1" },
+    });
+
+    // payment_method_collection is "if_required", so a trial can start with no
+    // card. Stripe's unset default is create_invoice, which a test clock shows
+    // landing on past_due: entitlement stops either way, but only because
+    // ACTIVE_SUBSCRIPTION_STATUSES happens to exclude it, and the customer gets
+    // dunned for a card they were told they did not need. State the ending.
+    expect(
+      params.get("subscription_data[trial_settings][end_behavior][missing_payment_method]"),
+    ).toBe("cancel");
+    expect(params.get("payment_method_collection")).toBe("if_required");
+  });
+
+  it("sets no trial-end behaviour when there is no trial to end", () => {
+    const params = buildHostedVaultCheckoutParams({
+      request: new Request("https://autovault.dev/cloud"),
+      env: { AUTOVAULT_HOSTED_PRICE_ID: "price_x", AUTOVAULT_HOSTED_TRIAL_DAYS: "0" },
+      user: { id: "u_1" },
+    });
+
+    expect(
+      params.get("subscription_data[trial_settings][end_behavior][missing_payment_method]"),
+    ).toBeNull();
+  });
+
   it("says nothing about a trial when none is configured", () => {
     const params = buildHostedVaultCheckoutParams({
       request: new Request("https://autovault.dev/cloud"),

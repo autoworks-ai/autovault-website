@@ -39,7 +39,7 @@
       <div class="step">
         <div class="num mono-label">02</div>
         <div class="step-title">You confirm the code</div>
-        <div class="muted step-sub">Your browser opens at <code>/cloud/pair</code>. Check the fingerprint on screen against the one in your terminal before you confirm, then admit the machine.</div>
+        <div class="muted step-sub">Your browser opens at <code>/cloud/pair</code>. Check the fingerprint on screen against the one in your terminal, then confirm. Confirming <em>is</em> the admission here: the machine comes back active, with no second step on the dashboard.</div>
       </div>
       <div class="step">
         <div class="num mono-label">03</div>
@@ -57,7 +57,7 @@
     <h2 id="admit">Admit and revoke</h2>
     <p>Every machine is listed under <strong>Machines</strong> on your cloud dashboard, identified by fingerprint. A fingerprint is the first four and last four characters of the machine's public key. The console never renders a full key.</p>
     <div class="kv hs-kv">
-      <span class="k">Admit</span><span class="v">Moves a machine from <code>pending</code> to <code>active</code>.</span>
+      <span class="k">Admit</span><span class="v">Moves a machine from <code>pending</code> to <code>active</code>. This is for a machine enrolled with <code>autovault link &lt;slug&gt;</code>, which lands pending. Confirming a pairing code already admitted that machine.</span>
       <span class="k">Revoke</span><span class="v">Moves it to <code>revoked</code>, effective on that machine's next request. This needs no active subscription, so a lapsed account can still remove a machine it no longer controls.</span>
       <span class="k">Deny</span><span class="v">Refuses a waiting pairing code. It writes a tombstone rather than deleting the record, so the CLI is told it was refused instead of timing out against a 404.</span>
     </div>

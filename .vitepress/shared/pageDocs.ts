@@ -219,13 +219,13 @@ autovault link
 
 The CLI generates an Ed25519 keypair, asks Cloud for a pairing code, and prints it. Codes look like \`BKDF-QMTW\`: eight characters from a 20-letter alphabet with no vowels, so a code can never spell a word. The CLI opens your browser and polls every 5 seconds.
 
-Confirm the code at \`/cloud/pair\`. Check the fingerprint on screen against the one in your terminal before confirming. Codes expire after 15 minutes; run \`autovault link\` again to mint another.
+Confirm the code at \`/cloud/pair\`. Check the fingerprint on screen against the one in your terminal before confirming. Confirming is the admission in this flow: the machine comes back active with no second dashboard step. Codes expire after 15 minutes; run \`autovault link\` again to mint another.
 
 ## Admit and revoke
 
 Machines are listed under Machines on the cloud dashboard, identified by a fingerprint: the first four and last four characters of the public key. The console never renders a full key.
 
-- **Admit** moves a machine from pending to active.
+- **Admit** moves a machine from pending to active. This is for a machine enrolled with \`autovault link <slug>\`, which lands pending; confirming a pairing code already admitted that machine.
 - **Revoke** moves it to revoked, effective on that machine's next request. This needs no active subscription, so a lapsed account can still remove a machine it no longer controls.
 - **Deny** refuses a waiting pairing code. It writes a tombstone rather than deleting the record, so the CLI is told it was refused instead of timing out against a 404.
 
@@ -649,7 +649,7 @@ AutoVault Cloud moves a signed catalog from the owner's machine to the machines 
 - Cloud never holds a release signing key. There is no upload API and no publish button, because either would require Cloud to hold the thing that makes a release trustworthy. Signed objects are placed by hand from the machine that signed them.
 - A device proves identity with an Ed25519 keypair generated on that machine. The private half never leaves it and there is no API key in its place.
 - Every request under /v/ carries a detached signature over \`<METHOD>\\n<pathname>\\n<unix-seconds>\`. A timestamp more than 300 seconds out is refused, so a captured request stops working in five minutes.
-- Admission is a person clicking Admit in the browser, not a token exchange. An enrolled key nobody admits reads nothing but its own status.
+- Admission is a person in the browser, not a token exchange. An enrolled key nobody has admitted reads the catalog and its own status, never a bundle: it needs the catalog to pin the publisher key before anyone has decided about it.
 - Device responses are no-store and private, because they are authorized per device rather than per URL.
 
 Two costs worth knowing before adopting hosted sync:

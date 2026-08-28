@@ -159,7 +159,7 @@
         </article>
       </div>
 
-      <p class="sub">A device proves who it is with an Ed25519 keypair it generates locally. The private half never leaves that machine, and there is no API key to leak in its place. Every request under <code>/v/</code> carries a detached signature over <code>&lt;METHOD&gt;\n&lt;pathname&gt;\n&lt;unix-seconds&gt;</code>, and a timestamp more than 300 seconds out is refused, so a captured request stops working in five minutes. Admission is a person clicking Admit in the browser, not a token exchange: an enrolled key that nobody admits reads nothing but its own status.</p>
+      <p class="sub">A device proves who it is with an Ed25519 keypair it generates locally. The private half never leaves that machine, and there is no API key to leak in its place. Every request under <code>/v/</code> carries a detached signature over <code>&lt;METHOD&gt;\n&lt;pathname&gt;\n&lt;unix-seconds&gt;</code>, and a timestamp more than 300 seconds out is refused, so a captured request stops working in five minutes. Admission is a person in the browser, not a token exchange. An enrolled key that nobody has admitted reads the catalog and its own status, never a bundle: it needs the catalog to pin the publisher key before anyone has decided about it, and bundles are where skill content actually lives.</p>
 
       <div class="callout security-note">
         <span class="icn"><UiIcon name="tip" /></span>

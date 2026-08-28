@@ -66,16 +66,24 @@ export function buildHostedVaultCheckoutParams({
   // paid, so provisioning and the sync routes need no change to let a trialing
   // customer reserve a namespace and pull bundles.
   //
-  // Trial end is Stripe's default, verified against test mode rather than read
-  // off the docs: trial_settings.end_behavior.missing_payment_method comes back
-  // "create_invoice". A trial that ends with no card on file therefore does not
-  // silently keep serving. Stripe invoices, collection fails, and the status
-  // leaves ACTIVE_SUBSCRIPTION_STATUSES, which shuts the sync routes. Copy says
-  // "no card up front" for that reason and never promises a moment at day 14
-  // where someone asks for one.
+  // Trial end is stated, not inherited. Stripe's default here is
+  // "create_invoice", and a test clock advanced past day 14 shows that landing
+  // on status=past_due, which ACTIVE_SUBSCRIPTION_STATUSES excludes, so
+  // entitlement does stop on its own. It stops by dunning somebody for an
+  // invoice against a card they were told they did not have to give.
+  //
+  // "cancel" is the behaviour the copy already promises. No card up front means
+  // there is nothing to collect, so the honest end of an unconverted trial is
+  // the subscription ending, not an unpaid bill and a sequence of Stripe emails
+  // about it. Writing it down also stops a money decision from resting on a
+  // default that Stripe is free to change.
   const trialDays = hostedTrialDays(env);
   if (trialDays > 0) {
     params.set("subscription_data[trial_period_days]", String(trialDays));
+    params.set(
+      "subscription_data[trial_settings][end_behavior][missing_payment_method]",
+      "cancel",
+    );
   }
   params.set("submit_type", env.STRIPE_CHECKOUT_SUBMIT_TYPE || "subscribe");
   // Lets a customer type a Stripe promotion code on Checkout. Coupons without
