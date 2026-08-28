@@ -281,6 +281,34 @@ describe("v1 content guardrails", () => {
     expect(pageDocsSource).toContain("SkillClone");
   });
 
+  it("never tells a paired machine to go and get admitted afterwards", () => {
+    // Two enrollment paths, and they end differently. `autovault link <slug>`
+    // POSTs /v/<slug>/devices and lands `pending`, so the dashboard Admit is
+    // real for it. `autovault link` with no argument goes through a pairing
+    // code, and the confirm handler calls admitDevice and returns an active
+    // device -- confirming IS the admission. Five separate surfaces told the
+    // second group to go and click a button that is not there for them, which
+    // is a support ticket dressed as instructions.
+    const surfaces = [
+      ".vitepress/theme/components/HostedSyncPage.vue",
+      ".vitepress/theme/components/HostedVaultFunnel.vue",
+      ".vitepress/theme/components/CloudPage.vue",
+      ".vitepress/shared/pageDocs.ts"
+    ];
+
+    for (const file of surfaces) {
+      const text = read(file);
+      expect(text, `${file} sends a paired machine looking for an Admit button`)
+        .not.toMatch(/pair (?:it|this machine)[^.]*, then admit/i);
+      expect(text, `${file} sends a paired machine looking for an Admit button`)
+        .not.toMatch(/confirm (?:that |the )?code[^.]*, then admit/i);
+    }
+
+    // And the correction is stated, not merely absent.
+    expect(read(".vitepress/theme/components/HostedSyncPage.vue"))
+      .toContain("Confirming <em>is</em> the admission here");
+  });
+
   it("caps the top nav at five links and keeps every demoted page reachable", () => {
     const topbar = read(".vitepress/theme/components/AvTopbar.vue");
     const footer = read(".vitepress/theme/components/AvFooter.vue");

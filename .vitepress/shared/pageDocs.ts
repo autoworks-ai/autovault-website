@@ -185,7 +185,7 @@ Cancel any time from the Stripe billing portal. Revoking a machine keeps working
 - Create an account and subscribe through Stripe Checkout.
 - Reserve a namespace, then reach it at \`https://autovault.dev/v/<slug>/\`.
 - Pair a machine by running \`autovault link\` with no argument. The CLI prints an \`XXXX-XXXX\` code and waits.
-- Confirm that code in the browser, then admit or revoke the machine from the dashboard.
+- Confirm that code in the browser. Confirming admits the machine; the dashboard Admit is for a machine enrolled with \`autovault link <slug>\`, which lands pending. Revoke is on the dashboard either way.
 - Admitted machines fetch \`catalog.json\` and each signed bundle, verifying the release signature, the bundle hash, and every file hash.
 
 ## How content lands in your vault

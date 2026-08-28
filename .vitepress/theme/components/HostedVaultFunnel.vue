@@ -885,7 +885,7 @@ async function provisionVault() {
     // Success notice FIRST. This also clears any stale warn from an earlier
     // attempt ("waiting for the webhook") that would otherwise still be on
     // screen when the shell advances to the connect step.
-    notice.value = { kind: "ok", text: "Hosted namespace reserved. Run autovault link on a machine to pair it, then admit it below." };
+    notice.value = { kind: "ok", text: "Hosted namespace reserved. Run autovault link on a machine, then confirm the code it prints. Confirming admits the machine." };
     // Merge onto `current`, not onto the local copy. If this component's own
     // /api/me failed earlier the local copy is still null, and handing the
     // shell { user: null, vault } would install an anonymous state over the
@@ -1057,7 +1057,7 @@ async function copyCommands() {
 
 async function copyAgentHandoff(agent: "claude-code" | "cursor") {
   const label = agent === "claude-code" ? "Claude Code" : "Cursor";
-  await copyText(`# ${label} paid hosted AutoVault handoff\n${commandBlock.value}\n\nRun 'autovault link' with no argument to pair this machine, then admit it from the cloud dashboard. Skills are signed locally; the hosted namespace only serves them.\n`);
+  await copyText(`# ${label} paid hosted AutoVault handoff\n${commandBlock.value}\n\nRun 'autovault link' with no argument on this machine and confirm the code it prints in the browser. Confirming admits the machine, so there is no separate dashboard step. Skills are signed locally; the hosted namespace only serves them.\n`);
   notice.value = { kind: "ok", text: `${label} handoff copied.` };
 }
 
