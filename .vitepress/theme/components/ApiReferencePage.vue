@@ -232,7 +232,7 @@ const sections: ApiSection[] = [
     id: "sync",
     title: "Hosted sync",
     meta: "AutoVault Cloud · device-signed HTTPS",
-    lede: "Four routes under /v/<slug>/, served by AutoVault Cloud. Every one of them is signed: there are no anonymous reads and no API keys. A device holds an Ed25519 keypair, signs the string METHOD, newline, pathname, newline, unix seconds, and Cloud verifies the detached signature against the public key it enrolled. Timestamps more than 300 seconds off are rejected. There is no route here that writes a catalog. Publishing is owner-side and out of band, so this section is a read surface and the CLI that uses it is purely a consumer. Only the enrollment route has a command to copy. The three read routes have no one-line invocation at all, because every request needs a fresh Ed25519 signature over its own path and timestamp, and a curl that omits those headers is answered with 401 rather than data.",
+    lede: "Four routes under /v/<slug>/, served by AutoVault Cloud. Every one of them is signed: there are no anonymous reads and no API keys. A device holds an Ed25519 keypair, signs the string METHOD, newline, pathname, newline, unix seconds, and Cloud verifies the detached signature against the public key it enrolled. Timestamps more than 300 seconds off are rejected. There is no route here that writes a catalog. Publishing is owner-side and out of band, so nothing here writes a catalog, and the CLI that uses these routes is purely a consumer of one. The surface itself is one write and three reads: POST devices enrols a key as pending, and everything else only reads. Only the enrollment route has a command to copy. The three read routes have no one-line invocation at all, because every request needs a fresh Ed25519 signature over its own path and timestamp, and a curl that omits those headers is answered with 401 rather than data.",
     items: [
       {
         id: "sync-enroll",
@@ -246,7 +246,12 @@ const sections: ApiSection[] = [
         // starts the browser pairing flow, which is a different route entirely.
         // Only the slug form POSTs here, and it is the form a headless machine
         // needs.
-        copy: "autovault link <slug>",
+        //
+        // `your-slug`, not `<slug>`. This is the string that lands in somebody's
+        // shell, where angle brackets are redirection: `autovault link <slug>`
+        // is a syntax error before the CLI ever runs. Placeholder style in a
+        // copy button is a different question from placeholder style in prose.
+        copy: "autovault link your-slug",
         // Not just "Header" any more: the body field below is required too,
         // and the column heading is the only thing that says where each one
         // goes.

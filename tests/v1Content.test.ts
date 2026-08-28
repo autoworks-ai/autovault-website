@@ -281,6 +281,34 @@ describe("v1 content guardrails", () => {
     expect(pageDocsSource).toContain("SkillClone");
   });
 
+  it("only offers copy buttons for commands a shell will accept", () => {
+    const api = read(".vitepress/theme/components/ApiReferencePage.vue");
+    const copies = [...api.matchAll(/copy: "((?:[^"\\]|\\.)*)"/g)].map((m) => m[1]);
+    expect(copies.length).toBeGreaterThan(0);
+
+    // Angle brackets are redirection. `autovault link <slug>` is a syntax
+    // error before the CLI ever starts, so a copy button emitting one hands
+    // the reader a broken paste. Prose placeholders are a separate question:
+    // this rule is only about the string that lands in a shell.
+    for (const command of copies) {
+      expect(command, `copy value is not shell-safe: ${command}`).not.toMatch(/[<>]/);
+    }
+  });
+
+  it("does not call the hosted sync section a read surface", () => {
+    // Three separate copies of this claim, corrected one at a time over three
+    // rounds: the page summary, the agent markdown, and this section lede.
+    // Scanning both surfaces at once is what stops a fourth.
+    const api = read(".vitepress/theme/components/ApiReferencePage.vue");
+    const apiMarkdown = pageDocs.find((doc) => doc.key === "api")?.markdown ?? "";
+
+    for (const text of [api, apiMarkdown]) {
+      expect(text).not.toMatch(/is a read surface/i);
+      expect(text).not.toMatch(/four device-signed read routes/i);
+      expect(text).not.toMatch(/read-only surface/i);
+    }
+  });
+
   it("keeps both account surfaces agreeing on which statuses go to the portal", () => {
     // CloudPage and ClerkCloudTab each carry their own copy of this set. Two
     // account surfaces offering different recovery paths for one Stripe status
