@@ -21,6 +21,11 @@ import { getSubscription } from "../_lib/vault.js";
 
 // Creates the one trial checkout an account may have open, recovering rather
 // than duplicating when Stripe says the key has already been spent.
+// Both throws below happen after the claim was won and before
+// attachTrialSession runs downstream, so each one has to leave trial_claims in
+// a state the next request can read correctly. A bare throw leaves a claim with
+// no session on it, which reads as in-flight for IN_FLIGHT_MS and 409s an
+// account that may be perfectly eligible.
 async function createTrialCheckout(env, params, userId, claimToken, customerId) {
   const signal = AbortSignal.timeout(CHECKOUT_CREATE_TIMEOUT_MS);
   try {
@@ -35,19 +40,27 @@ async function createTrialCheckout(env, params, userId, claimToken, customerId) 
     // reachable when its subscription webhook has not landed yet. Handing back
     // a fresh checkout here would be the second trial, not a recovery.
     if (session.status === "complete") {
+      // Spent, and the claim should say so rather than sitting session-less
+      // until it looks abandoned and frees a second trial.
+      await attachTrialSession(env, userId, session.id);
       throw new ApiError(409, "This account already used its free trial.");
     }
     // Otherwise the key can be replaying an expired session from an earlier,
     // since-released claim. Returning its URL sends somebody to a dead
     // checkout, so mint a fresh one under this claim's own key.
     if (session.status && session.status !== "open") {
-      return createCheckoutSession(
+      const fresh = await createCheckoutSession(
         env,
         params,
         fetch,
         signal,
         `av-trial-checkout-claim-${claimToken}`
       );
+      // The keyed create no longer demands a url, because a replay legitimately
+      // has none. This one is not a replay, so it must.
+      if (!fresh.url)
+        throw new ApiError(502, "Stripe Checkout Session creation failed.");
+      return fresh;
     }
     return session;
   } catch (error) {
@@ -59,8 +72,14 @@ async function createTrialCheckout(env, params, userId, claimToken, customerId) 
     // The key being refused IS the answer: this account already has a trial
     // checkout, in flight or created under different parameters. Find it rather
     // than making a second one.
+    // Recovery returns the session, and attachTrialSession downstream records
+    // it against this claim, so nothing is left dangling on the happy path.
     const existing = await findOutstandingTrialSession(env, customerId);
     if (existing) return existing;
+    // Nothing to recover and nothing created here, so this claim bought
+    // nothing. Holding it would lock an eligible account out for two minutes
+    // over a key collision it had no part in.
+    await releaseTrialClaim(env, userId, { claim_token: claimToken });
     throw new ApiError(
       409,
       "A trial checkout is already open for this account. Try again in a moment."

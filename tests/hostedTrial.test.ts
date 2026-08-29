@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createSession } from "../functions/api/_lib/auth.js";
+import { onRequestPost as checkoutHostedVault } from "../functions/api/checkout/hosted-vault.js";
 import { createTestEnv, seedUser } from "./support/d1.js";
 import {
   attachTrialSession,
@@ -642,23 +644,6 @@ describe("trial copy never outlives the trial", () => {
     // sends a second trial out behind the first. An idempotency key scoped to
     // the ACCOUNT is what survives that window: a per-claim key would be a new
     // key on the new claim, which is exactly the case that needs stopping.
-    const route = readFileSync(
-      new URL("../functions/api/checkout/hosted-vault.js", import.meta.url),
-      "utf-8"
-    );
-    expect(route).toContain("`av-trial-checkout-${userId}`");
-    // Refusal is the signal that a trial checkout already exists, so recover
-    // rather than create a second one.
-    expect(route).toContain("in-progress request using this Idempotent Key");
-    expect(route).toContain("can only be used with the same parameters");
-    expect(route).toContain("findOutstandingTrialSession(env, customerId)");
-    // And a session the key replays from a since-released claim is expired, so
-    // its URL must not be handed to anybody.
-    expect(route).toContain('session.status === "complete"');
-    expect(route).toContain('session.status !== "open"');
-    expect(route).toContain("`av-trial-checkout-claim-${claimToken}`");
-
-    // The key reaches Stripe as a header rather than being accepted and dropped.
     let key: string | null = "unset";
     const fetcher = (async (_url: URL | RequestInfo, init?: RequestInit) => {
       key = new Headers(init?.headers).get("idempotency-key");
@@ -676,6 +661,141 @@ describe("trial copy never outlives the trial", () => {
     // A full-price create carries none, so two deliberate purchases stay two.
     await createCheckoutSession(env, params, fetcher);
     expect(key).toBeNull();
+
+    // A replay under a key returns a spent session, which has no url. Demanding
+    // one would 502 before the caller could read the status it has to act on.
+    const replay = (async () =>
+      new Response(JSON.stringify({ id: "cs_old", status: "complete", url: null }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      })) as typeof fetch;
+    await expect(
+      createCheckoutSession(env, params, replay, null, "av-trial-checkout-clerk_1")
+    ).resolves.toMatchObject({ id: "cs_old", status: "complete" });
+    // Without a key a urlless session is still a failed create.
+    await expect(createCheckoutSession(env, params, replay)).rejects.toThrow();
+  });
+
+  describe("when Stripe refuses the account's checkout key", () => {
+    // Driven through the route rather than asserted against its source, because
+    // what matters is the row trial_claims is left holding. Both exits below
+    // happen after the claim is won and before attachTrialSession runs.
+    const runCheckout = async (stripe: (url: string, init: RequestInit) => unknown) => {
+      const { db, env } = createTestEnv({ AUTOVAULT_HOSTED_TRIAL_DAYS: "14" });
+      seedUser(db);
+      const fetcher = vi.fn(async (url: URL | RequestInfo, init?: RequestInit) => {
+        const body = stripe(String(url), init ?? {}) as { error?: unknown };
+        return new Response(JSON.stringify(body), {
+          status: body?.error ? 400 : 200,
+          headers: { "content-type": "application/json" }
+        });
+      });
+      vi.stubGlobal("fetch", fetcher);
+      const cookie = await createSession(
+        new Request("https://autovault.dev"),
+        env,
+        "clerk_1"
+      );
+      const response = await checkoutHostedVault({
+        request: new Request("https://autovault.dev/api/checkout/hosted-vault", {
+          method: "POST",
+          headers: { cookie, "content-type": "application/json" },
+          body: JSON.stringify({ source: "deploy" })
+        }),
+        env
+      });
+      const keys = fetcher.mock.calls
+        .filter(([url, init]) =>
+          (init as RequestInit | undefined)?.method === "POST" &&
+          String(url).endsWith("/v1/checkout/sessions"))
+        .map(([, init]) =>
+          new Headers((init as RequestInit | undefined)?.headers).get("idempotency-key"));
+      return { response, keys, claim: await getTrialClaim(env, "clerk_1") };
+    };
+
+    // Everything before the create: no customer, no prior subscription, no open
+    // session. The account is eligible and reaches the claim.
+    const eligible = (url: string) => {
+      if (url.includes("/v1/customers/search")) return { data: [] };
+      if (url.includes("/v1/customers/cus_1")) return { id: "cus_1" };
+      if (url.includes("/v1/customers")) return { data: [], id: "cus_1" };
+      if (url.includes("/v1/subscriptions")) return { data: [] };
+      return null;
+    };
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("recovers the session the refused key already made", async () => {
+      let listed = 0;
+      const { response, keys, claim } = await runCheckout((url, init) => {
+        if (init.method === "POST" && url.endsWith("/v1/checkout/sessions"))
+          return {
+            error: { message: "another in-progress request using this Idempotent Key" }
+          };
+        if (url.includes("/v1/checkout/sessions")) {
+          // Empty before the claim, populated after: the session Stripe made
+          // behind the aborted POST has become listable by the retry.
+          listed += 1;
+          return listed === 1
+            ? { data: [] }
+            : {
+                data: [
+                  {
+                    id: "cs_recovered",
+                    url: "https://checkout/recovered",
+                    status: "open",
+                    metadata: { trial_days: "14" }
+                  }
+                ]
+              };
+        }
+        return eligible(url);
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ id: "cs_recovered" });
+      // Scoped to the account, which is the whole point: a per-claim key would
+      // be a fresh key on the retry's fresh claim and collide with nothing.
+      expect(keys).toEqual(["av-trial-checkout-clerk_1"]);
+      // And the claim now names the session it was spent on, so a later request
+      // can tell it from one whose checkout is gone.
+      expect(claim?.session_id).toBe("cs_recovered");
+    });
+
+    it("frees the claim when there is nothing to recover", async () => {
+      const { response, claim } = await runCheckout((url, init) => {
+        if (init.method === "POST" && url.endsWith("/v1/checkout/sessions"))
+          return {
+            error: {
+              message:
+                "Keys for idempotent requests can only be used with the same parameters"
+            }
+          };
+        if (url.includes("/v1/checkout/sessions")) return { data: [] };
+        return eligible(url);
+      });
+
+      expect(response.status).toBe(409);
+      // The claim bought nothing, so holding it would lock an eligible account
+      // out for IN_FLIGHT_MS over a key collision it had no part in.
+      expect(claim).toBeNull();
+    });
+
+    it("records the session when the key replays a completed trial", async () => {
+      const { response, claim } = await runCheckout((url, init) => {
+        if (init.method === "POST" && url.endsWith("/v1/checkout/sessions"))
+          return { id: "cs_spent", status: "complete", url: null };
+        if (url.includes("/v1/checkout/sessions")) return { data: [] };
+        return eligible(url);
+      });
+
+      expect(response.status).toBe(409);
+      // Spent, and the claim says so rather than sitting session-less until it
+      // looks abandoned and frees a second trial.
+      expect(claim?.session_id).toBe("cs_spent");
+    });
   });
 
   it("treats a completed checkout as spent rather than stale", () => {

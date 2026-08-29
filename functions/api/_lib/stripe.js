@@ -165,11 +165,17 @@ export async function createCheckoutSession(
     },
   );
   const payload = await response.json();
-  if (!response.ok || !payload.url)
+  if (!response.ok)
     throw new ApiError(
       502,
       payload.error?.message || "Stripe Checkout Session creation failed.",
     );
+  // A fresh session always carries a url. A replay under an idempotency key
+  // does not: Stripe nulls url once a session is complete or expired, so
+  // demanding one here would turn every replay into a 502 and hide the status
+  // the caller has to act on.
+  if (!payload.url && !idempotencyKey)
+    throw new ApiError(502, "Stripe Checkout Session creation failed.");
   return payload;
 }
 
