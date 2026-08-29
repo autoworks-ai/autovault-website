@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { HOSTED_TRIAL_DAYS } from "../.vitepress/theme/data/product";
 import {
   buildHostedVaultCheckoutParams,
+  findOutstandingTrialSession,
   hasPriorStripeSubscription,
   hostedTrialDays,
 } from "../functions/api/_lib/stripe.js";
@@ -294,12 +295,94 @@ describe("trial copy never outlives the trial", () => {
     // own: it is written after Checkout completes, so between opening a session
     // and finishing it there is no local record that a trial was offered.
     expect(route).toContain("hasPriorStripeSubscription");
-    expect(route).toContain("getStripeCustomerId");
-    const at = route.indexOf("const firstSubscription");
+    expect(route).toContain("resolveStripeCustomerId");
+    const at = route.indexOf("const hadTrialBefore");
     expect(at, "no eligibility check").toBeGreaterThan(-1);
-    const block = route.slice(at, route.indexOf(";", route.indexOf("email: user.email", at)));
-    expect(block).toContain("!subscription?.status");
+    const block = route.slice(at, route.indexOf("};", at));
+    expect(block).toContain("subscription?.status");
     expect(block).toContain("hasPriorStripeSubscription");
+  });
+
+  it("reuses an outstanding trial session instead of issuing a second", () => {
+    const route = readFileSync(
+      new URL("../functions/api/checkout/hosted-vault.js", import.meta.url),
+      "utf-8"
+    );
+
+    // A subscription lookup structurally cannot see a trial that has been
+    // offered and not yet taken, because no subscription exists until a session
+    // completes. The open session is the only object alive in that window, so
+    // it is what the second request has to find.
+    expect(route).toContain("findOutstandingTrialSession");
+    const at = route.indexOf("if (!hadTrialBefore)");
+    expect(at, "no outstanding-session check").toBeGreaterThan(-1);
+    const block = route.slice(at, route.indexOf("const params", at));
+    expect(block).toContain("findOutstandingTrialSession");
+    expect(block).toContain("reused: true");
+
+    // And it has to run before the session is built, not after.
+    expect(at).toBeLessThan(route.indexOf("buildHostedVaultCheckoutParams({"));
+  });
+
+  it("finds an open trial session and ignores the ones that are not", async () => {
+    const stub = (sessions: unknown[]) =>
+      (async (url: URL | RequestInfo) => {
+        expect(String(url)).toContain("status=open");
+        expect(String(url)).toContain("customer=cus_1");
+        return new Response(JSON.stringify({ data: sessions }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      }) as typeof fetch;
+
+    const env = { STRIPE_SECRET_KEY: "sk_test_x" };
+
+    // A session without the trial stamp is somebody paying full price; reusing
+    // it would be wrong, and so would refusing a trial because of it.
+    await expect(
+      findOutstandingTrialSession(env, "cus_1", stub([
+        { id: "cs_paid", url: "https://checkout/paid", metadata: {} }
+      ]))
+    ).resolves.toBeNull();
+
+    await expect(
+      findOutstandingTrialSession(env, "cus_1", stub([
+        { id: "cs_paid", url: "https://checkout/paid", metadata: {} },
+        { id: "cs_trial", url: "https://checkout/trial", metadata: { trial_days: "14" } }
+      ]))
+    ).resolves.toMatchObject({ id: "cs_trial" });
+
+    // trial_days "0" is a session built with the trial switched off.
+    await expect(
+      findOutstandingTrialSession(env, "cus_1", stub([
+        { id: "cs_zero", url: "https://checkout/zero", metadata: { trial_days: "0" } }
+      ]))
+    ).resolves.toBeNull();
+
+    // No customer means no session list to read, and no Stripe call either.
+    await expect(
+      findOutstandingTrialSession(env, null, (() => {
+        throw new Error("must not call Stripe without a customer");
+      }) as unknown as typeof fetch)
+    ).resolves.toBeNull();
+  });
+
+  it("does not record a billing relationship that has not started", () => {
+    const stripe = readFileSync(
+      new URL("../functions/api/_lib/stripe.js", import.meta.url),
+      "utf-8"
+    );
+    const at = stripe.indexOf("export async function resolveStripeCustomerId");
+    expect(at, "no resolveStripeCustomerId").toBeGreaterThan(-1);
+    const fn = stripe.slice(at, stripe.indexOf("\nexport ", at + 10));
+
+    // /api/billing/portal returns 409 on the ABSENCE of a customers row, to
+    // mean no billing relationship has ever existed. Somebody who opened
+    // Checkout and walked away has not started one, so resolving a customer
+    // here must not write that row. The billing webhook still does, on
+    // completion.
+    expect(fn).toContain("getStripeCustomerId");
+    expect(fn).not.toContain("upsertCustomer");
   });
 
   it("sets no trial-end behaviour when there is no trial to end", () => {

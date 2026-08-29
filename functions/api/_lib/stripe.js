@@ -42,6 +42,12 @@ export function buildHostedVaultCheckoutParams({
   env,
   user,
   source = "hosted-vault",
+  // The Stripe customer this session belongs to, resolved by the caller.
+  // Passing an id rather than customer_email is what makes a session findable
+  // afterwards: with customer_email Stripe mints a fresh Customer per
+  // completed checkout, so one account accumulates several and none of them
+  // can be listed against to see what is already outstanding.
+  customerId = null,
   // One trial per account. Stripe does not remember that a customer already
   // had one, and "cancel" at trial end leaves them free to check out again, so
   // without this a 14-day trial is a renewable subscription that never bills.
@@ -90,6 +96,11 @@ export function buildHostedVaultCheckoutParams({
       "subscription_data[trial_settings][end_behavior][missing_payment_method]",
       "cancel",
     );
+    // Stamped on the session itself, not just the subscription, because the
+    // session is the only object that exists while the trial is merely offered.
+    // findOutstandingTrialSession reads this to recognise an offer that is
+    // still open, which is what stops a second one being made.
+    params.set("metadata[trial_days]", String(trialDays));
   }
   params.set("submit_type", env.STRIPE_CHECKOUT_SUBMIT_TYPE || "subscribe");
   // Lets a customer type a Stripe promotion code on Checkout. Coupons without
@@ -98,7 +109,8 @@ export function buildHostedVaultCheckoutParams({
   // 100% coupons would still demand a card without this. Paid totals still
   // collect a payment method; $0 after a promo does not.
   params.set("payment_method_collection", "if_required");
-  if (user.email) params.set("customer_email", user.email);
+  if (customerId) params.set("customer", customerId);
+  else if (user.email) params.set("customer_email", user.email);
 
   applyBranding(params, env);
   applyCustomText(params, env, allowTrial);
@@ -184,22 +196,7 @@ export async function hasPriorStripeSubscription(
   if (!env.STRIPE_SECRET_KEY)
     throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
 
-  const get = async (path) => {
-    const response = await fetcher(`https://api.stripe.com/v1/${path}`, {
-      method: "GET",
-      headers: {
-        authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
-        "stripe-version": STRIPE_API_VERSION,
-      },
-    });
-    const payload = await response.json();
-    if (!response.ok)
-      throw new ApiError(
-        502,
-        payload.error?.message || "Stripe subscription lookup failed.",
-      );
-    return payload;
-  };
+  const get = (path) => stripeGet(env, path, fetcher);
 
   const seen = new Set();
   const anyFor = async (customerId) => {
@@ -225,6 +222,95 @@ export async function hasPriorStripeSubscription(
   }
 
   return false;
+}
+
+// The Stripe customer to bill this user as, creating one if Stripe has never
+// seen them.
+//
+// Deliberately does NOT write to `customers`. That table's absence of a row is
+// what /api/billing/portal reads to mean "no billing relationship has ever
+// existed", and somebody who opens Checkout and walks away has not started
+// one. The billing webhook still writes the row when a session completes. Here
+// the row is only ever read, and Stripe's own customer list is the fallback,
+// which is also what stops an abandoned checkout leaving a fresh orphan
+// customer behind on every attempt.
+export async function resolveStripeCustomerId(
+  env,
+  { userId, email },
+  fetcher = fetch,
+) {
+  const known = await getStripeCustomerId(env, userId);
+  if (known) return known;
+  if (!email) return null;
+
+  const existing = await stripeGet(env, `customers?email=${encodeURIComponent(email)}&limit=1`, fetcher);
+  const found = asId(existing.data?.[0]);
+  if (found) return found;
+
+  const created = await stripePost(
+    env,
+    "customers",
+    { email, "metadata[user_id]": userId },
+    fetcher,
+  );
+  return asId(created) || null;
+}
+
+// An unfinished Checkout Session for this customer that already carries a
+// trial, or null.
+//
+// This is the half hasPriorStripeSubscription cannot answer. That one asks
+// whether a trial was ever TAKEN, and a subscription only exists once a
+// session completes; between issuing a session and finishing it there is
+// nothing for it to find, so a first-time account could open several and each
+// one carried a trial. The session is the object that exists during exactly
+// that window, so the session is what has to be looked at.
+export async function findOutstandingTrialSession(env, customerId, fetcher = fetch) {
+  if (!customerId) return null;
+  const list = await stripeGet(
+    env,
+    `checkout/sessions?customer=${encodeURIComponent(customerId)}&status=open&limit=20`,
+    fetcher,
+  );
+  return (
+    (list.data ?? []).find(
+      (session) => Number(session.metadata?.trial_days) > 0 && session.url,
+    ) || null
+  );
+}
+
+async function stripeGet(env, path, fetcher = fetch) {
+  if (!env.STRIPE_SECRET_KEY)
+    throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
+  const response = await fetcher(`https://api.stripe.com/v1/${path}`, {
+    method: "GET",
+    headers: {
+      authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+      "stripe-version": STRIPE_API_VERSION,
+    },
+  });
+  const payload = await response.json();
+  if (!response.ok)
+    throw new ApiError(502, payload.error?.message || "Stripe lookup failed.");
+  return payload;
+}
+
+async function stripePost(env, path, body, fetcher = fetch) {
+  if (!env.STRIPE_SECRET_KEY)
+    throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
+  const response = await fetcher(`https://api.stripe.com/v1/${path}`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+      "content-type": "application/x-www-form-urlencoded",
+      "stripe-version": STRIPE_API_VERSION,
+    },
+    body: new URLSearchParams(body).toString(),
+  });
+  const payload = await response.json();
+  if (!response.ok)
+    throw new ApiError(502, payload.error?.message || "Stripe request failed.");
+  return payload;
 }
 
 export function buildBillingPortalParams({
