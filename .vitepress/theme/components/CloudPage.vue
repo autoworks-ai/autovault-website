@@ -559,10 +559,17 @@
                      say what still works until then. -->
                 <p v-if="cancelling" class="cv-muted cv-sub-warn">
                   <strong>This subscription is cancelled.</strong>
-                  {{ renewalLabel ? renewalLabel.replace("Access ends ", "Hosted access continues until ") + "." : "Hosted access continues until the end of the current period." }}
-                  Machines keep syncing until then, and nothing is deleted when
-                  it lapses. Reopen the billing portal to resume before that
-                  date.
+                  <template v-if="paid">
+                    Hosted access continues until
+                    {{ periodEndDate || "the end of the current period" }}.
+                    Machines keep syncing until then, and nothing is deleted
+                    when it lapses.
+                  </template>
+                  <template v-else>
+                    Hosted access has already stopped, because the payment
+                    status needs attention as well. Nothing is deleted.
+                  </template>
+                  Reopen the billing portal to resume.
                 </p>
                 <p
                   v-else-if="canStartCheckout && !canManageBilling"
@@ -1804,11 +1811,20 @@ const SUBSCRIPTION_LABELS: Record<
 // period closes. Every field this page reads was identical before and after,
 // which meant somebody who had just cancelled had no way to tell whether it
 // had worked. This is the field that says so.
-const cancelling = computed(
-  () =>
-    Boolean(subscription.value?.cancel_at_period_end) &&
-    Boolean(subscription.value?.active),
-);
+// Statuses where the ending has already happened, so a scheduled cancellation
+// is history rather than news. Everything else, including the payment-problem
+// statuses, still needs to be told it is cancelled.
+const ENDED_STATUSES = new Set(["canceled", "incomplete_expired"]);
+
+const cancelling = computed(() => {
+  if (!subscription.value?.cancel_at_period_end) return false;
+  // Deliberately NOT `&& active`. That was the first version and it hid the
+  // cancellation from a subscriber who is past_due or paused as well, which is
+  // the person most likely to have just cancelled and most in need of being
+  // told it worked. Whether access is still running is a separate question,
+  // and the copy below answers it separately.
+  return !ENDED_STATUSES.has(subscription.value?.status ?? "");
+});
 
 const subscriptionState = computed(() => {
   const status = subscription.value?.status ?? null;
@@ -1856,16 +1872,21 @@ const canManageBilling = computed(
   () => paid.value || Boolean(subscription.value?.status),
 );
 
-const renewalLabel = computed(() => {
+const periodEndDate = computed(() => {
   const seconds = subscription.value?.current_period_end;
   if (!seconds) return null;
   const date = new Date(seconds * 1000);
   if (Number.isNaN(date.getTime())) return null;
-  const formatted = date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
+});
+
+const renewalLabel = computed(() => {
+  const formatted = periodEndDate.value;
+  if (!formatted) return null;
   // The API persists cancel_at_period_end now, so this can finally say which
   // one it is. It used to hedge with "Current period ends" for everything that
   // was not already dead, because a subscription cancelled effective

@@ -99,7 +99,24 @@ describe("cloud dashboard stage machine", () => {
     for (const source of [cloudPage, clerkTab]) {
       expect(source).toContain("cancel_at_period_end");
       expect(source).toContain('{ text: "Cancelled", tone: "warn" as const }');
+
+      // Not gated on `active`. The first version was, which hid the
+      // cancellation from a past_due or paused subscriber: the person most
+      // likely to have just cancelled and most in need of being told it took.
+      // Whether access is still running is a separate question and the copy
+      // answers it separately.
+      const at = source.indexOf("const cancelling = computed");
+      expect(at, "no cancelling computed").toBeGreaterThan(-1);
+      const body = source.slice(at, source.indexOf("\n});", at));
+      expect(body).not.toContain("subscription.value?.active");
+      expect(body).toContain("ENDED_STATUSES");
     }
+
+    // Only the "access continues" half depends on being paid.
+    const panelAt = cloudPage.indexOf('v-if="cancelling"');
+    const panel = cloudPage.slice(panelAt, cloudPage.indexOf("</p>", panelAt));
+    expect(panel).toContain('v-if="paid"');
+    expect(panel.replace(/\s+/g, " ")).toContain("Hosted access has already stopped");
   });
 });
 

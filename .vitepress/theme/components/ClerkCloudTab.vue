@@ -59,11 +59,15 @@ const billingNotice = ref<string | null>(null);
 // cancelled from the portal keeps its status until the period closes, so
 // "Trialing" and "Active" are both true of a cancelled one and both wrong to
 // show as the headline.
-const cancelling = computed(
-  () =>
-    Boolean(subscription.value?.cancel_at_period_end) &&
-    Boolean(subscription.value?.active),
-);
+// Same rule as the dashboard's, including that it does NOT also require
+// `active`: a past_due or paused subscriber who has cancelled still has to be
+// told the cancellation took.
+const ENDED_STATUSES = new Set(["canceled", "incomplete_expired"]);
+
+const cancelling = computed(() => {
+  if (!subscription.value?.cancel_at_period_end) return false;
+  return !ENDED_STATUSES.has(subscription.value?.status ?? "");
+});
 
 const subscriptionState = computed(() => {
   const status = subscription.value?.status ?? null;
