@@ -241,11 +241,20 @@ export async function resolveStripeCustomerId(
 ) {
   const known = await getStripeCustomerId(env, userId);
   if (known) return known;
-  if (!email) return null;
 
-  const existing = await stripeGet(env, `customers?email=${encodeURIComponent(email)}&limit=1`, fetcher);
-  const found = asId(existing.data?.[0]);
-  if (found) return found;
+  if (email) {
+    const existing = await stripeGet(env, `customers?email=${encodeURIComponent(email)}&limit=1`, fetcher);
+    const found = asId(existing.data?.[0]);
+    if (found) return found;
+  }
+
+  // Last resort before creating, and only that. Customer search is eventually
+  // consistent: measured against real Stripe, a customer created seconds ago
+  // was still not indexed 24 seconds later. It finds an older customer whose
+  // email has since changed, which no other lookup here can, and it is not
+  // load-bearing for anything recent.
+  const byUser = await searchCustomerByUserId(env, userId, fetcher);
+  if (byUser) return byUser;
 
   // Idempotent per user, which is load-bearing rather than tidy. Two first-time
   // requests can reach here at the same moment and each create a customer, and
@@ -257,9 +266,18 @@ export async function resolveStripeCustomerId(
   // safe here and not on the Checkout Session, whose params vary by source and
   // origin.
   const key = `av-customer-${userId}`;
-  const body = { email, "metadata[user_id]": userId };
+  // Email deliberately NOT in the keyed body. Stripe refuses a key reused with
+  // different parameters, so including a mutable field means somebody who edits
+  // their address inside the retention window is blocked from checking out, and
+  // once the key ages out they get the second customer this key exists to
+  // prevent. A body of nothing but the user id cannot vary, which is what makes
+  // the key a guarantee rather than a hope. The address is set immediately
+  // after, off the keyed path.
+  const body = { "metadata[user_id]": userId };
   try {
-    return asId(await stripePost(env, "customers", body, fetcher, key)) || null;
+    const customerId = asId(await stripePost(env, "customers", body, fetcher, key));
+    if (customerId && email) await setCustomerEmail(env, customerId, email, fetcher);
+    return customerId || null;
   } catch (error) {
     // Verified against Stripe rather than assumed: two requests using one key at
     // the same instant do NOT serialise. The second is refused with
@@ -267,10 +285,24 @@ export async function resolveStripeCustomerId(
     // doing its job, and it means the other request is creating the customer
     // right now, so read it back rather than reporting a 502 at somebody
     // trying to pay.
-    if (!/in-progress request using this Idempotent Key/i.test(error?.message ?? "")) throw error;
-    const raced = await stripeGet(env, `customers?email=${encodeURIComponent(email)}&limit=1`, fetcher);
-    const found = asId(raced.data?.[0]);
-    if (found) return found;
+    // Two shapes, one recovery. The in-progress refusal means another request
+    // is creating this customer right now. The changed-parameters refusal means
+    // the key was already spent on a create whose body differed, which happens
+    // when somebody edits their email inside the retention window. In both
+    // cases the customer either exists or is about to, so look rather than
+    // fail: the alternative is a 502 at somebody trying to pay, or worse, a
+    // second customer once the key ages out.
+    const recoverable =
+      /in-progress request using this Idempotent Key/i.test(error?.message ?? "") ||
+      /can only be used with the same parameters/i.test(error?.message ?? "");
+    if (!recoverable) throw error;
+    const raced =
+      (await searchCustomerByUserId(env, userId, fetcher)) ||
+      asId(
+        (await stripeGet(env, `customers?email=${encodeURIComponent(email)}&limit=1`, fetcher))
+          .data?.[0],
+      );
+    if (raced) return raced;
     throw new ApiError(
       503,
       "Your checkout is already being set up. Try again in a moment."
@@ -299,6 +331,32 @@ export async function findOutstandingTrialSession(env, customerId, fetcher = fet
       (session) => Number(session.metadata?.trial_days) > 0 && session.url,
     ) || null
   );
+}
+
+// Best effort, and off the idempotent path on purpose. A customer with no email
+// still bills correctly and Checkout collects one anyway; a customer that could
+// not be created at all does not. Failing here must not fail the checkout.
+async function setCustomerEmail(env, customerId, email, fetcher = fetch) {
+  try {
+    await stripePost(env, `customers/${encodeURIComponent(customerId)}`, { email }, fetcher);
+  } catch {
+    // Left for the webhook and the next resolve to sort out.
+  }
+}
+
+// The stable handle for an account's Stripe customer. Written at creation and
+// never edited, unlike the email.
+async function searchCustomerByUserId(env, userId, fetcher = fetch) {
+  if (!userId) return null;
+  const query = encodeURIComponent(`metadata['user_id']:'${userId}'`);
+  try {
+    const found = await stripeGet(env, `customers/search?query=${query}&limit=1`, fetcher);
+    return asId(found.data?.[0]) || null;
+  } catch {
+    // Search is a convenience here, not the contract: the local row and the
+    // email lookup still answer, and a search outage must not stop checkout.
+    return null;
+  }
 }
 
 async function stripeGet(env, path, fetcher = fetch) {

@@ -453,12 +453,19 @@ describe("trial copy never outlives the trial", () => {
   });
 
   it("creates at most one Stripe customer per account, even concurrently", async () => {
-    const calls: Array<{ path: string; key: string | null }> = [];
+    const calls: Array<{ path: string; key: string | null; method: string; body: string }> = [];
     const fetcher = (async (url: URL | RequestInfo, init?: RequestInit) => {
       const path = String(url).replace("https://api.stripe.com/v1/", "");
       const headers = new Headers(init?.headers as HeadersInit);
-      calls.push({ path, key: headers.get("idempotency-key") });
-      const body = path.startsWith("customers?") ? { data: [] } : { id: "cus_new" };
+      calls.push({
+        path,
+        key: headers.get("idempotency-key"),
+        method: init?.method ?? "GET",
+        body: String(init?.body ?? "")
+      });
+      const body = path.startsWith("customers?") || path.startsWith("customers/search")
+        ? { data: [] }
+        : { id: "cus_new" };
       return new Response(JSON.stringify(body), {
         status: 200,
         headers: { "content-type": "application/json" }
@@ -477,8 +484,23 @@ describe("trial copy never outlives the trial", () => {
     // resolving the other, so an open session went unseen and a live claim read
     // as stale. The body is stable per user, which is what makes a key safe
     // here and not on the Checkout Session, whose params vary by source.
-    const create = calls.find((c) => c.path === "customers");
+    const create = calls.find((c) => c.path === "customers" && c.method === "POST");
     expect(create?.key).toBe("av-customer-u_1");
+
+    // The keyed body carries the user id and nothing else. Stripe refuses a key
+    // reused with different parameters, so a mutable field in here blocks
+    // checkout for anyone who edits their email inside the retention window and
+    // hands them a second customer once the key ages out. Verified against real
+    // Stripe: with a stable body, a resolve with a changed email returns the
+    // same customer.
+    expect(create?.body).toContain("metadata%5Buser_id%5D=u_1");
+    expect(create?.body).not.toContain("email");
+
+    // The address is set immediately after, off the keyed path, where failing
+    // costs an email rather than a checkout.
+    const update = calls.find((c) => c.path.startsWith("customers/cus_"));
+    expect(update?.key).toBeNull();
+    expect(update?.body).toContain("email=");
   });
 
   it("treats an in-progress idempotent create as the other request winning", async () => {
@@ -511,6 +533,20 @@ describe("trial copy never outlives the trial", () => {
     ).resolves.toBe("cus_winner");
   });
 
+  it("does not claim a trial that is not configured", () => {
+    const route = readFileSync(
+      new URL("../functions/api/checkout/hosted-vault.js", import.meta.url),
+      "utf-8"
+    );
+
+    // The claim arbitrates an offer. With no trial configured there is no
+    // offer, and claiming anyway records a full-price session as the one this
+    // account's trial was spent on: switch the trial on later and an eligible
+    // first-timer gets their own old non-trial checkout handed back through the
+    // reuse path.
+    expect(route).toContain("!hadTrialBefore && hostedTrialDays(env) > 0");
+  });
+
   it("keeps the claim when Stripe cannot say whether its session is open", () => {
     const route = readFileSync(
       new URL("../functions/api/checkout/hosted-vault.js", import.meta.url),
@@ -538,7 +574,8 @@ describe("trial copy never outlives the trial", () => {
     // completes. The open session is the only object alive in that window, so
     // it is what the second request has to find.
     expect(route).toContain("findOutstandingTrialSession");
-    const at = route.indexOf("if (!hadTrialBefore)");
+    // The condition gained the trial-configured gate, so match its stem.
+    const at = route.indexOf("if (!hadTrialBefore");
     expect(at, "no outstanding-session check").toBeGreaterThan(-1);
     const block = route.slice(at, route.indexOf("const params", at));
     expect(block).toContain("findOutstandingTrialSession");

@@ -5,6 +5,7 @@ import {
   createCheckoutSession,
   findOutstandingTrialSession,
   hasPriorStripeSubscription,
+  hostedTrialDays,
   resolveStripeCustomerId,
   retrieveCheckoutSession
 } from "../_lib/stripe.js";
@@ -77,7 +78,12 @@ export async function onRequestPost({ request, env }) {
     // would strand the first, and Stripe keeps them open for 24 hours.
     let allowTrial = false;
 
-    if (!hadTrialBefore) {
+    // No trial configured means no claim. The claim exists to arbitrate an
+    // offer, and there is no offer: claiming anyway records a full-price
+    // session as the one this account's trial was spent on, so switching the
+    // trial on later would hand an eligible first-timer their own old
+    // non-trial checkout back through the reuse path.
+    if (!hadTrialBefore && hostedTrialDays(env) > 0) {
       // An offer that has already been made and not yet resolved. Reuse rather
       // than refuse: a second session would strand the first, and Stripe keeps
       // them open for 24 hours.
