@@ -5,6 +5,8 @@ import {
   attachTrialSession,
   claimTrial,
   getTrialClaim,
+  IN_FLIGHT_MS,
+  isTrialClaimInFlight,
   releaseTrialClaim,
 } from "../functions/api/_lib/trials.js";
 import { HOSTED_TRIAL_DAYS } from "../.vitepress/theme/data/product";
@@ -347,10 +349,61 @@ describe("trial copy never outlives the trial", () => {
 
     // Released only when the caller has established the offer lapsed, after
     // which the account may try again.
-    expect(await getTrialClaim(env, "clerk_1")).toBeTruthy();
-    await releaseTrialClaim(env, "clerk_1");
+    const held = await getTrialClaim(env, "clerk_1");
+    expect(held).toBeTruthy();
+    await releaseTrialClaim(env, "clerk_1", held);
     expect(await getTrialClaim(env, "clerk_1")).toBeNull();
     expect(await claimTrial(env, "clerk_1", "cs_d")).toBe(true);
+  });
+
+  it("does not release a claim whose session is still being created", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db);
+
+    // The failure this guard exists for. Request A inserts its claim and pauses
+    // to create a Stripe session. Request B looks, finds no session in Stripe
+    // because A has not finished, and used to delete A's claim as stale, claim
+    // for itself, and hand out a second trial. The delete defeated the primary
+    // key it was there to respect.
+    await claimTrial(env, "clerk_1");
+    const inFlight = await getTrialClaim(env, "clerk_1");
+    expect(isTrialClaimInFlight(inFlight)).toBe(true);
+
+    // Once a session is attached it is no longer in flight: from then on its
+    // liveness is Stripe's answer about that session, not a clock.
+    await attachTrialSession(env, "clerk_1", "cs_open");
+    expect(isTrialClaimInFlight(await getTrialClaim(env, "clerk_1"))).toBe(false);
+  });
+
+  it("stops treating a claim as in flight once the window passes", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db);
+
+    // Otherwise a request that died between claiming and creating a session
+    // would block that account forever.
+    await claimTrial(env, "clerk_1");
+    const claim = await getTrialClaim(env, "clerk_1");
+    expect(isTrialClaimInFlight(claim, Date.parse(claim.claimed_at) + IN_FLIGHT_MS + 1)).toBe(false);
+  });
+
+  it("releases only the exact claim it looked at", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db);
+
+    await claimTrial(env, "clerk_1", "cs_old");
+    const stale = await getTrialClaim(env, "clerk_1");
+
+    // Somebody re-claims in the gap between the read and the delete.
+    await releaseTrialClaim(env, "clerk_1", stale);
+    await claimTrial(env, "clerk_1", "cs_new");
+
+    // Replaying the stale release must not throw the new claim away. An
+    // unconditional delete would, and so would one matched on claimed_at:
+    // these two claims are made inside the same millisecond and carry the same
+    // timestamp, which is why the identity is the rowid.
+    expect(stale.claim_token).not.toBe((await getTrialClaim(env, "clerk_1"))?.claim_token);
+    await releaseTrialClaim(env, "clerk_1", stale);
+    expect((await getTrialClaim(env, "clerk_1"))?.session_id).toBe("cs_new");
   });
 
   it("records which session a claim was spent on", async () => {
@@ -380,7 +433,10 @@ describe("trial copy never outlives the trial", () => {
     // Losing the race must not silently sell somebody a full-price
     // subscription they did not ask for.
     expect(route).toContain("A checkout session is already being created");
-    expect(route).toContain("allowTrial = await claimTrial");
+    expect(route).toContain("await claimTrial(env, user.id)");
+    // A claim still being spent by another request is not a claim to take.
+    expect(route).toContain("isTrialClaimInFlight");
+    expect(route).toContain("if (claim && !inFlight)");
   });
 
   it("reuses an outstanding trial session instead of issuing a second", () => {

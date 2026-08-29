@@ -20,22 +20,27 @@ import { first, nowIso, run } from "./db.js";
 export async function claimTrial(env, userId, sessionId = null) {
   const row = await first(
     env,
-    `insert into trial_claims (user_id, session_id, claimed_at)
-     values (?, ?, ?)
+    `insert into trial_claims (user_id, session_id, claimed_at, claim_token)
+     values (?, ?, ?, ?)
      on conflict(user_id) do nothing
      returning user_id`,
     userId,
     sessionId,
     nowIso(),
+    crypto.randomUUID(),
   );
   return Boolean(row);
 }
 
 export async function getTrialClaim(env, userId) {
   if (!userId) return null;
+  // claim_token is the identity. Two weaker ones were tried and both collide:
+  // claimed_at repeats when two claims land inside the same millisecond, and
+  // SQLite reuses a rowid once the row it belonged to is deleted, which is
+  // exactly the delete-then-insert this path performs.
   return first(
     env,
-    "select user_id, session_id, claimed_at from trial_claims where user_id = ?",
+    "select user_id, session_id, claimed_at, claim_token from trial_claims where user_id = ?",
     userId,
   );
 }
@@ -52,11 +57,44 @@ export async function attachTrialSession(env, userId, sessionId) {
   );
 }
 
-// A claim is only released once the caller has established that the offer
-// lapsed: no subscription anywhere and no open session carrying it. Releasing
-// on any weaker evidence would hand out a second trial, which is the whole
-// thing this table exists to prevent.
-export async function releaseTrialClaim(env, userId) {
-  if (!userId) return;
-  await run(env, "delete from trial_claims where user_id = ?", userId);
+// How long a claim with no session attached is treated as still being worked
+// on. Creating a Stripe Checkout Session is one network call; two minutes is
+// generous for it and short enough that a request which died mid-create only
+// blocks that account briefly rather than for good.
+export const IN_FLIGHT_MS = 120_000;
+
+// A claim that has been made but whose session does not exist yet, because the
+// request that won it is still talking to Stripe.
+//
+// This distinction is the whole correctness of the release path. The first
+// version released any claim it found once it had established there was no
+// subscription and no open session, and called that claim provably stale. It
+// was not: request A inserts its claim and pauses to create a session, so
+// request B sees no session in Stripe, deletes A's claim as stale, claims for
+// itself, and both hand out a trial. The delete defeated the primary key it
+// was there to respect.
+export function isTrialClaimInFlight(claim, now = Date.now()) {
+  if (!claim || claim.session_id) return false;
+  const claimedAt = Date.parse(claim.claimed_at ?? "");
+  if (Number.isNaN(claimedAt)) return false;
+  return now - claimedAt < IN_FLIGHT_MS;
+}
+
+// Released only against the exact claim the caller looked at.
+//
+// If anything re-claimed in between, the rowid differs and this deletes nothing
+// rather than throwing away a live claim it never saw. An unconditional delete
+// here is how the race got back in.
+export async function releaseTrialClaim(env, userId, claim) {
+  // No token, no release. A row written before the column existed cannot be
+  // identified, and guessing with a looser match is the failure this whole
+  // function is shaped to avoid. Such a row ages out of the in-flight window
+  // and is superseded when its own session is seen to be gone.
+  if (!userId || !claim?.claim_token) return;
+  await run(
+    env,
+    "delete from trial_claims where user_id = ? and claim_token = ?",
+    userId,
+    claim.claim_token,
+  );
 }

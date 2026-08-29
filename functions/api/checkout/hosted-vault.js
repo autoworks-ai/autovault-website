@@ -11,6 +11,7 @@ import {
   attachTrialSession,
   claimTrial,
   getTrialClaim,
+  isTrialClaimInFlight,
   releaseTrialClaim
 } from "../_lib/trials.js";
 import { getSubscription } from "../_lib/vault.js";
@@ -82,17 +83,25 @@ export async function onRequestPost({ request, env }) {
       const outstanding = await findOutstandingTrialSession(env, customerId);
       if (outstanding) return json({ url: outstanding.url, id: outstanding.id, reused: true });
 
-      // Past here we know Stripe has no subscription for this account and no
-      // open session carrying a trial, so any claim on record was spent on a
-      // checkout that expired without being taken. That offer lapsed rather
-      // than being used, and the account gets to try again.
-      if (await getTrialClaim(env, user.id)) await releaseTrialClaim(env, user.id);
+      // A claim with no session attached, made moments ago, is another request
+      // still talking to Stripe. Not stale, and deleting it is exactly how the
+      // race gets back in: that request will create a trial session the instant
+      // it returns, and this one would create a second.
+      const claim = await getTrialClaim(env, user.id);
+      const inFlight = isTrialClaimInFlight(claim);
+
+      // Only past that. Stripe has no subscription and no open session carrying
+      // a trial, and the claim on record names a session that is therefore gone
+      // (or never appeared inside the in-flight window). That offer lapsed
+      // rather than being used, so the account gets to try again. Released
+      // against this exact claim, so a claim made since is never thrown away.
+      if (claim && !inFlight) await releaseTrialClaim(env, user.id, claim);
 
       // The atomic step, and the only one in this sequence that is. Everything
       // above is a check-then-act against Stripe, so two overlapping requests
       // could both reach here believing they are the first. Exactly one of them
       // wins the insert.
-      allowTrial = await claimTrial(env, user.id);
+      allowTrial = inFlight ? false : await claimTrial(env, user.id);
 
       if (!allowTrial) {
         // Lost the race by milliseconds. The winner may not have created its
