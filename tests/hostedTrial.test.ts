@@ -12,6 +12,8 @@ import {
 import { HOSTED_TRIAL_DAYS } from "../.vitepress/theme/data/product";
 import {
   buildHostedVaultCheckoutParams,
+  CHECKOUT_CREATE_TIMEOUT_MS,
+  createCheckoutSession,
   findOutstandingTrialSession,
   hasPriorStripeSubscription,
   hostedTrialDays,
@@ -553,6 +555,41 @@ describe("trial copy never outlives the trial", () => {
     expect(await getTrialClaim(env, "clerk_1")).toBeNull();
     // And the account is usable again rather than 409 forever.
     expect(await claimTrial(env, "clerk_1", "cs_after")).toBe(true);
+  });
+
+  it("cannot outlive the claim window it is covered by", async () => {
+    // The window is a guess unless the call underneath it is bounded. An owner
+    // still inside createCheckoutSession when IN_FLIGHT_MS elapses would have
+    // its claim released and a second trial session created behind it, and then
+    // succeed. The abort makes the window an upper bound instead.
+    expect(CHECKOUT_CREATE_TIMEOUT_MS).toBeLessThan(IN_FLIGHT_MS);
+
+    const route = readFileSync(
+      new URL("../functions/api/checkout/hosted-vault.js", import.meta.url),
+      "utf-8"
+    );
+    expect(route).toContain("AbortSignal.timeout(CHECKOUT_CREATE_TIMEOUT_MS)");
+    // Bounded only where a claim is held. A full-price session has no window to
+    // stay inside and no reason to be cut short.
+    expect(route).toContain("allowTrial ? AbortSignal.timeout");
+
+    // And the signal actually reaches fetch rather than being accepted and
+    // dropped.
+    let sawSignal = false;
+    const fetcher = (async (_url: URL | RequestInfo, init?: RequestInit) => {
+      sawSignal = Boolean(init?.signal);
+      return new Response(JSON.stringify({ id: "cs_1", url: "https://checkout/x" }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }) as typeof fetch;
+    await createCheckoutSession(
+      { STRIPE_SECRET_KEY: "sk_test_x" },
+      new URLSearchParams({ mode: "subscription" }),
+      fetcher,
+      AbortSignal.timeout(1000)
+    );
+    expect(sawSignal).toBe(true);
   });
 
   it("does not claim a trial that is not configured", () => {

@@ -58,9 +58,15 @@ export async function attachTrialSession(env, userId, sessionId) {
 }
 
 // How long a claim with no session attached is treated as still being worked
-// on. Creating a Stripe Checkout Session is one network call; two minutes is
-// generous for it and short enough that a request which died mid-create only
-// blocks that account briefly rather than for good.
+// on, and short enough that a request which died mid-create only blocks that
+// account briefly rather than for good.
+//
+// This is only sound because it outlasts every request it covers.
+// CHECKOUT_CREATE_TIMEOUT_MS aborts the session creation well before this
+// elapses, so a claim reaching this age cannot still have an owner about to
+// succeed behind it. A fixed age with an unbounded call underneath would be a
+// guess, and the retry it authorises would create a second trial session while
+// the first request was still going.
 export const IN_FLIGHT_MS = 120_000;
 
 // A claim that has been made but whose session does not exist yet, because the

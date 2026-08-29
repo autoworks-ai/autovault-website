@@ -117,7 +117,25 @@ export function buildHostedVaultCheckoutParams({
   return params;
 }
 
-export async function createCheckoutSession(env, params, fetcher = fetch) {
+// How long a trial-bearing session creation is allowed to take.
+//
+// Bound rather than advisory, and deliberately well under IN_FLIGHT_MS. A trial
+// claim is treated as still being worked on for that long, and a claim window
+// is only sound if it outlasts every request it covers: an owner still inside
+// this call when the window expires would have its claim released and a second
+// trial session created behind it. Cutting the call short makes the window an
+// upper bound instead of a guess. If Stripe created the session anyway before
+// the abort landed, the retry finds it under the account's one customer and
+// reuses it, which is what the stable customer id bought.
+export const CHECKOUT_CREATE_TIMEOUT_MS = 30_000;
+
+/**
+ * @param {Record<string, unknown>} env
+ * @param {URLSearchParams} params
+ * @param {typeof fetch} [fetcher]
+ * @param {AbortSignal | null} [signal]
+ */
+export async function createCheckoutSession(env, params, fetcher = fetch, signal = null) {
   if (!env.STRIPE_SECRET_KEY)
     throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
   const response = await fetcher(
@@ -130,6 +148,7 @@ export async function createCheckoutSession(env, params, fetcher = fetch) {
         "stripe-version": STRIPE_API_VERSION,
       },
       body: params,
+      ...(signal ? { signal } : {}),
     },
   );
   const payload = await response.json();

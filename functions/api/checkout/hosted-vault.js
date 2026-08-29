@@ -2,6 +2,7 @@ import { requireUser } from "../_lib/auth.js";
 import { ApiError, handleApi, json, readJson } from "../_lib/http.js";
 import {
   buildHostedVaultCheckoutParams,
+  CHECKOUT_CREATE_TIMEOUT_MS,
   createCheckoutSession,
   findOutstandingTrialSession,
   hasPriorStripeSubscription,
@@ -162,7 +163,16 @@ export async function onRequestPost({ request, env }) {
       source: body.source === "playground" ? "playground" : "deploy",
       allowTrial
     });
-    const session = await createCheckoutSession(env, params);
+    // Bounded only on the trial path, because only that path holds a claim
+    // whose window has to outlast this call. Aborting loses a session Stripe
+    // may already have created; the retry finds it under the account's one
+    // customer and reuses it, which is strictly better than a second trial.
+    const session = await createCheckoutSession(
+      env,
+      params,
+      fetch,
+      allowTrial ? AbortSignal.timeout(CHECKOUT_CREATE_TIMEOUT_MS) : null
+    );
     // Which session the claim was spent on, so a later request can tell a claim
     // waiting on a live checkout from one whose checkout is gone.
     if (allowTrial) await attachTrialSession(env, user.id, session.id);
