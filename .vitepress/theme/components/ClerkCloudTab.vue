@@ -17,6 +17,7 @@ type Vault = {
 type Subscription = {
   active: boolean;
   status?: string | null;
+  cancel_at_period_end?: boolean | null;
 } | null;
 type MePayload = {
   subscription?: Subscription;
@@ -26,10 +27,11 @@ type SyncDevice = { status: "pending" | "active" | "revoked" };
 
 const { authHeaders } = useClerkApiAuth();
 
-// Mirrors CloudPage.vue's SUBSCRIPTION_LABELS map exactly (around line 833 in
-// that file). This repo has no shared composable for the vocabulary yet, so
-// the small map is duplicated rather than invented -- keep these two in sync
-// if either changes.
+// Mirrors CloudPage.vue's SUBSCRIPTION_LABELS map exactly. This repo has no
+// shared composable for the vocabulary yet, so the small map is duplicated
+// rather than invented. Keep these two in sync if either changes: the last time
+// they drifted, `paused` reached one of them and not the other, and the two
+// account surfaces offered different recovery paths for one Stripe status.
 const SUBSCRIPTION_LABELS: Record<
   string,
   { text: string; tone: "ok" | "warn" | "bad" }
@@ -53,8 +55,23 @@ const activeDeviceCount = ref<number | null>(null);
 const billingBusy = ref(false);
 const billingNotice = ref<string | null>(null);
 
+// Same rule as the dashboard's, and here for the same reason: a subscription
+// cancelled from the portal keeps its status until the period closes, so
+// "Trialing" and "Active" are both true of a cancelled one and both wrong to
+// show as the headline.
+// Same rule as the dashboard's, including that it does NOT also require
+// `active`: a past_due or paused subscriber who has cancelled still has to be
+// told the cancellation took.
+const ENDED_STATUSES = new Set(["canceled", "incomplete_expired"]);
+
+const cancelling = computed(() => {
+  if (!subscription.value?.cancel_at_period_end) return false;
+  return !ENDED_STATUSES.has(subscription.value?.status ?? "");
+});
+
 const subscriptionState = computed(() => {
   const status = subscription.value?.status ?? null;
+  if (cancelling.value) return { text: "Cancelled", tone: "warn" as const };
   if (!status) {
     return subscription.value?.active
       ? { text: "Active", tone: "ok" as const }

@@ -453,6 +453,7 @@ export async function handleStripeEvent(env, event) {
         status: subscription.status,
         priceId: priceIdForSubscription(subscription),
         currentPeriodEnd: currentPeriodEndFor(subscription),
+        cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end),
         eventCreated: Number(event.created) || null,
       });
       stored = true;
@@ -532,6 +533,11 @@ export async function upsertSubscription(
     status,
     priceId,
     currentPeriodEnd,
+    // Stripe's cancel_at_period_end. Stored because status cannot carry it: a
+    // subscription cancelled from the portal keeps its status until the period
+    // actually closes, so this is the only field that distinguishes "will
+    // renew" from "will end" on an otherwise healthy row.
+    cancelAtPeriodEnd = false,
     eventCreated = null,
   },
 ) {
@@ -550,7 +556,9 @@ export async function upsertSubscription(
   // alone, so break it on status instead of arrival order: a non-paid
   // incoming status is allowed through (fail closed — prefer revoking access
   // on ambiguity), a paid incoming status is rejected (does not grant access
-  // on ambiguity). A first plain "or" on time was tried and rejected here:
+  // on ambiguity), and a paid incoming status that is newly CANCELLING is
+  // allowed through for the same reason the non-paid one is: it takes access
+  // away, just on a schedule. A first plain "or" on time was tried and rejected here:
   // unconditionally dropping every tie just moves the bug — a genuine
   // same-second cancellation arriving after a same-second "active" would
   // then itself be dropped, leaving the account wrongly active.
@@ -558,20 +566,34 @@ export async function upsertSubscription(
   await run(
     env,
     `
-    insert into subscriptions (user_id, stripe_subscription_id, stripe_customer_id, status, price_id, current_period_end, last_event_created, created_at, updated_at)
-    values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    insert into subscriptions (user_id, stripe_subscription_id, stripe_customer_id, status, price_id, current_period_end, cancel_at_period_end, last_event_created, created_at, updated_at)
+    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     on conflict(user_id) do update set
       stripe_subscription_id = excluded.stripe_subscription_id,
       stripe_customer_id = excluded.stripe_customer_id,
       status = excluded.status,
       price_id = excluded.price_id,
       current_period_end = excluded.current_period_end,
+      cancel_at_period_end = excluded.cancel_at_period_end,
       last_event_created = excluded.last_event_created,
       updated_at = excluded.updated_at
     where excluded.last_event_created is null
        or subscriptions.last_event_created is null
        or excluded.last_event_created > subscriptions.last_event_created
-       or (excluded.last_event_created = subscriptions.last_event_created and ? = 0)
+       or (
+            excluded.last_event_created = subscriptions.last_event_created
+            and (
+              ? = 0
+              -- Same rule, one rung down. The tie-break above prefers the event
+              -- that takes access away, and a scheduled cancellation is exactly
+              -- that even though its status is still paid: Stripe leaves the
+              -- status alone until the period closes. Without this clause an
+              -- "active" and a portal cancellation created in the same second
+              -- leave cancel_at_period_end at 0, and the dashboard goes back to
+              -- telling somebody who just cancelled that they renew.
+              or (excluded.cancel_at_period_end = 1 and subscriptions.cancel_at_period_end = 0)
+            )
+          )
   `,
     userId,
     subscriptionId,
@@ -579,6 +601,7 @@ export async function upsertSubscription(
     status || null,
     priceId || null,
     currentPeriodEnd || null,
+    cancelAtPeriodEnd ? 1 : 0,
     eventCreated,
     nowIso(),
     nowIso(),

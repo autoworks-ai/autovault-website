@@ -1,0 +1,13 @@
+-- Whether Stripe will end this subscription at the end of the current period.
+--
+-- Without it the dashboard cannot tell "will renew" from "will end". Cancelling
+-- from the billing portal is cancel-at-period-end by default, so Stripe leaves
+-- the status alone: a trialing subscriber who cancels stays `trialing` until the
+-- period closes. Every field we stored was therefore identical before and after
+-- the cancellation, and the page had nothing to show that would change. Somebody
+-- who had just cancelled could not tell whether it had worked.
+--
+-- Integer rather than boolean, because D1 has no boolean type and the rest of
+-- this schema already uses 0/1. Defaults to 0 so existing rows read as "not
+-- cancelling", which is what they were.
+alter table subscriptions add column cancel_at_period_end integer not null default 0;

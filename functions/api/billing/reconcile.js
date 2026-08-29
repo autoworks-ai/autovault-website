@@ -51,6 +51,7 @@ export async function onRequestPost({ request, env }) {
         status: subscription.status,
         priceId: priceIdForSubscription(subscription),
         currentPeriodEnd: currentPeriodEndFor(subscription),
+        cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end),
         // This is a live, authoritative read straight from Stripe, not a
         // replayed webhook — so it has no `event.created` of its own. Stamp
         // it with the read-start time captured above rather than leaving the

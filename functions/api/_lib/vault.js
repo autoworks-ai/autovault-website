@@ -5,11 +5,19 @@ import { isPaidStatus } from "./stripe.js";
 
 export async function getSubscription(env, userId) {
   const row = await first(env, `
-    select status, stripe_subscription_id, price_id, current_period_end
+    select status, stripe_subscription_id, price_id, current_period_end, cancel_at_period_end
     from subscriptions
     where user_id = ?
   `, userId);
-  return row ? { ...row, active: isPaidStatus(row.status) } : { active: false, status: null };
+  return row
+    ? {
+        ...row,
+        // Boolean at the edge of the API rather than the 0/1 D1 stores, so
+        // every reader does not have to know which one it got.
+        cancel_at_period_end: Boolean(row.cancel_at_period_end),
+        active: isPaidStatus(row.status)
+      }
+    : { active: false, status: null, cancel_at_period_end: false };
 }
 
 export async function getCurrentVault(env, userId) {

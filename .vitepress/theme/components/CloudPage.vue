@@ -550,8 +550,29 @@
                     >
                   </li>
                 </ul>
+                <!-- First branch, ahead of the generic attention line, and
+                     stated rather than implied. Cancelling from the portal
+                     changes nothing this card used to render: the status stays
+                     as it was until the period closes, so somebody returning
+                     from Stripe saw the identical screen and could not tell
+                     whether the cancellation had taken. Say it, date it, and
+                     say what still works until then. -->
+                <p v-if="cancelling" class="cv-muted cv-sub-warn">
+                  <strong>This subscription is cancelled.</strong>
+                  <template v-if="paid">
+                    Hosted access continues until
+                    {{ periodEndDate || "the end of the current period" }}.
+                    Machines keep syncing until then, and nothing is deleted
+                    when it lapses.
+                  </template>
+                  <template v-else>
+                    Hosted access has already stopped, because the payment
+                    status needs attention as well. Nothing is deleted.
+                  </template>
+                  Reopen the billing portal to resume.
+                </p>
                 <p
-                  v-if="canStartCheckout && !canManageBilling"
+                  v-else-if="canStartCheckout && !canManageBilling"
                   class="cv-muted cv-sub-warn"
                 >
                   Start a hosted subscription to keep this namespace on the
@@ -1040,6 +1061,7 @@ type CloudSubscription = {
   active: boolean;
   status?: string | null;
   current_period_end?: number | null;
+  cancel_at_period_end?: boolean | null;
 } | null;
 type CloudVault = {
   id?: string;
@@ -1784,8 +1806,32 @@ const SUBSCRIPTION_LABELS: Record<
   paused: { text: "Paused", tone: "warn" },
 };
 
+// Stripe leaves the status alone when a subscription is cancelled from the
+// portal, so a trialing subscriber who cancels stays `trialing` until the
+// period closes. Every field this page reads was identical before and after,
+// which meant somebody who had just cancelled had no way to tell whether it
+// had worked. This is the field that says so.
+// Statuses where the ending has already happened, so a scheduled cancellation
+// is history rather than news. Everything else, including the payment-problem
+// statuses, still needs to be told it is cancelled.
+const ENDED_STATUSES = new Set(["canceled", "incomplete_expired"]);
+
+const cancelling = computed(() => {
+  if (!subscription.value?.cancel_at_period_end) return false;
+  // Deliberately NOT `&& active`. That was the first version and it hid the
+  // cancellation from a subscriber who is past_due or paused as well, which is
+  // the person most likely to have just cancelled and most in need of being
+  // told it worked. Whether access is still running is a separate question,
+  // and the copy below answers it separately.
+  return !ENDED_STATUSES.has(subscription.value?.status ?? "");
+});
+
 const subscriptionState = computed(() => {
   const status = subscription.value?.status ?? null;
+  // Ahead of the status map on purpose: "Trialing" and "Active" are both true
+  // of a cancelled subscription and both wrong to show as the headline, since
+  // the one thing the owner needs to know is that it is ending.
+  if (cancelling.value) return { text: "Cancelled", tone: "warn" as const };
   if (!status) {
     return subscription.value?.active
       ? { text: "Active", tone: "ok" as const }
@@ -1826,25 +1872,37 @@ const canManageBilling = computed(
   () => paid.value || Boolean(subscription.value?.status),
 );
 
-const renewalLabel = computed(() => {
+const periodEndDate = computed(() => {
   const seconds = subscription.value?.current_period_end;
   if (!seconds) return null;
   const date = new Date(seconds * 1000);
   if (Number.isNaN(date.getTime())) return null;
-  const formatted = date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
-  // A subscription cancelled effective end-of-period keeps status "active"
-  // (and therefore tone "ok") right up until that date -- the API persists
-  // only status and current_period_end, not Stripe's cancel_at_period_end,
-  // so this computed cannot tell "will renew" from "will end" for an
-  // otherwise-active row. A neutral date label is accurate either way;
-  // "Renews" is not.
-  return subscriptionState.value.tone === "bad"
-    ? `Ends ${formatted}`
-    : `Current period ends ${formatted}`;
+});
+
+const renewalLabel = computed(() => {
+  const formatted = periodEndDate.value;
+  if (!formatted) return null;
+  // The API persists cancel_at_period_end now, so this can finally say which
+  // one it is. It used to hedge with "Current period ends" for everything that
+  // was not already dead, because a subscription cancelled effective
+  // end-of-period keeps its status right up to that date and nothing stored
+  // could distinguish it from one about to renew. A neutral label was accurate
+  // either way, and useless to the person who most needed it.
+  if (cancelling.value) return `Access ends ${formatted}`;
+  if (subscriptionState.value.tone === "bad") return `Ends ${formatted}`;
+  // "Renews" is only for a subscription that is actually going to. past_due,
+  // incomplete and paused are all tone "warn" and all not renewing: the same
+  // component sends every one of them to the billing portal rather than to
+  // Checkout, because Stripe still holds them and they need fixing, not
+  // starting. Promoting the old neutral label to "Renews" swept them up, so
+  // they keep the neutral one.
+  if (subscriptionState.value.tone !== "ok") return `Current period ends ${formatted}`;
+  return `Renews ${formatted}`;
 });
 
 const vaultSlug = computed(() => vault.value?.slug ?? "your-vault");
