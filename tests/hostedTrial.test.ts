@@ -15,6 +15,7 @@ import {
   findOutstandingTrialSession,
   hasPriorStripeSubscription,
   hostedTrialDays,
+  resolveStripeCustomerId,
 } from "../functions/api/_lib/stripe.js";
 import { pageDocs } from "../.vitepress/shared/pageDocs";
 
@@ -449,6 +450,81 @@ describe("trial copy never outlives the trial", () => {
     expect(verifyAt, "no session verification").toBeGreaterThan(-1);
     expect(verifyAt, "verify before releasing").toBeLessThan(releaseAt);
     expect(route).toContain('recorded?.status === "open"');
+  });
+
+  it("creates at most one Stripe customer per account, even concurrently", async () => {
+    const calls: Array<{ path: string; key: string | null }> = [];
+    const fetcher = (async (url: URL | RequestInfo, init?: RequestInit) => {
+      const path = String(url).replace("https://api.stripe.com/v1/", "");
+      const headers = new Headers(init?.headers as HeadersInit);
+      calls.push({ path, key: headers.get("idempotency-key") });
+      const body = path.startsWith("customers?") ? { data: [] } : { id: "cus_new" };
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }) as typeof fetch;
+
+    const env = {
+      STRIPE_SECRET_KEY: "sk_test_x",
+      AUTOVAULT_DB: { prepare: () => ({ bind: () => ({ first: async () => null }) }) }
+    };
+    await resolveStripeCustomerId(env, { userId: "u_1", email: "a@b.test" }, fetcher);
+
+    // Two first-time requests reaching here at once used to create a customer
+    // each, and from then on the two halves of the trial machinery looked at
+    // different ones: the winner's session under one, a later email lookup
+    // resolving the other, so an open session went unseen and a live claim read
+    // as stale. The body is stable per user, which is what makes a key safe
+    // here and not on the Checkout Session, whose params vary by source.
+    const create = calls.find((c) => c.path === "customers");
+    expect(create?.key).toBe("av-customer-u_1");
+  });
+
+  it("treats an in-progress idempotent create as the other request winning", async () => {
+    // Verified against Stripe rather than assumed: two requests using one key
+    // at the same instant do not serialise, the second is refused. That refusal
+    // means the other request is creating the customer right now, so it must
+    // not surface as a 502 at somebody trying to pay.
+    const fetcher = (async (url: URL | RequestInfo) => {
+      const path = String(url).replace("https://api.stripe.com/v1/", "");
+      if (path === "customers") {
+        return new Response(
+          JSON.stringify({
+            error: { message: "There is currently another in-progress request using this Idempotent Key: av-customer-u_1" }
+          }),
+          { status: 409, headers: { "content-type": "application/json" } }
+        );
+      }
+      return new Response(JSON.stringify({ data: [{ id: "cus_winner" }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }) as typeof fetch;
+
+    const env = {
+      STRIPE_SECRET_KEY: "sk_test_x",
+      AUTOVAULT_DB: { prepare: () => ({ bind: () => ({ first: async () => null }) }) }
+    };
+    await expect(
+      resolveStripeCustomerId(env, { userId: "u_1", email: "a@b.test" }, fetcher)
+    ).resolves.toBe("cus_winner");
+  });
+
+  it("keeps the claim when Stripe cannot say whether its session is open", () => {
+    const route = readFileSync(
+      new URL("../functions/api/checkout/hosted-vault.js", import.meta.url),
+      "utf-8"
+    );
+
+    // `.catch(() => null)` read a 429 or a network blip as "the session is
+    // gone", released a claim whose session was very likely still open, and
+    // issued a second trial off the back of it. Only a positive answer releases
+    // a claim: a 404 means Stripe has no such session, anything else means
+    // Stripe did not answer.
+    expect(route).not.toContain("retrieveCheckoutSession(env, claim.session_id).catch");
+    expect(route).toContain("error?.status !== 404");
+    expect(route).toContain("Could not confirm your existing checkout with Stripe");
   });
 
   it("reuses an outstanding trial session instead of issuing a second", () => {

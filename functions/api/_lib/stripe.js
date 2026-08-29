@@ -247,13 +247,35 @@ export async function resolveStripeCustomerId(
   const found = asId(existing.data?.[0]);
   if (found) return found;
 
-  const created = await stripePost(
-    env,
-    "customers",
-    { email, "metadata[user_id]": userId },
-    fetcher,
-  );
-  return asId(created) || null;
+  // Idempotent per user, which is load-bearing rather than tidy. Two first-time
+  // requests can reach here at the same moment and each create a customer, and
+  // from then on the two halves of this feature look at different ones: the
+  // winner's Checkout Session sits under one while a later email lookup
+  // resolves the other, so an open session goes unseen and a live trial claim
+  // reads as stale. One customer per account removes that divergence at the
+  // root. The body is stable per user, which is what makes an idempotency key
+  // safe here and not on the Checkout Session, whose params vary by source and
+  // origin.
+  const key = `av-customer-${userId}`;
+  const body = { email, "metadata[user_id]": userId };
+  try {
+    return asId(await stripePost(env, "customers", body, fetcher, key)) || null;
+  } catch (error) {
+    // Verified against Stripe rather than assumed: two requests using one key at
+    // the same instant do NOT serialise. The second is refused with
+    // "another in-progress request using this Idempotent Key". That is the key
+    // doing its job, and it means the other request is creating the customer
+    // right now, so read it back rather than reporting a 502 at somebody
+    // trying to pay.
+    if (!/in-progress request using this Idempotent Key/i.test(error?.message ?? "")) throw error;
+    const raced = await stripeGet(env, `customers?email=${encodeURIComponent(email)}&limit=1`, fetcher);
+    const found = asId(raced.data?.[0]);
+    if (found) return found;
+    throw new ApiError(
+      503,
+      "Your checkout is already being set up. Try again in a moment."
+    );
+  }
 }
 
 // An unfinished Checkout Session for this customer that already carries a
@@ -295,7 +317,7 @@ async function stripeGet(env, path, fetcher = fetch) {
   return payload;
 }
 
-async function stripePost(env, path, body, fetcher = fetch) {
+async function stripePost(env, path, body, fetcher = fetch, idempotencyKey = null) {
   if (!env.STRIPE_SECRET_KEY)
     throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
   const response = await fetcher(`https://api.stripe.com/v1/${path}`, {
@@ -304,6 +326,7 @@ async function stripePost(env, path, body, fetcher = fetch) {
       authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
       "content-type": "application/x-www-form-urlencoded",
       "stripe-version": STRIPE_API_VERSION,
+      ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}),
     },
     body: new URLSearchParams(body).toString(),
   });

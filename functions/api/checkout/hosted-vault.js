@@ -102,9 +102,25 @@ export async function onRequestPost({ request, env }) {
       // customer this request never looked at. A session id is unambiguous
       // where a customer id is a guess.
       if (claim && !inFlight) {
-        const recorded = claim.session_id
-          ? await retrieveCheckoutSession(env, claim.session_id).catch(() => null)
-          : null;
+        let recorded = null;
+        if (claim.session_id) {
+          try {
+            recorded = await retrieveCheckoutSession(env, claim.session_id);
+          } catch (error) {
+            // A 404 is an answer: Stripe has no such session, so the claim
+            // names nothing and may be released. Anything else is Stripe being
+            // unreachable, and `.catch(() => null)` here read that as "the
+            // session is gone", released a claim whose session was very likely
+            // still open, and issued a second trial off the back of a 429.
+            // Only a positive result releases a claim.
+            if (error?.status !== 404) {
+              throw new ApiError(
+                503,
+                "Could not confirm your existing checkout with Stripe. Try again in a moment."
+              );
+            }
+          }
+        }
         if (recorded?.status === "open" && recorded.url) {
           return json({ url: recorded.url, id: recorded.id, reused: true });
         }
