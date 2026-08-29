@@ -453,6 +453,7 @@ export async function handleStripeEvent(env, event) {
         status: subscription.status,
         priceId: priceIdForSubscription(subscription),
         currentPeriodEnd: currentPeriodEndFor(subscription),
+        cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end),
         eventCreated: Number(event.created) || null,
       });
       stored = true;
@@ -532,6 +533,11 @@ export async function upsertSubscription(
     status,
     priceId,
     currentPeriodEnd,
+    // Stripe's cancel_at_period_end. Stored because status cannot carry it: a
+    // subscription cancelled from the portal keeps its status until the period
+    // actually closes, so this is the only field that distinguishes "will
+    // renew" from "will end" on an otherwise healthy row.
+    cancelAtPeriodEnd = false,
     eventCreated = null,
   },
 ) {
@@ -558,14 +564,15 @@ export async function upsertSubscription(
   await run(
     env,
     `
-    insert into subscriptions (user_id, stripe_subscription_id, stripe_customer_id, status, price_id, current_period_end, last_event_created, created_at, updated_at)
-    values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    insert into subscriptions (user_id, stripe_subscription_id, stripe_customer_id, status, price_id, current_period_end, cancel_at_period_end, last_event_created, created_at, updated_at)
+    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     on conflict(user_id) do update set
       stripe_subscription_id = excluded.stripe_subscription_id,
       stripe_customer_id = excluded.stripe_customer_id,
       status = excluded.status,
       price_id = excluded.price_id,
       current_period_end = excluded.current_period_end,
+      cancel_at_period_end = excluded.cancel_at_period_end,
       last_event_created = excluded.last_event_created,
       updated_at = excluded.updated_at
     where excluded.last_event_created is null
@@ -579,6 +586,7 @@ export async function upsertSubscription(
     status || null,
     priceId || null,
     currentPeriodEnd || null,
+    cancelAtPeriodEnd ? 1 : 0,
     eventCreated,
     nowIso(),
     nowIso(),

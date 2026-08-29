@@ -46,12 +46,51 @@ describe("cloud dashboard stage machine", () => {
   });
 
   it("does not label a scheduled-to-cancel subscription as renewing", () => {
-    // A subscription cancelled effective end-of-period keeps status "active"
-    // (tone "ok") right up until that date, and the API doesn't persist
-    // Stripe's cancel_at_period_end -- so this can't distinguish "will renew"
-    // from "will end" for an otherwise-active row. "Renews" overclaims.
-    expect(cloudPage).not.toMatch(/`Renews \$\{formatted\}`/);
-    expect(cloudPage).toContain("Current period ends");
+    // This case used to forbid "Renews" outright, and it was right to: a
+    // subscription cancelled effective end-of-period keeps its status right up
+    // to that date, and nothing stored could tell "will renew" from "will end",
+    // so the label hedged for everybody. The API persists cancel_at_period_end
+    // now, so the rule narrows rather than disappears. "Renews" is allowed, and
+    // it must be unreachable when the subscription is ending.
+    const at = cloudPage.indexOf("const renewalLabel = computed");
+    expect(at, "no renewalLabel").toBeGreaterThan(-1);
+    const body = cloudPage.slice(at, cloudPage.indexOf("\n});", at));
+    const renewsAt = body.indexOf("`Renews ${formatted}`");
+    const cancelAt = body.indexOf("if (cancelling.value)");
+    expect(renewsAt, "no Renews branch").toBeGreaterThan(-1);
+    expect(cancelAt, "no cancelling branch").toBeGreaterThan(-1);
+    expect(cancelAt, "cancelling must be checked before Renews").toBeLessThan(renewsAt);
+    expect(body).toContain("`Access ends ${formatted}`");
+  });
+
+  it("says a cancellation happened rather than leaving the screen unchanged", () => {
+    // Cancelling from the portal changes no field this card used to render, so
+    // somebody returning from Stripe saw the identical screen and could not
+    // tell whether it had worked. The state has to be named, dated, and paired
+    // with what still works until then.
+    expect(cloudPage).toContain("This subscription is cancelled.");
+    expect(cloudPage).toContain("Machines keep syncing until then");
+    expect(cloudPage).toContain('v-if="cancelling"');
+
+    // And it outranks the generic attention line, which would otherwise catch
+    // it and say nothing useful.
+    const cancelAt = cloudPage.indexOf('v-if="cancelling"');
+    const genericAt = cloudPage.indexOf('v-else-if="subscriptionNeedsAttention"');
+    expect(cancelAt).toBeLessThan(genericAt);
+  });
+
+  it("shows the cancelled state on both account surfaces", () => {
+    const clerkTab = readFileSync(
+      new URL("../.vitepress/theme/components/ClerkCloudTab.vue", import.meta.url),
+      "utf-8"
+    );
+
+    // The last time these two drifted, `paused` reached one and not the other
+    // and they offered different recovery paths for one Stripe status.
+    for (const source of [cloudPage, clerkTab]) {
+      expect(source).toContain("cancel_at_period_end");
+      expect(source).toContain('{ text: "Cancelled", tone: "warn" as const }');
+    }
   });
 });
 
