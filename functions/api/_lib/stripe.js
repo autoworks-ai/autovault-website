@@ -153,6 +153,80 @@ export async function getStripeCustomerId(env, userId) {
   return row?.stripe_customer_id ?? null;
 }
 
+// Has Stripe ever created a subscription for this person, in any state?
+//
+// The trial is once per account, and the check that enforced it read the local
+// `subscriptions` row. That row is written by the webhook or by
+// /api/billing/reconcile, both of which run AFTER a Checkout Session
+// completes, so it answers a question about the past with data that arrives
+// late. Stripe is the system that actually owns this fact, so ask Stripe.
+//
+// Two lookups, because two things can be missing. The known customer id is the
+// exact handle and needs one call. When there is none, because a webhook never
+// landed or a customer was reassigned away, the email finds Stripe customers
+// this account created under a different id, which is precisely the case a
+// local-only check gets wrong. Capped at five, because this is on the checkout
+// path and an unbounded fan-out there is a worse bug than the one it prevents.
+//
+// Takes the customer id rather than resolving it: this file's other Stripe
+// helpers do not read D1, and a function that talks to one system is the one
+// you can test against a stubbed fetch alone.
+//
+// Throws rather than guessing on a Stripe failure. Guessing false hands out a
+// second trial; guessing true silently charges somebody who was promised one,
+// and they find out on the statement. A 502 is visible and retryable, and
+// createCheckoutSession would have thrown one moments later anyway.
+export async function hasPriorStripeSubscription(
+  env,
+  { customerId, email },
+  fetcher = fetch,
+) {
+  if (!env.STRIPE_SECRET_KEY)
+    throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
+
+  const get = async (path) => {
+    const response = await fetcher(`https://api.stripe.com/v1/${path}`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+        "stripe-version": STRIPE_API_VERSION,
+      },
+    });
+    const payload = await response.json();
+    if (!response.ok)
+      throw new ApiError(
+        502,
+        payload.error?.message || "Stripe subscription lookup failed.",
+      );
+    return payload;
+  };
+
+  const seen = new Set();
+  const anyFor = async (customerId) => {
+    if (!customerId || seen.has(customerId)) return false;
+    seen.add(customerId);
+    // status=all so a canceled subscriber counts. Cancelling is the whole way
+    // somebody comes back for a second trial.
+    const list = await get(
+      `subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=1`,
+    );
+    return Array.isArray(list.data) && list.data.length > 0;
+  };
+
+  if (await anyFor(customerId)) return true;
+
+  if (email) {
+    const customers = await get(
+      `customers?email=${encodeURIComponent(email)}&limit=5`,
+    );
+    for (const customer of customers.data ?? []) {
+      if (await anyFor(asId(customer))) return true;
+    }
+  }
+
+  return false;
+}
+
 export function buildBillingPortalParams({
   request,
   env,

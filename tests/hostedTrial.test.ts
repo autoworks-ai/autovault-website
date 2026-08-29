@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { HOSTED_TRIAL_DAYS } from "../.vitepress/theme/data/product";
 import {
   buildHostedVaultCheckoutParams,
+  hasPriorStripeSubscription,
   hostedTrialDays,
 } from "../functions/api/_lib/stripe.js";
 import { pageDocs } from "../.vitepress/shared/pageDocs";
@@ -197,6 +198,108 @@ describe("trial copy never outlives the trial", () => {
     // /api/pricing is edge-cached and answers for everybody, so the page has to
     // apply the same eligibility the checkout route does.
     expect(body).toContain("subscription.value?.status");
+  });
+
+  it("asks Stripe, not the local table, whether a trial was already had", async () => {
+    // The local row lands after Checkout completes, so it cannot answer this
+    // question during the window it is actually asked. These cases pin the
+    // lookup that can.
+    const calls: string[] = [];
+    const stub = (routes: Record<string, unknown>) =>
+      (async (url: URL | RequestInfo) => {
+        const path = String(url).replace("https://api.stripe.com/v1/", "");
+        calls.push(path);
+        const key = Object.keys(routes).find((k) => path.startsWith(k));
+        return new Response(JSON.stringify(key ? routes[key] : { data: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      }) as typeof fetch;
+
+    const env = { STRIPE_SECRET_KEY: "sk_test_x" };
+
+    // A canceled subscription still counts. Cancelling is the whole route back
+    // for a second free trial, so status=all has to be on the request.
+    calls.length = 0;
+    await expect(
+      hasPriorStripeSubscription(
+        { ...env },
+        { customerId: "cus_known", email: "a@b.test" },
+        stub({ customers: { data: [{ id: "cus_1" }] }, subscriptions: { data: [{ id: "sub_1", status: "canceled" }] } })
+      )
+    ).resolves.toBe(true);
+    expect(calls.some((c) => c.includes("status=all"))).toBe(true);
+
+    // Nothing anywhere means eligible.
+    calls.length = 0;
+    await expect(
+      hasPriorStripeSubscription(
+        { ...env },
+        { customerId: "cus_known", email: "a@b.test" },
+        stub({ customers: { data: [] }, subscriptions: { data: [] } })
+      )
+    ).resolves.toBe(false);
+
+    // A Stripe failure throws rather than guessing. Guessing false hands out a
+    // second trial; guessing true charges somebody who was promised one.
+    await expect(
+      hasPriorStripeSubscription(
+        { ...env },
+        { customerId: "cus_known", email: "a@b.test" },
+        async () =>
+          new Response(JSON.stringify({ error: { message: "boom" } }), {
+            status: 500,
+            headers: { "content-type": "application/json" }
+          })
+      )
+    ).rejects.toThrow(/Stripe|boom/i);
+  });
+
+  it("finds history under a customer the local tables never recorded", async () => {
+    // The case a D1-only check gets wrong: the completed-checkout webhook never
+    // landed, so there is no customers row and no subscriptions row, while
+    // Stripe has both. Without the email fallback this account is handed a
+    // second trial for free, indefinitely.
+    const seen: string[] = [];
+    const fetcher = (async (url: URL | RequestInfo) => {
+      const path = String(url).replace("https://api.stripe.com/v1/", "");
+      seen.push(path);
+      const body = path.startsWith("customers")
+        ? { data: [{ id: "cus_orphan" }] }
+        : { data: [{ id: "sub_old", status: "canceled" }] };
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }) as typeof fetch;
+
+    await expect(
+      hasPriorStripeSubscription(
+        { STRIPE_SECRET_KEY: "sk_test_x" },
+        { customerId: null, email: "orphan@b.test" },
+        fetcher
+      )
+    ).resolves.toBe(true);
+    expect(seen[0]).toContain("customers?email=orphan%40b.test");
+    expect(seen.some((p) => p.startsWith("subscriptions?customer=cus_orphan"))).toBe(true);
+  });
+
+  it("keeps the checkout route's eligibility question on Stripe", () => {
+    const route = readFileSync(
+      new URL("../functions/api/checkout/hosted-vault.js", import.meta.url),
+      "utf-8"
+    );
+
+    // The local row is allowed as a short-circuit, never as the answer on its
+    // own: it is written after Checkout completes, so between opening a session
+    // and finishing it there is no local record that a trial was offered.
+    expect(route).toContain("hasPriorStripeSubscription");
+    expect(route).toContain("getStripeCustomerId");
+    const at = route.indexOf("const firstSubscription");
+    expect(at, "no eligibility check").toBeGreaterThan(-1);
+    const block = route.slice(at, route.indexOf(";", route.indexOf("email: user.email", at)));
+    expect(block).toContain("!subscription?.status");
+    expect(block).toContain("hasPriorStripeSubscription");
   });
 
   it("sets no trial-end behaviour when there is no trial to end", () => {

@@ -114,7 +114,17 @@ describe("Clerk-backed Pages Function auth", () => {
       env
     });
     const payload = await response.json() as { url: string };
-    const checkoutBody = String((fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+    // Find the Checkout POST rather than assuming it is the first call. The
+    // route now asks Stripe about prior subscriptions before building the
+    // session, so call 0 is a GET with no body and this read used to return
+    // the string "undefined" and fail on the wrong thing.
+    const calls = (fetch as unknown as ReturnType<typeof vi.fn>).mock
+      .calls as unknown as Array<[string, { body?: unknown }]>;
+    const checkoutCall = calls.find(
+      (call) => String(call[0]) === "https://api.stripe.com/v1/checkout/sessions"
+    );
+    if (!checkoutCall) throw new Error("no Checkout Session request was made");
+    const checkoutBody = String(checkoutCall[1].body);
 
     expect(response.status).toBe(200);
     expect(payload.url).toBe("https://checkout.stripe.com/c/test_clerk");

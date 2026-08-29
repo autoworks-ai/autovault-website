@@ -1,6 +1,11 @@
 import { requireUser } from "../_lib/auth.js";
 import { ApiError, handleApi, json, readJson } from "../_lib/http.js";
-import { buildHostedVaultCheckoutParams, createCheckoutSession } from "../_lib/stripe.js";
+import {
+  buildHostedVaultCheckoutParams,
+  createCheckoutSession,
+  getStripeCustomerId,
+  hasPriorStripeSubscription
+} from "../_lib/stripe.js";
 import { getSubscription } from "../_lib/vault.js";
 
 export async function onRequestPost({ request, env }) {
@@ -25,13 +30,27 @@ export async function onRequestPost({ request, env }) {
       );
     }
 
-    // A row in `subscriptions` means this account has subscribed before, so it
-    // has already had whatever trial was on offer then. The table is keyed on
-    // user_id and upserted, so the row survives cancellation: that is the only
-    // durable record of prior eligibility, and it is why the check is a status
-    // presence test rather than an `active` test. Without it, a trial that ends
-    // in "cancel" can simply be started again, forever, for free.
-    const firstSubscription = !subscription?.status;
+    // Eligibility comes from Stripe, not from here.
+    //
+    // The local `subscriptions` row is a fine short-circuit when it is
+    // present: it is keyed on user_id and upserted, so it survives
+    // cancellation, and reading it costs nothing. What it cannot do is answer
+    // the question in time. It is written by the billing webhook or by
+    // /api/billing/reconcile, both of which run after a Checkout Session
+    // completes, so between opening a session and finishing it there is no
+    // local record that a trial was ever offered. Several sessions opened back
+    // to back all read an empty table and all carried a trial.
+    //
+    // Stripe knows. It has the subscription the moment one exists, under any
+    // status, including the canceled ones that are the entire route back for a
+    // second free trial. One extra call on a path that already talks to Stripe
+    // twice.
+    const firstSubscription =
+      !subscription?.status &&
+      !(await hasPriorStripeSubscription(env, {
+        customerId: await getStripeCustomerId(env, user.id),
+        email: user.email
+      }));
 
     const body = await readJson(request, 8_000);
     const params = buildHostedVaultCheckoutParams({
