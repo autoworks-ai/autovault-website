@@ -13,23 +13,33 @@ import { readFileSync } from "node:fs";
  */
 const cloudPage = readFileSync(
   new URL("../.vitepress/theme/components/CloudPage.vue", import.meta.url),
-  "utf-8"
+  "utf-8",
 );
 const accountMenu = readFileSync(
-  new URL("../.vitepress/theme/components/CloudAccountMenu.vue", import.meta.url),
-  "utf-8"
+  new URL(
+    "../.vitepress/theme/components/CloudAccountMenu.vue",
+    import.meta.url,
+  ),
+  "utf-8",
 );
 const clerkConfig = readFileSync(
   new URL("../.vitepress/theme/clerk.ts", import.meta.url),
-  "utf-8"
+  "utf-8",
 );
+
+/** One item() call, whole. Sliced to the call's own `),` rather than to
+ * the end of its first line: these are formatted source, and an item long
+ * enough to wrap would otherwise be read as a truncated fragment, which
+ * silently passes every `not.toContain` below. */
+function itemCall(key: string): string {
+  const at = cloudPage.indexOf(`item("${key}"`);
+  expect(at, `no nav item named ${key}`).toBeGreaterThan(-1);
+  return cloudPage.slice(at, cloudPage.indexOf("),", at) + 2);
+}
 
 /** The `section:` a nav item selects, read off its own item() call. */
 function sectionOf(key: string): string | null {
-  const at = cloudPage.indexOf(`item("${key}"`);
-  expect(at, `no nav item named ${key}`).toBeGreaterThan(-1);
-  const call = cloudPage.slice(at, cloudPage.indexOf("\n", at));
-  return /section: "([a-z]+)"/.exec(call)?.[1] ?? null;
+  return /section: "([a-z]+)"/.exec(itemCall(key))?.[1] ?? null;
 }
 
 /** Collapses hand-wrapped template prose to one space between words, so a
@@ -45,7 +55,9 @@ function revealTable(): Record<string, string | null> {
   expect(at, "no SECTION_REVEAL table").toBeGreaterThan(-1);
   const body = cloudPage.slice(at, cloudPage.indexOf("};", at));
   const rows: Record<string, string | null> = {};
-  for (const [, name, value] of body.matchAll(/^\s{2}(\w+): (?:"(\w+)"|null),/gm)) {
+  for (const [, name, value] of body.matchAll(
+    /^\s{2}(\w+): (?:"(\w+)"|null),/gm,
+  )) {
     rows[name] = value ?? null;
   }
   return rows;
@@ -71,7 +83,9 @@ describe("the sidebar selects a panel", () => {
     // /cloud is one page. A URL that named a panel would have to survive the
     // Stripe and Clerk round trips that already own this page's query string
     // and its #launch-path fragment.
-    expect(cloudPage).toContain('const selectedSection = ref<Section>("overview");');
+    expect(cloudPage).toContain(
+      'const selectedSection = ref<Section>("overview");',
+    );
     expect(cloudPage).toContain("const activeSection = computed<Section>(");
     expect(cloudPage).not.toContain("vue-router");
     expect(cloudPage).not.toContain("useRoute");
@@ -83,7 +97,9 @@ describe("the sidebar selects a panel", () => {
     // including "error", where STAGE_ORDER.indexOf is -1 and only the null
     // branch of stageReached can pass.
     expect(revealTable().overview).toBeNull();
-    expect(cloudPage).toContain("return at === null || STAGE_ORDER.indexOf(current) >= STAGE_ORDER.indexOf(at);");
+    expect(cloudPage).toContain(
+      "return at === null || STAGE_ORDER.indexOf(current) >= STAGE_ORDER.indexOf(at);",
+    );
   });
 
   it("falls back to overview when the selected panel stops being reachable", () => {
@@ -92,7 +108,9 @@ describe("the sidebar selects a panel", () => {
     // would keep rendering a panel whose own nav item is disabled.
     const at = cloudPage.indexOf("const activeSection = computed<Section>(");
     const body = cloudPage.slice(at, cloudPage.indexOf(");", at));
-    expect(body).toContain("stageReached(SECTION_REVEAL[selectedSection.value], stage.value)");
+    expect(body).toContain(
+      "stageReached(SECTION_REVEAL[selectedSection.value], stage.value)",
+    );
     expect(body).toContain("selectedSection.value");
     expect(body).toContain('"overview"');
   });
@@ -110,7 +128,9 @@ describe("the sidebar selects a panel", () => {
     const table = revealTable();
     for (const [key, section] of wiring) {
       expect(sectionOf(key), `nav item ${key}`).toBe(section);
-      expect(Object.keys(table), `SECTION_REVEAL.${section}`).toContain(section);
+      expect(Object.keys(table), `SECTION_REVEAL.${section}`).toContain(
+        section,
+      );
       // Machines is the one panel rendered outside the v-if/v-else-if chain,
       // because it is also part of the overview and it starts at `connect`.
       const marker =
@@ -129,19 +149,23 @@ describe("the sidebar selects a panel", () => {
     expect(table).toEqual({
       overview: null,
       machines: "connect",
-      skills: "explore",
-      billing: "explore",
-      catalog: "explore"
+      skills: "ready",
+      billing: "ready",
+      catalog: "ready",
     });
     expect(cloudPage).toContain(
-      "const revealAt = opts.revealAt ?? (opts.section ? SECTION_REVEAL[opts.section] : null);"
+      "const revealAt =\n      opts.revealAt ?? (opts.section ? SECTION_REVEAL[opts.section] : null);",
     );
     // All three derivations must read the resolved value. Leaving any of them
     // on opts.revealAt silently drops the "new" badge, which nothing renders a
     // test failure for.
     expect(cloudPage).toContain("const revealed = stageReached(revealAt, s);");
-    expect(cloudPage).toContain("const justRevealed = revealAt !== null && revealAt === s;");
-    expect(cloudPage).toContain("const locked = Boolean(opts.soon) || !revealed;");
+    expect(cloudPage).toContain(
+      "const justRevealed = revealAt !== null && revealAt === s;",
+    );
+    expect(cloudPage).toContain(
+      "const locked = Boolean(opts.soon) || !revealed;",
+    );
   });
 
   it("keeps the vault strip as stage chrome rather than overview content", () => {
@@ -151,10 +175,10 @@ describe("the sidebar selects a panel", () => {
     // strip was not rendered at that moment: the mark played its 700ms unlock,
     // cv-vaulthead then unmounted, and the gesture landed on nothing. It has
     // to sit above the panel chain, inside the stage template.
-    const stageAt = cloudPage.indexOf(`v-if="stage === 'explore' || stage === 'ready'"`);
+    const stageAt = cloudPage.indexOf(`v-if="stage === 'ready'"`);
     const cardAt = cloudPage.indexOf('class="cv-status-card"');
     const overviewAt = cloudPage.indexOf(`v-if="activeSection === 'overview'"`);
-    expect(stageAt, "no explore/ready stage template").toBeGreaterThan(-1);
+    expect(stageAt, "no ready stage template").toBeGreaterThan(-1);
     expect(cardAt, "no status card").toBeGreaterThan(stageAt);
     expect(cardAt, "status card is inside a panel").toBeLessThan(overviewAt);
   });
@@ -163,8 +187,12 @@ describe("the sidebar selects a panel", () => {
     // `active: true` used to be a literal on the Overview item, so the
     // highlight never moved and never meant anything.
     expect(cloudPage).not.toContain("{ active: true }");
-    expect(cloudPage).toContain("const active = !locked && section !== null && section === current;");
-    expect(cloudPage).toContain(`:aria-current="item.active ? 'true' : undefined"`);
+    expect(cloudPage).toContain(
+      "const active = !locked && section !== null && section === current;",
+    );
+    expect(cloudPage).toContain(
+      `:aria-current="item.active ? 'true' : undefined"`,
+    );
   });
 });
 
@@ -174,15 +202,19 @@ describe("the heading names the panel that is on screen", () => {
     // be produced (Record<Section, string> would fail typecheck, but this
     // catches a row added to one table and forgotten in the other, which
     // typechecks fine and silently mislabels a panel).
-    expect(cloudPage).toContain("const SECTION_TITLE: Record<Section, string> = {");
+    expect(cloudPage).toContain(
+      "const SECTION_TITLE: Record<Section, string> = {",
+    );
     expect(titleTable()).toEqual({
       overview: "Overview",
       billing: "Billing",
       machines: "Machines",
       skills: "Skills",
-      catalog: "Vault catalog"
+      catalog: "Vault catalog",
     });
-    expect(Object.keys(titleTable()).sort()).toEqual(Object.keys(revealTable()).sort());
+    expect(Object.keys(titleTable()).sort()).toEqual(
+      Object.keys(revealTable()).sort(),
+    );
   });
 
   it("follows the selection, not a literal, past the stage branches", () => {
@@ -203,7 +235,9 @@ describe("the heading names the panel that is on screen", () => {
     const navAt = cloudPage.indexOf("const navItems = computed<NavItem[]>(");
     const nav = cloudPage.slice(navAt, cloudPage.indexOf("\n});", navAt));
     expect(nav).toContain("const current = activeSection.value;");
-    expect(nav).toContain("const active = !locked && section !== null && section === current;");
+    expect(nav).toContain(
+      "const active = !locked && section !== null && section === current;",
+    );
   });
 
   it("keeps the three stage branches ahead of it", () => {
@@ -213,16 +247,19 @@ describe("the heading names the panel that is on screen", () => {
     // literal out of this exact branch.
     const at = cloudPage.indexOf("const pageTitle = computed");
     const body = cloudPage.slice(at, cloudPage.indexOf("});", at));
-    const fallthrough = body.indexOf("return SECTION_TITLE[activeSection.value];");
+    const fallthrough = body.indexOf(
+      "return SECTION_TITLE[activeSection.value];",
+    );
     for (const branch of [
       'if (stage.value === "error") return "We couldn\'t load your vault";',
-      'if (!vault.value) return "Reserve a hosted AutoVault namespace";',
-      'if (stage.value === "connect") return "Connect your CLI";'
+      'if (!vault.value) return "AutoVault Cloud";',
+      'if (stage.value === "connect") return "Connect your CLI";',
     ]) {
       expect(body, branch).toContain(branch);
-      expect(body.indexOf(branch), `${branch} must precede the fallthrough`).toBeLessThan(
-        fallthrough
-      );
+      expect(
+        body.indexOf(branch),
+        `${branch} must precede the fallthrough`,
+      ).toBeLessThan(fallthrough);
     }
   });
 
@@ -233,76 +270,77 @@ describe("the heading names the panel that is on screen", () => {
     expect(cloudPage).toContain('aria-labelledby="cv-devices-title"');
     // One per in-chain panel: overview, billing, skills, catalog. Machines
     // keeps its own heading as its label, since it renders outside the chain.
-    expect((cloudPage.match(/aria-labelledby="cv-page-title"/g) ?? []).length).toBe(4);
+    expect(
+      (cloudPage.match(/aria-labelledby="cv-page-title"/g) ?? []).length,
+    ).toBe(4);
     for (const section of ["overview", "billing", "skills", "catalog"]) {
       const at = cloudPage.indexOf(`activeSection === '${section}'`);
       expect(at, `no ${section} panel`).toBeGreaterThan(-1);
-      const opening = cloudPage.slice(at, cloudPage.indexOf(">", cloudPage.indexOf("<div", at)));
-      expect(opening, `${section} panel is not a named region`).toContain('role="region"');
-      expect(opening, `${section} panel has no label`).toContain('aria-labelledby="cv-page-title"');
+      const opening = cloudPage.slice(
+        at,
+        cloudPage.indexOf(">", cloudPage.indexOf("<div", at)),
+      );
+      expect(opening, `${section} panel is not a named region`).toContain(
+        'role="region"',
+      );
+      expect(opening, `${section} panel has no label`).toContain(
+        'aria-labelledby="cv-page-title"',
+      );
     }
   });
 });
 
-describe("the early-access ask belongs to the stage, not to a panel", () => {
+describe("the early-access ask is gone, not relocated", () => {
   /** The vault strip, from its own class attribute to where the panel chain
    * starts. Everything in here renders whichever panel is selected. */
   const stripAt = cloudPage.indexOf('class="cv-status-card"');
-  const strip = cloudPage.slice(stripAt, cloudPage.indexOf("SECTION: OVERVIEW", stripAt));
+  const strip = cloudPage.slice(
+    stripAt,
+    cloudPage.indexOf("SECTION: OVERVIEW", stripAt),
+  );
 
-  it("is reachable from the strip, whichever panel is on screen", () => {
-    // The defect this fixes: markProgress('early_access') is the only action
-    // that advances explore -> ready, and C2's section split left its single
-    // call site inside the Skills panel. `explore` lands on Overview, so a
-    // paying, vaulted, linked user's next page load had nothing on it to do
-    // -- and the one nav item hiding the CTA was badged "new" identically to
-    // the two beside it that did not.
+  it("leaves no waitlist control anywhere on the page", () => {
+    // This block used to pin the opposite: that markProgress('early_access')
+    // had exactly one call site, and that it lived in the vault strip rather
+    // than inside the Skills panel. The ask queued people for hosted sync,
+    // which has since shipped, so the control was deleted rather than
+    // repointed at some other unbuilt thing.
+    expect(cloudPage).not.toContain("markProgress");
+    expect(cloudPage).not.toMatch(/Get early access/i);
+    expect(cloudPage).not.toMatch(/early-access list/i);
+  });
+
+  it("keeps the strip as stage chrome, showing state it can prove", () => {
     expect(stripAt, "no status card").toBeGreaterThan(-1);
-    expect(strip).toContain("@click=\"markProgress('early_access')\"");
-    expect(strip).toContain("Get early access");
-    // Same behaviour it had in the panel: it takes the shell's request lock
-    // and says so rather than going quiet. The word changed with the move --
-    // `busy` is one lock shared with Manage billing, and the Billing panel
-    // now renders with this button beside it every time, so "Saving…" had the
-    // strip announcing work nobody asked for. "Working…" is what the device
-    // rows already say while someone else's request is in flight.
-    expect(strip).toContain(':disabled="busy"');
-    // Anchored on the label expression, not the bare word: the comment above
-    // the button explains what it stopped saying, and a negative match on the
-    // quoted literal alone reads that comment instead of the code.
-    expect(strip).toContain('busy ? "Working…"');
-    expect(strip).not.toContain('busy ? "Saving…"');
-    // And the strip really is stage chrome outside the chain -- the panel
-    // test above pins that, this pins that the button came with it.
     const overviewAt = cloudPage.indexOf(`v-if="activeSection === 'overview'"`);
-    expect(strip.indexOf("markProgress")).toBeGreaterThan(-1);
     expect(stripAt).toBeLessThan(overviewAt);
+    // Counted off the device list, not off a column a button wrote.
+    expect(strip).toContain("activeDevices.length");
+    expect(flatten(strip)).toMatch(/signed skills/i);
   });
 
-  it("moved rather than being copied", () => {
-    // Two call sites would be two buttons on screen at once whenever Skills
-    // is the selected panel, both writing the same column.
-    expect((cloudPage.match(/markProgress\('early_access'\)/g) ?? []).length).toBe(1);
-    const skillsAt = cloudPage.indexOf(`v-else-if="activeSection === 'skills'"`);
-    const skills = cloudPage.slice(skillsAt, cloudPage.indexOf("SECTION: CATALOG", skillsAt));
+  it("states the publishing limit where the ask used to be", () => {
+    // flatten: the sentence is line-wrapped in the template, so a raw match
+    // would depend on where the wrap happens to fall.
+    expect(flatten(strip)).toMatch(/hands-on in private beta/i);
+    expect(flatten(strip)).not.toMatch(/we'll email|when it ships/i);
+  });
+
+  it("leaves the Skills panel a labelled preview with no action in it", () => {
+    const skillsAt = cloudPage.indexOf(
+      `v-else-if="activeSection === 'skills'"`,
+    );
+    const skills = cloudPage.slice(
+      skillsAt,
+      cloudPage.indexOf("SECTION: CATALOG", skillsAt),
+    );
     expect(skillsAt, "no skills panel").toBeGreaterThan(-1);
-    expect(skills, "skills panel is still the only way to the CTA").not.toContain("markProgress");
-    // The panel still exists and is still worth visiting -- only the action
-    // left it. And it says where the action went.
-    expect(skills).toContain("Manage your vault from the web");
-    expect(flatten(skills)).toContain("Ask for early access from the vault strip above");
-  });
-
-  it("disappears once the ask has been made", () => {
-    // stage === "ready" IS early_access_at being set (see the stage computed),
-    // so the button has to go when the strip's own text starts saying "early
-    // access requested" and the Skills panel starts confirming it.
-    expect(strip).toContain(`v-if="stage !== 'ready'"`);
-    expect(strip).toContain("early access requested");
-    const at = cloudPage.indexOf("const stage = computed<Stage>");
-    const body = cloudPage.slice(at, cloudPage.indexOf("\n});", at));
-    expect(body).toContain('if (!earlyAccess.value) return "explore";');
-    expect(body).toContain('return "ready";');
+    expect(skills).not.toContain("markProgress");
+    // Labelled as unbuilt rather than as imminent: the old label alternated
+    // between "Coming soon · preview" and "You're on the list · preview".
+    expect(flatten(skills)).toContain("Not built yet · preview");
+    // And it points at where skills actually come from instead of a waitlist.
+    expect(flatten(skills)).toMatch(/signed catalog/i);
   });
 });
 
@@ -317,20 +355,27 @@ describe("locked items are genuinely unselectable", () => {
     // 3. And the permanently-locked item carries no section at all, so there
     //    is nothing for the handler to assign even with both other guards off.
     expect(sectionOf("members")).toBeNull();
-    expect(cloudPage).toContain('item("members", "Members", ICON.users, { soon: true }),');
+    expect(cloudPage).toContain(
+      'item("members", "Members", ICON.users, { soon: true }),',
+    );
   });
 
   it("leaves Settings a no-op rather than inventing a panel for it", () => {
     // It reveals at ready and does nothing, exactly as before this switcher.
     // Giving it a section would mean shipping settings there are none of.
     expect(sectionOf("settings")).toBeNull();
-    expect(cloudPage).toContain('item("settings", "Settings", ICON.gear, { revealAt: "ready" })');
+    expect(cloudPage).toContain(
+      'item("settings", "Settings", ICON.gear, { revealAt: "ready" })',
+    );
   });
 });
 
 describe("the Billing panel", () => {
   const at = cloudPage.indexOf(`v-else-if="activeSection === 'billing'"`);
-  const panel = cloudPage.slice(at, cloudPage.indexOf(`v-else-if="activeSection === 'skills'"`, at));
+  const panel = cloudPage.slice(
+    at,
+    cloudPage.indexOf(`v-else-if="activeSection === 'skills'"`, at),
+  );
 
   it("exists as a panel, not a card to scroll to", () => {
     expect(at, "no billing panel").toBeGreaterThan(-1);
@@ -344,10 +389,46 @@ describe("the Billing panel", () => {
     // nothing in /api/me exposes what this subscription is actually charged.
     expect(panel).toContain("{{ hostedPriceLabel }}");
     expect(panel).toContain("Plan price");
-    expect(cloudPage).toContain('import { formatPriceLabel } from "../utils/money";');
-    expect(cloudPage).toContain("formatPriceLabel(price.amount, price.currency, price.interval)");
+    expect(cloudPage).toContain(
+      'import { formatPriceLabel } from "../utils/money";',
+    );
+    expect(cloudPage).toContain(
+      "formatPriceLabel(price.amount, price.currency, price.interval)",
+    );
     expect(cloudPage).toContain('await fetch("/api/pricing"');
     expect(cloudPage).not.toMatch(/\$\d+\s*\/\s*(mo|month)/);
+  });
+
+  it("sends never-subscribed owners to Checkout, not a second subscription for past_due", () => {
+    // Membership, not the literal source line. The rule is "a status that still
+    // has a live Stripe subscription behind it goes to the portal, because
+    // Checkout would mint a second one"; `paused` joined the set for exactly
+    // that reason and the old string match failed on the formatting rather than
+    // on the rule.
+    const at0 = cloudPage.indexOf("const PORTAL_ONLY_STATUSES");
+    expect(at0, "no PORTAL_ONLY_STATUSES").toBeGreaterThan(-1);
+    const declared = cloudPage.slice(at0, cloudPage.indexOf("]);", at0));
+    for (const live of ["past_due", "unpaid", "incomplete", "paused"]) {
+      expect(declared, `${live} must not reach Checkout`).toContain(`"${live}"`);
+    }
+    // Canceled and never-subscribed are the ones Checkout is for.
+    for (const gone of ["canceled", "incomplete_expired"]) {
+      expect(declared).not.toContain(`"${gone}"`);
+    }
+    const at = cloudPage.indexOf("const canStartCheckout = computed");
+    expect(at, "no canStartCheckout").toBeGreaterThan(-1);
+    const body = cloudPage.slice(
+      at,
+      cloudPage.indexOf("const canManageBilling", at),
+    );
+    expect(body).toContain("if (paid.value) return false");
+    expect(body).toContain("PORTAL_ONLY_STATUSES.has(status)");
+    const checkout = cloudPage.slice(
+      cloudPage.indexOf("async function startHostedCheckout"),
+      cloudPage.indexOf("async function openBillingPortal"),
+    );
+    expect(checkout).toContain("if (paid.value)");
+    expect(checkout).toContain('fetch("/api/checkout/hosted-vault"');
   });
 
   it("reuses the existing subscription vocabulary instead of a second one", () => {
@@ -357,15 +438,23 @@ describe("the Billing panel", () => {
     expect(panel).toContain("subscriptionNeedsAttention");
   });
 
-  it("is where the portal is opened from", () => {
-    // The panel's own button is the thing that reaches Stripe. It reuses
-    // openBillingPortal untouched, which already handles the 409 "no billing
-    // account yet" case and works for a canceled subscriber.
+  it("is where Checkout and the portal are opened from", () => {
+    // After the funnel, this panel is the only place a never-subscribed
+    // owner can start paying: the vault already exists, so stage stays
+    // "ready" and the funnel's Open checkout button is gone. The portal is
+    // still here for anyone who already has a Stripe customer.
+    expect(panel).toContain('@click="startHostedCheckout"');
+    expect(panel).toContain("Start subscription");
+    expect(panel).toContain('v-if="canStartCheckout"');
+    expect(panel).toContain('v-if="canManageBilling"');
     expect(panel).toContain('@click="openBillingPortal"');
     expect(panel).toContain("Manage billing");
     // It shares the shell's request lock.
     expect(panel).toContain(':disabled="busy"');
-    // Exactly one transport, not a copy of it inside the panel.
+    // Exactly one of each transport, not a copy of either inside the panel.
+    expect((cloudPage.match(/api\/checkout\/hosted-vault/g) ?? []).length).toBe(
+      1,
+    );
     expect((cloudPage.match(/api\/billing\/portal/g) ?? []).length).toBe(1);
   });
 
@@ -387,10 +476,15 @@ describe("the Billing panel", () => {
     // menu is already rendered. Falling through to the portal there is what
     // keeps the item from becoming a live-looking command that does nothing.
     expect(body).toContain("stageReached(SECTION_REVEAL.billing, stage.value)");
+    expect(body).toContain("void startHostedCheckout();");
     expect(body).toContain("void openBillingPortal();");
-    // The fallback is the guarded branch, not the default one.
+    // Checkout is the fall-through for a never-subscribed account; the portal
+    // is the remaining fallback. Both are the guarded branch, not the default.
+    expect(body.indexOf("void startHostedCheckout();")).toBeLessThan(
+      body.indexOf('selectedSection.value = "billing";'),
+    );
     expect(body.indexOf("void openBillingPortal();")).toBeLessThan(
-      body.indexOf('selectedSection.value = "billing";')
+      body.indexOf('selectedSection.value = "billing";'),
     );
     // And because that branch survives, the menu item can still take the
     // shell's request lock -- so its aria-disabled guard stays load-bearing.
@@ -416,7 +510,7 @@ describe("the Billing panel", () => {
     // It used to just be the words "contact support" with nothing behind
     // them. Retired by linking it rather than deleting it: a subscriber
     // whose access looks wrong still needs somewhere to go.
-    const noticeAt = panel.indexOf('v-if="subscriptionNeedsAttention"');
+    const noticeAt = panel.indexOf('v-else-if="subscriptionNeedsAttention"');
     expect(noticeAt, "no subscription-attention notice").toBeGreaterThan(-1);
     const notice = panel.slice(noticeAt, panel.indexOf("</p>", noticeAt));
     expect(notice).toContain("contact support");
@@ -424,16 +518,58 @@ describe("the Billing panel", () => {
   });
 });
 
+describe("the billing recovery block", () => {
+  const at = cloudPage.indexOf("BILLING RECOVERY");
+  const block = cloudPage.slice(at, cloudPage.indexOf("SECTION: MACHINES", at));
+
+  it("gives a lapsed owner a way out before any machine is admitted", () => {
+    // The Billing panel reveals at `ready`, and `ready` requires an admitted
+    // machine. Admitting one answers 402 while the subscription is inactive.
+    // An owner who reserved a namespace and then lapsed was parked at
+    // `connect` with both exits shut, and that is every unconverted trial. So
+    // this block has to live OUTSIDE the `ready` template, next to Machines.
+    expect(at, "no billing recovery block").toBeGreaterThan(-1);
+    expect(SECTION_REVEAL_BILLING).toBe('billing: "ready"');
+    expect(block).toContain('v-if="vault && !paid"');
+    expect(block).toContain("startHostedCheckout");
+    expect(block).toContain("openBillingPortal");
+    // Same predicates the Billing panel uses, so a paused or past_due owner is
+    // still routed to the portal rather than to a second subscription.
+    expect(block).toContain('v-if="canStartCheckout"');
+    expect(block).toContain('v-if="canManageBilling"');
+  });
+
+  it("says the namespace survived rather than implying it was taken away", () => {
+    expect(flatten(block)).toContain("still reserved and nothing has been deleted");
+  });
+});
+
+const SECTION_REVEAL_BILLING = (() => {
+  const at = cloudPage.indexOf("const SECTION_REVEAL");
+  const body = cloudPage.slice(at, cloudPage.indexOf("};", at));
+  return body.split("\n").map((line) => line.trim().replace(/,$/, ""))
+    .find((line) => line.startsWith("billing:")) ?? "";
+})();
+
 describe("the Catalog panel", () => {
   const at = cloudPage.indexOf(`v-else-if="activeSection === 'catalog'"`);
-  const panel = cloudPage.slice(at, cloudPage.indexOf("SECTION: MACHINES", at));
+  // Ends at whichever block comes next, not at one named marker. This slice
+  // used to run to SECTION: MACHINES and swallowed everything inserted between
+  // the two, so a <button> in a later, unrelated block failed a case about the
+  // catalog panel. The nearest following marker is the panel's real end.
+  const panelEnd = Math.min(
+    ...["BILLING RECOVERY", "SECTION: MACHINES"]
+      .map((marker) => cloudPage.indexOf(marker, at))
+      .filter((index) => index > -1)
+  );
+  const panel = cloudPage.slice(at, panelEnd);
 
   it("exists as a panel, not a card to scroll to", () => {
     expect(at, "no catalog panel").toBeGreaterThan(-1);
     expect(sectionOf("catalog")).toBe("catalog");
   });
 
-  it("reveals at explore, not connect, even though the copy is about linked machines", () => {
+  it("reveals at ready, not connect, even though the copy is about linked machines", () => {
     // The naive read of "this needs a linked machine to be meaningful" points
     // at "connect", but the panel lives inside the explore/ready template
     // (the same v-else-if chain skills and billing use), which does not
@@ -443,15 +579,15 @@ describe("the Catalog panel", () => {
     // only value that keeps the nav item's lock in sync with the template
     // that actually renders behind it.
     const table = revealTable();
-    expect(table.catalog).toBe("explore");
+    expect(table.catalog).toBe("ready");
     // And the panel really is inside that chain, not pulled out the way
     // machines is -- proven by position: it has to fall between the outer
     // template's opening and the machines comment that marks where that
     // template closes.
-    const exploreReadyAt = cloudPage.indexOf(`v-if="stage === 'explore' || stage === 'ready'"`);
+    const readyAt = cloudPage.indexOf(`v-if="stage === 'ready'"`);
     const machinesCommentAt = cloudPage.indexOf("SECTION: MACHINES");
-    expect(exploreReadyAt).toBeGreaterThan(-1);
-    expect(at).toBeGreaterThan(exploreReadyAt);
+    expect(readyAt).toBeGreaterThan(-1);
+    expect(at).toBeGreaterThan(readyAt);
     expect(at).toBeLessThan(machinesCommentAt);
   });
 
@@ -461,16 +597,28 @@ describe("the Catalog panel", () => {
   });
 
   it("answers how it relates to linked machines", () => {
-    expect(flatten(panel)).toContain("Every machine you admit reads from that same vault catalog");
+    expect(flatten(panel)).toContain(
+      "Every machine you admit reads from that same vault catalog",
+    );
   });
 
-  it("answers what publishing will look like, and agrees there is nothing to do today", () => {
-    expect(flatten(panel)).toContain("Publishing ships with hosted sync");
-    expect(flatten(panel)).toContain("nothing to publish or configure here today");
-    // Matches the Sync engine card's own framing (signing/serving stay local)
-    // rather than inventing a publish flow or an owner console that do not
-    // exist yet.
-    expect(flatten(panel)).toContain("signing and serving already work today");
+  it("answers how publishing actually works, without inventing a control", () => {
+    // This used to assert "Publishing ships with hosted sync" -- written when
+    // sync was the unshipped half. Sync shipped; publishing did not, and it is
+    // not waiting on sync. It is out of band by design, because the release
+    // signing key never reaches Cloud, so the copy has to explain the absence
+    // rather than date it.
+    expect(flatten(panel)).toContain("There is no publish button here");
+    expect(flatten(panel)).toContain("no upload API");
+    expect(flatten(panel)).toContain("never reaches us");
+    // And it says what a customer sees before the first release lands, so a
+    // 404 from their own catalog does not read as a fault they caused. Phrased
+    // as the rule rather than as a claim about this vault: the panel never
+    // queries KV, so "this vault serves nothing" was an assertion it could not
+    // support, in the same way "serving signed skills" was.
+    expect(flatten(panel)).toContain("answers 404 for its catalog");
+    expect(flatten(panel)).toContain("rather than a fault");
+    expect(panel).not.toContain("this vault serves nothing");
   });
 
   it("gives an honest empty state instead of a fake control", () => {
@@ -502,7 +650,9 @@ describe("the Catalog panel", () => {
     // still said the banned thing.
     const copy = flatten(panel);
     expect(copy).not.toMatch(/live vault|provisioned runtime/i);
-    expect(copy).not.toMatch(/cloud sync is enabled|enabled cloud sync|sync now/i);
+    expect(copy).not.toMatch(
+      /cloud sync is enabled|enabled cloud sync|sync now/i,
+    );
     expect(copy).not.toMatch(/prototype mode/i);
   });
 });
@@ -510,9 +660,7 @@ describe("the Catalog panel", () => {
 describe("Docs and Support are always-visible links, not sections", () => {
   it("are wired to an href, not a section", () => {
     for (const key of ["docs", "support"]) {
-      const at = cloudPage.indexOf(`item("${key}"`);
-      expect(at, `no nav item named ${key}`).toBeGreaterThan(-1);
-      const call = cloudPage.slice(at, cloudPage.indexOf("\n", at));
+      const call = itemCall(key);
       expect(call).toContain("href:");
       expect(call).not.toContain("section:");
     }
@@ -523,18 +671,13 @@ describe("Docs and Support are always-visible links, not sections", () => {
     // both read the same clerkBrand fields so there is exactly one place
     // either URL is written down.
     expect(cloudPage).toContain('import { clerkBrand } from "../clerk";');
-    const docsAt = cloudPage.indexOf('item("docs"');
-    const docsCall = cloudPage.slice(docsAt, cloudPage.indexOf("\n", docsAt));
-    expect(docsCall).toContain("clerkBrand.docsPath");
-    const supportAt = cloudPage.indexOf('item("support"');
-    const supportCall = cloudPage.slice(supportAt, cloudPage.indexOf("\n", supportAt));
-    expect(supportCall).toContain("clerkBrand.supportUrl");
+    expect(itemCall("docs")).toContain("clerkBrand.docsPath");
+    expect(itemCall("support")).toContain("clerkBrand.supportUrl");
   });
 
   it("carry no reveal stage or soon flag, so nothing can lock them", () => {
     for (const key of ["docs", "support"]) {
-      const at = cloudPage.indexOf(`item("${key}"`);
-      const call = cloudPage.slice(at, cloudPage.indexOf("\n", at));
+      const call = itemCall(key);
       expect(call).not.toContain("revealAt:");
       expect(call).not.toContain("soon:");
     }
@@ -548,12 +691,16 @@ describe("Docs and Support are always-visible links, not sections", () => {
   it("render as real anchors so open-in-new-tab and copy-link work", () => {
     expect(cloudPage).toContain(`:is="item.href ? 'a' : 'button'"`);
     expect(cloudPage).toContain(':href="item.href ?? undefined"');
-    expect(cloudPage).toContain(":target=\"item.external ? '_blank' : undefined\"");
+    expect(cloudPage).toContain(
+      ":target=\"item.external ? '_blank' : undefined\"",
+    );
     // The two literals the sidebar's lock/highlight tests already pin, kept
     // byte-identical through the tag switch rather than only true for
     // <button> once <a> items exist alongside it.
     expect(cloudPage).toContain(':disabled="item.disabled"');
-    expect(cloudPage).toContain(`:aria-current="item.active ? 'true' : undefined"`);
+    expect(cloudPage).toContain(
+      `:aria-current="item.active ? 'true' : undefined"`,
+    );
   });
 
   it("mark the GitHub support link external, and the docs link internal", () => {
@@ -592,7 +739,9 @@ describe("the machines list stays where it is needed", () => {
     // `autovault link` opens /cloud?admit=<fingerprint> and the page focuses
     // that row's Admit button. A second machine checking in while the owner is
     // reading Billing would otherwise focus a button Vue is not rendering.
-    const at = cloudPage.indexOf("if (!deviceId || admitFocusedId === deviceId) return;");
+    const at = cloudPage.indexOf(
+      "if (!deviceId || admitFocusedId === deviceId) return;",
+    );
     expect(at).toBeGreaterThan(-1);
     const body = cloudPage.slice(at, cloudPage.indexOf("button?.focus();", at));
     expect(body).toContain('selectedSection.value = "machines";');
@@ -609,7 +758,7 @@ describe("the machines list stays where it is needed", () => {
     expect(at).toBeGreaterThan(-1);
     const body = cloudPage.slice(at, cloudPage.indexOf("\n}", at));
     expect(body.indexOf("await nextTick();")).toBeLessThan(
-      body.indexOf("devicesCard.value?.scrollIntoView")
+      body.indexOf("devicesCard.value?.scrollIntoView"),
     );
   });
 

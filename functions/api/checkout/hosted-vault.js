@@ -1,6 +1,12 @@
 import { requireUser } from "../_lib/auth.js";
 import { ApiError, handleApi, json, readJson } from "../_lib/http.js";
-import { buildHostedVaultCheckoutParams, createCheckoutSession } from "../_lib/stripe.js";
+import {
+  buildHostedVaultCheckoutParams,
+  createCheckoutSession,
+  findOutstandingTrialSession,
+  hasPriorStripeSubscription,
+  resolveStripeCustomerId
+} from "../_lib/stripe.js";
 import { getSubscription } from "../_lib/vault.js";
 
 export async function onRequestPost({ request, env }) {
@@ -26,11 +32,53 @@ export async function onRequestPost({ request, env }) {
     }
 
     const body = await readJson(request, 8_000);
+
+    // Resolve the customer BEFORE deciding anything. Everything below needs a
+    // stable id: with customer_email, Stripe mints a fresh Customer per
+    // completed checkout, so one account accumulates several and none of them
+    // can be listed against to see what is already outstanding.
+    const customerId = await resolveStripeCustomerId(env, {
+      userId: user.id,
+      email: user.email
+    });
+
+    // Eligibility comes from Stripe, not from here.
+    //
+    // The local `subscriptions` row is a fine short-circuit when it is
+    // present: it is keyed on user_id and upserted, so it survives
+    // cancellation, and reading it costs nothing. What it cannot do is answer
+    // the question in time. It is written by the billing webhook or by
+    // /api/billing/reconcile, both of which run after a Checkout Session
+    // completes.
+    //
+    // Stripe knows about a subscription the moment one exists, under any
+    // status, including the canceled ones that are the entire route back for a
+    // second free trial.
+    const hadTrialBefore =
+      Boolean(subscription?.status) ||
+      (await hasPriorStripeSubscription(env, { customerId, email: user.email }));
+
+    // The other half, and the one a subscription lookup structurally cannot
+    // see: a trial that has been OFFERED and not yet taken. A first-time
+    // account could open several sessions before finishing any, and every one
+    // of them carried a trial, because no subscription existed for any check
+    // to find. The open session is the only object that exists in that window.
+    //
+    // Reuse rather than refuse. Sending somebody back to the session they
+    // already have is both the fix and the better behaviour: a second session
+    // would strand the first, and Stripe keeps them open for 24 hours.
+    if (!hadTrialBefore) {
+      const outstanding = await findOutstandingTrialSession(env, customerId);
+      if (outstanding) return json({ url: outstanding.url, id: outstanding.id, reused: true });
+    }
+
     const params = buildHostedVaultCheckoutParams({
       request,
       env,
       user,
-      source: body.source === "playground" ? "playground" : "deploy"
+      customerId,
+      source: body.source === "playground" ? "playground" : "deploy",
+      allowTrial: !hadTrialBefore
     });
     const session = await createCheckoutSession(env, params);
     return json({ url: session.url, id: session.id });

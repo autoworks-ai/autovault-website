@@ -75,7 +75,13 @@ function isHiddenSitemapItem(item: { url: string }) {
     : item.url.startsWith("/")
       ? item.url
       : `/${item.url}`;
-  return path === "/cloud" || path === "/cloud/" || path.startsWith("/cloud/");
+  // /cloud is a public product page. /cloud/pair is not: it is the
+  // device-confirmation endpoint the CLI sends an owner to, addressed by a
+  // one-time code, and it has no standalone meaning to a crawler. It also
+  // has no pageDocs entry, so transformHead never runs for it and this
+  // filter plus its own `search: false` are the only things keeping it out
+  // of an index.
+  return path === "/cloud/pair" || path === "/cloud/pair/";
 }
 
 export default defineConfig({
@@ -145,6 +151,7 @@ export default defineConfig({
       { text: "Permissions", link: "/permissions" },
       { text: "Authoring", link: "/authoring" },
       { text: "Examples", link: "/skills-directory" },
+      { text: "Hosted sync", link: "/hosted-sync" },
       { text: "Security", link: "/security" },
       { text: "Troubleshooting", link: "/troubleshooting" },
       { text: "About", link: "/about" },
@@ -185,6 +192,7 @@ export default defineConfig({
         text: "Reference",
         items: [
           { text: "Skill examples", link: "/skills-directory" },
+          { text: "Hosted sync", link: "/hosted-sync" },
           { text: "API reference", link: "/api" },
           { text: "Deploy remote vault", link: "/deploy" },
           { text: "Compare alternatives", link: "/compare" },

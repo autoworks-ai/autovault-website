@@ -15,13 +15,30 @@ STRIPE_BRAND_ICON_URL = "https://autovault.dev/square-1200x1200.png"
 # Very Good Plugins, not AutoVault. Verified on a live test session.
 STRIPE_BRAND_LOGO_URL = "https://autovault.dev/square-1200x1200.png"
 STRIPE_CHECKOUT_SUBMIT_TYPE = "subscribe"
+# Trial length in days. Read by buildHostedVaultCheckoutParams AND by
+# /api/pricing, so the number on the page is the number Stripe is asked for.
+# Set it to 0 or remove it to turn the trial off; the copy that mentions a
+# trial renders off this value and disappears with it.
+#
+# No card is collected during the trial, because payment_method_collection is
+# already "if_required" and Stripe reads a trial as nothing due now. The
+# subscription arrives as status=trialing, which isPaidStatus already accepts,
+# so a trialing customer reserves a namespace and pulls bundles normally.
+AUTOVAULT_HOSTED_TRIAL_DAYS = "14"
 # Rendered on the live Stripe Checkout page, so it is read at the moment money
 # changes hands. It used to say AutoVault reserves the namespace "once Stripe
 # confirms this subscription" -- true when provisioning happened on the Stripe
 # return, and false now that reserving is a deliberate click afterwards. The
 # check-then-claim race is accepted by design, so the name can even be gone by
 # the time they click: this may promise the step, never the outcome.
-STRIPE_CHECKOUT_CUSTOM_TEXT_SUBMIT = "You'll reserve your hosted namespace on the next screen, once Stripe confirms this subscription. Cloud sync remains disabled until the CLI handoff ships."
+# The second sentence used to say sync was disabled pending the CLI handoff.
+# That handoff shipped in CLI v0.5.0, so the honest disclosure at the moment of
+# payment is now the opposite one: sync works, publishing is still manual.
+# The trial is deliberately absent from this string. applyCustomText prepends a
+# sentence built from AUTOVAULT_HOSTED_TRIAL_DAYS, so the length quoted on the
+# Checkout page is the length Stripe was actually sent, and setting the trial to
+# 0 removes the sentence instead of leaving a stale one here.
+STRIPE_CHECKOUT_CUSTOM_TEXT_SUBMIT = "You'll reserve your hosted namespace on the next screen, once Stripe confirms this subscription. Pairing a machine and pulling signed skills works today. Publishing your first catalog is still hands-on in private beta."
 
 [[d1_databases]]
 binding = "AUTOVAULT_DB"

@@ -136,7 +136,9 @@ describe("the celebration happens at the size it was staged at", () => {
   });
 
   it("never shows two vaults at once", () => {
-    expect(cloudPage).toContain('v-show="!vaultUnlocking" class="cv-status-mark"');
+    expect(cloudPage).toContain(
+      'v-show="!vaultUnlocking"\n              class="cv-status-mark"'
+    );
   });
 });
 

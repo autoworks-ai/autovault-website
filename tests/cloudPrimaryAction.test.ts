@@ -43,7 +43,6 @@ const STAGES = [
   "subscription",
   "setup",
   "connect",
-  "explore",
   "ready",
 ] as const;
 
@@ -73,10 +72,6 @@ describe("which control is the one thing to do next", () => {
     expect(site("setup")).toBe("funnel");
   });
 
-  it("marks the status strip's CTA once the vault is open", () => {
-    expect(site("explore")).toBe("early-access");
-  });
-
   it("marks nothing at ready, where nothing is left to do", () => {
     // A marker with no step behind it is worse than none: it is the page
     // insisting there is another one.
@@ -84,9 +79,9 @@ describe("which control is the one thing to do next", () => {
   });
 
   it("still marks a named machine at ready, where the stage outlives the claim", () => {
-    // `stage` is `ready` whenever ANY machine is active and early access has
-    // been asked for -- cliLinked reads activeDevices, not pendingDevices. So
-    // an owner who has done both and then runs `autovault link` on a second
+    // `stage` is `ready` whenever ANY machine is active -- cliLinked reads
+    // activeDevices, not pendingDevices. So an owner who has linked one
+    // machine and then runs `autovault link` on a second
     // machine gets a pending row, an ?admit= fingerprint, and a stage that
     // never leaves `ready`. "Nothing is left to do" is false in exactly that
     // state: a CLI on the other end of that row is blocked on the click.
@@ -102,9 +97,9 @@ describe("which control is the one thing to do next", () => {
     // falls back to null rather than to the other row.
     expect(site("ready", true, true)).toBe("admit");
     // Card not on screen (the owner is reading Billing): no marker, rather
-    // than one on an element Vue is not rendering. `explore` falls back to the
-    // early-access CTA here; at `ready` that ask is already done, so there is
-    // nothing to fall back to.
+    // than one on an element Vue is not rendering. There is nothing to fall
+    // back to: publishing the first catalog is the only work left and it is
+    // ours, not a control this page could mark.
     expect(site("ready", true, false)).toBeNull();
     // Pending machines with nothing naming one: unmarked at ready for exactly
     // the same reason as at connect.
@@ -139,20 +134,20 @@ describe("which control is the one thing to do next", () => {
     expect(site("connect")).toBeNull();
   });
 
-  it("lets a waiting machine outrank the early-access ask", () => {
-    // Both are rendered at explore -- a second machine can enrol long after the
-    // first one opened the vault -- and this is the case where two markers
-    // would otherwise appear. A CLI is blocked on the Admit; nothing is
-    // blocked on early access.
-    expect(site("explore", true, true)).toBe("admit");
+  it("lets a waiting machine outrank everything else on screen", () => {
+    // A second machine can enrol long after the first one opened the vault.
+    // A CLI is blocked on that Admit, so it outranks anything else rendered.
+    expect(site("ready", true, true)).toBe("admit");
   });
 
-  it("falls back to the action that is actually on screen", () => {
+  it("marks nothing when the only candidate control is off screen", () => {
     // The owner can be reading Billing, where the Machines card is in a panel
     // Vue is not rendering. A marker on an element that is not in the DOM is
-    // no marker at all, so the one that IS on screen takes it.
-    expect(site("explore", true, false)).toBe("early-access");
-    // At connect there is no other control to fall back to.
+    // no marker at all. There used to be an early-access CTA in the strip to
+    // fall back to; it was removed with the waitlist, so the honest answer
+    // here is now none.
+    expect(site("ready", true, false)).toBeNull();
+    // At connect there is no other control to fall back to either.
     expect(site("connect", true, false)).toBeNull();
   });
 
@@ -168,12 +163,11 @@ describe("which control is the one thing to do next", () => {
           const marked = [
             answer === "funnel",
             answer === "admit",
-            answer === "early-access",
           ].filter(Boolean);
           expect(marked.length, `${stage}/${named}/${visible} marked ${marked.length}`)
             .toBeLessThanOrEqual(1);
           expect(
-            answer === null || ["funnel", "admit", "early-access"].includes(answer),
+            answer === null || ["funnel", "admit"].includes(answer),
             `${stage} produced an unknown site: ${answer}`
           ).toBe(true);
         }
@@ -183,19 +177,22 @@ describe("which control is the one thing to do next", () => {
 
   it("marks something at every stage that still has a step in it", () => {
     // The other direction, so a future edit cannot satisfy "at most one" by
-    // marking nothing anywhere. Every pre-vault stage and `explore` must name
-    // a control.
-    for (const stage of ["account", "subscription", "setup", "explore"]) {
+    // marking nothing anywhere. Every pre-vault stage must name a control.
+    // `ready` is deliberately not in this list: once a machine is admitted the
+    // owner has no step left, and the remaining work is ours.
+    for (const stage of ["account", "subscription", "setup"]) {
       expect(site(stage), `${stage} has a step but marks nothing`).not.toBeNull();
     }
   });
 });
 
 describe("the marker is wired to that decision and to nothing else", () => {
-  it("names the same three sites in the template that the function returns", () => {
+  it("names the same two sites in the template that the function returns", () => {
     expect(cloudPage).toContain(`:marked-action="nextAction === 'funnel'"`);
-    expect(cloudPage).toContain(`:class="{ 'av-nextaction': nextAction === 'early-access' }"`);
     expect(cloudPage).toContain(`:class="{ 'av-nextaction': isNextAction(device) }"`);
+    // The third site was the strip's "Get early access" button, removed with
+    // the waitlist. Nothing may bind the marker to a stage any more.
+    expect(cloudPage).not.toMatch(/av-nextaction': nextAction === '(?!funnel)/);
     // isNextAction is the admit branch. It reads the shared decision AND the
     // existing isAdmitTarget helper, rather than re-deriving either.
     expect(cloudPage).toContain(`return nextAction.value === "admit" && isAdmitTarget(device);`);
@@ -245,11 +242,12 @@ describe("the marker is wired to that decision and to nothing else", () => {
   });
 
   it("writes the marker class in exactly the places that consume the decision", () => {
-    // Four bindings for three sites: the funnel's primary has two branches
-    // (checkout and reserve) that are mutually exclusive by `v-else-if`.
+    // CloudPage owns one binding now: the Admit button on a device row. The
+    // second was the strip's "Get early access", removed with the waitlist.
+    // The funnel's own primary is bound in HostedVaultFunnel, counted below.
     const templateEnd = cloudPage.indexOf("<script setup");
     const cloudBindings = cloudPage.slice(0, templateEnd).match(/av-nextaction/g) ?? [];
-    expect(cloudBindings.length, "CloudPage marks something new").toBe(2);
+    expect(cloudBindings.length, "CloudPage marks something new").toBe(1);
 
     const funnelTemplateEnd = funnel.indexOf("<script setup");
     const funnelBindings = funnel.slice(0, funnelTemplateEnd).match(/av-nextaction/g) ?? [];
@@ -276,7 +274,9 @@ describe("the marker is wired to that decision and to nothing else", () => {
     // data-admit-target is what the focus handshake queries for. The marker is
     // a second, independent binding on the same button -- adding it must not
     // have replaced it.
-    expect(cloudPage).toContain(`:data-admit-target="isAdmitTarget(device) ? 'true' : undefined"`);
+    expect(cloudPage).toContain(
+      `:data-admit-target="\n                      isAdmitTarget(device) ? 'true' : undefined\n                    "`
+    );
     expect(cloudPage).toContain(`"[data-admit-target='true']"`);
   });
 });

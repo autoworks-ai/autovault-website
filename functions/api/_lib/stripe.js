@@ -10,8 +10,53 @@ export function isPaidStatus(status) {
   return ACTIVE_SUBSCRIPTION_STATUSES.has(status || "");
 }
 
-export function buildHostedVaultCheckoutParams({ request, env, user, source = "hosted-vault" }) {
-  if (!env.AUTOVAULT_HOSTED_PRICE_ID) throw new ApiError(503, "AUTOVAULT_HOSTED_PRICE_ID is not configured.");
+/**
+ * Trial length in days, or 0 for no trial.
+ *
+ * One resolver, read by both the Checkout builder and /api/pricing, so the
+ * number a visitor is shown is the number Stripe is asked for. A trial written
+ * into copy that Checkout does not send is the exact failure this codebase
+ * keeps auditing itself for, and a page cannot drift from a value it reads at
+ * runtime from the same function.
+ *
+ * Env-driven rather than a constant, so the trial can be turned off in one
+ * place without a deploy of new copy. Anything unparseable or negative reads
+ * as no trial, because the safe failure here is charging normally rather than
+ * silently granting free months.
+ */
+export function hostedTrialDays(env) {
+  // Whole string or nothing. parseInt would read "1e9999" as 1 and "14 days"
+  // as 14, so a typo in an env var turns into a real trial length that nobody
+  // typed. A value this decides billing on should refuse to guess.
+  const text = (env.AUTOVAULT_HOSTED_TRIAL_DAYS ?? "").trim();
+  if (!/^\d+$/.test(text)) return 0;
+  const raw = Number(text);
+  if (!Number.isSafeInteger(raw) || raw <= 0) return 0;
+  // Stripe's own ceiling on trial_period_days. Past it Checkout errors, which
+  // would take the whole funnel down rather than just the trial.
+  return Math.min(raw, 730);
+}
+
+export function buildHostedVaultCheckoutParams({
+  request,
+  env,
+  user,
+  source = "hosted-vault",
+  // The Stripe customer this session belongs to, resolved by the caller.
+  // Passing an id rather than customer_email is what makes a session findable
+  // afterwards: with customer_email Stripe mints a fresh Customer per
+  // completed checkout, so one account accumulates several and none of them
+  // can be listed against to see what is already outstanding.
+  customerId = null,
+  // One trial per account. Stripe does not remember that a customer already
+  // had one, and "cancel" at trial end leaves them free to check out again, so
+  // without this a 14-day trial is a renewable subscription that never bills.
+  // The caller owns the eligibility question because it is the half with a
+  // database; this function only refuses to offer what it was told not to.
+  allowTrial = true,
+}) {
+  if (!env.AUTOVAULT_HOSTED_PRICE_ID)
+    throw new ApiError(503, "AUTOVAULT_HOSTED_PRICE_ID is not configured.");
 
   const origin = new URL(request.url).origin;
   const successUrl = `${origin}/cloud?hosted=success&session_id={CHECKOUT_SESSION_ID}#launch-path`;
@@ -27,27 +72,72 @@ export function buildHostedVaultCheckoutParams({ request, env, user, source = "h
   params.set("metadata[source]", source);
   params.set("subscription_data[metadata][user_id]", user.id);
   params.set("subscription_data[metadata][source]", source);
+  // No card during a trial: payment_method_collection below is "if_required",
+  // and Stripe reads a trial as "nothing due now". The subscription comes back
+  // status=trialing, which ACTIVE_SUBSCRIPTION_STATUSES already counts as
+  // paid, so provisioning and the sync routes need no change to let a trialing
+  // customer reserve a namespace and pull bundles.
+  //
+  // Trial end is stated, not inherited. Stripe's default here is
+  // "create_invoice", and a test clock advanced past day 14 shows that landing
+  // on status=past_due, which ACTIVE_SUBSCRIPTION_STATUSES excludes, so
+  // entitlement does stop on its own. It stops by dunning somebody for an
+  // invoice against a card they were told they did not have to give.
+  //
+  // "cancel" is the behaviour the copy already promises. No card up front means
+  // there is nothing to collect, so the honest end of an unconverted trial is
+  // the subscription ending, not an unpaid bill and a sequence of Stripe emails
+  // about it. Writing it down also stops a money decision from resting on a
+  // default that Stripe is free to change.
+  const trialDays = allowTrial ? hostedTrialDays(env) : 0;
+  if (trialDays > 0) {
+    params.set("subscription_data[trial_period_days]", String(trialDays));
+    params.set(
+      "subscription_data[trial_settings][end_behavior][missing_payment_method]",
+      "cancel",
+    );
+    // Stamped on the session itself, not just the subscription, because the
+    // session is the only object that exists while the trial is merely offered.
+    // findOutstandingTrialSession reads this to recognise an offer that is
+    // still open, which is what stops a second one being made.
+    params.set("metadata[trial_days]", String(trialDays));
+  }
   params.set("submit_type", env.STRIPE_CHECKOUT_SUBMIT_TYPE || "subscribe");
-  if (user.email) params.set("customer_email", user.email);
+  // Lets a customer type a Stripe promotion code on Checkout. Coupons without
+  // a promotion code still have to be applied in the Dashboard.
+  params.set("allow_promotion_codes", "true");
+  // 100% coupons would still demand a card without this. Paid totals still
+  // collect a payment method; $0 after a promo does not.
+  params.set("payment_method_collection", "if_required");
+  if (customerId) params.set("customer", customerId);
+  else if (user.email) params.set("customer_email", user.email);
 
   applyBranding(params, env);
-  applyCustomText(params, env);
+  applyCustomText(params, env, allowTrial);
   return params;
 }
 
 export async function createCheckoutSession(env, params, fetcher = fetch) {
-  if (!env.STRIPE_SECRET_KEY) throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
-  const response = await fetcher("https://api.stripe.com/v1/checkout/sessions", {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
-      "content-type": "application/x-www-form-urlencoded",
-      "stripe-version": STRIPE_API_VERSION
+  if (!env.STRIPE_SECRET_KEY)
+    throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
+  const response = await fetcher(
+    "https://api.stripe.com/v1/checkout/sessions",
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+        "content-type": "application/x-www-form-urlencoded",
+        "stripe-version": STRIPE_API_VERSION,
+      },
+      body: params,
     },
-    body: params
-  });
+  );
   const payload = await response.json();
-  if (!response.ok || !payload.url) throw new ApiError(502, payload.error?.message || "Stripe Checkout Session creation failed.");
+  if (!response.ok || !payload.url)
+    throw new ApiError(
+      502,
+      payload.error?.message || "Stripe Checkout Session creation failed.",
+    );
   return payload;
 }
 
@@ -67,11 +157,168 @@ export async function createCheckoutSession(env, params, fetcher = fetch) {
 // correctly means "no live billing relationship".
 export async function getStripeCustomerId(env, userId) {
   if (!userId) return null;
-  const row = await first(env, "select stripe_customer_id from customers where user_id = ?", userId);
+  const row = await first(
+    env,
+    "select stripe_customer_id from customers where user_id = ?",
+    userId,
+  );
   return row?.stripe_customer_id ?? null;
 }
 
-export function buildBillingPortalParams({ request, env, customerId, returnTo }) {
+// Has Stripe ever created a subscription for this person, in any state?
+//
+// The trial is once per account, and the check that enforced it read the local
+// `subscriptions` row. That row is written by the webhook or by
+// /api/billing/reconcile, both of which run AFTER a Checkout Session
+// completes, so it answers a question about the past with data that arrives
+// late. Stripe is the system that actually owns this fact, so ask Stripe.
+//
+// Two lookups, because two things can be missing. The known customer id is the
+// exact handle and needs one call. When there is none, because a webhook never
+// landed or a customer was reassigned away, the email finds Stripe customers
+// this account created under a different id, which is precisely the case a
+// local-only check gets wrong. Capped at five, because this is on the checkout
+// path and an unbounded fan-out there is a worse bug than the one it prevents.
+//
+// Takes the customer id rather than resolving it: this file's other Stripe
+// helpers do not read D1, and a function that talks to one system is the one
+// you can test against a stubbed fetch alone.
+//
+// Throws rather than guessing on a Stripe failure. Guessing false hands out a
+// second trial; guessing true silently charges somebody who was promised one,
+// and they find out on the statement. A 502 is visible and retryable, and
+// createCheckoutSession would have thrown one moments later anyway.
+export async function hasPriorStripeSubscription(
+  env,
+  { customerId, email },
+  fetcher = fetch,
+) {
+  if (!env.STRIPE_SECRET_KEY)
+    throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
+
+  const get = (path) => stripeGet(env, path, fetcher);
+
+  const seen = new Set();
+  const anyFor = async (customerId) => {
+    if (!customerId || seen.has(customerId)) return false;
+    seen.add(customerId);
+    // status=all so a canceled subscriber counts. Cancelling is the whole way
+    // somebody comes back for a second trial.
+    const list = await get(
+      `subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=1`,
+    );
+    return Array.isArray(list.data) && list.data.length > 0;
+  };
+
+  if (await anyFor(customerId)) return true;
+
+  if (email) {
+    const customers = await get(
+      `customers?email=${encodeURIComponent(email)}&limit=5`,
+    );
+    for (const customer of customers.data ?? []) {
+      if (await anyFor(asId(customer))) return true;
+    }
+  }
+
+  return false;
+}
+
+// The Stripe customer to bill this user as, creating one if Stripe has never
+// seen them.
+//
+// Deliberately does NOT write to `customers`. That table's absence of a row is
+// what /api/billing/portal reads to mean "no billing relationship has ever
+// existed", and somebody who opens Checkout and walks away has not started
+// one. The billing webhook still writes the row when a session completes. Here
+// the row is only ever read, and Stripe's own customer list is the fallback,
+// which is also what stops an abandoned checkout leaving a fresh orphan
+// customer behind on every attempt.
+export async function resolveStripeCustomerId(
+  env,
+  { userId, email },
+  fetcher = fetch,
+) {
+  const known = await getStripeCustomerId(env, userId);
+  if (known) return known;
+  if (!email) return null;
+
+  const existing = await stripeGet(env, `customers?email=${encodeURIComponent(email)}&limit=1`, fetcher);
+  const found = asId(existing.data?.[0]);
+  if (found) return found;
+
+  const created = await stripePost(
+    env,
+    "customers",
+    { email, "metadata[user_id]": userId },
+    fetcher,
+  );
+  return asId(created) || null;
+}
+
+// An unfinished Checkout Session for this customer that already carries a
+// trial, or null.
+//
+// This is the half hasPriorStripeSubscription cannot answer. That one asks
+// whether a trial was ever TAKEN, and a subscription only exists once a
+// session completes; between issuing a session and finishing it there is
+// nothing for it to find, so a first-time account could open several and each
+// one carried a trial. The session is the object that exists during exactly
+// that window, so the session is what has to be looked at.
+export async function findOutstandingTrialSession(env, customerId, fetcher = fetch) {
+  if (!customerId) return null;
+  const list = await stripeGet(
+    env,
+    `checkout/sessions?customer=${encodeURIComponent(customerId)}&status=open&limit=20`,
+    fetcher,
+  );
+  return (
+    (list.data ?? []).find(
+      (session) => Number(session.metadata?.trial_days) > 0 && session.url,
+    ) || null
+  );
+}
+
+async function stripeGet(env, path, fetcher = fetch) {
+  if (!env.STRIPE_SECRET_KEY)
+    throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
+  const response = await fetcher(`https://api.stripe.com/v1/${path}`, {
+    method: "GET",
+    headers: {
+      authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+      "stripe-version": STRIPE_API_VERSION,
+    },
+  });
+  const payload = await response.json();
+  if (!response.ok)
+    throw new ApiError(502, payload.error?.message || "Stripe lookup failed.");
+  return payload;
+}
+
+async function stripePost(env, path, body, fetcher = fetch) {
+  if (!env.STRIPE_SECRET_KEY)
+    throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
+  const response = await fetcher(`https://api.stripe.com/v1/${path}`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+      "content-type": "application/x-www-form-urlencoded",
+      "stripe-version": STRIPE_API_VERSION,
+    },
+    body: new URLSearchParams(body).toString(),
+  });
+  const payload = await response.json();
+  if (!response.ok)
+    throw new ApiError(502, payload.error?.message || "Stripe request failed.");
+  return payload;
+}
+
+export function buildBillingPortalParams({
+  request,
+  env,
+  customerId,
+  returnTo,
+}) {
   const origin = new URL(request.url).origin;
   const params = new URLSearchParams();
   params.set("customer", customerId);
@@ -86,38 +333,58 @@ export function buildBillingPortalParams({ request, env, customerId, returnTo })
 }
 
 export async function createBillingPortalSession(env, params, fetcher = fetch) {
-  if (!env.STRIPE_SECRET_KEY) throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
-  const response = await fetcher("https://api.stripe.com/v1/billing_portal/sessions", {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
-      "content-type": "application/x-www-form-urlencoded",
-      "stripe-version": STRIPE_API_VERSION
+  if (!env.STRIPE_SECRET_KEY)
+    throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
+  const response = await fetcher(
+    "https://api.stripe.com/v1/billing_portal/sessions",
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+        "content-type": "application/x-www-form-urlencoded",
+        "stripe-version": STRIPE_API_VERSION,
+      },
+      body: params,
     },
-    body: params
-  });
+  );
   const payload = await response.json();
   if (!response.ok || !payload.url) {
-    throw new ApiError(502, payload.error?.message || "Stripe billing portal session creation failed.");
+    throw new ApiError(
+      502,
+      payload.error?.message ||
+        "Stripe billing portal session creation failed.",
+    );
   }
   return payload;
 }
 
-export async function verifyStripeSignature(payload, signatureHeader, secret, nowSeconds = Math.floor(Date.now() / 1000), toleranceSeconds = 300) {
+export async function verifyStripeSignature(
+  payload,
+  signatureHeader,
+  secret,
+  nowSeconds = Math.floor(Date.now() / 1000),
+  toleranceSeconds = 300,
+) {
   if (!signatureHeader || !secret) return false;
   const parts = parseStripeSignatureHeader(signatureHeader);
   if (!parts.timestamp || parts.signatures.length === 0) return false;
   if (Math.abs(nowSeconds - parts.timestamp) > toleranceSeconds) return false;
 
   const expected = await hmacSha256Hex(secret, `${parts.timestamp}.${payload}`);
-  return parts.signatures.some((signature) => timingSafeEqualHex(signature, expected));
+  return parts.signatures.some((signature) =>
+    timingSafeEqualHex(signature, expected),
+  );
 }
 
 // Stripe guarantees at-least-once delivery, so the same event id can arrive
 // several times.
 export async function isStripeEventClaimed(env, event) {
   if (!event?.id) return false;
-  const row = await first(env, "select 1 from stripe_events where event_id = ?", event.id);
+  const row = await first(
+    env,
+    "select 1 from stripe_events where event_id = ?",
+    event.id,
+  );
   return Boolean(row);
 }
 
@@ -131,16 +398,24 @@ export async function isStripeEventClaimed(env, event) {
 // insert; the second is a harmless no-op rather than an error.
 export async function claimStripeEvent(env, event) {
   if (!event?.id) return false;
-  const result = await run(env, `
+  const result = await run(
+    env,
+    `
     insert into stripe_events (event_id, event_type, created, received_at)
     values (?, ?, ?, ?)
     on conflict(event_id) do nothing
-  `, event.id, event.type || "unknown", Number(event.created) || 0, nowIso());
+  `,
+    event.id,
+    event.type || "unknown",
+    Number(event.created) || 0,
+    nowIso(),
+  );
   return (result?.meta?.changes ?? 0) > 0;
 }
 
 export async function handleStripeEvent(env, event) {
-  if (await isStripeEventClaimed(env, event)) return { stored: false, duplicate: true };
+  if (await isStripeEventClaimed(env, event))
+    return { stored: false, duplicate: true };
 
   let stored = false;
 
@@ -151,7 +426,11 @@ export async function handleStripeEvent(env, event) {
       await upsertCustomer(env, { userId, customerId: asId(session.customer) });
       stored = true;
     }
-  } else if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.created" || event.type === "customer.subscription.deleted") {
+  } else if (
+    event.type === "customer.subscription.updated" ||
+    event.type === "customer.subscription.created" ||
+    event.type === "customer.subscription.deleted"
+  ) {
     const subscription = event.data?.object;
     // `customers` is our live, current-owner mapping; `subscription.metadata`
     // is baked in once at creation and never updated. If a Stripe customer is
@@ -163,7 +442,9 @@ export async function handleStripeEvent(env, event) {
     // that reason; metadata is only the bootstrap fallback for the moment a
     // brand-new subscription's webhook can race ahead of its own
     // checkout.session.completed writing the customers row.
-    const userId = await userIdForCustomer(env, asId(subscription?.customer)) || subscription?.metadata?.user_id;
+    const userId =
+      (await userIdForCustomer(env, asId(subscription?.customer))) ||
+      subscription?.metadata?.user_id;
     if (userId && subscription?.id) {
       await upsertSubscription(env, {
         userId,
@@ -172,7 +453,7 @@ export async function handleStripeEvent(env, event) {
         status: subscription.status,
         priceId: priceIdForSubscription(subscription),
         currentPeriodEnd: currentPeriodEndFor(subscription),
-        eventCreated: Number(event.created) || null
+        eventCreated: Number(event.created) || null,
       });
       stored = true;
     }
@@ -196,7 +477,12 @@ export async function upsertCustomer(env, { userId, customerId }) {
   // forever. The incoming event is authoritative about who owns this
   // customer now, so the old mapping has to go -- but revoke the old
   // owner's subscription first (below), not after.
-  const stale = await first(env, "select user_id from customers where stripe_customer_id = ? and user_id <> ?", customerId, userId);
+  const stale = await first(
+    env,
+    "select user_id from customers where stripe_customer_id = ? and user_id <> ?",
+    customerId,
+    userId,
+  );
   if (stale?.user_id) {
     // Revoke BEFORE releasing the stale mapping below, not after. A
     // transient D1 failure between the two would otherwise leave the
@@ -211,26 +497,44 @@ export async function upsertCustomer(env, { userId, customerId }) {
       "update subscriptions set status = 'canceled', updated_at = ? where user_id = ? and stripe_customer_id = ?",
       nowIso(),
       stale.user_id,
-      customerId
+      customerId,
     );
   }
   await run(
     env,
     "delete from customers where stripe_customer_id = ? and user_id <> ?",
     customerId,
-    userId
+    userId,
   );
-  await run(env, `
+  await run(
+    env,
+    `
     insert into customers (user_id, stripe_customer_id, created_at, updated_at)
     values (?, ?, ?, ?)
     on conflict(user_id) do update set
       stripe_customer_id = excluded.stripe_customer_id,
       updated_at = excluded.updated_at
-  `, userId, customerId, nowIso(), nowIso());
+  `,
+    userId,
+    customerId,
+    nowIso(),
+    nowIso(),
+  );
   return true;
 }
 
-export async function upsertSubscription(env, { userId, subscriptionId, customerId, status, priceId, currentPeriodEnd, eventCreated = null }) {
+export async function upsertSubscription(
+  env,
+  {
+    userId,
+    subscriptionId,
+    customerId,
+    status,
+    priceId,
+    currentPeriodEnd,
+    eventCreated = null,
+  },
+) {
   if (!userId || !subscriptionId) return false;
   // The `where` on the conflict clause is the out-of-order guard. Stripe can
   // deliver a stale `subscription.updated` (status "active") after a
@@ -251,7 +555,9 @@ export async function upsertSubscription(env, { userId, subscriptionId, customer
   // same-second cancellation arriving after a same-second "active" would
   // then itself be dropped, leaving the account wrongly active.
   const incomingIsPaid = isPaidStatus(status) ? 1 : 0;
-  await run(env, `
+  await run(
+    env,
+    `
     insert into subscriptions (user_id, stripe_subscription_id, stripe_customer_id, status, price_id, current_period_end, last_event_created, created_at, updated_at)
     values (?, ?, ?, ?, ?, ?, ?, ?, ?)
     on conflict(user_id) do update set
@@ -266,15 +572,29 @@ export async function upsertSubscription(env, { userId, subscriptionId, customer
        or subscriptions.last_event_created is null
        or excluded.last_event_created > subscriptions.last_event_created
        or (excluded.last_event_created = subscriptions.last_event_created and ? = 0)
-  `, userId, subscriptionId, customerId || null, status || null, priceId || null, currentPeriodEnd || null, eventCreated, nowIso(), nowIso(), incomingIsPaid);
+  `,
+    userId,
+    subscriptionId,
+    customerId || null,
+    status || null,
+    priceId || null,
+    currentPeriodEnd || null,
+    eventCreated,
+    nowIso(),
+    nowIso(),
+    incomingIsPaid,
+  );
   return true;
 }
 
 export async function retrieveCheckoutSession(env, sessionId, fetcher = fetch) {
-  if (!env.STRIPE_SECRET_KEY) throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
+  if (!env.STRIPE_SECRET_KEY)
+    throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
   if (!sessionId) throw new ApiError(400, "session_id is required.");
 
-  const url = new URL(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`);
+  const url = new URL(
+    `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`,
+  );
   url.searchParams.append("expand[]", "subscription");
   url.searchParams.append("expand[]", "customer");
 
@@ -282,11 +602,15 @@ export async function retrieveCheckoutSession(env, sessionId, fetcher = fetch) {
     method: "GET",
     headers: {
       authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
-      "stripe-version": STRIPE_API_VERSION
-    }
+      "stripe-version": STRIPE_API_VERSION,
+    },
   });
   const payload = await response.json();
-  if (!response.ok) throw new ApiError(response.status === 404 ? 404 : 502, payload.error?.message || "Stripe session lookup failed.");
+  if (!response.ok)
+    throw new ApiError(
+      response.status === 404 ? 404 : 502,
+      payload.error?.message || "Stripe session lookup failed.",
+    );
   return payload;
 }
 
@@ -295,35 +619,60 @@ export async function retrieveCheckoutSession(env, sessionId, fetcher = fetch) {
 // literal in the UI would be worse, because it drifts silently the moment
 // the price changes in Stripe.
 export async function retrieveHostedPrice(env, fetcher = fetch) {
-  if (!env.STRIPE_SECRET_KEY) throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
-  if (!env.AUTOVAULT_HOSTED_PRICE_ID) throw new ApiError(503, "AUTOVAULT_HOSTED_PRICE_ID is not configured.");
+  if (!env.STRIPE_SECRET_KEY)
+    throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
+  if (!env.AUTOVAULT_HOSTED_PRICE_ID)
+    throw new ApiError(503, "AUTOVAULT_HOSTED_PRICE_ID is not configured.");
 
   const url = `https://api.stripe.com/v1/prices/${encodeURIComponent(env.AUTOVAULT_HOSTED_PRICE_ID)}`;
   const response = await fetcher(url, {
     method: "GET",
     headers: {
       authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
-      "stripe-version": STRIPE_API_VERSION
-    }
+      "stripe-version": STRIPE_API_VERSION,
+    },
   });
   const payload = await response.json();
-  if (!response.ok) throw new ApiError(502, payload.error?.message || "Stripe price lookup failed.");
+  if (!response.ok)
+    throw new ApiError(
+      502,
+      payload.error?.message || "Stripe price lookup failed.",
+    );
 
   return {
     amount: payload.unit_amount ?? null,
     currency: payload.currency ?? null,
-    interval: payload.recurring?.interval ?? null
+    interval: payload.recurring?.interval ?? null,
+    // Same resolver the Checkout builder reads. The page renders "14 days
+    // free" from this field or says nothing at all, so it cannot advertise a
+    // trial that Checkout is not configured to grant.
+    trial_days: hostedTrialDays(env),
   };
 }
 
 export { asId, currentPeriodEndFor, priceIdForSubscription };
 
 function applyBranding(params, env) {
-  params.set("branding_settings[display_name]", env.STRIPE_BRAND_DISPLAY_NAME || "AutoVault");
-  params.set("branding_settings[background_color]", env.STRIPE_BRAND_BACKGROUND_COLOR || "#0b1014");
-  params.set("branding_settings[button_color]", env.STRIPE_BRAND_BUTTON_COLOR || "#5ad6c0");
-  params.set("branding_settings[border_style]", env.STRIPE_BRAND_BORDER_STYLE || "rounded");
-  params.set("branding_settings[font_family]", env.STRIPE_BRAND_FONT_FAMILY || "inter");
+  params.set(
+    "branding_settings[display_name]",
+    env.STRIPE_BRAND_DISPLAY_NAME || "AutoVault",
+  );
+  params.set(
+    "branding_settings[background_color]",
+    env.STRIPE_BRAND_BACKGROUND_COLOR || "#0b1014",
+  );
+  params.set(
+    "branding_settings[button_color]",
+    env.STRIPE_BRAND_BUTTON_COLOR || "#5ad6c0",
+  );
+  params.set(
+    "branding_settings[border_style]",
+    env.STRIPE_BRAND_BORDER_STYLE || "rounded",
+  );
+  params.set(
+    "branding_settings[font_family]",
+    env.STRIPE_BRAND_FONT_FAMILY || "inter",
+  );
   if (env.STRIPE_BRAND_ICON_URL) {
     params.set("branding_settings[icon][type]", "url");
     params.set("branding_settings[icon][url]", env.STRIPE_BRAND_ICON_URL);
@@ -334,12 +683,31 @@ function applyBranding(params, env) {
   }
 }
 
-function applyCustomText(params, env) {
-  if (env.STRIPE_CHECKOUT_CUSTOM_TEXT_SUBMIT) {
-    params.set("custom_text[submit][message]", env.STRIPE_CHECKOUT_CUSTOM_TEXT_SUBMIT);
+function applyCustomText(params, env, allowTrial = true) {
+  // The trial sentence is generated here rather than written into
+  // STRIPE_CHECKOUT_CUSTOM_TEXT_SUBMIT, because a configured "14 days free"
+  // would be a second copy of AUTOVAULT_HOSTED_TRIAL_DAYS, and this copy is the
+  // one a buyer reads while deciding to pay. Retire the trial and the sentence
+  // leaves with it.
+  const trialDays = allowTrial ? hostedTrialDays(env) : 0;
+  const submitMessage = [
+    trialDays > 0
+      ? `Your first ${trialDays} days are free and no card is collected today. Cancel before the trial ends and you are not charged.`
+      : "",
+    env.STRIPE_CHECKOUT_CUSTOM_TEXT_SUBMIT || "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  if (submitMessage) {
+    // Stripe rejects a submit message over 1200 characters, and a rejected
+    // Checkout session takes the whole funnel down rather than one sentence.
+    params.set("custom_text[submit][message]", submitMessage.slice(0, 1200));
   }
   if (env.STRIPE_CHECKOUT_CUSTOM_TEXT_AFTER_SUBMIT) {
-    params.set("custom_text[after_submit][message]", env.STRIPE_CHECKOUT_CUSTOM_TEXT_AFTER_SUBMIT);
+    params.set(
+      "custom_text[after_submit][message]",
+      env.STRIPE_CHECKOUT_CUSTOM_TEXT_AFTER_SUBMIT,
+    );
   }
 }
 
@@ -355,7 +723,11 @@ function parseStripeSignatureHeader(header) {
 
 async function userIdForCustomer(env, customerId) {
   if (!customerId) return null;
-  const row = await first(env, "select user_id from customers where stripe_customer_id = ?", customerId);
+  const row = await first(
+    env,
+    "select user_id from customers where stripe_customer_id = ?",
+    customerId,
+  );
   return row?.user_id ?? null;
 }
 

@@ -23,7 +23,7 @@ import BrandMark from './BrandMark.vue'
       </div>
       <div class="av-footer-col">
         <h5>Develop</h5>
-        <a href="/quick-start">Quick start</a><a href="/authoring">Authoring skills</a><a href="/deploy">Self-hosting</a><a href="/deploy">Remote MCP</a><a href="/changelog">Changelog</a>
+        <a href="/quick-start">Quick start</a><a href="/authoring">Authoring skills</a><a href="/deploy">Self-hosting and remote MCP</a><a href="/compare">Compare</a><a href="/changelog">Changelog</a>
       </div>
       <div class="av-footer-col">
         <h5>Org</h5>

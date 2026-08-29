@@ -19,6 +19,7 @@ import ComparePage from "./components/ComparePage.vue";
 import SkillDetailPage from "./components/SkillDetailPage.vue";
 import AuthorProfilePage from "./components/AuthorProfilePage.vue";
 import AboutPage from "./components/AboutPage.vue";
+import HostedSyncPage from "./components/HostedSyncPage.vue";
 import CloudPage from "./components/CloudPage.vue";
 import CloudPairPage from "./components/CloudPairPage.vue";
 
@@ -48,6 +49,7 @@ export default {
     app.component("SkillDetailPage", SkillDetailPage);
     app.component("AuthorProfilePage", AuthorProfilePage);
     app.component("AboutPage", AboutPage);
+    app.component("HostedSyncPage", HostedSyncPage);
     app.component("CloudPage", CloudPage);
     app.component("CloudPairPage", CloudPairPage);
   }

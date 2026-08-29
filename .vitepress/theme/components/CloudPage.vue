@@ -54,7 +54,8 @@
     <div
       class="cv-shell"
       :class="{ locked: !signedIn, booting: !revealed }"
-      :inert="!revealed">
+      :inert="!revealed"
+    >
       <aside class="cv-side" aria-label="Vault navigation">
         <div class="cv-brand">
           <span class="cv-brand-mark"
@@ -156,7 +157,7 @@
           <div>
             <div class="cv-eyebrow"><span class="cv-spark" /> Hosted vault</div>
             <div class="cv-crumb">
-              <span class="cv-crumb-host">vault.autovault.dev</span> /
+              <span class="cv-crumb-host">autovault.dev/v</span> /
               {{ vaultSlug }}
             </div>
             <!-- Named, because each panel below points its region label here:
@@ -174,7 +175,10 @@
             <span v-if="activeDevices.length" class="cv-pill ok"
               ><span class="cv-dot" />
               {{ activeDevices.length }}
-              {{ activeDevices.length === 1 ? "machine" : "machines" }} linked</span
+              {{
+                activeDevices.length === 1 ? "machine" : "machines"
+              }}
+              linked</span
             >
             <!-- Deliberately NOT chained onto the pill above. As a v-else-if
                  this said nothing whenever a machine was already linked -- and
@@ -223,52 +227,49 @@
              performed by an icon that had just teleported. The mark stays big
              for the ~700ms, then collapses. -->
         <div v-if="!vaultOpen || vaultUnlocking" class="cv-vaulthead">
-        <div
-          class="cv-vaultfocal"
-          aria-hidden="true"
-        >
-          <BrandMark
-            :size="72"
-            :state="vaultOpen ? 'unlocked' : 'locked'"
-            :working="vaultWorking"
-            :unlocking="vaultUnlocking"
-            show-depth
-          />
-        </div>
+          <div class="cv-vaultfocal" aria-hidden="true">
+            <BrandMark
+              :size="72"
+              :state="vaultOpen ? 'unlocked' : 'locked'"
+              :working="vaultWorking"
+              :unlocking="vaultUnlocking"
+              show-depth
+            />
+          </div>
 
-        <!-- The single progress model. One derivation, rendered two ways:
+          <!-- The single progress model. One derivation, rendered two ways:
              labelled while there is still something to do, and collapsed into
              the vault strip once there is not. -->
-        <ol
-          v-if="!vaultOpen"
-          class="cv-rail"
-          :class="{ complete: onboardingComplete }"
-          aria-label="Hosted vault setup progress"
-        >
-          <li
-            v-for="(step, i) in onboardingSteps"
-            :key="step.key"
-            class="cv-rail-step"
-            :class="step.state"
-            :aria-current="step.state === 'active' ? 'step' : undefined"
+          <ol
+            v-if="!vaultOpen"
+            class="cv-rail"
+            :class="{ complete: onboardingComplete }"
+            aria-label="Hosted vault setup progress"
           >
-            <span class="cv-rail-dot" aria-hidden="true">{{
-              step.state === "done" ? "✓" : step.index
-            }}</span>
-            <span class="cv-rail-copy">
-              <strong>{{ step.label }}</strong>
-              <small>{{ step.detail }}</small>
-              <span class="visually-hidden">{{
-                RAIL_STATE_LABEL[step.state]
+            <li
+              v-for="(step, i) in onboardingSteps"
+              :key="step.key"
+              class="cv-rail-step"
+              :class="step.state"
+              :aria-current="step.state === 'active' ? 'step' : undefined"
+            >
+              <span class="cv-rail-dot" aria-hidden="true">{{
+                step.state === "done" ? "✓" : step.index
               }}</span>
-            </span>
-            <span
-              v-if="i < onboardingSteps.length - 1"
-              class="cv-rail-line"
-              aria-hidden="true"
-            />
-          </li>
-        </ol>
+              <span class="cv-rail-copy">
+                <strong>{{ step.label }}</strong>
+                <small>{{ step.detail }}</small>
+                <span class="visually-hidden">{{
+                  RAIL_STATE_LABEL[step.state]
+                }}</span>
+              </span>
+              <span
+                v-if="i < onboardingSteps.length - 1"
+                class="cv-rail-line"
+                aria-hidden="true"
+              />
+            </li>
+          </ol>
         </div>
 
         <p
@@ -314,13 +315,44 @@
             </div>
             <h2>{{ setupHeadline }}</h2>
             <p class="cv-focal-body">{{ setupLede }}</p>
-            <p v-if="hostedPriceLabel && !paid" class="cv-price">
-              <strong>{{ hostedPriceLabel }}</strong>
-              <span>Cancel any time from the billing portal.</span>
-            </p>
+            <!-- The plan, for a visitor who has not signed in. /cloud used
+                 to be unlisted, so the only price anywhere was on Stripe's own
+                 page after committing. It is a public product page now, and
+                 the number belongs above the button. Everything here is read
+                 from /api/pricing rather than written down: the amount comes
+                 from Stripe, and trialLabel is null unless Checkout is
+                 actually configured to grant a trial. -->
+            <div v-if="hostedPriceLabel && !paid" class="cv-plan">
+              <div class="cv-plan-head">
+                <p class="cv-price">
+                  <strong>{{ hostedPriceLabel }}</strong>
+                  <span v-if="trialLabel" class="cv-plan-trial">{{
+                    trialLabel
+                  }}</span>
+                </p>
+                <p class="cv-plan-sub">
+                  <template v-if="trialLabel"
+                    >No card up front. Cancel any time from the billing
+                    portal.</template
+                  >
+                  <template v-else
+                    >Cancel any time from the billing portal.</template
+                  >
+                </p>
+              </div>
+              <ul class="cv-plan-list">
+                <li v-for="item in PLAN_INCLUDES" :key="item">{{ item }}</li>
+              </ul>
+              <p class="cv-plan-note">
+                Publishing a catalog into your vault is hands-on while this is
+                in private beta. Everything above works the day you sign up;
+                that one step is still us, by hand.
+              </p>
+            </div>
             <HostedVaultFunnel
               entry="deploy"
               :state="cloudState"
+              :trial-days="trialDays"
               :marked-action="nextAction === 'funnel'"
               @state-change="syncCloudState"
               @notice="setNotice"
@@ -371,15 +403,15 @@
                connected that sentence to the Machines card that renders next
                (see showsMachines). This is the bridge between the two: a rule
                down to the card, and the sentence that names what to do when
-               you get there. Connect stage only — from `explore` on, Machines
+               you get there. Connect stage only. From `ready` on, Machines
                is a peer panel rather than the next step. -->
           <div class="cv-nextstep">
             <span class="cv-nextstep-rule" aria-hidden="true" />
             <p class="cv-nextstep-copy">
               <span class="cv-nextstep-caret" aria-hidden="true">↓</span>
               Next: your machine shows up under
-              <strong>Machines</strong> below. Admit it there and the CLI
-              stops waiting.
+              <strong>Machines</strong> below. Admit it there and the CLI stops
+              waiting.
             </p>
           </div>
         </template>
@@ -389,7 +421,7 @@
              panels below is on screen, chosen by activeSection. The chain is
              deliberately flat and uniform — a new section is one more
              `v-else-if="activeSection === '…'"` template and nothing else. -->
-        <template v-if="stage === 'explore' || stage === 'ready'">
+        <template v-if="stage === 'ready'">
           <!-- Progress summary, collapsing stage A. Stage chrome, ABOVE the
                panel chain and outside it: this is what the 72px focal mark
                shrinks into when a machine is admitted, and admitting happens
@@ -403,7 +435,11 @@
                  does not have to shout it. -->
             <!-- Hidden while the focal mark above is mid-celebration, so
                  there is never a moment with two vaults on screen. -->
-            <span v-show="!vaultUnlocking" class="cv-status-mark" aria-hidden="true">
+            <span
+              v-show="!vaultUnlocking"
+              class="cv-status-mark"
+              aria-hidden="true"
+            >
               <BrandMark
                 :size="34"
                 state="unlocked"
@@ -413,44 +449,34 @@
             </span>
             <span class="cv-pill ok"
               ><span class="cv-dot" />
-              {{ stage === "ready" ? "All set" : "CLI linked" }}</span
+              {{
+                activeDevices.length === 1
+                  ? "1 machine linked"
+                  : `${activeDevices.length} machines linked`
+              }}</span
             >
+            <!-- Two claims this page cannot support, both removed. It never
+                 queries KV, so asserting an empty vault was as much an
+                 invention as asserting a serving one, just pointed the other
+                 way. And
+                 `ready` means a machine is admitted, not that billing is live:
+                 bundles answer 402 the moment a subscription lapses, while the
+                 recovery card three sections down says exactly that. State the
+                 rule, and gate the part that depends on billing. -->
             <span class="cv-status-text">
-              <template v-if="stage === 'ready'">
-                CLI linked · early access requested. We'll email you the moment
-                hosted sync ships.
+              <template v-if="paid">
+                Admitted machines pull signed skills from
+                <code>{{ vaultSlug }}</code> and verify every release before
+                installing it.
               </template>
               <template v-else>
-                Your machine is pointed at <code>{{ vaultSlug }}</code
-                >. Hosted sync turns on automatically when it ships.
+                Bundle downloads answer <code>402</code> while the subscription
+                is inactive. Admitted machines stay admitted.
               </template>
+              Publishing the first catalog is still hands-on in private beta,
+              and a namespace with nothing published answers <code>404</code>
+              for its catalog.
             </span>
-            <!-- The one thing a vaulted owner can still do, and it belongs to
-                 the stage rather than to a panel. It used to live inside the
-                 Skills panel, which meant the default landing panel had no
-                 action on it at all: at `explore` you arrived on Overview,
-                 and the only way to the sole remaining step was to guess
-                 which nav item hid it. Here it survives every panel switch.
-                 Gone at `ready` because the ask has been made -- the strip's
-                 own text says so, and the Skills panel confirms it. -->
-            <!-- "Working…", not "Saving…", which is what this button said
-                 inside the Skills panel. `busy` is the shell's single request
-                 lock, so it is also held by Manage billing — and the Billing
-                 panel now renders with this button beside it every time, so
-                 clicking Manage billing made the strip announce it was saving
-                 something nobody had asked it to save. Same word the device
-                 rows already use while a request they did not start is in
-                 flight. -->
-            <button
-              v-if="stage !== 'ready'"
-              type="button"
-              class="cv-btn cv-status-cta"
-              :class="{ 'av-nextaction': nextAction === 'early-access' }"
-              :disabled="busy"
-              @click="markProgress('early_access')"
-            >
-              {{ busy ? "Working…" : "Get early access →" }}
-            </button>
           </div>
 
           <!-- ---------- SECTION: OVERVIEW ---------- -->
@@ -463,14 +489,25 @@
             >
               <article class="cv-card soft">
                 <div class="cv-card-label">Sync engine</div>
-                <span class="cv-pill warn"
-                  ><span class="cv-dot" /> Building — you'll be first to
-                  know</span
+                <!-- A capability, not a claim about what this vault is doing
+                     right now. The page never queries KV, so it cannot know
+                     whether a catalog exists here, and a new vault answers 404
+                     until a release is published out of band. The pill used to
+                     assert delivery unconditionally at `ready`, which
+                     contradicted the Catalog panel on the same screen: the
+                     exact overclaim this rewrite exists to remove. Worded so a
+                     test can forbid the old string without matching this
+                     comment. -->
+                <span class="cv-pill ok"
+                  ><span class="cv-dot" /> Sync enabled</span
                 >
                 <p class="cv-muted">
-                  Until hosted sync ships, your local CLI is fully usable offline.
-                  Nothing is gated behind the cloud — this namespace and any
-                  skills carry over automatically.
+                  Admitted machines fetch this namespace over HTTPS and verify
+                  every release before installing it. A namespace with
+                  nothing published answers <code>404</code> for its catalog,
+                  which is the normal state of a new vault rather than a fault.
+                  Nothing is gated behind the cloud: your local CLI stays fully
+                  usable offline, and it is still where skills get signed.
                 </p>
               </article>
             </div>
@@ -499,24 +536,37 @@
                        /api/me exposes what this particular subscription is
                        charged. Never a literal — see loadPricing. -->
                   <li v-if="hostedPriceLabel">
-                    <span>Plan price</span><strong>{{ hostedPriceLabel }}</strong>
+                    <span>Plan price</span
+                    ><strong>{{ hostedPriceLabel }}</strong>
                   </li>
                   <li v-if="renewalLabel">
                     <span>Billing</span><strong>{{ renewalLabel }}</strong>
                   </li>
                   <li>
                     <span>Status</span
-                    ><span
-                      class="cv-pill sm"
-                      :class="subscriptionState.tone"
-                      ><span class="cv-dot" /> {{ subscriptionState.text }}</span
+                    ><span class="cv-pill sm" :class="subscriptionState.tone"
+                      ><span class="cv-dot" />
+                      {{ subscriptionState.text }}</span
                     >
                   </li>
                 </ul>
-                <p v-if="subscriptionNeedsAttention" class="cv-muted cv-sub-warn">
+                <p
+                  v-if="canStartCheckout && !canManageBilling"
+                  class="cv-muted cv-sub-warn"
+                >
+                  Start a hosted subscription to keep this namespace on the
+                  hosted plan. You'll confirm the plan on the next screen.
+                </p>
+                <p
+                  v-else-if="subscriptionNeedsAttention"
+                  class="cv-muted cv-sub-warn"
+                >
                   Hosted access follows this status. If that looks wrong, reload
                   after Stripe finishes processing, or
-                  <a :href="clerkBrand.supportUrl" target="_blank" rel="noopener"
+                  <a
+                    :href="clerkBrand.supportUrl"
+                    target="_blank"
+                    rel="noopener"
                     >contact support</a
                   >.
                 </p>
@@ -530,24 +580,35 @@
                   </li>
                 </ul>
                 <div class="cv-card-actions">
-                  <!-- "Working…", not "Opening…" — same shared `busy` lock as
-                       the status strip's CTA above (see that button's
-                       comment), so clicking Get early access from here makes
-                       this button flip too. "Opening…" claimed a specific
-                       action that was not the one running; "Working…" does
-                       not, matching the mitigation already chosen for the
-                       mirror-image case rather than adding a second
-                       per-action lock next to the existing one. -->
+                  <!-- "Working…", not "Opening…". `busy` is the shell's
+                       single request lock, so this button also flips while a
+                       request it did not start is in flight. "Opening…" would
+                       claim a specific action that may not be the one
+                       running. -->
                   <button
+                    v-if="canStartCheckout"
                     type="button"
                     class="cv-btn"
+                    :disabled="busy"
+                    @click="startHostedCheckout"
+                  >
+                    {{ busy ? "Working…" : "Start subscription" }}
+                  </button>
+                  <button
+                    v-if="canManageBilling"
+                    type="button"
+                    class="cv-btn"
+                    :class="{ ghost: canStartCheckout }"
                     :disabled="busy"
                     @click="openBillingPortal"
                   >
                     {{ busy ? "Working…" : "Manage billing" }}
                   </button>
                 </div>
-                <p class="cv-muted sm">
+                <p v-if="canStartCheckout" class="cv-muted sm">
+                  Opens Stripe Checkout for the hosted plan.
+                </p>
+                <p v-else-if="canManageBilling" class="cv-muted sm">
                   Cards, invoices and cancellation live in Stripe's billing
                   portal — the same one the account menu opens.
                 </p>
@@ -557,7 +618,10 @@
 
           <!-- ---------- SECTION: SKILLS ----------
                A preview, and labelled as one. The browser-side skill list does
-               not exist yet; what is real here is the early-access request. -->
+               not exist. It used to carry the early-access waitlist, which
+               asked people to queue for hosted sync; sync shipped, so the ask
+               was removed rather than repointed at a different unbuilt thing.
+               What is left states where skills actually come from today. -->
           <template v-else-if="activeSection === 'skills'">
             <div
               class="cv-reveal"
@@ -568,11 +632,11 @@
               <article class="cv-preview">
                 <div class="cv-appframe" aria-hidden="true">
                   <div class="cv-appbar">
-                    <span class="cv-tdot bad" /><span class="cv-tdot warn" /><span
-                      class="cv-tdot ok"
-                    />
+                    <span class="cv-tdot bad" /><span
+                      class="cv-tdot warn"
+                    /><span class="cv-tdot ok" />
                     <span class="cv-appurl"
-                      >vault.autovault.dev/{{ vaultSlug }}</span
+                      >autovault.dev/v/{{ vaultSlug }}</span
                     >
                   </div>
                   <div class="cv-appbody">
@@ -596,40 +660,23 @@
                 </div>
                 <div class="cv-preview-copy">
                   <div class="cv-card-label violet">
-                    {{
-                      stage === "ready"
-                        ? "You're on the list · preview"
-                        : "Coming soon · preview"
-                    }}
+                    Not built yet · preview
                   </div>
-                  <h2>Manage your vault from the web</h2>
+                  <h2>Managing your vault from the web</h2>
                   <p>
-                    Browse and search every synced skill, watch the live sync log
-                    between your machines, and manage who has access — without
-                    leaving the browser.
+                    Browsing skills, reading a per-release sync log, and
+                    managing access from the browser are all planned. None of it
+                    is built, and the screen above is a mockup rather than your
+                    vault.
                   </p>
                   <div class="cv-feats">
                     <span>Skill browser</span><span>Live sync log</span
                     ><span>Team access</span>
                   </div>
-                  <div v-if="stage === 'ready'" class="cv-confirm">
-                    <span class="cv-confirm-ic">✓</span>
-                    <span
-                      >You're on the early-access list.<small
-                        >Requested {{ earlyAccessDate }} · we'll email
-                        {{ accountEmailShort }} first.</small
-                      ></span
-                    >
-                  </div>
-                  <!-- The ask itself moved to the vault strip above, which is
-                       on screen whichever panel you are reading. What is left
-                       here is where it went: this panel is a preview, and a
-                       preview is a bad place to keep the stage's only
-                       action. -->
-                  <p v-else class="cv-muted sm">
-                    Ask for early access from the vault strip above, and we'll
-                    email <strong>{{ accountEmailShort }}</strong> the moment
-                    it's live.
+                  <p class="cv-muted sm">
+                    Skills reach your machines through the signed catalog, not
+                    through this screen. See <strong>Catalog</strong> for what
+                    that file is and how it gets published.
                   </p>
                 </div>
               </article>
@@ -665,22 +712,21 @@
                   ><span class="cv-dot" /> No publish path yet</span
                 >
                 <p class="cv-muted">
-                  Your vault catalog is the signed manifest your linked
-                  machines pull skills from — a file, not a screen you
-                  browse.
+                  Your vault catalog is the signed manifest your linked machines
+                  pull skills from — a file, not a screen you browse.
                 </p>
                 <p class="cv-muted">
                   Every machine you admit reads from that same vault catalog
-                  once one exists. Link a second machine and it stays in
-                  sync through that one file, not a copy of its own.
+                  once one exists. Link a second machine and it stays in sync
+                  through that one file, not a copy of its own.
                 </p>
                 <p class="cv-muted">
-                  Publishing ships with hosted sync, and that hasn't shipped
-                  yet — there's nothing to publish or configure here today.
-                  When it does, the signing key that makes a release
-                  trustworthy still stays on your machine, the same way
-                  signing and serving already work today: Cloud reads and
-                  serves, it never holds that key.
+                  There is no publish button here, and no upload API behind one.
+                  The signing key that makes a release trustworthy lives on your
+                  machine and never reaches us, so releases are placed in your
+                  namespace out of band while this is in private beta. A
+                  namespace with nothing published answers 404 for its catalog,
+                  which is the expected state of a new one rather than a fault.
                 </p>
                 <p class="cv-muted sm">
                   Not to be confused with
@@ -692,6 +738,44 @@
             </div>
           </template>
         </template>
+        <!-- ---------- BILLING RECOVERY ----------
+             Outside the `ready` template on purpose, for the same reason the
+             Machines card is: the Billing panel reveals at `ready`, and `ready`
+             now requires an admitted machine. An owner whose subscription
+             lapsed before admitting one is therefore parked at `connect` with
+             no Billing panel, and admitting a machine answers 402 while the
+             subscription is inactive. Both exits are shut, and the trial made
+             that a normal way to end rather than an edge case: every trial
+             nobody converts arrives here. This is the way out. -->
+        <div v-if="vault && !paid" class="cv-recover" role="region" aria-labelledby="cv-recover-title">
+          <h3 id="cv-recover-title" class="cv-recover-title">Subscription inactive</h3>
+          <p class="cv-muted sm">
+            {{ vaultSlug }} is still reserved and nothing has been deleted.
+            Machines cannot be admitted and bundles answer 402 until a
+            subscription is active again.
+          </p>
+          <div class="cv-recover-actions">
+            <button
+              v-if="canStartCheckout"
+              type="button"
+              class="cv-btn"
+              :disabled="busy"
+              @click="startHostedCheckout"
+            >
+              {{ busy ? "Working…" : "Start subscription" }}
+            </button>
+            <button
+              v-if="canManageBilling"
+              type="button"
+              class="cv-btn ghost"
+              :disabled="busy"
+              @click="openBillingPortal"
+            >
+              {{ busy ? "Working…" : "Manage billing" }}
+            </button>
+          </div>
+        </div>
+
         <!-- ---------- SECTION: MACHINES ----------
              Enrolled machines. This list IS the link step: there is no
              button to say a CLI is connected, because saying so was never
@@ -708,7 +792,14 @@
                than sitting there as one more neutral panel. Added to the
                existing binding, never replacing it -- `focusflash` is the
                transient flash the admit handshake drives. -->
-          <div v-if="vault" ref="devicesCard" class="cv-devices standalone" :class="{ focusflash: devicesFlash, awaiting: stage === 'connect' }" role="region" aria-labelledby="cv-devices-title">
+          <div
+            v-if="vault"
+            ref="devicesCard"
+            class="cv-devices standalone"
+            :class="{ focusflash: devicesFlash, awaiting: stage === 'connect' }"
+            role="region"
+            aria-labelledby="cv-devices-title"
+          >
             <h3 id="cv-devices-title" class="cv-devices-title">
               Machines
               <span v-if="pendingDevices.length" class="cv-devices-count">
@@ -728,8 +819,8 @@
               <!-- Once the budget is spent nothing is arriving, and a spinner
                    that never resolves is worse than saying so. -->
               <template v-if="admitWaitExpired">
-                No machine matching <code>{{ admitFingerprint }}</code> has checked
-                in. If you closed that terminal, run
+                No machine matching <code>{{ admitFingerprint }}</code> has
+                checked in. If you closed that terminal, run
                 <code>autovault link</code> there again.
               </template>
               <template v-else>
@@ -738,8 +829,8 @@
             </p>
 
             <p v-else-if="!devices.length" class="cv-devices-empty">
-              Nothing enrolled yet. Run the command above and this machine
-              will appear here within a few seconds.
+              Nothing enrolled yet. Run the command above and this machine will
+              appear here within a few seconds.
             </p>
 
             <ul v-if="devices.length" class="cv-device-list">
@@ -747,7 +838,10 @@
                 v-for="device in devices"
                 :key="device.id"
                 class="cv-device"
-                :class="[device.status, { 'admit-target': isAdmitTarget(device) }]"
+                :class="[
+                  device.status,
+                  { 'admit-target': isAdmitTarget(device) },
+                ]"
               >
                 <span class="cv-device-id">
                   <strong>{{ device.hostname || "Unnamed machine" }}</strong>
@@ -756,10 +850,15 @@
                   <code>ed25519 {{ device.fingerprint }}</code>
                 </span>
                 <span class="cv-device-seen">
-                  <span class="cv-pill" :class="device.status === 'active' ? 'ok' : ''">
+                  <span
+                    class="cv-pill"
+                    :class="device.status === 'active' ? 'ok' : ''"
+                  >
                     <span class="cv-dot" />{{ device.status }}
                   </span>
-                  <small>first seen {{ formatWhen(device.first_seen_at) }}</small>
+                  <small
+                    >first seen {{ formatWhen(device.first_seen_at) }}</small
+                  >
                 </span>
                 <span class="cv-device-actions">
                   <button
@@ -767,7 +866,9 @@
                     type="button"
                     class="cv-btn small"
                     :class="{ 'av-nextaction': isNextAction(device) }"
-                    :data-admit-target="isAdmitTarget(device) ? 'true' : undefined"
+                    :data-admit-target="
+                      isAdmitTarget(device) ? 'true' : undefined
+                    "
                     :disabled="deviceBusy === device.id"
                     @click="decideDevice(device.id, 'admit')"
                   >
@@ -809,7 +910,10 @@ import CloudAccountMenu from "./CloudAccountMenu.vue";
 import { copyText as copyToClipboard } from "../utils/clipboard";
 import { prefersReducedMotion } from "../utils/motion";
 import { formatPriceLabel } from "../utils/money";
-import { consumeVaultArrival, isAuthenticatedCloudState } from "../utils/vaultArrival";
+import {
+  consumeVaultArrival,
+  isAuthenticatedCloudState,
+} from "../utils/vaultArrival";
 import { cloudStateIsKnown, deviceListIsKnown } from "../utils/cloudLoadState";
 import { cloudNextAction, type CloudNextAction } from "../utils/nextAction";
 import {
@@ -818,7 +922,11 @@ import {
   readAdmitFingerprint,
 } from "../utils/admit";
 import { clerkBrand } from "../clerk";
-import { clerkAuthRecoveryMessage, isClerkApiAuthError, useClerkApiAuth } from "../utils/clerkApi";
+import {
+  clerkAuthRecoveryMessage,
+  isClerkApiAuthError,
+  useClerkApiAuth,
+} from "../utils/clerkApi";
 import {
   useTerminalReplay,
   type TerminalReplayLine,
@@ -886,18 +994,19 @@ const ConnectTerminal = defineComponent({
             "aria-hidden": "true",
           },
           [
-          ...replay.visibleLines.value.map((line, index) =>
-            line.type === "cmd"
-              ? h("div", { class: "line terminal-line", key: index }, [
-                  h("span", { class: "pmt cv-pmt" }, "$ "),
-                  h("span", line.text),
-                ])
-              : h("div", { class: line.type, key: index }, line.text),
-          ),
-          !replay.complete.value
-            ? h("span", { class: "cur cursor cv-cur" })
-            : null,
-        ]),
+            ...replay.visibleLines.value.map((line, index) =>
+              line.type === "cmd"
+                ? h("div", { class: "line terminal-line", key: index }, [
+                    h("span", { class: "pmt cv-pmt" }, "$ "),
+                    h("span", line.text),
+                  ])
+                : h("div", { class: line.type, key: index }, line.text),
+            ),
+            !replay.complete.value
+              ? h("span", { class: "cur cursor cv-cur" })
+              : null,
+          ],
+        ),
         // A footer row rather than an overlay pinned to the body's top-right.
         // The terminal head now occupies that corner, and the reference card
         // (.hosted-copy-row in HostedVaultFunnel.vue) already puts its copy
@@ -939,6 +1048,9 @@ type CloudVault = {
   public_url: string;
   provisioned_at?: string | null;
   cli_linked_at?: string | null;
+  // Vestigial. The early-access waitlist that wrote this column was removed
+  // once hosted sync shipped; the column and /api/vaults/current/progress
+  // still exist, and /api/me still returns this, but nothing reads it.
   early_access_at?: string | null;
 } | null;
 type CloudState = {
@@ -963,7 +1075,6 @@ type Stage =
   | "subscription"
   | "setup"
   | "connect"
-  | "explore"
   | "ready";
 // The main area renders exactly one of these at a time, chosen from the
 // sidebar. Adding one means four edits and nothing else: a member here, a row
@@ -1122,8 +1233,13 @@ const devicesCard = ref<HTMLElement | null>(null);
 const devicesFlash = ref(false);
 const previewRows = [{ w: "55%" }, { w: "42%" }, { w: "60%" }];
 
-const { authHeaders, clerkAuthEnabled, isClerkLoaded, isClerkSignedIn, clerkUserLabel } =
-  useClerkApiAuth();
+const {
+  authHeaders,
+  clerkAuthEnabled,
+  isClerkLoaded,
+  isClerkSignedIn,
+  clerkUserLabel,
+} = useClerkApiAuth();
 let cloudStateRequestSeq = 0;
 
 type SyncDevice = {
@@ -1148,8 +1264,12 @@ const vault = computed(() => cloudState.value.vault);
 // without a machine anywhere near the vault, and the dashboard would then
 // claim a CLI was connected. The column still exists (0002 is applied and
 // migrations are not edited after shipping) but nothing reads it now.
-const activeDevices = computed(() => devices.value.filter((device) => device.status === "active"));
-const pendingDevices = computed(() => devices.value.filter((device) => device.status === "pending"));
+const activeDevices = computed(() =>
+  devices.value.filter((device) => device.status === "active"),
+);
+const pendingDevices = computed(() =>
+  devices.value.filter((device) => device.status === "pending"),
+);
 const cliLinked = computed(() => activeDevices.value.length > 0);
 
 // ---- CLI admit handshake -------------------------------------------------
@@ -1163,9 +1283,13 @@ const cliLinked = computed(() => activeDevices.value.length > 0);
 // would become a credential that admits a machine to the vault on load.
 const admitFingerprint = ref<string | null>(null);
 
-const admitTarget = computed(() => findAdmitTarget(devices.value, admitFingerprint.value));
+const admitTarget = computed(() =>
+  findAdmitTarget(devices.value, admitFingerprint.value),
+);
 
-const admitState = computed(() => admitHandshakeState(devices.value, admitFingerprint.value));
+const admitState = computed(() =>
+  admitHandshakeState(devices.value, admitFingerprint.value),
+);
 
 // A `waiting` handshake is normally seconds long: the CLI enrols, then opens
 // this page, so the row is usually one poll behind. But a stale, malformed, or
@@ -1203,7 +1327,7 @@ watch(
       admitWaitTimer = undefined;
     }, ADMIT_WAIT_BUDGET_MS);
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 onBeforeUnmount(clearAdmitWaitTimer);
@@ -1224,17 +1348,13 @@ function isAdmitTarget(device: SyncDevice) {
 // wait for the boot veil to lift, and it cannot name `revealed` before that
 // constant exists. See "the admit handoff waits for the veil".
 
-const earlyAccess = computed(() => Boolean(vault.value?.early_access_at));
-
 const subscription = computed(() => cloudState.value.subscription);
 
 // ORs in the live Clerk flag, not just the /api/me payload. Clerk resolves
 // after mount, so between those two moments `user` is still null -- without
 // this the shell would blink back to "create an account" for someone who is
 // demonstrably signed in.
-const signedIn = computed(
-  () => Boolean(user.value) || isClerkSignedIn.value,
-);
+const signedIn = computed(() => Boolean(user.value) || isClerkSignedIn.value);
 const paid = computed(() => Boolean(subscription.value?.active));
 
 /* ---------------------------------------------------------------------------
@@ -1268,7 +1388,8 @@ const cloudStateKnown = computed(() =>
     loadedSignedIn: loadedSignedIn.value,
     authSettled: authSettled.value,
     clerkSignedIn: isClerkSignedIn.value,
-    patienceExpired: loadPatienceExpired.value && cloudLoadsInFlight.value === 0,
+    patienceExpired:
+      loadPatienceExpired.value && cloudLoadsInFlight.value === 0,
   }),
 );
 
@@ -1348,7 +1469,10 @@ const stage = computed<Stage>(() => {
       return "loading";
     }
     if (!cliLinked.value) return "connect";
-    if (!earlyAccess.value) return "explore";
+    // Admitting a machine is the last thing the owner can do. Publishing the
+    // first catalog is on us, out of band, so there is no further customer
+    // step to gate a stage on. This used to check early_access_at, which
+    // waitlisted a capability that has since shipped.
     return "ready";
   }
   if (!signedIn.value) return "account";
@@ -1554,11 +1678,11 @@ watch(
     // Queried rather than held as a template ref: the button lives inside a
     // v-for, and the row it belongs to can arrive several polls after mount.
     const button = devicesCard.value?.querySelector<HTMLButtonElement>(
-      "[data-admit-target='true']"
+      "[data-admit-target='true']",
     );
     button?.focus();
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 /* ---------------------------------------------------------------------------
@@ -1577,7 +1701,7 @@ watch(
  * named a machine, and focus on a button that grants vault access is something
  * the ?admit= handshake earns by carrying a fingerprint.
  *
- * Connect only. From `explore` on, the owner may be reading Billing, and a
+ * Connect only. From `ready` on, the owner may be reading Billing, and a
  * page that scrolls itself out from under them is worse than a badge they can
  * click -- which is exactly what the topbar's "N waiting to be admitted" is.
  * ------------------------------------------------------------------------ */
@@ -1599,7 +1723,9 @@ watch(
       stage.value,
     ] as const,
   async ([, isRevealed, currentStage]) => {
-    const unseen = pendingDevices.value.filter((device) => !arrivalShownIds.has(device.id));
+    const unseen = pendingDevices.value.filter(
+      (device) => !arrivalShownIds.has(device.id),
+    );
     if (!unseen.length) return;
     // Every guard that could mean "this could not have worked" sits before the
     // latch, so a failed attempt does not spend the one each machine gets.
@@ -1631,7 +1757,7 @@ watch(
     // flash; not scrolling one that has just left the viewport costs the whole
     // point. On a window tall enough to hold the page this is a no-op anyway.
     await focusDevicesCard();
-  }
+  },
 );
 
 // The card used to render a hardcoded "Active" pill and a hardcoded monthly
@@ -1644,7 +1770,10 @@ watch(
 // the plan's LIST price, not this subscription's charge — subscriptions.price_id
 // is in D1 but /api/me exposes no amount — so it is labelled "Plan price" and
 // Stripe's own portal remains the authority on what anyone is actually billed.
-const SUBSCRIPTION_LABELS: Record<string, { text: string; tone: "ok" | "warn" | "bad" }> = {
+const SUBSCRIPTION_LABELS: Record<
+  string,
+  { text: string; tone: "ok" | "warn" | "bad" }
+> = {
   active: { text: "Active", tone: "ok" },
   trialing: { text: "Trialing", tone: "ok" },
   past_due: { text: "Past due", tone: "warn" },
@@ -1662,11 +1791,39 @@ const subscriptionState = computed(() => {
       ? { text: "Active", tone: "ok" as const }
       : { text: "No subscription", tone: "warn" as const };
   }
-  return SUBSCRIPTION_LABELS[status] ?? { text: status.replace(/_/g, " "), tone: "warn" as const };
+  return (
+    SUBSCRIPTION_LABELS[status] ?? {
+      text: status.replace(/_/g, " "),
+      tone: "warn" as const,
+    }
+  );
 });
 
 const subscriptionNeedsAttention = computed(
   () => subscriptionState.value.tone !== "ok",
+);
+
+// Statuses that already have a Stripe subscription in a payment-problem
+// state. Checkout would mint a second one; the portal is how they update the
+// card. Canceled / expired / never-subscribed go to Checkout instead.
+// `paused` belongs here for the same reason the other three do: the
+// subscription still exists in Stripe, so Checkout mints a second one rather
+// than resuming this one. Resuming is a portal action.
+const PORTAL_ONLY_STATUSES = new Set([
+  "past_due",
+  "unpaid",
+  "incomplete",
+  "paused",
+]);
+
+const canStartCheckout = computed(() => {
+  if (paid.value) return false;
+  const status = subscription.value?.status ?? null;
+  return !status || !PORTAL_ONLY_STATUSES.has(status);
+});
+
+const canManageBilling = computed(
+  () => paid.value || Boolean(subscription.value?.status),
 );
 
 const renewalLabel = computed(() => {
@@ -1691,9 +1848,12 @@ const renewalLabel = computed(() => {
 });
 
 const vaultSlug = computed(() => vault.value?.slug ?? "your-vault");
+// The stored public_url is a vault.autovault.dev display string, and nothing
+// routes or serves that host. The address a CLI actually reaches is the
+// /v/<slug>/ path on this origin, so derive it from the slug rather than
+// echoing public_url back at the customer.
 const hostedEndpoint = computed(
-  () =>
-    vault.value?.public_url ?? `https://vault.autovault.dev/${vaultSlug.value}`,
+  () => `https://autovault.dev/v/${vaultSlug.value}/`,
 );
 const accountName = computed(
   () =>
@@ -1731,9 +1891,9 @@ const avatarStyle = computed<Record<string, string>>(() => {
  * announced four steps and then switched to a different two-step model
  * partway through.
  *
- * "Sync" is deliberately NOT a step. Hosted sync does not exist server-side,
- * and a step you cannot complete is not a step -- it stays a locked
- * destination in the sidebar instead.
+ * "Sync" is deliberately NOT a step. Once a machine is admitted it syncs on
+ * its own, and publishing the first catalog is done out of band by us. Neither
+ * is something the owner completes here, so neither is a step.
  * ------------------------------------------------------------------------ */
 type StepKey = "account" | "subscription" | "namespace" | "connect";
 type StepState = "done" | "active" | "pending" | "unknown";
@@ -1778,7 +1938,9 @@ const activeStepKey = computed<StepKey | null>(
 );
 
 const stepDetail = computed<Record<StepKey, string>>(() => ({
-  account: signedIn.value ? accountEmailShort.value : "Create an account or sign in",
+  account: signedIn.value
+    ? accountEmailShort.value
+    : "Create an account or sign in",
   subscription: paid.value
     ? subscriptionState.value.text
     : vault.value
@@ -1813,7 +1975,15 @@ const onboardingSteps = computed<OnboardingStep[]>(() =>
   })),
 );
 
-type HostedPrice = { amount: number | null; currency: string | null; interval: string | null };
+type HostedPrice = {
+  amount: number | null;
+  currency: string | null;
+  interval: string | null;
+  // Comes from the same hostedTrialDays() the Checkout builder reads, so the
+  // page cannot offer a trial Stripe was not asked for. 0 means no trial, and
+  // every trial line below renders off this rather than off a literal.
+  trial_days?: number | null;
+};
 const hostedPrice = ref<HostedPrice | null>(null);
 
 // What the plan costs, read from Stripe. The funnel previously sent people to
@@ -1826,11 +1996,41 @@ const hostedPriceLabel = computed(() => {
   return formatPriceLabel(price.amount, price.currency, price.interval);
 });
 
+// Null when the endpoint reports no trial, which is also what happens when
+// /api/pricing is unreachable. Both cases render the plan without a trial line
+// rather than guessing, because the wrong guess here is a promise.
+const trialDays = computed(() => {
+  // /api/pricing is public and edge-cached, so it answers for everybody and
+  // cannot know who is asking. The checkout route grants the trial only on a
+  // first subscription, so anyone with a subscription row -- cancelled, lapsed,
+  // paused, whatever -- would be shown an offer the Checkout page then does not
+  // make. Advertising it here is the same defect this whole page exists to
+  // remove, one step earlier.
+  if (subscription.value?.status) return null;
+  const days = hostedPrice.value?.trial_days ?? 0;
+  return typeof days === "number" && days > 0 ? days : null;
+});
+const trialLabel = computed(() =>
+  trialDays.value === null ? null : `${trialDays.value} days free`,
+);
+
+// What a subscription actually buys, kept to things a customer gets on the day
+// they sign up. Publishing is not on this list on purpose: it is the one thing
+// the plan does not yet self-serve, and it is named right underneath instead.
+const PLAN_INCLUDES = [
+  "One hosted namespace at autovault.dev/v/<slug>/",
+  "Unlimited machines, each admitted by you from the browser",
+  "Signed catalog and bundle delivery over HTTPS",
+  "Revoke a machine at any time, subscription or not",
+];
+
 async function loadPricing() {
   // Never blocks or breaks the funnel: if Stripe is unreachable the price
   // line simply does not render.
   try {
-    const response = await fetch("/api/pricing", { headers: { accept: "application/json" } });
+    const response = await fetch("/api/pricing", {
+      headers: { accept: "application/json" },
+    });
     if (!response.ok) return;
     hostedPrice.value = await response.json();
   } catch {
@@ -1848,26 +2048,32 @@ const activeStepNumber = computed(() =>
 // Headline and lede follow the active step, so the focal card always names
 // the one thing to do rather than describing the whole journey.
 const setupHeadline = computed(() => {
-  if (stage.value === "account") return "Create your AutoVault account";
+  if (stage.value === "account") {
+    // Both branches, rather than the trial wording with a fallback bolted on.
+    // trialDays is null whenever /api/pricing is unreachable, and a headline
+    // that promises a free trial on a page that then charges is worse than a
+    // plain one.
+    return trialDays.value
+      ? `Try AutoVault Cloud free for ${trialDays.value} days`
+      : "Create your AutoVault account";
+  }
   if (stage.value === "subscription") return "Finish checkout";
   return "Reserve your namespace";
 });
 
 const setupLede = computed(() => {
   if (stage.value === "account") {
-    return "Create your account, reserve a stable namespace, and keep your local CLI as the source of truth. Hosted sync ships next.";
+    return trialDays.value
+      ? "Create your account, reserve a stable namespace, and pair the machines that should pull from it. No card up front. Signing stays on your machine."
+      : "Create your account, reserve a stable namespace, and pair the machines that should pull from it. Signing stays on your machine.";
   }
   if (stage.value === "subscription") {
     return "Stripe records the subscription through a webhook before AutoVault reserves your namespace.";
   }
-  return "Your subscription is active. Reserve the namespace to finish setup — signing and serving stay on the local CLI today.";
+  return "Your subscription is active. Reserve the namespace, then pair a machine to it. Skills are signed on your machine, never in the cloud.";
 });
 
 const installDocsHref = "/quick-start#install";
-
-const earlyAccessDate = computed(() =>
-  formatDate(vault.value?.early_access_at),
-);
 
 /* ---------------------------------------------------------------------------
  * Section switcher
@@ -1876,12 +2082,18 @@ const earlyAccessDate = computed(() =>
  * named a panel would have to survive the Stripe and Clerk round trips that
  * already own this page's query string and fragment.
  *
- * The switcher only does real work at explore/ready. Before that nearly every
+ * The switcher only does real work at `ready`. Before that nearly every
  * nav item is still locked, so there is nothing to switch between and the
  * stage templates simply render — which is why this is a ref and a computed
  * rather than a routing layer.
  * ------------------------------------------------------------------------ */
-const STAGE_ORDER: Stage[] = ["account", "subscription", "setup", "connect", "explore", "ready"];
+const STAGE_ORDER: Stage[] = [
+  "account",
+  "subscription",
+  "setup",
+  "connect",
+  "ready",
+];
 
 // The stage at which each panel's content first exists, and the single source
 // of truth for it: the nav item that selects a panel is locked until this
@@ -1892,11 +2104,11 @@ const STAGE_ORDER: Stage[] = ["account", "subscription", "setup", "connect", "ex
 const SECTION_REVEAL: Record<Section, Stage | null> = {
   overview: null,
   machines: "connect",
-  skills: "explore",
-  billing: "explore",
+  skills: "ready",
+  billing: "ready",
   // Not "connect", even though the copy is about linked machines and machines
   // itself reveals there: machines only gets away with "connect" because its
-  // panel is the one rendered OUTSIDE the explore/ready template (see
+  // panel is the one rendered OUTSIDE the `ready` template (see
   // showsMachines, below). The catalog panel lives inside that template, in
   // the same v-else-if chain as skills and billing -- so "connect" here would
   // unlock the nav item two stages before the template that renders its
@@ -1904,7 +2116,7 @@ const SECTION_REVEAL: Record<Section, Stage | null> = {
   // also would have described machines nobody has admitted yet: at "connect"
   // cliLinked is false by definition, before "how it relates to your linked
   // machines" is even true.
-  catalog: "explore",
+  catalog: "ready",
 };
 
 // What the page's one <h1> says while each panel is on screen. Separate from
@@ -1929,7 +2141,7 @@ function stageReached(at: Stage | null, current: Stage) {
 }
 
 // What is actually on screen. Revoking the last machine drops the stage from
-// explore back to connect, which re-locks Billing and Skills — so a selection
+// `ready` back to connect, which re-locks Billing and Skills, so a selection
 // made before that has to stop being honoured rather than leaving the main
 // area rendering a panel whose nav item is disabled.
 const activeSection = computed<Section>(() =>
@@ -1955,7 +2167,14 @@ const pageTitle = computed(() => {
   // name every panel region points at, so it must not name a step.
   if (stage.value === "loading") return "Opening your hosted vault…";
   if (stage.value === "error") return "We couldn't load your vault";
-  if (!vault.value) return "Reserve a hosted AutoVault namespace";
+  // The product, not the step. This used to read "Reserve a hosted AutoVault
+  // namespace", which was accurate for the funnel's third step and wrong as an
+  // h1: /cloud is a public product page now, the focal card below already
+  // names the one thing to do, and a heading that named step three while the
+  // card offered a trial had the page saying two different things at once.
+  // Stable on purpose. It is the accessible name every panel region points
+  // at, so it must not move as the funnel advances.
+  if (!vault.value) return "AutoVault Cloud";
   if (stage.value === "connect") return "Connect your CLI";
   return SECTION_TITLE[activeSection.value];
 });
@@ -1965,7 +2184,8 @@ const pageTitle = computed(() => {
 // admitted — and once the vault is open, which machines hold it IS the state
 // of the vault. Sync log then gives the same list a panel of its own.
 const showsMachines = computed(
-  () => activeSection.value === "overview" || activeSection.value === "machines",
+  () =>
+    activeSection.value === "overview" || activeSection.value === "machines",
 );
 
 /* ---------------------------------------------------------------------------
@@ -2043,7 +2263,8 @@ const navItems = computed<NavItem[]>(() => {
     // Resolved once and read by all three of revealed/justRevealed/locked. An
     // item that selects a panel inherits that panel's reveal stage, so the two
     // cannot drift apart; `revealAt` stays available for an item with no panel.
-    const revealAt = opts.revealAt ?? (opts.section ? SECTION_REVEAL[opts.section] : null);
+    const revealAt =
+      opts.revealAt ?? (opts.section ? SECTION_REVEAL[opts.section] : null);
     const revealed = stageReached(revealAt, s);
     const justRevealed = revealAt !== null && revealAt === s;
     const locked = Boolean(opts.soon) || !revealed;
@@ -2079,7 +2300,7 @@ const navItems = computed<NavItem[]>(() => {
 
   return [
     item("overview", "Overview", ICON.grid, { section: "overview" }),
-    // The skills panel only exists inside the explore/ready template, which is
+    // The skills panel only exists inside the `ready` template, which is
     // what SECTION_REVEAL.skills says. Enabled any earlier it is a live-looking
     // nav item that silently does nothing.
     item("skills", "Skills", ICON.book, { section: "skills" }),
@@ -2089,7 +2310,7 @@ const navItems = computed<NavItem[]>(() => {
     item("sync", "Sync log", ICON.sync, { section: "machines" }),
     // Explains what a vault catalog actually is, once there is a linked
     // machine to explain it in the context of. The catalog item below reveals
-    // at explore rather than connect -- see the comment on SECTION_REVEAL
+    // at `ready` rather than connect: see the comment on SECTION_REVEAL
     // above for why the two cannot match here the way they do for machines.
     item("catalog", "Catalog", ICON.layers, { section: "catalog" }),
     item("members", "Members", ICON.users, { soon: true }),
@@ -2104,7 +2325,9 @@ const navItems = computed<NavItem[]>(() => {
     // UserButton menu), reached through the one shared brand config instead
     // of a second copy of these two URLs.
     item("docs", "Docs", ICON.fileText, { href: clerkBrand.docsPath }),
-    item("support", "Support", ICON.helpCircle, { href: clerkBrand.supportUrl }),
+    item("support", "Support", ICON.helpCircle, {
+      href: clerkBrand.supportUrl,
+    }),
   ];
 });
 
@@ -2178,7 +2401,7 @@ watch(
     void loadDevices();
     startDevicePolling();
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 // A deadline that only reaches `fetch` bounds only the last step of the
@@ -2240,10 +2463,13 @@ async function loadCloudState(initial = false) {
   const abortTimer = setTimeout(() => abort.abort(), LOAD_PATIENCE_MS);
   try {
     const headers = await Promise.race([
-      authHeaders({ accept: "application/json" }, {
-        required: clerkAuthEnabled && isClerkSignedIn.value,
-        fresh: isClerkSignedIn.value,
-      }),
+      authHeaders(
+        { accept: "application/json" },
+        {
+          required: clerkAuthEnabled && isClerkSignedIn.value,
+          fresh: isClerkSignedIn.value,
+        },
+      ),
       abortRejection(abort.signal),
     ]);
     const response = await fetch("/api/me", {
@@ -2306,7 +2532,8 @@ async function loadCloudState(initial = false) {
     // Set in the finally rather than on success so a network failure still
     // resolves the wait: /api/me failing leaves loadError null and the state
     // empty, and that has to reach a rendered stage rather than spin.
-    if (requestSeq === cloudStateRequestSeq) loadedSignedIn.value = requestSignedIn;
+    if (requestSeq === cloudStateRequestSeq)
+      loadedSignedIn.value = requestSignedIn;
   }
 }
 
@@ -2356,22 +2583,78 @@ function normalizeCloudState(payload: CloudStatePayload): CloudState {
 // What the account menu's Billing item does. It selects the panel rather than
 // jumping straight to Stripe: every other item that navigates this page now
 // selects a section, and the panel is where the plan, price, status and period
-// end are. Being handed to Stripe's portal without seeing any of that first is
-// exactly what the panel exists to fix — the portal is one click further, on
-// the panel's own Manage billing button.
+// end are. Being handed to Stripe without seeing any of that first is
+// exactly what the panel exists to fix — Checkout or the portal is one click
+// further, on the panel's own button.
 //
-// Before `explore` there IS no panel (SECTION_REVEAL.billing), and this menu is
-// rendered from sign-in onward, so those stages fall through to the portal as
-// they did before. Otherwise the item would become a live-looking command that
-// does nothing and says nothing, which is the defect openBillingPortal's own
-// busy guard was written against. That path stays useful even with no billing
-// account yet: the endpoint's 409 wording lands in the notice channel.
+// Before `ready` there IS no panel (SECTION_REVEAL.billing), and this menu is
+// rendered from sign-in onward, so those stages fall through to the matching
+// Stripe action. A never-subscribed account has no portal customer; sending
+// them there 409s. Checkout is the action that can create one.
 function showBilling() {
   if (!stageReached(SECTION_REVEAL.billing, stage.value)) {
-    void openBillingPortal();
+    if (signedIn.value && canStartCheckout.value) void startHostedCheckout();
+    else void openBillingPortal();
     return;
   }
   selectedSection.value = "billing";
+}
+
+async function startHostedCheckout() {
+  if (busy.value) {
+    notice.value = {
+      kind: "warn",
+      text: "Just a moment — finishing the last request.",
+    };
+    return;
+  }
+  if (paid.value) {
+    notice.value = {
+      kind: "warn",
+      text: "You already have an active hosted vault subscription.",
+    };
+    return;
+  }
+  busy.value = true;
+  notice.value = null;
+  try {
+    const headers = await authHeaders(
+      {
+        "content-type": "application/json",
+        accept: "application/json",
+      },
+      { required: true, fresh: true },
+    );
+    const response = await fetch("/api/checkout/hosted-vault", {
+      method: "POST",
+      credentials: "include",
+      headers,
+      body: JSON.stringify({ source: "deploy" }),
+    });
+    const payload = (await response.json().catch(() => ({}))) as {
+      url?: string;
+      error?: string;
+    };
+    if (!response.ok || !payload.url) {
+      notice.value = {
+        kind: "warn",
+        text:
+          payload.error ||
+          "Couldn't open checkout just now. Try again in a moment.",
+      };
+      return;
+    }
+    window.location.assign(payload.url);
+  } catch (error) {
+    notice.value = {
+      kind: "warn",
+      text: isClerkApiAuthError(error)
+        ? clerkAuthRecoveryMessage(error)
+        : "Couldn't reach the server. Try again in a moment.",
+    };
+  } finally {
+    busy.value = false;
+  }
 }
 
 async function openBillingPortal() {
@@ -2380,30 +2663,41 @@ async function openBillingPortal() {
     // held, so reaching here means the lock was taken between paint and
     // click. Say so rather than swallowing the choice: an apparently live
     // command that does nothing and explains nothing reads as a broken app.
-    notice.value = { kind: "warn", text: "Just a moment — finishing the last request." };
+    notice.value = {
+      kind: "warn",
+      text: "Just a moment — finishing the last request.",
+    };
     return;
   }
   busy.value = true;
   notice.value = null;
   try {
-    const headers = await authHeaders({
-      "content-type": "application/json",
-      accept: "application/json",
-    }, { required: true, fresh: true });
+    const headers = await authHeaders(
+      {
+        "content-type": "application/json",
+        accept: "application/json",
+      },
+      { required: true, fresh: true },
+    );
     const response = await fetch("/api/billing/portal", {
       method: "POST",
       credentials: "include",
       headers,
       body: JSON.stringify({ return_to: "/cloud#launch-path" }),
     });
-    const payload = await response.json().catch(() => ({})) as { url?: string; error?: string };
+    const payload = (await response.json().catch(() => ({}))) as {
+      url?: string;
+      error?: string;
+    };
     if (!response.ok || !payload.url) {
       // Covers the 409 "no billing account yet" case as well as a Stripe
       // outage — the server's own wording is more useful than anything
       // generic we could invent here.
       notice.value = {
         kind: "warn",
-        text: payload.error || "Couldn't open billing just now. Try again in a moment.",
+        text:
+          payload.error ||
+          "Couldn't open billing just now. Try again in a moment.",
       };
       return;
     }
@@ -2436,7 +2730,10 @@ function formatWhen(iso: string): string {
   if (seconds < 45) return "just now";
   if (seconds < 3600) return `${Math.round(seconds / 60)} min ago`;
   if (seconds < 86_400) return `${Math.round(seconds / 3600)} h ago`;
-  return new Date(when).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return new Date(when).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 // A count rather than a flag, and for the same reason cloudLoadsInFlight is
@@ -2461,10 +2758,13 @@ async function loadDevices() {
   const abortTimer = setTimeout(() => abort.abort(), LOAD_PATIENCE_MS);
   try {
     const headers = await Promise.race([
-      authHeaders({ accept: "application/json" }, {
-        required: true,
-        fresh: false,
-      }),
+      authHeaders(
+        { accept: "application/json" },
+        {
+          required: true,
+          fresh: false,
+        },
+      ),
       abortRejection(abort.signal),
     ]);
     const response = await fetch("/api/vaults/current/devices", {
@@ -2502,7 +2802,6 @@ async function loadDevices() {
   }
 }
 
-
 // Two speeds, never off.
 //
 // Fast while something is waiting on the owner -- the connect step, or a
@@ -2537,7 +2836,7 @@ let devicePollInterval = 0;
 
 const VAULT_UNLOCK_MS = 700;
 
-const vaultOpen = computed(() => stage.value === "explore" || stage.value === "ready");
+const vaultOpen = computed(() => stage.value === "ready");
 
 // The dial sweeps only while something is genuinely in flight. Not a spinner:
 // a dial that turns forever reads as a component somebody forgot to stop.
@@ -2550,7 +2849,7 @@ const vaultWorking = computed(
     // expired, polling had dropped to idle, and the copy had already switched
     // to explaining that nothing was coming.
     (admitState.value === "waiting" && !admitWaitExpired.value) ||
-    deviceBusy.value !== null
+    deviceBusy.value !== null,
 );
 
 const vaultUnlocking = ref(false);
@@ -2669,10 +2968,10 @@ const ambientVault = computed(() => revealed.value && signedIn.value);
 // funnel's own syncCloudState, so asking it -- rather than the Clerk flag --
 // is asking the state itself instead of a promise of one.
 const cloudStateAuthenticated = computed(() =>
-  isAuthenticatedCloudState(cloudState.value)
+  isAuthenticatedCloudState(cloudState.value),
 );
 const vaultArrivalReady = computed(
-  () => ambientVault.value && cloudStateAuthenticated.value
+  () => ambientVault.value && cloudStateAuthenticated.value,
 );
 
 const vaultArriving = ref(false);
@@ -2736,7 +3035,7 @@ const devicePollUrgent = computed(
     // shows nothing. `?admit=` is positive evidence that a row is inbound --
     // but only until the budget above runs out, because a link that matches
     // nothing is evidence of nothing.
-    (admitState.value === "waiting" && !admitWaitExpired.value)
+    (admitState.value === "waiting" && !admitWaitExpired.value),
 );
 
 function stopDevicePolling() {
@@ -2747,7 +3046,9 @@ function stopDevicePolling() {
 
 function startDevicePolling() {
   if (typeof window === "undefined" || !vault.value) return;
-  const wanted = devicePollUrgent.value ? DEVICE_POLL_ACTIVE_MS : DEVICE_POLL_IDLE_MS;
+  const wanted = devicePollUrgent.value
+    ? DEVICE_POLL_ACTIVE_MS
+    : DEVICE_POLL_IDLE_MS;
   if (devicePollTimer && devicePollInterval === wanted) return;
   stopDevicePolling();
   devicePollInterval = wanted;
@@ -2780,19 +3081,30 @@ async function decideDevice(deviceId: string, action: "admit" | "revoke") {
   // by the state the owner actually saw: the state at the moment they clicked.
   const wasOpen = vaultOpen.value;
   try {
-    const headers = await authHeaders({
-      "content-type": "application/json",
-      accept: "application/json",
-    }, { required: true, fresh: true });
-    const response = await fetch(`/api/vaults/current/devices/${encodeURIComponent(deviceId)}`, {
-      method: "POST",
-      credentials: "include",
-      headers,
-      body: JSON.stringify({ action }),
-    });
-    const payload = await response.json().catch(() => ({})) as { error?: string };
+    const headers = await authHeaders(
+      {
+        "content-type": "application/json",
+        accept: "application/json",
+      },
+      { required: true, fresh: true },
+    );
+    const response = await fetch(
+      `/api/vaults/current/devices/${encodeURIComponent(deviceId)}`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers,
+        body: JSON.stringify({ action }),
+      },
+    );
+    const payload = (await response.json().catch(() => ({}))) as {
+      error?: string;
+    };
     if (!response.ok) {
-      notice.value = { kind: "warn", text: payload.error || "Couldn't update that device just now." };
+      notice.value = {
+        kind: "warn",
+        text: payload.error || "Couldn't update that device just now.",
+      };
       return;
     }
     // Only a closed vault becoming open celebrates — admitting a second
@@ -2823,7 +3135,7 @@ async function decideDevice(deviceId: string, action: "admit" | "revoke") {
     devices.value = devices.value.map((device) =>
       device.id === deviceId
         ? { ...device, status: action === "admit" ? "active" : "revoked" }
-        : device
+        : device,
     );
 
     // Same tick as the write above, before anything yields. Awaiting first let
@@ -2836,9 +3148,10 @@ async function decideDevice(deviceId: string, action: "admit" | "revoke") {
     await loadDevices();
     notice.value = {
       kind: "ok",
-      text: action === "admit"
-        ? "Device admitted. Its CLI will pick that up within a couple of seconds."
-        : "Device revoked. It can no longer pull from this vault.",
+      text:
+        action === "admit"
+          ? "Device admitted. Its CLI will pick that up within a couple of seconds."
+          : "Device revoked. It can no longer pull from this vault.",
     };
   } catch (error) {
     notice.value = {
@@ -2849,50 +3162,6 @@ async function decideDevice(deviceId: string, action: "admit" | "revoke") {
     };
   } finally {
     deviceBusy.value = null;
-  }
-}
-
-async function markProgress(step: "early_access") {
-  if (busy.value || !vault.value) return;
-  busy.value = true;
-  notice.value = null;
-  try {
-    const headers = await authHeaders({
-      "content-type": "application/json",
-      accept: "application/json",
-    }, { required: true, fresh: true });
-    const response = await fetch("/api/vaults/current/progress", {
-      method: "POST",
-      credentials: "include",
-      headers,
-      body: JSON.stringify({ step }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || !payload.vault) {
-      notice.value = {
-        kind: "warn",
-        text:
-          payload.error ||
-          "Couldn't save that just now — try again in a moment.",
-      };
-      return;
-    }
-    cloudState.value = { ...cloudState.value, vault: payload.vault };
-    notice.value = {
-      kind: "ok",
-      text: "You're on the early-access list. We'll be in touch.",
-    };
-  } catch (error) {
-    if (isClerkApiAuthError(error)) {
-      notice.value = { kind: "warn", text: clerkAuthRecoveryMessage(error) };
-      return;
-    }
-    notice.value = {
-      kind: "warn",
-      text: "Couldn't reach the server — try again in a moment.",
-    };
-  } finally {
-    busy.value = false;
   }
 }
 
@@ -3225,7 +3494,6 @@ const ICON = {
   font-size: 11px;
   opacity: 0.5;
 }
-
 
 /* main content */
 .cv-content {
@@ -3653,6 +3921,27 @@ const ICON = {
 }
 /* Inside the focal card it borrowed that card's frame. On its own it needs
    one, and it is now the only route to revoking a machine. */
+.cv-recover {
+  margin: 0 0 18px;
+  padding: 18px 20px;
+  border: 1px solid rgba(217, 113, 113, 0.32);
+  border-radius: 12px;
+  background: rgba(217, 113, 113, 0.05);
+}
+
+.cv-recover-title {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cv-recover-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
 .cv-devices.standalone {
   margin-top: 20px;
   padding: 16px 18px 18px;
@@ -3670,7 +3959,7 @@ const ICON = {
 }
 /* At connect this card is the next step, not a peer panel -- the same accent
    focusflash uses, held rather than flashed, so the sentence above it lands
-   somewhere visibly live. Dropped from `explore` on, where Machines stops
+   somewhere visibly live. Dropped from `ready` on, where Machines stops
    being the thing to do next and going on shouting would be a lie. */
 .cv-devices.standalone.awaiting {
   border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
@@ -4091,12 +4380,69 @@ const ICON = {
 .cv-shell.booting {
   pointer-events: none;
 }
+.cv-plan {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin: 0 0 22px;
+  background: rgba(255, 255, 255, 0.015);
+}
+.cv-plan-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cv-plan-trial {
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+.cv-plan-sub {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.cv-plan-list {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+}
+.cv-plan-list li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.cv-plan-list li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.cv-plan-note {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink-3);
+}
 .cv-price {
   display: flex;
   align-items: baseline;
   gap: 10px;
   flex-wrap: wrap;
-  margin: 0 0 20px;
+  margin: 0;
 }
 .cv-price strong {
   font-size: 22px;

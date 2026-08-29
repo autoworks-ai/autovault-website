@@ -137,6 +137,42 @@
       </div>
     </section>
 
+    <section id="hosted-sync" class="sec-section">
+      <div class="eyebrow"><span class="dash" /> Hosted sync</div>
+      <h2>Cloud serves the bytes. It never signs them.</h2>
+      <p class="sub">AutoVault Cloud moves a signed catalog from your machine to the machines you admit. That is the whole job. The trust boundary does not move when a vault becomes hosted: the gate still ran on your workstation, the release was still signed by a key that stayed there, and Cloud stores the result without being able to produce one.</p>
+
+      <div class="disc-grid">
+        <article class="disc-card">
+          <h3>What Cloud holds</h3>
+          <p><strong>Sync artifacts:</strong> signed catalog and bundle objects byte for byte, enrolled device public keys with their status and hostname, and live pairing codes until they expire.</p>
+          <p><strong>Account records:</strong> the email, name and avatar your identity provider returns, your Stripe customer and subscription ids, and the reserved namespace.</p>
+          <p><strong>Skill drafts you submit:</strong> a draft posted from the dashboard is stored whole, body text included, and nothing reads it back yet.</p>
+          <p class="muted">No signing key, in any of them. That is the one thing Cloud is built never to hold.</p>
+          <div class="kv">
+            <span class="k">Serves</span><span class="v">/v/&lt;slug&gt;/</span>
+          </div>
+        </article>
+        <article class="disc-card">
+          <h3>What Cloud never holds</h3>
+          <p>A release signing key. There is no upload API and no publish button, because either one would need Cloud to hold the thing that makes a release trustworthy. Objects are placed by hand from the machine that signed them.</p>
+          <div class="kv">
+            <span class="k">Signing</span><span class="v">stays local</span>
+          </div>
+        </article>
+      </div>
+
+      <p class="sub">A device proves who it is with an Ed25519 keypair it generates locally. The private half never leaves that machine, and there is no API key to leak in its place. Every request under <code>/v/</code> carries a detached signature over <code>&lt;METHOD&gt;\n&lt;pathname&gt;\n&lt;unix-seconds&gt;</code>, and a timestamp more than 300 seconds out is refused, so a captured request stops working in five minutes. Admission is a person in the browser, not a token exchange. An enrolled key that nobody has admitted reads the catalog and its own status, never a bundle: it needs the catalog to pin the publisher key before anyone has decided about it, and bundles are where skill content actually lives.</p>
+
+      <div class="callout security-note">
+        <span class="icn"><UiIcon name="tip" /></span>
+        <div>
+          <p><strong>Rotating the catalog key breaks every enrolled device.</strong> A device pins <code>catalog.public_key</code> the first time it reads the catalog, which is what stops a compromised Cloud from swapping in releases of its own. The cost of that guarantee is real: there is no rotation path in beta, and changing the key means re-enrolling every machine.</p>
+          <p>Revoking a device is immediate for catalog and bundle reads. It does not reach back onto that machine. Skills it already pulled are files on a disk you no longer control.</p>
+        </div>
+      </div>
+    </section>
+
     <section class="sec-section">
       <div class="eyebrow"><span class="dash" /> Disclosure</div>
       <h2>Found something? Tell us.</h2>

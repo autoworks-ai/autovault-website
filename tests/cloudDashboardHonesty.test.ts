@@ -56,23 +56,25 @@ describe("cloud dashboard stage machine", () => {
 });
 
 describe("team mode copy", () => {
-  it("does not promise signed skill sync as a live hosted-beta capability", () => {
-    // HostedVaultFunnel.vue tells customers "sync is not enabled yet" --
-    // team mode's own hosted route previously listed "signed skill sync" as
-    // something a team gets today alongside the reserved namespace, directly
-    // contradicting that. It must not claim sync ships now.
-    expect(teamMode).not.toMatch(/reserved namespace, enrolled devices, signed skill sync/i);
-    expect(teamMode).toContain("not enabled yet");
+  it("no longer withholds enrollment and signed sync, which both shipped", () => {
+    // This pair of cases used to assert the opposite. They were written while
+    // the hosted route had a reserved namespace and nothing else, to stop the
+    // landing page listing "signed skill sync" as something a team got today.
+    // Device enrollment (#98), admit/revoke (#99) and pairing (#117) have all
+    // shipped since, so "not enabled yet" became the false claim, sitting on
+    // the most public page on the site.
+    expect(teamMode).not.toMatch(/not enabled yet/i);
+    expect(teamMode).toMatch(/pair a machine/i);
+    expect(teamMode).toMatch(/signed skills/i);
   });
 
-  it("does not promise device enrollment as a live hosted-beta capability either", () => {
-    // A local review caught that the first fix for the finding above swapped
-    // one overclaim for another: the backend has no device table, issuance
-    // endpoint, or enrollment flow -- only a self-attested "I've linked my
-    // CLI" click (CloudPage.vue markProgress("cli_linked")). Only namespace
-    // reservation is real today.
-    expect(teamMode).not.toMatch(/reserved namespace and enrolled devices today/i);
-    expect(teamMode).toContain("device enrollment and signed skill sync are not enabled yet");
+  it("still does not promise a publish path, because there is none", () => {
+    // The one claim in this area that is still false. There is no upload API
+    // and the CLI is a consumer only: AUTOVAULT_VAULT_OBJECTS.put() appears
+    // once in functions/, writing a pending-skill draft. Signed catalogs are
+    // placed in KV out of band, so nothing here may imply a team pushes to it.
+    expect(teamMode).not.toMatch(/publish your|upload your|push your/i);
+    expect(teamMode).toMatch(/hands-on in private beta/i);
   });
 });
 
@@ -144,7 +146,10 @@ describe("unified shell", () => {
 
     // 2. no vault
     expect(pageTitle).toContain('if (!vault.value)');
-    expect(pageTitle).toContain('"Reserve a hosted AutoVault namespace"');
+    // Names the product, not step three. The branch ORDER is what this case
+    // guards; the wording moved when /cloud went public and the focal card
+    // took over naming the next action.
+    expect(pageTitle).toContain('"AutoVault Cloud"');
 
     // 3. connect stage (must be checked BEFORE the fallthrough)
     expect(pageTitle).toContain('if (stage.value === "connect")');
@@ -446,5 +451,46 @@ describe("local handoff terminal", () => {
     // `copyToClipboard`.
     expect(funnel).toContain("import { copyText } from \"../utils/clipboard\";");
     expect(funnel).not.toContain("async function copyText(text: string) {");
+  });
+});
+
+describe("the sync engine card", () => {
+  it("claims sync is enabled, not that anything is being served", () => {
+    // The page never queries KV, so it cannot know whether this vault has a
+    // catalog, and a new one answers 404 until a release is published out of
+    // band. A green "Serving signed skills" at `ready` contradicted the Catalog
+    // panel on the same screen.
+    expect(cloudPage).not.toContain("Serving signed skills");
+    expect(cloudPage).toContain("Sync enabled");
+    const at = cloudPage.indexOf('<div class="cv-card-label">Sync engine</div>');
+    expect(at, "no sync engine card").toBeGreaterThan(-1);
+    const card = cloudPage.slice(at, cloudPage.indexOf("</article>", at));
+    expect(card.replace(/\s+/g, " ")).toContain("answers <code>404</code>");
+  });
+});
+
+describe("per-vault claims the dashboard cannot support", () => {
+  it("never asserts what this specific vault is or is not serving", () => {
+    // The page never queries KV. "Serving signed skills" and "this vault serves
+    // nothing" are the same defect pointed in opposite directions, and this
+    // branch shipped one, replaced it with the other, and had to be told twice.
+    // Every claim about catalog contents has to be a rule, not a state.
+    expect(cloudPage).not.toContain("serves nothing");
+    expect(cloudPage).not.toContain("Serving signed skills");
+    expect(cloudPage).not.toContain("published here");
+    expect(cloudPage.replace(/\s+/g, " ")).toContain(
+      "a namespace with nothing published answers"
+    );
+  });
+
+  it("does not promise bundle downloads while billing is lapsed", () => {
+    // `ready` proves a machine is admitted, not that the subscription is live.
+    // Bundles answer 402 the moment it lapses, and the recovery card further
+    // down already says so, so the status strip must not contradict it.
+    const at = cloudPage.indexOf('<span class="cv-status-text">');
+    expect(at, "no status strip").toBeGreaterThan(-1);
+    const strip = cloudPage.slice(at, cloudPage.indexOf("</span>", at));
+    expect(strip).toContain('v-if="paid"');
+    expect(strip.replace(/\s+/g, " ")).toContain("402");
   });
 });

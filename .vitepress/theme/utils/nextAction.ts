@@ -26,12 +26,11 @@
  *                   / Reserve namespace, in HostedVaultFunnel.
  * `admit`         — the Admit button on the `?admit=` target row, in
  *                   CloudPage's Machines card.
- * `early-access`  — the status strip's "Get early access", in CloudPage.
  * `null`          — nothing to mark: the page does not know its state yet, the
  *                   load failed, everything is done, or the only remaining
  *                   action is one this page cannot single out.
  */
-export type CloudNextAction = "funnel" | "admit" | "early-access" | null;
+export type CloudNextAction = "funnel" | "admit" | null;
 
 export interface CloudNextActionInput {
   /** CloudPage's `stage`. */
@@ -68,10 +67,7 @@ export function cloudNextAction({
   if (stage === "loading" || stage === "error") return null;
 
   // A machine sitting in a spinner outranks anything else on screen: a CLI on
-  // the other end of it is blocked until this click happens. This is also what
-  // keeps `explore` from showing two markers — a second machine can enrol long
-  // after the first one opened the vault, and then both this and the status
-  // strip's CTA are rendered at once.
+  // the other end of it is blocked until this click happens.
   //
   // Gated on the card actually being rendered rather than merely on the
   // machine existing: the owner can be reading Billing, where the Admit button
@@ -80,14 +76,16 @@ export function cloudNextAction({
   // the action that IS on screen.
   if (namedPendingMachine && machinesOnScreen) return "admit";
 
-  // `ready` — the vault is open, a machine is linked, and early access has
-  // been asked for. Nothing is left to do, and a marker pointing at nothing is
-  // worse than none: it is the page insisting there is another step.
+  // `ready` — the vault is open and a machine is linked. Nothing is left for
+  // the owner to do, and a marker pointing at nothing is worse than none: it
+  // is the page insisting there is another step. Publishing the first catalog
+  // is the remaining work and it is ours, not theirs, so it is not a step this
+  // page can mark.
   //
   // Below the admit branch rather than above it, because the stage outlives
-  // the claim. `stage` is `ready` while ANY machine is active and
-  // `early_access_at` is set, so linking a second machine from an account that
-  // has already done both leaves it at `ready` with a pending row on screen —
+  // the claim. `stage` is `ready` while ANY machine is active, so linking a
+  // second machine from an account that already has one leaves it at `ready`
+  // with a pending row on screen:
   // `cliLinked` reads activeDevices, not pendingDevices. Returning null there
   // withheld the marker from the one control that was genuinely blocking a
   // CLI, and did it while the rest of the page was pointing straight at that
@@ -103,9 +101,6 @@ export function cloudNextAction({
   // machine empties admitTarget, and this branch is then what the fall-through
   // lands on — null, not the other row.
   if (stage === "ready") return null;
-
-  // The vault is open and the one thing left is asking for early access.
-  if (stage === "explore") return "early-access";
 
   // Pre-vault: account -> subscription -> setup, one primary button each.
   if (stage === "account" || stage === "subscription" || stage === "setup") {

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { onRequestGet as pricing } from "../functions/api/pricing.js";
 import { formatPriceLabel } from "../.vitepress/theme/utils/money";
+import { buildHostedVaultCheckoutParams } from "../functions/api/_lib/stripe.js";
 
 const ENV = { STRIPE_SECRET_KEY: "sk_test_x", AUTOVAULT_HOSTED_PRICE_ID: "price_hosted" };
 
@@ -19,7 +20,12 @@ describe("pricing endpoint", () => {
   it("returns the configured plan's real price from Stripe", async () => {
     stubPrice({ unit_amount: 1500, currency: "usd", recurring: { interval: "month" } });
     const response = await pricing({ env: ENV });
-    expect(await response.json()).toEqual({ amount: 1500, currency: "usd", interval: "month" });
+    expect(await response.json()).toEqual({ amount: 1500, currency: "usd", interval: "month", trial_days: 0 });
+
+    // 0, not absent. The page renders every trial line off this number, so an
+    // endpoint that simply omitted the field when no trial is configured would
+    // be indistinguishable from an older deploy that did not know about
+    // trials, and "no trial" is the answer that has to be unambiguous.
   });
 
   it("is cacheable — the price is identical for every visitor", async () => {
@@ -31,7 +37,15 @@ describe("pricing endpoint", () => {
     // Assert the header the endpoint actually sends, not the text of the
     // source -- the value is built from a constant now, so a source match
     // would have gone vacuous without anything failing.
-    expect(response.headers.get("cache-control")).toMatch(/^public, max-age=\d+$/);
+    const cacheControl = response.headers.get("cache-control") ?? "";
+    // The edge holds it; the browser does not. A shared cache is what spares
+    // Stripe the call, and it is invalidated by the config fingerprint on the
+    // key. A browser copy cannot be invalidated at all, so a retired trial
+    // would have gone on being advertised for the rest of its max-age to
+    // precisely the people already looking at the page.
+    expect(cacheControl).toMatch(/\bs-maxage=\d+/);
+    expect(cacheControl).toMatch(/\bmax-age=0\b/);
+    expect(cacheControl).toContain("public");
 
     const source = readFileSync(new URL("../functions/api/pricing.js", import.meta.url), "utf-8");
     // Anchor on the import, not the word: the comment explaining why json()
@@ -72,11 +86,11 @@ describe("pricing endpoint", () => {
     return (async () => {
       const request = new Request("https://autovault.dev/api/pricing");
       const first = await pricing({ request, env: ENV });
-      expect(await first.json()).toEqual({ amount: 1500, currency: "usd", interval: "month" });
+      expect(await first.json()).toEqual({ amount: 1500, currency: "usd", interval: "month", trial_days: 0 });
       expect(stripe).toHaveBeenCalledTimes(1);
 
       const second = await pricing({ request, env: ENV });
-      expect(await second.json()).toEqual({ amount: 1500, currency: "usd", interval: "month" });
+      expect(await second.json()).toEqual({ amount: 1500, currency: "usd", interval: "month", trial_days: 0 });
       // The point of the whole exercise: no second Stripe call.
       expect(stripe).toHaveBeenCalledTimes(1);
     })();
@@ -99,7 +113,47 @@ describe("pricing endpoint", () => {
     await pricing({ request: new Request("https://autovault.dev/api/pricing?bust=2"), env: ENV });
 
     expect(stripe).toHaveBeenCalledTimes(1);
-    expect([...store.keys()]).toEqual(["https://autovault.dev/api/pricing"]);
+    // One key, and it is the server's, not the caller's: the `config` suffix is
+    // built from env rather than from anything in the request.
+    expect([...store.keys()]).toEqual([
+      "https://autovault.dev/api/pricing?config=price_hosted%3A0"
+    ]);
+  });
+
+  it("stops serving the old trial the moment the trial changes", async () => {
+    // The body carries trial_days now, so a key that ignores the config leaves
+    // a 300 second window where the cached page promises a trial that a session
+    // created in the same second no longer grants. Shortening or switching the
+    // trial off has to invalidate, not wait out the TTL.
+    const store = new Map<string, Response>();
+    vi.stubGlobal("caches", {
+      default: {
+        match: async (key: Request) => store.get(key.url)?.clone(),
+        put: async (key: Request, value: Response) => void store.set(key.url, value)
+      }
+    });
+    const stripe = stubPrice({ unit_amount: 1500, currency: "usd", recurring: { interval: "month" } });
+    const request = new Request("https://autovault.dev/api/pricing");
+
+    const withTrial = await pricing({
+      request,
+      env: { ...ENV, AUTOVAULT_HOSTED_TRIAL_DAYS: "14" }
+    });
+    expect((await withTrial.json()).trial_days).toBe(14);
+
+    const retired = await pricing({
+      request,
+      env: { ...ENV, AUTOVAULT_HOSTED_TRIAL_DAYS: "0" }
+    });
+    expect((await retired.json()).trial_days).toBe(0);
+
+    // A second Stripe call, because the second request could not hit the first
+    // entry. Both keys survive; the stale one is simply unreachable.
+    expect(stripe).toHaveBeenCalledTimes(2);
+    expect([...store.keys()].sort()).toEqual([
+      "https://autovault.dev/api/pricing?config=price_hosted%3A0",
+      "https://autovault.dev/api/pricing?config=price_hosted%3A14"
+    ]);
   });
 
   it("never hardcodes a price in the funnel UI", () => {
@@ -156,5 +210,37 @@ describe("price label", () => {
     expect(label(null, "usd")).toBeNull();
     expect(label(1500, null)).toBeNull();
     expect(formatPriceLabel(1500, "usd", null, "en-US")).toBe("$15");
+  });
+
+  it("reports the same trial Checkout would send", async () => {
+    // The one guarantee that keeps "14 days free" on the page honest. This
+    // endpoint is where the funnel learns the trial length, and
+    // buildHostedVaultCheckoutParams is what Stripe is actually asked for.
+    // Both read hostedTrialDays, so this asserts they cannot disagree.
+    stubPrice({ unit_amount: 1500, currency: "usd", recurring: { interval: "month" } });
+    const env = { ...ENV, AUTOVAULT_HOSTED_TRIAL_DAYS: "14" };
+    const body = await (await pricing({ env })).json() as { trial_days: number };
+
+    const params = buildHostedVaultCheckoutParams({
+      request: new Request("https://autovault.dev/cloud"),
+      env,
+      user: { id: "user_1", email: "jack@example.com" }
+    });
+
+    expect(body.trial_days).toBe(14);
+    expect(params.get("subscription_data[trial_period_days]")).toBe(String(body.trial_days));
+  });
+
+  it("advertises no trial when Checkout would send none", async () => {
+    stubPrice({ unit_amount: 1500, currency: "usd", recurring: { interval: "month" } });
+    const body = await (await pricing({ env: ENV })).json() as { trial_days: number };
+    const params = buildHostedVaultCheckoutParams({
+      request: new Request("https://autovault.dev/cloud"),
+      env: ENV,
+      user: { id: "user_1", email: "jack@example.com" }
+    });
+
+    expect(body.trial_days).toBe(0);
+    expect(params.get("subscription_data[trial_period_days]")).toBeNull();
   });
 });
