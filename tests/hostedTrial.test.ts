@@ -533,6 +533,28 @@ describe("trial copy never outlives the trial", () => {
     ).resolves.toBe("cus_winner");
   });
 
+  it("releases a claim written before claim_token existed", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db);
+
+    // 0008 rows carry a null token. Refusing to release them strands the
+    // account rather than the claim: the release is a permanent no-op, the next
+    // claimTrial conflicts on user_id, and checkout answers 409 for that user
+    // forever. 0010 backfills them, and this stays for a database that has not
+    // run it yet.
+    db.prepare(
+      "insert into trial_claims (user_id, session_id, claimed_at, claim_token) values (?, ?, ?, null)"
+    ).run("clerk_1", "cs_legacy", new Date(0).toISOString());
+
+    const legacy = await getTrialClaim(env, "clerk_1");
+    expect(legacy?.claim_token).toBeNull();
+
+    await releaseTrialClaim(env, "clerk_1", legacy);
+    expect(await getTrialClaim(env, "clerk_1")).toBeNull();
+    // And the account is usable again rather than 409 forever.
+    expect(await claimTrial(env, "clerk_1", "cs_after")).toBe(true);
+  });
+
   it("does not claim a trial that is not configured", () => {
     const route = readFileSync(
       new URL("../functions/api/checkout/hosted-vault.js", import.meta.url),

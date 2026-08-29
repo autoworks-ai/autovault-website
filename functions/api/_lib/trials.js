@@ -86,11 +86,27 @@ export function isTrialClaimInFlight(claim, now = Date.now()) {
 // rather than throwing away a live claim it never saw. An unconditional delete
 // here is how the race got back in.
 export async function releaseTrialClaim(env, userId, claim) {
-  // No token, no release. A row written before the column existed cannot be
-  // identified, and guessing with a looser match is the failure this whole
-  // function is shaped to avoid. Such a row ages out of the in-flight window
-  // and is superseded when its own session is seen to be gone.
-  if (!userId || !claim?.claim_token) return;
+  if (!userId || !claim) return;
+
+  // A row written under 0008, before claim_token existed. Refusing outright was
+  // the first version and it strands the account rather than the claim: the
+  // release becomes a permanent no-op, the next claimTrial conflicts on
+  // user_id, and checkout answers 409 for that user forever. 0010 backfills
+  // these, so this branch should find nothing; it stays because a database that
+  // has not run 0010 yet must not brick an account either.
+  //
+  // `claim_token is null` is an exact match despite carrying no token, because
+  // user_id is the primary key: there is one row per account, and any claim
+  // made since this one was read carries a token and cannot be hit by it.
+  if (!claim.claim_token) {
+    await run(
+      env,
+      "delete from trial_claims where user_id = ? and claim_token is null",
+      userId,
+    );
+    return;
+  }
+
   await run(
     env,
     "delete from trial_claims where user_id = ? and claim_token = ?",
