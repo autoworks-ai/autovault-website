@@ -139,8 +139,15 @@ export const CHECKOUT_CREATE_TIMEOUT_MS = 30_000;
  * @param {URLSearchParams} params
  * @param {typeof fetch} [fetcher]
  * @param {AbortSignal | null} [signal]
+ * @param {string | null} [idempotencyKey]
  */
-export async function createCheckoutSession(env, params, fetcher = fetch, signal = null) {
+export async function createCheckoutSession(
+  env,
+  params,
+  fetcher = fetch,
+  signal = null,
+  idempotencyKey = null,
+) {
   if (!env.STRIPE_SECRET_KEY)
     throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
   const response = await fetcher(
@@ -151,6 +158,7 @@ export async function createCheckoutSession(env, params, fetcher = fetch, signal
         authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
         "content-type": "application/x-www-form-urlencoded",
         "stripe-version": STRIPE_API_VERSION,
+        ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}),
       },
       body: params,
       ...(signal ? { signal } : {}),

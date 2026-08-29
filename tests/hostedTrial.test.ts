@@ -573,8 +573,9 @@ describe("trial copy never outlives the trial", () => {
     );
     expect(route).toContain("AbortSignal.timeout(CHECKOUT_CREATE_TIMEOUT_MS)");
     // Bounded only where a claim is held. A full-price session has no window to
-    // stay inside and no reason to be cut short.
-    expect(route).toContain("allowTrial ? AbortSignal.timeout");
+    // stay inside and no reason to be cut short, so it goes out unsignalled.
+    expect(route).toContain("createTrialCheckout(env, params, user.id");
+    expect(route).toContain(": await createCheckoutSession(env, params);");
 
     // And the signal actually reaches fetch rather than being accepted and
     // dropped.
@@ -632,6 +633,49 @@ describe("trial copy never outlives the trial", () => {
     await expect(
       findOutstandingTrialSession(env, "cus_1", fetcher)
     ).resolves.toBeTruthy();
+  });
+
+  it("makes a second trial checkout the same operation as the first", async () => {
+    // The claim-token recovery only finds a session that has already become
+    // listable. Stripe still processing an aborted POST has not produced one
+    // yet, so the retry sees nothing, releases the claim, takes a new one, and
+    // sends a second trial out behind the first. An idempotency key scoped to
+    // the ACCOUNT is what survives that window: a per-claim key would be a new
+    // key on the new claim, which is exactly the case that needs stopping.
+    const route = readFileSync(
+      new URL("../functions/api/checkout/hosted-vault.js", import.meta.url),
+      "utf-8"
+    );
+    expect(route).toContain("`av-trial-checkout-${userId}`");
+    // Refusal is the signal that a trial checkout already exists, so recover
+    // rather than create a second one.
+    expect(route).toContain("in-progress request using this Idempotent Key");
+    expect(route).toContain("can only be used with the same parameters");
+    expect(route).toContain("findOutstandingTrialSession(env, customerId)");
+    // And a session the key replays from a since-released claim is expired, so
+    // its URL must not be handed to anybody.
+    expect(route).toContain('session.status === "complete"');
+    expect(route).toContain('session.status !== "open"');
+    expect(route).toContain("`av-trial-checkout-claim-${claimToken}`");
+
+    // The key reaches Stripe as a header rather than being accepted and dropped.
+    let key: string | null = "unset";
+    const fetcher = (async (_url: URL | RequestInfo, init?: RequestInit) => {
+      key = new Headers(init?.headers).get("idempotency-key");
+      return new Response(JSON.stringify({ id: "cs_1", url: "https://checkout/x" }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }) as typeof fetch;
+    const env = { STRIPE_SECRET_KEY: "sk_test_x" };
+    const params = new URLSearchParams({ mode: "subscription" });
+
+    await createCheckoutSession(env, params, fetcher, null, "av-trial-checkout-clerk_1");
+    expect(key).toBe("av-trial-checkout-clerk_1");
+
+    // A full-price create carries none, so two deliberate purchases stay two.
+    await createCheckoutSession(env, params, fetcher);
+    expect(key).toBeNull();
   });
 
   it("treats a completed checkout as spent rather than stale", () => {
