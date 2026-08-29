@@ -11,7 +11,8 @@ function subscriptionEvent({
   created,
   status,
   userId = "clerk_1",
-  periodEnd = 1800000000
+  periodEnd = 1800000000,
+  cancelAtPeriodEnd = false
 }: {
   id: string;
   type?: string;
@@ -19,6 +20,7 @@ function subscriptionEvent({
   status: string;
   userId?: string;
   periodEnd?: number | null;
+  cancelAtPeriodEnd?: boolean;
 }) {
   return {
     id,
@@ -29,6 +31,7 @@ function subscriptionEvent({
         id: "sub_1",
         customer: "cus_1",
         status,
+        cancel_at_period_end: cancelAtPeriodEnd,
         metadata: { user_id: userId },
         items: { data: [{ price: { id: "price_1" }, current_period_end: periodEnd }] }
       }
@@ -129,6 +132,55 @@ describe("Stripe webhook state handling", () => {
     const subscription = await getSubscription(env, "clerk_1");
     expect(subscription.status).toBe("canceled");
     expect(subscription.active).toBe(false);
+  });
+
+  it("still applies a same-timestamp scheduled cancellation, which keeps a paid status", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db);
+
+    // The tie-break prefers the event that takes access away, and it used to
+    // read that off the status alone. A portal cancellation does not change the
+    // status: Stripe leaves it paid until the period closes. So an "active" and
+    // a cancellation created in the same second left cancel_at_period_end at 0,
+    // and the dashboard went straight back to telling somebody who had just
+    // cancelled that their subscription renews. Which is the entire bug this
+    // change set exists to remove, re-entered through the ordering guard.
+    await handleStripeEvent(env, subscriptionEvent({ id: "evt_paid_tie", created: 7000, status: "active" }));
+    await handleStripeEvent(env, subscriptionEvent({
+      id: "evt_sched_cancel_tie",
+      created: 7000,
+      status: "active",
+      cancelAtPeriodEnd: true
+    }));
+
+    const subscription = await getSubscription(env, "clerk_1");
+    expect(subscription.status).toBe("active");
+    expect(subscription.active).toBe(true);
+    expect(subscription.cancel_at_period_end).toBe(true);
+  });
+
+  it("does not let a same-timestamp resume undo a stored cancellation", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db);
+
+    // The other direction. The new clause only lets a tie through when it is
+    // ADDING a cancellation, so a same-second "still active, not cancelling"
+    // cannot quietly clear one that is already recorded.
+    await handleStripeEvent(env, subscriptionEvent({
+      id: "evt_cancel_first",
+      created: 8000,
+      status: "active",
+      cancelAtPeriodEnd: true
+    }));
+    await handleStripeEvent(env, subscriptionEvent({
+      id: "evt_resume_tie",
+      created: 8000,
+      status: "active",
+      cancelAtPeriodEnd: false
+    }));
+
+    const subscription = await getSubscription(env, "clerk_1");
+    expect(subscription.cancel_at_period_end).toBe(true);
   });
 
   it("applies an event once and ignores the redelivery", async () => {

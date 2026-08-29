@@ -556,7 +556,9 @@ export async function upsertSubscription(
   // alone, so break it on status instead of arrival order: a non-paid
   // incoming status is allowed through (fail closed — prefer revoking access
   // on ambiguity), a paid incoming status is rejected (does not grant access
-  // on ambiguity). A first plain "or" on time was tried and rejected here:
+  // on ambiguity), and a paid incoming status that is newly CANCELLING is
+  // allowed through for the same reason the non-paid one is: it takes access
+  // away, just on a schedule. A first plain "or" on time was tried and rejected here:
   // unconditionally dropping every tie just moves the bug — a genuine
   // same-second cancellation arriving after a same-second "active" would
   // then itself be dropped, leaving the account wrongly active.
@@ -578,7 +580,20 @@ export async function upsertSubscription(
     where excluded.last_event_created is null
        or subscriptions.last_event_created is null
        or excluded.last_event_created > subscriptions.last_event_created
-       or (excluded.last_event_created = subscriptions.last_event_created and ? = 0)
+       or (
+            excluded.last_event_created = subscriptions.last_event_created
+            and (
+              ? = 0
+              -- Same rule, one rung down. The tie-break above prefers the event
+              -- that takes access away, and a scheduled cancellation is exactly
+              -- that even though its status is still paid: Stripe leaves the
+              -- status alone until the period closes. Without this clause an
+              -- "active" and a portal cancellation created in the same second
+              -- leave cancel_at_period_end at 0, and the dashboard goes back to
+              -- telling somebody who just cancelled that they renew.
+              or (excluded.cancel_at_period_end = 1 and subscriptions.cancel_at_period_end = 0)
+            )
+          )
   `,
     userId,
     subscriptionId,
