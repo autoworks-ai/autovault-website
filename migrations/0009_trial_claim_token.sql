@@ -1,0 +1,13 @@
+-- A per-claim identity, so releasing one cannot delete a different one.
+--
+-- The release path matches the claim it read, otherwise a request that reads a
+-- stale claim and deletes it can throw away a live claim made in between, which
+-- is a second trial handed out. Two earlier identities were tried and both
+-- collide: claimed_at repeats when two claims land inside the same millisecond,
+-- and SQLite reuses a rowid once the row it belonged to is deleted, which is
+-- exactly the delete-then-insert this path performs.
+--
+-- Nullable because rows written before this column existed have no token, and
+-- releaseTrialClaim refuses to act without one rather than falling back to a
+-- looser match.
+alter table trial_claims add column claim_token text;

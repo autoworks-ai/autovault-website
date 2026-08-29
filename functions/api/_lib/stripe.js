@@ -54,6 +54,10 @@ export function buildHostedVaultCheckoutParams({
   // The caller owns the eligibility question because it is the half with a
   // database; this function only refuses to offer what it was told not to.
   allowTrial = true,
+  // Stamped into the session's metadata when a trial is granted. Aborting our
+  // fetch does not stop Stripe finishing the create, so a session can exist
+  // that this side never saw the id of. This token is what finds it again.
+  claimToken = null,
 }) {
   if (!env.AUTOVAULT_HOSTED_PRICE_ID)
     throw new ApiError(503, "AUTOVAULT_HOSTED_PRICE_ID is not configured.");
@@ -101,6 +105,7 @@ export function buildHostedVaultCheckoutParams({
     // findOutstandingTrialSession reads this to recognise an offer that is
     // still open, which is what stops a second one being made.
     params.set("metadata[trial_days]", String(trialDays));
+    if (claimToken) params.set("metadata[claim_token]", claimToken);
   }
   params.set("submit_type", env.STRIPE_CHECKOUT_SUBMIT_TYPE || "subscribe");
   // Lets a customer type a Stripe promotion code on Checkout. Coupons without
@@ -117,7 +122,32 @@ export function buildHostedVaultCheckoutParams({
   return params;
 }
 
-export async function createCheckoutSession(env, params, fetcher = fetch) {
+// How long a trial-bearing session creation is allowed to take.
+//
+// Bound rather than advisory, and deliberately well under IN_FLIGHT_MS. A trial
+// claim is treated as still being worked on for that long, and a claim window
+// is only sound if it outlasts every request it covers: an owner still inside
+// this call when the window expires would have its claim released and a second
+// trial session created behind it. Cutting the call short makes the window an
+// upper bound instead of a guess. If Stripe created the session anyway before
+// the abort landed, the retry finds it under the account's one customer and
+// reuses it, which is what the stable customer id bought.
+export const CHECKOUT_CREATE_TIMEOUT_MS = 30_000;
+
+/**
+ * @param {Record<string, unknown>} env
+ * @param {URLSearchParams} params
+ * @param {typeof fetch} [fetcher]
+ * @param {AbortSignal | null} [signal]
+ * @param {string | null} [idempotencyKey]
+ */
+export async function createCheckoutSession(
+  env,
+  params,
+  fetcher = fetch,
+  signal = null,
+  idempotencyKey = null,
+) {
   if (!env.STRIPE_SECRET_KEY)
     throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
   const response = await fetcher(
@@ -128,16 +158,24 @@ export async function createCheckoutSession(env, params, fetcher = fetch) {
         authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
         "content-type": "application/x-www-form-urlencoded",
         "stripe-version": STRIPE_API_VERSION,
+        ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}),
       },
       body: params,
+      ...(signal ? { signal } : {}),
     },
   );
   const payload = await response.json();
-  if (!response.ok || !payload.url)
+  if (!response.ok)
     throw new ApiError(
       502,
       payload.error?.message || "Stripe Checkout Session creation failed.",
     );
+  // A fresh session always carries a url. A replay under an idempotency key
+  // does not: Stripe nulls url once a session is complete or expired, so
+  // demanding one here would turn every replay into a 502 and hide the status
+  // the caller has to act on.
+  if (!payload.url && !idempotencyKey)
+    throw new ApiError(502, "Stripe Checkout Session creation failed.");
   return payload;
 }
 
@@ -241,19 +279,73 @@ export async function resolveStripeCustomerId(
 ) {
   const known = await getStripeCustomerId(env, userId);
   if (known) return known;
-  if (!email) return null;
 
-  const existing = await stripeGet(env, `customers?email=${encodeURIComponent(email)}&limit=1`, fetcher);
-  const found = asId(existing.data?.[0]);
-  if (found) return found;
+  if (email) {
+    const existing = await stripeGet(env, `customers?email=${encodeURIComponent(email)}&limit=1`, fetcher);
+    const found = asId(existing.data?.[0]);
+    if (found) return found;
+  }
 
-  const created = await stripePost(
-    env,
-    "customers",
-    { email, "metadata[user_id]": userId },
-    fetcher,
-  );
-  return asId(created) || null;
+  // Last resort before creating, and only that. Customer search is eventually
+  // consistent: measured against real Stripe, a customer created seconds ago
+  // was still not indexed 24 seconds later. It finds an older customer whose
+  // email has since changed, which no other lookup here can, and it is not
+  // load-bearing for anything recent.
+  const byUser = await searchCustomerByUserId(env, userId, fetcher);
+  if (byUser) return byUser;
+
+  // Idempotent per user, which is load-bearing rather than tidy. Two first-time
+  // requests can reach here at the same moment and each create a customer, and
+  // from then on the two halves of this feature look at different ones: the
+  // winner's Checkout Session sits under one while a later email lookup
+  // resolves the other, so an open session goes unseen and a live trial claim
+  // reads as stale. One customer per account removes that divergence at the
+  // root. The body is stable per user, which is what makes an idempotency key
+  // safe here and not on the Checkout Session, whose params vary by source and
+  // origin.
+  const key = `av-customer-${userId}`;
+  // Email deliberately NOT in the keyed body. Stripe refuses a key reused with
+  // different parameters, so including a mutable field means somebody who edits
+  // their address inside the retention window is blocked from checking out, and
+  // once the key ages out they get the second customer this key exists to
+  // prevent. A body of nothing but the user id cannot vary, which is what makes
+  // the key a guarantee rather than a hope. The address is set immediately
+  // after, off the keyed path.
+  const body = { "metadata[user_id]": userId };
+  try {
+    const customerId = asId(await stripePost(env, "customers", body, fetcher, key));
+    if (customerId && email) await setCustomerEmail(env, customerId, email, fetcher);
+    return customerId || null;
+  } catch (error) {
+    // Verified against Stripe rather than assumed: two requests using one key at
+    // the same instant do NOT serialise. The second is refused with
+    // "another in-progress request using this Idempotent Key". That is the key
+    // doing its job, and it means the other request is creating the customer
+    // right now, so read it back rather than reporting a 502 at somebody
+    // trying to pay.
+    // Two shapes, one recovery. The in-progress refusal means another request
+    // is creating this customer right now. The changed-parameters refusal means
+    // the key was already spent on a create whose body differed, which happens
+    // when somebody edits their email inside the retention window. In both
+    // cases the customer either exists or is about to, so look rather than
+    // fail: the alternative is a 502 at somebody trying to pay, or worse, a
+    // second customer once the key ages out.
+    const recoverable =
+      /in-progress request using this Idempotent Key/i.test(error?.message ?? "") ||
+      /can only be used with the same parameters/i.test(error?.message ?? "");
+    if (!recoverable) throw error;
+    const raced =
+      (await searchCustomerByUserId(env, userId, fetcher)) ||
+      asId(
+        (await stripeGet(env, `customers?email=${encodeURIComponent(email)}&limit=1`, fetcher))
+          .data?.[0],
+      );
+    if (raced) return raced;
+    throw new ApiError(
+      503,
+      "Your checkout is already being set up. Try again in a moment."
+    );
+  }
 }
 
 // An unfinished Checkout Session for this customer that already carries a
@@ -265,7 +357,18 @@ export async function resolveStripeCustomerId(
 // nothing for it to find, so a first-time account could open several and each
 // one carried a trial. The session is the object that exists during exactly
 // that window, so the session is what has to be looked at.
-export async function findOutstandingTrialSession(env, customerId, fetcher = fetch) {
+/**
+ * @param {Record<string, unknown>} env
+ * @param {string | null} customerId
+ * @param {typeof fetch} [fetcher]
+ * @param {string | null} [claimToken]
+ */
+export async function findOutstandingTrialSession(
+  env,
+  customerId,
+  fetcher = fetch,
+  claimToken = null,
+) {
   if (!customerId) return null;
   const list = await stripeGet(
     env,
@@ -274,9 +377,42 @@ export async function findOutstandingTrialSession(env, customerId, fetcher = fet
   );
   return (
     (list.data ?? []).find(
-      (session) => Number(session.metadata?.trial_days) > 0 && session.url,
+      (session) =>
+        Number(session.metadata?.trial_days) > 0 &&
+        session.url &&
+        // With a token, only that claim's own session counts. This is how a
+        // session Stripe finished creating after our fetch was aborted is
+        // recognised as belonging to the claim that paid for it, rather than
+        // being missed and a second trial issued behind it.
+        (!claimToken || session.metadata?.claim_token === claimToken),
     ) || null
   );
+}
+
+// Best effort, and off the idempotent path on purpose. A customer with no email
+// still bills correctly and Checkout collects one anyway; a customer that could
+// not be created at all does not. Failing here must not fail the checkout.
+async function setCustomerEmail(env, customerId, email, fetcher = fetch) {
+  try {
+    await stripePost(env, `customers/${encodeURIComponent(customerId)}`, { email }, fetcher);
+  } catch {
+    // Left for the webhook and the next resolve to sort out.
+  }
+}
+
+// The stable handle for an account's Stripe customer. Written at creation and
+// never edited, unlike the email.
+async function searchCustomerByUserId(env, userId, fetcher = fetch) {
+  if (!userId) return null;
+  const query = encodeURIComponent(`metadata['user_id']:'${userId}'`);
+  try {
+    const found = await stripeGet(env, `customers/search?query=${query}&limit=1`, fetcher);
+    return asId(found.data?.[0]) || null;
+  } catch {
+    // Search is a convenience here, not the contract: the local row and the
+    // email lookup still answer, and a search outage must not stop checkout.
+    return null;
+  }
 }
 
 async function stripeGet(env, path, fetcher = fetch) {
@@ -295,7 +431,7 @@ async function stripeGet(env, path, fetcher = fetch) {
   return payload;
 }
 
-async function stripePost(env, path, body, fetcher = fetch) {
+async function stripePost(env, path, body, fetcher = fetch, idempotencyKey = null) {
   if (!env.STRIPE_SECRET_KEY)
     throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
   const response = await fetcher(`https://api.stripe.com/v1/${path}`, {
@@ -304,6 +440,7 @@ async function stripePost(env, path, body, fetcher = fetch) {
       authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
       "content-type": "application/x-www-form-urlencoded",
       "stripe-version": STRIPE_API_VERSION,
+      ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}),
     },
     body: new URLSearchParams(body).toString(),
   });
@@ -591,7 +728,20 @@ export async function upsertSubscription(
               -- "active" and a portal cancellation created in the same second
               -- leave cancel_at_period_end at 0, and the dashboard goes back to
               -- telling somebody who just cancelled that they renew.
-              or (excluded.cancel_at_period_end = 1 and subscriptions.cancel_at_period_end = 0)
+              --
+              -- The stored-status condition is not optional. Without it a
+              -- delayed paid event carrying cancel_at_period_end=1 could win a
+              -- tie against a stored canceled row, overwrite it with active,
+              -- and hand hosted access back to a subscription Stripe has
+              -- already ended: the precise resurrection the outer rule exists
+              -- to prevent, re-entered one rung down. A tie may add a scheduled
+              -- cancellation to a live subscription. It may never revive a dead
+              -- one.
+              or (
+                excluded.cancel_at_period_end = 1
+                and subscriptions.cancel_at_period_end = 0
+                and subscriptions.status in ('active', 'trialing')
+              )
             )
           )
   `,

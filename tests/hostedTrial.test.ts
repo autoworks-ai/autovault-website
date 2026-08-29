@@ -1,11 +1,25 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createSession } from "../functions/api/_lib/auth.js";
+import { onRequestPost as checkoutHostedVault } from "../functions/api/checkout/hosted-vault.js";
+import { createTestEnv, seedUser } from "./support/d1.js";
+import {
+  attachTrialSession,
+  claimTrial,
+  getTrialClaim,
+  IN_FLIGHT_MS,
+  isTrialClaimInFlight,
+  releaseTrialClaim,
+} from "../functions/api/_lib/trials.js";
 import { HOSTED_TRIAL_DAYS } from "../.vitepress/theme/data/product";
 import {
   buildHostedVaultCheckoutParams,
+  CHECKOUT_CREATE_TIMEOUT_MS,
+  createCheckoutSession,
   findOutstandingTrialSession,
   hasPriorStripeSubscription,
   hostedTrialDays,
+  resolveStripeCustomerId,
 } from "../functions/api/_lib/stripe.js";
 import { pageDocs } from "../.vitepress/shared/pageDocs";
 
@@ -93,6 +107,23 @@ describe("trial copy never outlives the trial", () => {
     text.replace(/\$\{[^}]*\}/g, "").replace(/\{\{[\s\S]*?\}\}/g, "");
 
   for (const surface of SOURCE) {
+    it(`${surface.name}: states that a trial exists, never how long or for whom`, () => {
+      if (HOSTED_TRIAL_DAYS === 0) return;
+
+      // The rule tightened. It used to be "interpolate the number, never type
+      // it", which stopped the copy going stale against wrangler.toml but not
+      // against reality: HOSTED_TRIAL_DAYS is fixed at build, and eligibility is
+      // decided per account at checkout, so a static page is blind to both. It
+      // may say a trial exists. /cloud reads the length and the eligibility at
+      // runtime and is one click away.
+      const rendersLength = /\{\{[^}]*HOSTED_TRIAL_DAYS[^}]*\}\}|\$\{[^}]*HOSTED_TRIAL_DAYS[^}]*\}/;
+      const printed = surface.text.match(rendersLength);
+      // `${HOSTED_TRIAL_DAYS > 0 ? ... : ...}` is a gate, not a print: it picks
+      // between two strings rather than putting the number in one.
+      const isGateOnly = printed ? /HOSTED_TRIAL_DAYS\s*[><=]/.test(printed[0]) : true;
+      expect(isGateOnly, `${surface.name} prints the trial length: ${printed?.[0]}`).toBe(true);
+    });
+
     it(`${surface.name}: writes the trial length as HOSTED_TRIAL_DAYS, never as a number`, () => {
       if (HOSTED_TRIAL_DAYS === 0) return;
       const hardcoded = new RegExp(`\\b${HOSTED_TRIAL_DAYS}[\\s-]?days?\\b`, "i");
@@ -303,6 +334,520 @@ describe("trial copy never outlives the trial", () => {
     expect(block).toContain("hasPriorStripeSubscription");
   });
 
+  it("lets exactly one of two overlapping requests claim the trial", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db);
+
+    // The atomic step. Everything else in the eligibility sequence is a
+    // check-then-act against Stripe, so two overlapping requests can both
+    // believe they are the first. D1's primary key is the only arbiter in the
+    // stack, and `on conflict do nothing ... returning` makes the answer
+    // unambiguous: a row back means this call won.
+    const [a, b] = await Promise.all([
+      claimTrial(env, "clerk_1", "cs_a"),
+      claimTrial(env, "clerk_1", "cs_b")
+    ]);
+    // The winner gets the token back, because the token has to reach the
+    // Checkout Session's metadata: it is the only durable link from a session
+    // Stripe finished creating after an abort back to the claim that paid.
+    expect([a, b].filter(Boolean)).toHaveLength(1);
+
+    // And it stays claimed for every later attempt.
+    expect(await claimTrial(env, "clerk_1", "cs_c")).toBeNull();
+
+    // Released only when the caller has established the offer lapsed, after
+    // which the account may try again.
+    const held = await getTrialClaim(env, "clerk_1");
+    expect(held).toBeTruthy();
+    await releaseTrialClaim(env, "clerk_1", held);
+    expect(await getTrialClaim(env, "clerk_1")).toBeNull();
+    expect(await claimTrial(env, "clerk_1", "cs_d")).toBeTruthy();
+  });
+
+  it("does not release a claim whose session is still being created", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db);
+
+    // The failure this guard exists for. Request A inserts its claim and pauses
+    // to create a Stripe session. Request B looks, finds no session in Stripe
+    // because A has not finished, and used to delete A's claim as stale, claim
+    // for itself, and hand out a second trial. The delete defeated the primary
+    // key it was there to respect.
+    await claimTrial(env, "clerk_1");
+    const inFlight = await getTrialClaim(env, "clerk_1");
+    expect(isTrialClaimInFlight(inFlight)).toBe(true);
+
+    // Once a session is attached it is no longer in flight: from then on its
+    // liveness is Stripe's answer about that session, not a clock.
+    await attachTrialSession(env, "clerk_1", "cs_open");
+    expect(isTrialClaimInFlight(await getTrialClaim(env, "clerk_1"))).toBe(false);
+  });
+
+  it("stops treating a claim as in flight once the window passes", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db);
+
+    // Otherwise a request that died between claiming and creating a session
+    // would block that account forever.
+    await claimTrial(env, "clerk_1");
+    const claim = await getTrialClaim(env, "clerk_1");
+    expect(isTrialClaimInFlight(claim, Date.parse(claim.claimed_at) + IN_FLIGHT_MS + 1)).toBe(false);
+  });
+
+  it("releases only the exact claim it looked at", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db);
+
+    await claimTrial(env, "clerk_1", "cs_old");
+    const stale = await getTrialClaim(env, "clerk_1");
+
+    // Somebody re-claims in the gap between the read and the delete.
+    await releaseTrialClaim(env, "clerk_1", stale);
+    await claimTrial(env, "clerk_1", "cs_new");
+
+    // Replaying the stale release must not throw the new claim away. An
+    // unconditional delete would, and so would one matched on claimed_at:
+    // these two claims are made inside the same millisecond and carry the same
+    // timestamp, which is why the identity is the rowid.
+    expect(stale.claim_token).not.toBe((await getTrialClaim(env, "clerk_1"))?.claim_token);
+    await releaseTrialClaim(env, "clerk_1", stale);
+    expect((await getTrialClaim(env, "clerk_1"))?.session_id).toBe("cs_new");
+  });
+
+  it("records which session a claim was spent on", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db);
+
+    // Without this a later request cannot tell a claim waiting on a live
+    // checkout from one whose checkout is gone, and would either strand the
+    // account or hand out a second trial.
+    await claimTrial(env, "clerk_1");
+    expect((await getTrialClaim(env, "clerk_1"))?.session_id).toBeNull();
+    await attachTrialSession(env, "clerk_1", "cs_real");
+    expect((await getTrialClaim(env, "clerk_1"))?.session_id).toBe("cs_real");
+  });
+
+  it("claims before building the session, and only when no trial was had", () => {
+    const route = readFileSync(
+      new URL("../functions/api/checkout/hosted-vault.js", import.meta.url),
+      "utf-8"
+    );
+
+    const claimAt = route.indexOf("await claimTrial(");
+    const buildAt = route.indexOf("buildHostedVaultCheckoutParams({");
+    expect(claimAt, "no claimTrial call").toBeGreaterThan(-1);
+    expect(claimAt, "the claim must precede the session").toBeLessThan(buildAt);
+
+    // Losing the race must not silently sell somebody a full-price
+    // subscription they did not ask for.
+    expect(route).toContain("A checkout session is already being created");
+    expect(route).toContain("await claimTrial(env, user.id)");
+    // A claim still being spent by another request is not a claim to take.
+    expect(route).toContain("isTrialClaimInFlight");
+    expect(route).toContain("if (claim && !inFlight)");
+
+    // And a claim is only released after asking Stripe about its OWN session by
+    // id. Inferring from the customer does not hold: two first-time requests
+    // can each create a Stripe customer, so the winner's session sits under one
+    // and a later email lookup resolves the other. The outstanding search then
+    // finds nothing and the release throws away a claim whose session is open
+    // under a customer this request never looked at.
+    const releaseAt = route.indexOf("releaseTrialClaim(env, user.id, claim)");
+    const verifyAt = route.indexOf("retrieveCheckoutSession(env, claim.session_id)");
+    expect(verifyAt, "no session verification").toBeGreaterThan(-1);
+    expect(verifyAt, "verify before releasing").toBeLessThan(releaseAt);
+    expect(route).toContain('recorded?.status === "open"');
+  });
+
+  it("creates at most one Stripe customer per account, even concurrently", async () => {
+    const calls: Array<{ path: string; key: string | null; method: string; body: string }> = [];
+    const fetcher = (async (url: URL | RequestInfo, init?: RequestInit) => {
+      const path = String(url).replace("https://api.stripe.com/v1/", "");
+      const headers = new Headers(init?.headers as HeadersInit);
+      calls.push({
+        path,
+        key: headers.get("idempotency-key"),
+        method: init?.method ?? "GET",
+        body: String(init?.body ?? "")
+      });
+      const body = path.startsWith("customers?") || path.startsWith("customers/search")
+        ? { data: [] }
+        : { id: "cus_new" };
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }) as typeof fetch;
+
+    const env = {
+      STRIPE_SECRET_KEY: "sk_test_x",
+      AUTOVAULT_DB: { prepare: () => ({ bind: () => ({ first: async () => null }) }) }
+    };
+    await resolveStripeCustomerId(env, { userId: "u_1", email: "a@b.test" }, fetcher);
+
+    // Two first-time requests reaching here at once used to create a customer
+    // each, and from then on the two halves of the trial machinery looked at
+    // different ones: the winner's session under one, a later email lookup
+    // resolving the other, so an open session went unseen and a live claim read
+    // as stale. The body is stable per user, which is what makes a key safe
+    // here and not on the Checkout Session, whose params vary by source.
+    const create = calls.find((c) => c.path === "customers" && c.method === "POST");
+    expect(create?.key).toBe("av-customer-u_1");
+
+    // The keyed body carries the user id and nothing else. Stripe refuses a key
+    // reused with different parameters, so a mutable field in here blocks
+    // checkout for anyone who edits their email inside the retention window and
+    // hands them a second customer once the key ages out. Verified against real
+    // Stripe: with a stable body, a resolve with a changed email returns the
+    // same customer.
+    expect(create?.body).toContain("metadata%5Buser_id%5D=u_1");
+    expect(create?.body).not.toContain("email");
+
+    // The address is set immediately after, off the keyed path, where failing
+    // costs an email rather than a checkout.
+    const update = calls.find((c) => c.path.startsWith("customers/cus_"));
+    expect(update?.key).toBeNull();
+    expect(update?.body).toContain("email=");
+  });
+
+  it("treats an in-progress idempotent create as the other request winning", async () => {
+    // Verified against Stripe rather than assumed: two requests using one key
+    // at the same instant do not serialise, the second is refused. That refusal
+    // means the other request is creating the customer right now, so it must
+    // not surface as a 502 at somebody trying to pay.
+    const fetcher = (async (url: URL | RequestInfo) => {
+      const path = String(url).replace("https://api.stripe.com/v1/", "");
+      if (path === "customers") {
+        return new Response(
+          JSON.stringify({
+            error: { message: "There is currently another in-progress request using this Idempotent Key: av-customer-u_1" }
+          }),
+          { status: 409, headers: { "content-type": "application/json" } }
+        );
+      }
+      return new Response(JSON.stringify({ data: [{ id: "cus_winner" }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }) as typeof fetch;
+
+    const env = {
+      STRIPE_SECRET_KEY: "sk_test_x",
+      AUTOVAULT_DB: { prepare: () => ({ bind: () => ({ first: async () => null }) }) }
+    };
+    await expect(
+      resolveStripeCustomerId(env, { userId: "u_1", email: "a@b.test" }, fetcher)
+    ).resolves.toBe("cus_winner");
+  });
+
+  it("releases a claim written before claim_token existed", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db);
+
+    // 0008 rows carry a null token. Refusing to release them strands the
+    // account rather than the claim: the release is a permanent no-op, the next
+    // claimTrial conflicts on user_id, and checkout answers 409 for that user
+    // forever. 0010 backfills them, and this stays for a database that has not
+    // run it yet.
+    db.prepare(
+      "insert into trial_claims (user_id, session_id, claimed_at, claim_token) values (?, ?, ?, null)"
+    ).run("clerk_1", "cs_legacy", new Date(0).toISOString());
+
+    const legacy = await getTrialClaim(env, "clerk_1");
+    expect(legacy?.claim_token).toBeNull();
+
+    await releaseTrialClaim(env, "clerk_1", legacy);
+    expect(await getTrialClaim(env, "clerk_1")).toBeNull();
+    // And the account is usable again rather than 409 forever.
+    expect(await claimTrial(env, "clerk_1", "cs_after")).toBeTruthy();
+  });
+
+  it("cannot outlive the claim window it is covered by", async () => {
+    // The window is a guess unless the call underneath it is bounded. An owner
+    // still inside createCheckoutSession when IN_FLIGHT_MS elapses would have
+    // its claim released and a second trial session created behind it, and then
+    // succeed. The abort makes the window an upper bound instead.
+    expect(CHECKOUT_CREATE_TIMEOUT_MS).toBeLessThan(IN_FLIGHT_MS);
+
+    const route = readFileSync(
+      new URL("../functions/api/checkout/hosted-vault.js", import.meta.url),
+      "utf-8"
+    );
+    expect(route).toContain("AbortSignal.timeout(CHECKOUT_CREATE_TIMEOUT_MS)");
+    // Bounded only where a claim is held. A full-price session has no window to
+    // stay inside and no reason to be cut short, so it goes out unsignalled.
+    expect(route).toContain("createTrialCheckout(env, params, user.id");
+    expect(route).toContain(": await createCheckoutSession(env, params);");
+
+    // And the signal actually reaches fetch rather than being accepted and
+    // dropped.
+    let sawSignal = false;
+    const fetcher = (async (_url: URL | RequestInfo, init?: RequestInit) => {
+      sawSignal = Boolean(init?.signal);
+      return new Response(JSON.stringify({ id: "cs_1", url: "https://checkout/x" }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }) as typeof fetch;
+    await createCheckoutSession(
+      { STRIPE_SECRET_KEY: "sk_test_x" },
+      new URLSearchParams({ mode: "subscription" }),
+      fetcher,
+      AbortSignal.timeout(1000)
+    );
+    expect(sawSignal).toBe(true);
+  });
+
+  it("finds a session Stripe finished creating after the abort", async () => {
+    // Aborting our fetch does not stop Stripe's server-side work, so a create
+    // that timed out can still produce a session this side never saw the id of.
+    // The claim token stamped into that session's metadata is the link back;
+    // without it the claim looks like it bought nothing and a second trial goes
+    // out behind it.
+    const orphan = {
+      id: "cs_orphan",
+      url: "https://checkout/orphan",
+      metadata: { trial_days: "14", claim_token: "tok_mine" }
+    };
+    const other = {
+      id: "cs_other",
+      url: "https://checkout/other",
+      metadata: { trial_days: "14", claim_token: "tok_someone_else" }
+    };
+    const fetcher = (async () =>
+      new Response(JSON.stringify({ data: [other, orphan] }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      })) as typeof fetch;
+    const env = { STRIPE_SECRET_KEY: "sk_test_x" };
+
+    await expect(
+      findOutstandingTrialSession(env, "cus_1", fetcher, "tok_mine")
+    ).resolves.toMatchObject({ id: "cs_orphan" });
+
+    // A token that matches nothing must not fall back to somebody else's
+    // session, which would hand this account a checkout it does not own.
+    await expect(
+      findOutstandingTrialSession(env, "cus_1", fetcher, "tok_absent")
+    ).resolves.toBeNull();
+
+    // Without a token the older behaviour stands: any open trial session.
+    await expect(
+      findOutstandingTrialSession(env, "cus_1", fetcher)
+    ).resolves.toBeTruthy();
+  });
+
+  it("makes a second trial checkout the same operation as the first", async () => {
+    // The claim-token recovery only finds a session that has already become
+    // listable. Stripe still processing an aborted POST has not produced one
+    // yet, so the retry sees nothing, releases the claim, takes a new one, and
+    // sends a second trial out behind the first. An idempotency key scoped to
+    // the ACCOUNT is what survives that window: a per-claim key would be a new
+    // key on the new claim, which is exactly the case that needs stopping.
+    let key: string | null = "unset";
+    const fetcher = (async (_url: URL | RequestInfo, init?: RequestInit) => {
+      key = new Headers(init?.headers).get("idempotency-key");
+      return new Response(JSON.stringify({ id: "cs_1", url: "https://checkout/x" }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }) as typeof fetch;
+    const env = { STRIPE_SECRET_KEY: "sk_test_x" };
+    const params = new URLSearchParams({ mode: "subscription" });
+
+    await createCheckoutSession(env, params, fetcher, null, "av-trial-checkout-clerk_1");
+    expect(key).toBe("av-trial-checkout-clerk_1");
+
+    // A full-price create carries none, so two deliberate purchases stay two.
+    await createCheckoutSession(env, params, fetcher);
+    expect(key).toBeNull();
+
+    // A replay under a key returns a spent session, which has no url. Demanding
+    // one would 502 before the caller could read the status it has to act on.
+    const replay = (async () =>
+      new Response(JSON.stringify({ id: "cs_old", status: "complete", url: null }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      })) as typeof fetch;
+    await expect(
+      createCheckoutSession(env, params, replay, null, "av-trial-checkout-clerk_1")
+    ).resolves.toMatchObject({ id: "cs_old", status: "complete" });
+    // Without a key a urlless session is still a failed create.
+    await expect(createCheckoutSession(env, params, replay)).rejects.toThrow();
+  });
+
+  describe("when Stripe refuses the account's checkout key", () => {
+    // Driven through the route rather than asserted against its source, because
+    // what matters is the row trial_claims is left holding. Both exits below
+    // happen after the claim is won and before attachTrialSession runs.
+    const runCheckout = async (stripe: (url: string, init: RequestInit) => unknown) => {
+      const { db, env } = createTestEnv({ AUTOVAULT_HOSTED_TRIAL_DAYS: "14" });
+      seedUser(db);
+      const fetcher = vi.fn(async (url: URL | RequestInfo, init?: RequestInit) => {
+        const body = stripe(String(url), init ?? {}) as { error?: unknown };
+        return new Response(JSON.stringify(body), {
+          status: body?.error ? 400 : 200,
+          headers: { "content-type": "application/json" }
+        });
+      });
+      vi.stubGlobal("fetch", fetcher);
+      const cookie = await createSession(
+        new Request("https://autovault.dev"),
+        env,
+        "clerk_1"
+      );
+      const response = await checkoutHostedVault({
+        request: new Request("https://autovault.dev/api/checkout/hosted-vault", {
+          method: "POST",
+          headers: { cookie, "content-type": "application/json" },
+          body: JSON.stringify({ source: "deploy" })
+        }),
+        env
+      });
+      const keys = fetcher.mock.calls
+        .filter(([url, init]) =>
+          (init as RequestInit | undefined)?.method === "POST" &&
+          String(url).endsWith("/v1/checkout/sessions"))
+        .map(([, init]) =>
+          new Headers((init as RequestInit | undefined)?.headers).get("idempotency-key"));
+      return { response, keys, claim: await getTrialClaim(env, "clerk_1") };
+    };
+
+    // Everything before the create: no customer, no prior subscription, no open
+    // session. The account is eligible and reaches the claim.
+    const eligible = (url: string) => {
+      if (url.includes("/v1/customers/search")) return { data: [] };
+      if (url.includes("/v1/customers/cus_1")) return { id: "cus_1" };
+      if (url.includes("/v1/customers")) return { data: [], id: "cus_1" };
+      if (url.includes("/v1/subscriptions")) return { data: [] };
+      return null;
+    };
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("recovers the session the refused key already made", async () => {
+      let listed = 0;
+      const { response, keys, claim } = await runCheckout((url, init) => {
+        if (init.method === "POST" && url.endsWith("/v1/checkout/sessions"))
+          return {
+            error: { message: "another in-progress request using this Idempotent Key" }
+          };
+        if (url.includes("/v1/checkout/sessions")) {
+          // Empty before the claim, populated after: the session Stripe made
+          // behind the aborted POST has become listable by the retry.
+          listed += 1;
+          return listed === 1
+            ? { data: [] }
+            : {
+                data: [
+                  {
+                    id: "cs_recovered",
+                    url: "https://checkout/recovered",
+                    status: "open",
+                    metadata: { trial_days: "14" }
+                  }
+                ]
+              };
+        }
+        return eligible(url);
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ id: "cs_recovered" });
+      // Scoped to the account, which is the whole point: a per-claim key would
+      // be a fresh key on the retry's fresh claim and collide with nothing.
+      expect(keys).toEqual(["av-trial-checkout-clerk_1"]);
+      // And the claim now names the session it was spent on, so a later request
+      // can tell it from one whose checkout is gone.
+      expect(claim?.session_id).toBe("cs_recovered");
+    });
+
+    it("frees the claim when there is nothing to recover", async () => {
+      const { response, claim } = await runCheckout((url, init) => {
+        if (init.method === "POST" && url.endsWith("/v1/checkout/sessions"))
+          return {
+            error: {
+              message:
+                "Keys for idempotent requests can only be used with the same parameters"
+            }
+          };
+        if (url.includes("/v1/checkout/sessions")) return { data: [] };
+        return eligible(url);
+      });
+
+      expect(response.status).toBe(409);
+      // The claim bought nothing, so holding it would lock an eligible account
+      // out for IN_FLIGHT_MS over a key collision it had no part in.
+      expect(claim).toBeNull();
+    });
+
+    it("records the session when the key replays a completed trial", async () => {
+      const { response, claim } = await runCheckout((url, init) => {
+        if (init.method === "POST" && url.endsWith("/v1/checkout/sessions"))
+          return { id: "cs_spent", status: "complete", url: null };
+        if (url.includes("/v1/checkout/sessions")) return { data: [] };
+        return eligible(url);
+      });
+
+      expect(response.status).toBe(409);
+      // Spent, and the claim says so rather than sitting session-less until it
+      // looks abandoned and frees a second trial.
+      expect(claim?.session_id).toBe("cs_spent");
+    });
+  });
+
+  it("treats a completed checkout as spent rather than stale", () => {
+    const route = readFileSync(
+      new URL("../functions/api/checkout/hosted-vault.js", import.meta.url),
+      "utf-8"
+    );
+
+    // status "complete" means the session was paid and a subscription exists,
+    // even if its webhook has not landed here yet. Releasing on it hands the
+    // same account a second trial off a checkout it already finished. Only
+    // "expired", or no record at all, frees a claim.
+    expect(route).toContain('recorded.status !== "expired"');
+    expect(route).toContain("already used its trial checkout");
+
+    // And the recovery runs before the release, not after it.
+    const orphanAt = route.indexOf("findOutstandingTrialSession(\n            env,");
+    const releaseAt = route.indexOf("releaseTrialClaim(env, user.id, claim)");
+    expect(orphanAt, "no orphan recovery").toBeGreaterThan(-1);
+    expect(orphanAt).toBeLessThan(releaseAt);
+  });
+
+  it("does not claim a trial that is not configured", () => {
+    const route = readFileSync(
+      new URL("../functions/api/checkout/hosted-vault.js", import.meta.url),
+      "utf-8"
+    );
+
+    // The claim arbitrates an offer. With no trial configured there is no
+    // offer, and claiming anyway records a full-price session as the one this
+    // account's trial was spent on: switch the trial on later and an eligible
+    // first-timer gets their own old non-trial checkout handed back through the
+    // reuse path.
+    expect(route).toContain("!hadTrialBefore && hostedTrialDays(env) > 0");
+  });
+
+  it("keeps the claim when Stripe cannot say whether its session is open", () => {
+    const route = readFileSync(
+      new URL("../functions/api/checkout/hosted-vault.js", import.meta.url),
+      "utf-8"
+    );
+
+    // `.catch(() => null)` read a 429 or a network blip as "the session is
+    // gone", released a claim whose session was very likely still open, and
+    // issued a second trial off the back of it. Only a positive answer releases
+    // a claim: a 404 means Stripe has no such session, anything else means
+    // Stripe did not answer.
+    expect(route).not.toContain("retrieveCheckoutSession(env, claim.session_id).catch");
+    expect(route).toContain("error?.status !== 404");
+    expect(route).toContain("Could not confirm your existing checkout with Stripe");
+  });
+
   it("reuses an outstanding trial session instead of issuing a second", () => {
     const route = readFileSync(
       new URL("../functions/api/checkout/hosted-vault.js", import.meta.url),
@@ -314,7 +859,8 @@ describe("trial copy never outlives the trial", () => {
     // completes. The open session is the only object alive in that window, so
     // it is what the second request has to find.
     expect(route).toContain("findOutstandingTrialSession");
-    const at = route.indexOf("if (!hadTrialBefore)");
+    // The condition gained the trial-configured gate, so match its stem.
+    const at = route.indexOf("if (!hadTrialBefore");
     expect(at, "no outstanding-session check").toBeGreaterThan(-1);
     const block = route.slice(at, route.indexOf("const params", at));
     expect(block).toContain("findOutstandingTrialSession");
