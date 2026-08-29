@@ -345,10 +345,13 @@ describe("trial copy never outlives the trial", () => {
       claimTrial(env, "clerk_1", "cs_a"),
       claimTrial(env, "clerk_1", "cs_b")
     ]);
+    // The winner gets the token back, because the token has to reach the
+    // Checkout Session's metadata: it is the only durable link from a session
+    // Stripe finished creating after an abort back to the claim that paid.
     expect([a, b].filter(Boolean)).toHaveLength(1);
 
     // And it stays claimed for every later attempt.
-    expect(await claimTrial(env, "clerk_1", "cs_c")).toBe(false);
+    expect(await claimTrial(env, "clerk_1", "cs_c")).toBeNull();
 
     // Released only when the caller has established the offer lapsed, after
     // which the account may try again.
@@ -356,7 +359,7 @@ describe("trial copy never outlives the trial", () => {
     expect(held).toBeTruthy();
     await releaseTrialClaim(env, "clerk_1", held);
     expect(await getTrialClaim(env, "clerk_1")).toBeNull();
-    expect(await claimTrial(env, "clerk_1", "cs_d")).toBe(true);
+    expect(await claimTrial(env, "clerk_1", "cs_d")).toBeTruthy();
   });
 
   it("does not release a claim whose session is still being created", async () => {
@@ -554,7 +557,7 @@ describe("trial copy never outlives the trial", () => {
     await releaseTrialClaim(env, "clerk_1", legacy);
     expect(await getTrialClaim(env, "clerk_1")).toBeNull();
     // And the account is usable again rather than 409 forever.
-    expect(await claimTrial(env, "clerk_1", "cs_after")).toBe(true);
+    expect(await claimTrial(env, "clerk_1", "cs_after")).toBeTruthy();
   });
 
   it("cannot outlive the claim window it is covered by", async () => {
@@ -590,6 +593,65 @@ describe("trial copy never outlives the trial", () => {
       AbortSignal.timeout(1000)
     );
     expect(sawSignal).toBe(true);
+  });
+
+  it("finds a session Stripe finished creating after the abort", async () => {
+    // Aborting our fetch does not stop Stripe's server-side work, so a create
+    // that timed out can still produce a session this side never saw the id of.
+    // The claim token stamped into that session's metadata is the link back;
+    // without it the claim looks like it bought nothing and a second trial goes
+    // out behind it.
+    const orphan = {
+      id: "cs_orphan",
+      url: "https://checkout/orphan",
+      metadata: { trial_days: "14", claim_token: "tok_mine" }
+    };
+    const other = {
+      id: "cs_other",
+      url: "https://checkout/other",
+      metadata: { trial_days: "14", claim_token: "tok_someone_else" }
+    };
+    const fetcher = (async () =>
+      new Response(JSON.stringify({ data: [other, orphan] }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      })) as typeof fetch;
+    const env = { STRIPE_SECRET_KEY: "sk_test_x" };
+
+    await expect(
+      findOutstandingTrialSession(env, "cus_1", fetcher, "tok_mine")
+    ).resolves.toMatchObject({ id: "cs_orphan" });
+
+    // A token that matches nothing must not fall back to somebody else's
+    // session, which would hand this account a checkout it does not own.
+    await expect(
+      findOutstandingTrialSession(env, "cus_1", fetcher, "tok_absent")
+    ).resolves.toBeNull();
+
+    // Without a token the older behaviour stands: any open trial session.
+    await expect(
+      findOutstandingTrialSession(env, "cus_1", fetcher)
+    ).resolves.toBeTruthy();
+  });
+
+  it("treats a completed checkout as spent rather than stale", () => {
+    const route = readFileSync(
+      new URL("../functions/api/checkout/hosted-vault.js", import.meta.url),
+      "utf-8"
+    );
+
+    // status "complete" means the session was paid and a subscription exists,
+    // even if its webhook has not landed here yet. Releasing on it hands the
+    // same account a second trial off a checkout it already finished. Only
+    // "expired", or no record at all, frees a claim.
+    expect(route).toContain('recorded.status !== "expired"');
+    expect(route).toContain("already used its trial checkout");
+
+    // And the recovery runs before the release, not after it.
+    const orphanAt = route.indexOf("findOutstandingTrialSession(\n            env,");
+    const releaseAt = route.indexOf("releaseTrialClaim(env, user.id, claim)");
+    expect(orphanAt, "no orphan recovery").toBeGreaterThan(-1);
+    expect(orphanAt).toBeLessThan(releaseAt);
   });
 
   it("does not claim a trial that is not configured", () => {

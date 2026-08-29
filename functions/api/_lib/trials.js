@@ -11,13 +11,19 @@ import { first, nowIso, run } from "./db.js";
 // The primary key on trial_claims is the arbiter. `on conflict do nothing` plus
 // `returning` makes the answer unambiguous: a row back means this call won.
 
-// True when this call is the one that claimed the trial.
+// The claim token when this call is the one that claimed the trial, else null.
+//
+// Returns the token rather than a boolean because the token has to reach the
+// Checkout Session: stamped into its metadata, it is the only durable link back
+// to the claim that paid for it. Without that link an aborted create leaves a
+// session Stripe made and this side never saw.
 /**
  * @param {Record<string, unknown>} env
  * @param {string} userId
  * @param {string | null} [sessionId]
  */
 export async function claimTrial(env, userId, sessionId = null) {
+  const token = crypto.randomUUID();
   const row = await first(
     env,
     `insert into trial_claims (user_id, session_id, claimed_at, claim_token)
@@ -27,9 +33,9 @@ export async function claimTrial(env, userId, sessionId = null) {
     userId,
     sessionId,
     nowIso(),
-    crypto.randomUUID(),
+    token,
   );
-  return Boolean(row);
+  return row ? token : null;
 }
 
 export async function getTrialClaim(env, userId) {

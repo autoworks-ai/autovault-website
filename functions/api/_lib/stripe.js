@@ -54,6 +54,10 @@ export function buildHostedVaultCheckoutParams({
   // The caller owns the eligibility question because it is the half with a
   // database; this function only refuses to offer what it was told not to.
   allowTrial = true,
+  // Stamped into the session's metadata when a trial is granted. Aborting our
+  // fetch does not stop Stripe finishing the create, so a session can exist
+  // that this side never saw the id of. This token is what finds it again.
+  claimToken = null,
 }) {
   if (!env.AUTOVAULT_HOSTED_PRICE_ID)
     throw new ApiError(503, "AUTOVAULT_HOSTED_PRICE_ID is not configured.");
@@ -101,6 +105,7 @@ export function buildHostedVaultCheckoutParams({
     // findOutstandingTrialSession reads this to recognise an offer that is
     // still open, which is what stops a second one being made.
     params.set("metadata[trial_days]", String(trialDays));
+    if (claimToken) params.set("metadata[claim_token]", claimToken);
   }
   params.set("submit_type", env.STRIPE_CHECKOUT_SUBMIT_TYPE || "subscribe");
   // Lets a customer type a Stripe promotion code on Checkout. Coupons without
@@ -338,7 +343,18 @@ export async function resolveStripeCustomerId(
 // nothing for it to find, so a first-time account could open several and each
 // one carried a trial. The session is the object that exists during exactly
 // that window, so the session is what has to be looked at.
-export async function findOutstandingTrialSession(env, customerId, fetcher = fetch) {
+/**
+ * @param {Record<string, unknown>} env
+ * @param {string | null} customerId
+ * @param {typeof fetch} [fetcher]
+ * @param {string | null} [claimToken]
+ */
+export async function findOutstandingTrialSession(
+  env,
+  customerId,
+  fetcher = fetch,
+  claimToken = null,
+) {
   if (!customerId) return null;
   const list = await stripeGet(
     env,
@@ -347,7 +363,14 @@ export async function findOutstandingTrialSession(env, customerId, fetcher = fet
   );
   return (
     (list.data ?? []).find(
-      (session) => Number(session.metadata?.trial_days) > 0 && session.url,
+      (session) =>
+        Number(session.metadata?.trial_days) > 0 &&
+        session.url &&
+        // With a token, only that claim's own session counts. This is how a
+        // session Stripe finished creating after our fetch was aborted is
+        // recognised as belonging to the claim that paid for it, rather than
+        // being missed and a second trial issued behind it.
+        (!claimToken || session.metadata?.claim_token === claimToken),
     ) || null
   );
 }

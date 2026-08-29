@@ -78,6 +78,7 @@ export async function onRequestPost({ request, env }) {
     // already have is both the fix and the better behaviour: a second session
     // would strand the first, and Stripe keeps them open for 24 hours.
     let allowTrial = false;
+    let claimToken = null;
 
     // No trial configured means no claim. The claim exists to arbitrate an
     // offer, and there is no offer: claiming anyway records a full-price
@@ -109,6 +110,24 @@ export async function onRequestPost({ request, env }) {
       // customer this request never looked at. A session id is unambiguous
       // where a customer id is a guess.
       if (claim && !inFlight) {
+        // A claim whose create was aborted has no session id here, and Stripe
+        // may have finished making the session anyway: aborting our fetch does
+        // not stop its server-side work. The token stamped into that session's
+        // metadata is the link back, so look for it before deciding the claim
+        // bought nothing.
+        if (!claim.session_id && claim.claim_token) {
+          const orphan = await findOutstandingTrialSession(
+            env,
+            customerId,
+            fetch,
+            claim.claim_token
+          );
+          if (orphan) {
+            await attachTrialSession(env, user.id, orphan.id);
+            return json({ url: orphan.url, id: orphan.id, reused: true });
+          }
+        }
+
         let recorded = null;
         if (claim.session_id) {
           try {
@@ -131,6 +150,17 @@ export async function onRequestPost({ request, env }) {
         if (recorded?.status === "open" && recorded.url) {
           return json({ url: recorded.url, id: recorded.id, reused: true });
         }
+        // "complete" is spent, not stale. The session was paid, so a
+        // subscription exists even if its webhook has not landed here yet, and
+        // releasing on it hands the same account a second trial off a checkout
+        // it already finished. Only a session Stripe positively says is expired,
+        // or has no record of, frees the claim.
+        if (recorded && recorded.status !== "expired") {
+          throw new ApiError(
+            409,
+            "This account has already used its trial checkout. Reload the page to carry on."
+          );
+        }
         // Released against this exact claim, so a claim made since is never
         // thrown away.
         await releaseTrialClaim(env, user.id, claim);
@@ -140,7 +170,8 @@ export async function onRequestPost({ request, env }) {
       // above is a check-then-act against Stripe, so two overlapping requests
       // could both reach here believing they are the first. Exactly one of them
       // wins the insert.
-      allowTrial = inFlight ? false : await claimTrial(env, user.id);
+      claimToken = inFlight ? null : await claimTrial(env, user.id);
+      allowTrial = Boolean(claimToken);
 
       if (!allowTrial) {
         // Lost the race by milliseconds. The winner may not have created its
@@ -161,7 +192,8 @@ export async function onRequestPost({ request, env }) {
       user,
       customerId,
       source: body.source === "playground" ? "playground" : "deploy",
-      allowTrial
+      allowTrial,
+      claimToken
     });
     // Bounded only on the trial path, because only that path holds a claim
     // whose window has to outlast this call. Aborting loses a session Stripe
