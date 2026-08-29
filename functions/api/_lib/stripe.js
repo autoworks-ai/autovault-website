@@ -591,7 +591,20 @@ export async function upsertSubscription(
               -- "active" and a portal cancellation created in the same second
               -- leave cancel_at_period_end at 0, and the dashboard goes back to
               -- telling somebody who just cancelled that they renew.
-              or (excluded.cancel_at_period_end = 1 and subscriptions.cancel_at_period_end = 0)
+              --
+              -- The stored-status condition is not optional. Without it a
+              -- delayed paid event carrying cancel_at_period_end=1 could win a
+              -- tie against a stored canceled row, overwrite it with active,
+              -- and hand hosted access back to a subscription Stripe has
+              -- already ended: the precise resurrection the outer rule exists
+              -- to prevent, re-entered one rung down. A tie may add a scheduled
+              -- cancellation to a live subscription. It may never revive a dead
+              -- one.
+              or (
+                excluded.cancel_at_period_end = 1
+                and subscriptions.cancel_at_period_end = 0
+                and subscriptions.status in ('active', 'trialing')
+              )
             )
           )
   `,

@@ -5,7 +5,8 @@ import {
   createCheckoutSession,
   findOutstandingTrialSession,
   hasPriorStripeSubscription,
-  resolveStripeCustomerId
+  resolveStripeCustomerId,
+  retrieveCheckoutSession
 } from "../_lib/stripe.js";
 import {
   attachTrialSession,
@@ -90,12 +91,27 @@ export async function onRequestPost({ request, env }) {
       const claim = await getTrialClaim(env, user.id);
       const inFlight = isTrialClaimInFlight(claim);
 
-      // Only past that. Stripe has no subscription and no open session carrying
-      // a trial, and the claim on record names a session that is therefore gone
-      // (or never appeared inside the in-flight window). That offer lapsed
-      // rather than being used, so the account gets to try again. Released
-      // against this exact claim, so a claim made since is never thrown away.
-      if (claim && !inFlight) await releaseTrialClaim(env, user.id, claim);
+      // Only past that, and only after asking Stripe about the claim's own
+      // session by id rather than inferring from the customer.
+      //
+      // The inference does not hold. Two first-time requests can both find no
+      // Stripe customer and each create one, so the winner's session sits under
+      // cus_A while a later `customers?email=` lookup resolves cus_B. The
+      // outstanding-session search then finds nothing, and releasing on that
+      // basis throws away a claim whose session is open the whole time, under a
+      // customer this request never looked at. A session id is unambiguous
+      // where a customer id is a guess.
+      if (claim && !inFlight) {
+        const recorded = claim.session_id
+          ? await retrieveCheckoutSession(env, claim.session_id).catch(() => null)
+          : null;
+        if (recorded?.status === "open" && recorded.url) {
+          return json({ url: recorded.url, id: recorded.id, reused: true });
+        }
+        // Released against this exact claim, so a claim made since is never
+        // thrown away.
+        await releaseTrialClaim(env, user.id, claim);
+      }
 
       // The atomic step, and the only one in this sequence that is. Everything
       // above is a check-then-act against Stripe, so two overlapping requests

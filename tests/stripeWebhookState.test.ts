@@ -183,6 +183,35 @@ describe("Stripe webhook state handling", () => {
     expect(subscription.cancel_at_period_end).toBe(true);
   });
 
+  it("does not let a same-timestamp scheduled cancellation revive a dead subscription", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db);
+
+    // The cancellation tie-break must not become a resurrection route. A
+    // terminal event lands first; a delayed paid event created in the same
+    // second carries cancel_at_period_end. Letting that through because the
+    // flag changes 0 to 1 would overwrite `canceled` with `active`, and
+    // isPaidStatus would hand hosted access back to a subscription Stripe has
+    // already ended. A tie may ADD a scheduled cancellation to a live
+    // subscription; it may never revive a dead one.
+    await handleStripeEvent(env, subscriptionEvent({
+      id: "evt_dead_first",
+      type: "customer.subscription.deleted",
+      created: 9000,
+      status: "canceled"
+    }));
+    await handleStripeEvent(env, subscriptionEvent({
+      id: "evt_late_sched_cancel",
+      created: 9000,
+      status: "active",
+      cancelAtPeriodEnd: true
+    }));
+
+    const subscription = await getSubscription(env, "clerk_1");
+    expect(subscription.status).toBe("canceled");
+    expect(subscription.active).toBe(false);
+  });
+
   it("applies an event once and ignores the redelivery", async () => {
     const { db, env } = createTestEnv();
     seedUser(db);

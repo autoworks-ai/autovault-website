@@ -437,6 +437,18 @@ describe("trial copy never outlives the trial", () => {
     // A claim still being spent by another request is not a claim to take.
     expect(route).toContain("isTrialClaimInFlight");
     expect(route).toContain("if (claim && !inFlight)");
+
+    // And a claim is only released after asking Stripe about its OWN session by
+    // id. Inferring from the customer does not hold: two first-time requests
+    // can each create a Stripe customer, so the winner's session sits under one
+    // and a later email lookup resolves the other. The outstanding search then
+    // finds nothing and the release throws away a claim whose session is open
+    // under a customer this request never looked at.
+    const releaseAt = route.indexOf("releaseTrialClaim(env, user.id, claim)");
+    const verifyAt = route.indexOf("retrieveCheckoutSession(env, claim.session_id)");
+    expect(verifyAt, "no session verification").toBeGreaterThan(-1);
+    expect(verifyAt, "verify before releasing").toBeLessThan(releaseAt);
+    expect(route).toContain('recorded?.status === "open"');
   });
 
   it("reuses an outstanding trial session instead of issuing a second", () => {
