@@ -1873,9 +1873,15 @@ const renewalLabel = computed(() => {
   // could distinguish it from one about to renew. A neutral label was accurate
   // either way, and useless to the person who most needed it.
   if (cancelling.value) return `Access ends ${formatted}`;
-  return subscriptionState.value.tone === "bad"
-    ? `Ends ${formatted}`
-    : `Renews ${formatted}`;
+  if (subscriptionState.value.tone === "bad") return `Ends ${formatted}`;
+  // "Renews" is only for a subscription that is actually going to. past_due,
+  // incomplete and paused are all tone "warn" and all not renewing: the same
+  // component sends every one of them to the billing portal rather than to
+  // Checkout, because Stripe still holds them and they need fixing, not
+  // starting. Promoting the old neutral label to "Renews" swept them up, so
+  // they keep the neutral one.
+  if (subscriptionState.value.tone !== "ok") return `Current period ends ${formatted}`;
+  return `Renews ${formatted}`;
 });
 
 const vaultSlug = computed(() => vault.value?.slug ?? "your-vault");

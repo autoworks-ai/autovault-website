@@ -61,6 +61,15 @@ describe("cloud dashboard stage machine", () => {
     expect(cancelAt, "no cancelling branch").toBeGreaterThan(-1);
     expect(cancelAt, "cancelling must be checked before Renews").toBeLessThan(renewsAt);
     expect(body).toContain("`Access ends ${formatted}`");
+
+    // And "Renews" is reachable only from a healthy subscription. past_due,
+    // incomplete and paused are tone "warn" and none of them is renewing; the
+    // same component routes all three to the billing portal rather than to
+    // Checkout. They keep the neutral label the whole thing used to use.
+    const warnAt = body.indexOf('subscriptionState.value.tone !== "ok"');
+    expect(warnAt, "no non-ok branch").toBeGreaterThan(-1);
+    expect(warnAt, "non-ok must be checked before Renews").toBeLessThan(renewsAt);
+    expect(body).toContain("`Current period ends ${formatted}`");
   });
 
   it("says a cancellation happened rather than leaving the screen unchanged", () => {
