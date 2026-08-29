@@ -1,5 +1,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { createTestEnv, seedUser } from "./support/d1.js";
+import {
+  attachTrialSession,
+  claimTrial,
+  getTrialClaim,
+  releaseTrialClaim,
+} from "../functions/api/_lib/trials.js";
 import { HOSTED_TRIAL_DAYS } from "../.vitepress/theme/data/product";
 import {
   buildHostedVaultCheckoutParams,
@@ -93,6 +100,23 @@ describe("trial copy never outlives the trial", () => {
     text.replace(/\$\{[^}]*\}/g, "").replace(/\{\{[\s\S]*?\}\}/g, "");
 
   for (const surface of SOURCE) {
+    it(`${surface.name}: states that a trial exists, never how long or for whom`, () => {
+      if (HOSTED_TRIAL_DAYS === 0) return;
+
+      // The rule tightened. It used to be "interpolate the number, never type
+      // it", which stopped the copy going stale against wrangler.toml but not
+      // against reality: HOSTED_TRIAL_DAYS is fixed at build, and eligibility is
+      // decided per account at checkout, so a static page is blind to both. It
+      // may say a trial exists. /cloud reads the length and the eligibility at
+      // runtime and is one click away.
+      const rendersLength = /\{\{[^}]*HOSTED_TRIAL_DAYS[^}]*\}\}|\$\{[^}]*HOSTED_TRIAL_DAYS[^}]*\}/;
+      const printed = surface.text.match(rendersLength);
+      // `${HOSTED_TRIAL_DAYS > 0 ? ... : ...}` is a gate, not a print: it picks
+      // between two strings rather than putting the number in one.
+      const isGateOnly = printed ? /HOSTED_TRIAL_DAYS\s*[><=]/.test(printed[0]) : true;
+      expect(isGateOnly, `${surface.name} prints the trial length: ${printed?.[0]}`).toBe(true);
+    });
+
     it(`${surface.name}: writes the trial length as HOSTED_TRIAL_DAYS, never as a number`, () => {
       if (HOSTED_TRIAL_DAYS === 0) return;
       const hardcoded = new RegExp(`\\b${HOSTED_TRIAL_DAYS}[\\s-]?days?\\b`, "i");
@@ -301,6 +325,62 @@ describe("trial copy never outlives the trial", () => {
     const block = route.slice(at, route.indexOf("};", at));
     expect(block).toContain("subscription?.status");
     expect(block).toContain("hasPriorStripeSubscription");
+  });
+
+  it("lets exactly one of two overlapping requests claim the trial", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db);
+
+    // The atomic step. Everything else in the eligibility sequence is a
+    // check-then-act against Stripe, so two overlapping requests can both
+    // believe they are the first. D1's primary key is the only arbiter in the
+    // stack, and `on conflict do nothing ... returning` makes the answer
+    // unambiguous: a row back means this call won.
+    const [a, b] = await Promise.all([
+      claimTrial(env, "clerk_1", "cs_a"),
+      claimTrial(env, "clerk_1", "cs_b")
+    ]);
+    expect([a, b].filter(Boolean)).toHaveLength(1);
+
+    // And it stays claimed for every later attempt.
+    expect(await claimTrial(env, "clerk_1", "cs_c")).toBe(false);
+
+    // Released only when the caller has established the offer lapsed, after
+    // which the account may try again.
+    expect(await getTrialClaim(env, "clerk_1")).toBeTruthy();
+    await releaseTrialClaim(env, "clerk_1");
+    expect(await getTrialClaim(env, "clerk_1")).toBeNull();
+    expect(await claimTrial(env, "clerk_1", "cs_d")).toBe(true);
+  });
+
+  it("records which session a claim was spent on", async () => {
+    const { db, env } = createTestEnv();
+    seedUser(db);
+
+    // Without this a later request cannot tell a claim waiting on a live
+    // checkout from one whose checkout is gone, and would either strand the
+    // account or hand out a second trial.
+    await claimTrial(env, "clerk_1");
+    expect((await getTrialClaim(env, "clerk_1"))?.session_id).toBeNull();
+    await attachTrialSession(env, "clerk_1", "cs_real");
+    expect((await getTrialClaim(env, "clerk_1"))?.session_id).toBe("cs_real");
+  });
+
+  it("claims before building the session, and only when no trial was had", () => {
+    const route = readFileSync(
+      new URL("../functions/api/checkout/hosted-vault.js", import.meta.url),
+      "utf-8"
+    );
+
+    const claimAt = route.indexOf("await claimTrial(");
+    const buildAt = route.indexOf("buildHostedVaultCheckoutParams({");
+    expect(claimAt, "no claimTrial call").toBeGreaterThan(-1);
+    expect(claimAt, "the claim must precede the session").toBeLessThan(buildAt);
+
+    // Losing the race must not silently sell somebody a full-price
+    // subscription they did not ask for.
+    expect(route).toContain("A checkout session is already being created");
+    expect(route).toContain("allowTrial = await claimTrial");
   });
 
   it("reuses an outstanding trial session instead of issuing a second", () => {

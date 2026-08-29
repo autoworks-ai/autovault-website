@@ -34,13 +34,17 @@ import { HOSTED_TRIAL_DAYS } from '../data/product'
             <div class="route-body">
               <div class="route-title">Hosted at autovault.dev <span class="route-tag">private beta</span></div>
               <div class="route-desc">For teams who'd rather not run a server. Pair a machine with a code, admit it from the browser, and it pulls signed skills over HTTPS. Same engine, same gate. Publishing a catalog is still hands-on in private beta.</div>
-              <!-- The number is interpolated, never typed: HOSTED_TRIAL_DAYS
-                   is pinned to the Cloudflare var that Checkout reads, so this
-                   line cannot outlive the trial it advertises. See
-                   tests/hostedTrial.test.ts. -->
+              <!-- No day count, and no promise this page can keep.
+                   HOSTED_TRIAL_DAYS is a build-time constant, so it can only be
+                   as current as the last deploy, and eligibility is decided per
+                   account at checkout: a returning subscriber gets no trial at
+                   all. A static page knows neither. It says a trial exists and
+                   sends people to the one surface that reads both at runtime.
+                   The constant still gates whether the offer is mentioned,
+                   which is the one thing a build CAN know. -->
               <div v-if="HOSTED_TRIAL_DAYS > 0" class="route-cta">
-                <a class="route-btn" :href="clerkBrand.cloudPath">Try it free for {{ HOSTED_TRIAL_DAYS }} days</a>
-                <span class="route-fine">No card up front. <a href="/hosted-sync">How hosted sync works</a></span>
+                <a class="route-btn" :href="clerkBrand.cloudPath">Start a free trial</a>
+                <span class="route-fine">First-time accounts, no card up front. Terms on the <a :href="clerkBrand.cloudPath">Cloud page</a>. <a href="/hosted-sync">How hosted sync works</a></span>
               </div>
               <div v-else class="route-cta">
                 <a class="route-btn" :href="clerkBrand.cloudPath">See pricing</a>

@@ -290,6 +290,7 @@ function stubStripeSession(session: Record<string, unknown>) {
 }
 
 function createPagesEnv({ subscriptionStatus }: { subscriptionStatus: string | null }) {
+  const trialClaims = new Set<string>();
   const state = {
     users: new Map<string, { id: string; email: string; name: string; avatar_url: string | null; provider: string }>([
       ["github_1", { id: "github_1", email: "jack@example.com", name: "Jack", avatar_url: null, provider: "github" }],
@@ -312,12 +313,27 @@ function createPagesEnv({ subscriptionStatus }: { subscriptionStatus: string | n
     STRIPE_WEBHOOK_SECRET: "whsec_test",
     AUTOVAULT_HOSTED_PRICE_ID: "price_hosted_vault",
     AUTOVAULT_VAULT_OBJECTS: { async put() {} },
+    // Per-env, so each test starts eligible.
     AUTOVAULT_DB: {
       prepare(sql: string) {
         return {
           bind(...binds: unknown[]) {
             return {
               async first() {
+                // The trial claim is an insert-with-returning, so it answers
+                // through first(): a row back means this call won the claim.
+                // Modelled here because the route now asks D1 to arbitrate
+                // eligibility, and a stub that always answers null would report
+                // every caller as having lost.
+                if (sql.includes("trial_claims")) {
+                  const userId = String(binds[0]);
+                  if (sql.includes("insert into trial_claims")) {
+                    if (trialClaims.has(userId)) return null;
+                    trialClaims.add(userId);
+                    return { user_id: userId };
+                  }
+                  return trialClaims.has(userId) ? { user_id: userId, session_id: null } : null;
+                }
                 if (sql.includes("from sessions")) {
                   const userId = state.sessions.get(String(binds[0]));
                   return userId ? state.users.get(userId) : null;

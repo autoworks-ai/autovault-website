@@ -12,15 +12,16 @@
         <span class="pill">Ed25519</span>
         <span class="pill">revoke</span>
       </div>
-      <!-- Interpolated, never typed. HOSTED_TRIAL_DAYS is pinned to the
-           Cloudflare var Checkout reads, so this cannot advertise a trial that
-           has been switched off. -->
+      <!-- Says a trial exists, never how long. The length is a build-time
+           constant and eligibility is decided per account at checkout, so a
+           static page can be stale about the first and is blind to the second.
+           /cloud reads both at runtime and is one click away. -->
       <div class="hs-cta">
         <a class="hs-btn" :href="clerkBrand.cloudPath">
-          {{ HOSTED_TRIAL_DAYS > 0 ? `Try it free for ${HOSTED_TRIAL_DAYS} days` : "See pricing" }}
+          {{ HOSTED_TRIAL_DAYS > 0 ? "Start a free trial" : "See pricing" }}
         </a>
         <span class="hs-cta-fine">
-          <template v-if="HOSTED_TRIAL_DAYS > 0">No card up front. </template>Or
+          <template v-if="HOSTED_TRIAL_DAYS > 0">First-time accounts, no card up front. </template>Or
           <a href="#self-hosting">host the catalog yourself</a>, which costs nothing
           and speaks the same protocol.
         </span>

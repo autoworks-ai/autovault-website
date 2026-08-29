@@ -176,7 +176,7 @@ Cloud never holds a release signing key. Signing stays on your machine.
 
 One hosted namespace, unlimited machines, billed monthly. The live figure is served from Stripe at /api/pricing rather than written into this page, so treat that endpoint as authoritative.
 
-${HOSTED_TRIAL_DAYS > 0 ? `A ${HOSTED_TRIAL_DAYS} day free trial is currently configured, and no card is collected while it runs. Stripe Checkout reads the same setting this sentence does, so the trial offered is the trial granted.` : "No free trial is configured right now."}
+${HOSTED_TRIAL_DAYS > 0 ? "A free trial is currently offered to first-time accounts, and no card is collected while it runs. This page is generated at build time and cannot state the length or your eligibility: both are decided at checkout, and /api/pricing reports the current length at runtime." : "No free trial is configured right now."}
 
 Cancel any time from the Stripe billing portal. Revoking a machine keeps working after a subscription lapses, so a closed account can still remove a machine it no longer controls.
 
