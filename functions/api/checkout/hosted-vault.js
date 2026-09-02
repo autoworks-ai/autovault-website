@@ -21,72 +21,6 @@ import { getSubscription } from "../_lib/vault.js";
 
 // Creates the one trial checkout an account may have open, recovering rather
 // than duplicating when Stripe says the key has already been spent.
-// Both throws below happen after the claim was won and before
-// attachTrialSession runs downstream, so each one has to leave trial_claims in
-// a state the next request can read correctly. A bare throw leaves a claim with
-// no session on it, which reads as in-flight for IN_FLIGHT_MS and 409s an
-// account that may be perfectly eligible.
-async function createTrialCheckout(env, params, userId, claimToken, customerId) {
-  const signal = AbortSignal.timeout(CHECKOUT_CREATE_TIMEOUT_MS);
-  try {
-    const session = await createCheckoutSession(
-      env,
-      params,
-      fetch,
-      signal,
-      `av-trial-checkout-${userId}`
-    );
-    // A completed session under this key is a trial that was already taken,
-    // reachable when its subscription webhook has not landed yet. Handing back
-    // a fresh checkout here would be the second trial, not a recovery.
-    if (session.status === "complete") {
-      // Spent, and the claim should say so rather than sitting session-less
-      // until it looks abandoned and frees a second trial.
-      await attachTrialSession(env, userId, session.id);
-      throw new ApiError(409, "This account already used its free trial.");
-    }
-    // Otherwise the key can be replaying an expired session from an earlier,
-    // since-released claim. Returning its URL sends somebody to a dead
-    // checkout, so mint a fresh one under this claim's own key.
-    if (session.status && session.status !== "open") {
-      const fresh = await createCheckoutSession(
-        env,
-        params,
-        fetch,
-        signal,
-        `av-trial-checkout-claim-${claimToken}`
-      );
-      // The keyed create no longer demands a url, because a replay legitimately
-      // has none. This one is not a replay, so it must.
-      if (!fresh.url)
-        throw new ApiError(502, "Stripe Checkout Session creation failed.");
-      return fresh;
-    }
-    return session;
-  } catch (error) {
-    const message = error?.message ?? "";
-    const spent =
-      /in-progress request using this Idempotent Key/i.test(message) ||
-      /can only be used with the same parameters/i.test(message);
-    if (!spent) throw error;
-    // The key being refused IS the answer: this account already has a trial
-    // checkout, in flight or created under different parameters. Find it rather
-    // than making a second one.
-    // Recovery returns the session, and attachTrialSession downstream records
-    // it against this claim, so nothing is left dangling on the happy path.
-    const existing = await findOutstandingTrialSession(env, customerId);
-    if (existing) return existing;
-    // Nothing to recover and nothing created here, so this claim bought
-    // nothing. Holding it would lock an eligible account out for two minutes
-    // over a key collision it had no part in.
-    await releaseTrialClaim(env, userId, { claim_token: claimToken });
-    throw new ApiError(
-      409,
-      "A trial checkout is already open for this account. Try again in a moment."
-    );
-  }
-}
-
 export async function onRequestPost({ request, env }) {
   return handleApi(async () => {
     const user = await requireUser(request, env);
@@ -264,18 +198,27 @@ export async function onRequestPost({ request, env }) {
       claimToken
     });
     // Bounded only on the trial path, because only that path holds a claim
-    // whose window has to outlast this call.
+    // whose window has to outlast this call. Aborting loses a session Stripe
+    // may already have created; the claim token stamped into that session's
+    // metadata is what finds it again on the retry.
     //
-    // Keyed on the ACCOUNT, not the claim. A per-claim key protects a retry
-    // that still holds the same claim, and the dangerous path is the one that
-    // released it and took a new one: an aborted POST Stripe is still
-    // processing, whose session has not become listable yet, so the token
-    // recovery above finds nothing. An account-scoped key makes the second
-    // POST the same operation as the first, which is the only thing that
-    // survives that window.
-    const session = allowTrial
-      ? await createTrialCheckout(env, params, user.id, claimToken, customerId)
-      : await createCheckoutSession(env, params);
+    // This create carries no idempotency key, and cannot. A key scoped to the
+    // account would make an aborted POST and its retry one Stripe operation,
+    // which is the only thing that covers Stripe finishing server-side after
+    // IN_FLIGHT_MS. But the body under any such key is not stable: it carries
+    // the request origin, the source, and metadata[claim_token], and the token
+    // changes with every claim by design. Stripe refuses a key reused with
+    // changed parameters, so the account-scoped version locked an eligible
+    // account out for up to 24 hours whenever it retried from a different CTA
+    // or origin. That window is reachable; the one the key covered needs
+    // Stripe's server-side work to outlive our 30s abort by another 90s, and
+    // the orphan lookup above already recovers most of it.
+    const session = await createCheckoutSession(
+      env,
+      params,
+      fetch,
+      allowTrial ? AbortSignal.timeout(CHECKOUT_CREATE_TIMEOUT_MS) : null
+    );
     // Which session the claim was spent on, so a later request can tell a claim
     // waiting on a live checkout from one whose checkout is gone.
     if (allowTrial) await attachTrialSession(env, user.id, session.id);
