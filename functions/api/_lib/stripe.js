@@ -37,6 +37,17 @@ export function hostedTrialDays(env) {
   return Math.min(raw, 730);
 }
 
+/**
+ * @param {{
+ *   request: Request,
+ *   env: Record<string, unknown>,
+ *   user: { id: string, email?: string | null },
+ *   source?: string,
+ *   customerId?: string | null,
+ *   allowTrial?: boolean,
+ *   claimToken?: string | null,
+ * }} options
+ */
 export function buildHostedVaultCheckoutParams({
   request,
   env,
@@ -139,14 +150,12 @@ export const CHECKOUT_CREATE_TIMEOUT_MS = 30_000;
  * @param {URLSearchParams} params
  * @param {typeof fetch} [fetcher]
  * @param {AbortSignal | null} [signal]
- * @param {string | null} [idempotencyKey]
  */
 export async function createCheckoutSession(
   env,
   params,
   fetcher = fetch,
   signal = null,
-  idempotencyKey = null,
 ) {
   if (!env.STRIPE_SECRET_KEY)
     throw new ApiError(503, "STRIPE_SECRET_KEY is not configured.");
@@ -158,24 +167,17 @@ export async function createCheckoutSession(
         authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
         "content-type": "application/x-www-form-urlencoded",
         "stripe-version": STRIPE_API_VERSION,
-        ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}),
       },
       body: params,
       ...(signal ? { signal } : {}),
     },
   );
   const payload = await response.json();
-  if (!response.ok)
+  if (!response.ok || !payload.url)
     throw new ApiError(
       502,
       payload.error?.message || "Stripe Checkout Session creation failed.",
     );
-  // A fresh session always carries a url. A replay under an idempotency key
-  // does not: Stripe nulls url once a session is complete or expired, so
-  // demanding one here would turn every replay into a 502 and hide the status
-  // the caller has to act on.
-  if (!payload.url && !idempotencyKey)
-    throw new ApiError(502, "Stripe Checkout Session creation failed.");
   return payload;
 }
 
