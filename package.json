@@ -29,7 +29,7 @@
     "vitest": "^4.1.11",
     "vue": "^3.5.44",
     "vue-tsc": "^3.3.13",
-    "wrangler": "^4.150.0"
+    "wrangler": "^4.151.2"
   },
   "dependencies": {
     "@clerk/backend": "^3.25.0",
