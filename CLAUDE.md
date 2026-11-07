@@ -38,7 +38,7 @@ npm run ci                              # full local check (typecheck + test + f
 npx wrangler pages deploy .vitepress/dist --project-name autovault-website
 ```
 
-`npm run ci` is the gate before opening a PR.
+For PR creation, hosted review, CI, and merge readiness, use the installed `babysit` skill (`~/.autovault/skills/babysit/SKILL.md`) as the canonical procedure.
 
 ## Local hosted-vault flow (two terminals)
 
@@ -152,11 +152,10 @@ GET/approve/reject not yet implemented).
 5. **VitePress page files must be at repo root** OR explicitly registered
    in nav. New non-page Markdown (planning docs, agent briefs) goes under
    `.claude/` so it isn't crawled — VitePress skips dot-directories.
-6. **PR gates**: `npm run ci` locally, then GitHub CI runs build-test,
-   CodeQL, dependency audit, and deploys a preview. Required: build-test
-   green + preview deployed.
-7. **Don't merge PRs with `Lint PR Title` failures.** Title must follow
-   conventional commits (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`).
+6. **Preview verification**: verify UI changes against the Cloudflare Pages
+   PR preview; preview URLs appear in the PR checks.
+7. **PR titles** follow conventional commits (`feat:`, `fix:`, `docs:`,
+   `chore:`, `refactor:`).
 8. **No console.* in `functions/api/*.js`** — they emit to Cloudflare logs
    indiscriminately. Use `ApiError` + structured responses.
 9. **Never commit secrets to git.** Keys live in Cloudflare Pages env vars
