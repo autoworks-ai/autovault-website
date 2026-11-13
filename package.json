@@ -24,7 +24,7 @@
   "devDependencies": {
     "@types/node": "^26.6.6",
     "@vitejs/plugin-vue": "^6.0.10",
-    "concurrently": "^10.0.6",
+    "concurrently": "^10.0.7",
     "vitepress": "^1.6.4",
     "vitest": "^4.1.11",
     "vue": "^3.5.44",
